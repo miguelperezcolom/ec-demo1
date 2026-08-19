@@ -108,7 +108,10 @@ grafana:
     - name: Tempo
       uid: tempo
       type: tempo
-      url: http://tempo.observability.svc.cluster.local:3100
+      # 3200, not 3100. Tempo's HTTP query API is on tempo-prom-metrics/3200; 3100 is Loki's port,
+      # and a Tempo datasource pointed there answers 502 to every search — silently, because
+      # Grafana only surfaces it when somebody opens the Explore tab and looks for a trace.
+      url: http://tempo.observability.svc.cluster.local:3200
       access: proxy
       jsonData:
         tracesToLogsV2:

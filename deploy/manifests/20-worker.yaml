@@ -24,10 +24,12 @@ spec:
   template:
     metadata:
       labels: { app: worker }
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: /actuator/prometheus
-        prometheus.io/port: "8091"
+      # No prometheus.io/scrape here, unlike the shell and the gateway. The published
+      # worker-standalone-app image carries actuator but not micrometer-registry-prometheus, so
+      # /actuator/prometheus answers 404 — the endpoint does not exist without a registry on the
+      # classpath. Annotating it anyway just produces a target that is permanently down, which is
+      # worse than no target at all. Add the registry to the worker app upstream (the orchestrator
+      # and forms images already have it) and this becomes three lines.
     spec:
       nodeSelector: { kubernetes.io/arch: amd64 }
       securityContext:

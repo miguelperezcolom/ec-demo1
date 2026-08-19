@@ -69,6 +69,14 @@ orchestrator:
     WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/workflows"
     # One process is one trace: the outbox row carries the producing trace's traceparent and the
     # relay continues it, so a whole process is a single Tempo trace rather than one per hop.
+    #
+    # Inert on the 2.2.0 images, and kept anyway. They carry the OpenTelemetry libraries but not
+    # the Spring Boot autoconfiguration that creates a Tracer and reads these properties: Boot 4
+    # moved it into spring-boot-tracing / spring-boot-opentelemetry, neither of which is on the
+    # classpath, so `management.otlp.tracing.endpoint` and `management.tracing.sampling.probability`
+    # do not exist as properties at all. WorkflowTracingAutoConfiguration finds no tracer and runs
+    # untraced. Tempo is deployed and its datasource is correct, so this starts working the day the
+    # engine images pick the dependency back up — with no change here.
     OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
     TRACING_SAMPLING: "1.0"
     # JGit writes a user config as it clones, and these pods run with a read-only root

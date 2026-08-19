@@ -69,7 +69,8 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
    ```
 4. **Watch it run.** It validates, then reserves stock and charges the card at the same time,
    then stops at *Review shipping* — a human task. The step stays `PENDING` and the forms engine
-   creates a form execution for it; nothing advances until a person answers.
+   creates a form execution for it; nothing advances until a person answers. That step is the one
+   that names `topic: forms`; drop that line and the worker would answer it too.
 5. **Answer it** from **Forms → My tasks**. Tick *Approve shipping*, pick a carrier, submit. The
    field values become process variables, and `approved == 'true'` is what routes the flow to
    *Ship order* rather than *Cancel order*.
@@ -83,19 +84,32 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
    The saga rolls back: *Release stock* and *Refund card* run in reverse order, and nothing had
    to be coded to make that happen — `compensable` and `compensationStepId` on the two steps is
    the whole of it.
-7. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
+7. **Run one with no human in it.** `payment-review` leaves its `USER_TASK` on the default topic,
+   so the worker plays the reviewer:
+
+   ```json
+   {"tasks": {"verify-payment": {"variables": [{"name": "paymentReceived", "value": "true"}]}}}
+   ```
+
+   The variable it hands back is what the guards read, so the process routes to *Confirm booking*
+   and the `JOIN·XOR` cancels the other branch. Swap the value for `"false"`, or use
+   `{"outcome": "NO_REPLY"}` to let the 30-second deadline fire instead.
+8. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
-   (Prometheus) and the traces — one process is **one trace**, not one per hop, because the
-   outbox row carries the producing trace's `traceparent`.
+   (Prometheus). Traces are wired but not yet arriving — see below.
 
 ## Notes worth knowing
 
-- **Workers and people are separated by topic, not by consumer group.** Every `ACTION` names
-  `work`, which the test worker listens on; `USER_TASK` steps name no topic, so they go to
-  `downstream`, which the forms engine consumes to create the form execution. Put the worker on
-  `downstream` too and it answers the human tasks itself — they are in different consumer groups,
-  so both receive every message. One shared group is worse: they compete, and each human task
-  lands on whichever won the partition.
+- **A human task is opt-in.** The worker listens on `downstream`, the default destination for a
+  step that names no topic — so it answers the whole workflow, human tasks included, which is what
+  a definition under test wants. The forms engine listens on `forms` instead, and a `USER_TASK`
+  reaches it only by naming `topic: forms`. `order-fulfilment`'s *Review shipping* does;
+  `payment-review`'s *Verify payment* deliberately does not, which is how its 30-second deadline
+  stays testable — `NO_REPLY` is a reviewer who never answered, on demand.
+
+  The two cannot share `downstream`, and no consumer group fixes it: in different groups both
+  receive every message and the worker answers the human task itself; in one group they compete
+  for it.
 - **The shell's Keycloak URL is compiled in.** Mateu writes `@KeycloakSecured` into the generated
   bootstrap page, so it cannot be an environment variable yet. Changing the hostname means
   rebuilding the shell image.
@@ -110,5 +124,17 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
   the outbox rather than through a leader.
 - **The rule engine is deployed at zero replicas.** None of these three workflows has a `RULE`
   step. Its Deployment and Service exist, so turning it on is a one-line change.
+- **Traces do not flow yet, and it is not this deployment's fault.** Tempo is deployed, its OTLP
+  endpoint accepts spans, and Grafana's datasource points at it correctly. The engine cannot
+  produce any: the published `2.2.0` images carry the OpenTelemetry libraries but not the Spring
+  Boot autoconfiguration that creates a `Tracer` and reads `management.otlp.tracing.endpoint` —
+  Boot 4 moved it into `spring-boot-tracing` / `spring-boot-opentelemetry`, which are not on the
+  classpath, so neither that property nor `management.tracing.sampling.probability` exists at all
+  and both env vars are inert. `WorkflowTracingAutoConfiguration` then finds no tracer and runs
+  every call untraced. Fixing it upstream is a dependency, not a config change; everything on this
+  side is already in place for when it lands.
+- **The worker exposes no metrics.** Same shape of gap: its image has actuator but no
+  `micrometer-registry-prometheus`, so `/actuator/prometheus` is a 404. It is deliberately not
+  annotated for scraping, rather than left as a target that is permanently down.
 - **Keycloak runs `start-dev`** behind the ingress, which is the right shape for a demo and not
   for production. It does keep its data in PostgreSQL, so accounts survive a restart.
