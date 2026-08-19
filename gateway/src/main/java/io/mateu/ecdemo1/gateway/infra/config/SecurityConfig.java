@@ -32,8 +32,11 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
  *
  * <p>Public on purpose: the shell itself and everything it serves, because the bootstrap page is
  * what redirects an anonymous visitor to Keycloak — requiring a token to fetch it would mean nobody
- * could ever obtain one; and {@code /eventconductor/**}, the workflow-graph web component, which the
- * browser loads as a script tag and script tags send no headers.
+ * could ever obtain one; {@code /eventconductor/**}, the workflow-graph web component, which the
+ * browser loads as a script tag and script tags send no headers; and the two git webhook receivers,
+ * which GitHub calls with no token at all and which the engine authenticates by HMAC over the body.
+ * That last one only holds while a webhook secret is configured — a blank secret makes the engine
+ * verify nothing, and then these are two open endpoints that re-clone a repository on demand.
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -50,6 +53,11 @@ public class SecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers("/actuator/health/**").permitAll()
                         .pathMatchers("/eventconductor/**").permitAll()
+                        // Git webhooks, listed explicitly rather than left to the catch-all
+                        // below, because "public" is a decision here and not an oversight:
+                        // GitHub cannot hold a Keycloak token, so these authenticate by
+                        // HMAC-SHA256 over the body, verified by the engine itself.
+                        .pathMatchers("/workflow/webhooks/**", "/forms/webhooks/**").permitAll()
                         .pathMatchers("/_workflow/**", "/_forms/**", "/_worker/**").authenticated()
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))

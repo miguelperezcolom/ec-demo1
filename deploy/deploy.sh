@@ -64,6 +64,7 @@ if [ ! -f "$SECRETS" ]; then
     echo "KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
     echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
     echo "KAFKA_CONSOLE_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+    echo "GIT_WEBHOOK_SECRET=$(openssl rand -hex 24)"
   } > "$SECRETS"
   chmod 600 "$SECRETS"
   echo "generated $SECRETS"
@@ -90,6 +91,12 @@ kubectl create configmap keycloak-realm -n "$NS" \
 # no apache2-utils on whoever runs this.
 kubectl create secret generic kafka-console-auth -n "$NS" \
   --from-literal=auth="admin:$(openssl passwd -apr1 "$KAFKA_CONSOLE_PASSWORD")" \
+  --dry-run=client -o yaml | kubectl apply -f -
+# Shared by the orchestrator and the forms engine: each reads its own key and ignores the other.
+# Both apps verify inbound webhooks against it, and a blank value would make them verify nothing.
+kubectl create secret generic ec-git-webhook -n "$NS" \
+  --from-literal=WORKFLOW_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
+  --from-literal=FORMS_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "══ 3/6  EventConductor engine (PostgreSQL, Redpanda, orchestrator, forms) ══"
@@ -135,4 +142,11 @@ Done.
 
 Passwords are in $SECRETS.
 Certificates take a minute: kubectl get certificate -A
+
+To make a push to master reload the definitions, add two webhooks to the definitions
+repository (Settings -> Webhooks), both with content type application/json, the "Just the
+push event" trigger, and \$GIT_WEBHOOK_SECRET as the secret:
+
+  https://ec1.mateu.io/workflow/webhooks/github
+  https://ec1.mateu.io/forms/webhooks/github
 EOF

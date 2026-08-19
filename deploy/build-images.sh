@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REGISTRY="${REGISTRY:-miguelperezcolom}"
-TAG="${1:-0.1.1}"
+TAG="${1:-0.1.2}"
 
 for app in shell gateway; do
   echo "── building $app ──"

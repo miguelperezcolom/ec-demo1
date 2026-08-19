@@ -139,6 +139,16 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
   and both env vars are inert. `WorkflowTracingAutoConfiguration` then finds no tracer and runs
   every call untraced. Fixing it upstream is a dependency, not a config change; everything on this
   side is already in place for when it lands.
+- **Git webhooks are wired but return 500, and it is not this deployment's fault.** A push to
+  master should reload the definitions instead of waiting for the next restart, and everything on
+  this side is in place: the secret exists, the gateway routes `/workflow/webhooks/**` and
+  `/forms/webhooks/**` publicly, and the engines are configured to verify the HMAC. The engine
+  cannot serve them: all three webhook controllers declare `@PathVariable String provider` with no
+  explicit name, and the published jars carry no `MethodParameters` attribute at all — the build
+  configures `maven-compiler-plugin` itself, without a Spring Boot parent to add `-parameters`, so
+  Spring cannot resolve the argument and every call dies with `IllegalArgumentException` before the
+  signature is even checked. One line in the engine's root pom fixes it for all three:
+  `<parameters>true</parameters>`. Until then, definitions reload on pod restart.
 - **The worker exposes no metrics.** Same shape of gap: its image has actuator but no
   `micrometer-registry-prometheus`, so `/actuator/prometheus` is a 404. It is deliberately not
   annotated for scraping, rather than left as a target that is permanently down.

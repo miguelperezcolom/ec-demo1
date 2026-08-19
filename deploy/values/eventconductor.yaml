@@ -67,6 +67,8 @@ orchestrator:
     WORKFLOW_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-demo1.git"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/workflows"
+    # WORKFLOW_GITIMPORT_WEBHOOKSECRET is NOT here — it comes from the Secret below, because
+    # extraEnv renders literals into the manifest and this one must not be in version control.
     # One process is one trace: the outbox row carries the producing trace's traceparent and the
     # relay continues it, so a whole process is a single Tempo trace rather than one per hop.
     #
@@ -84,6 +86,13 @@ orchestrator:
     # about a lock file it could not create on every single run. The clone succeeds either way;
     # the errors are pure noise, and noise in an error log is what stops people reading it.
     XDG_CONFIG_HOME: "/tmp"
+  # Carries WORKFLOW_GITIMPORT_WEBHOOKSECRET, so a push to master re-imports the definitions
+  # instead of waiting for the next restart. Created at deploy time by deploy/deploy.sh.
+  #
+  # Not optional in practice: a blank secret makes the engine skip signature verification, and
+  # POST /workflow/webhooks/github is then an unauthenticated endpoint that clones a repository
+  # on demand, as often as anyone asks.
+  extraEnvFromSecret: ec-git-webhook
   resources:
     requests: { memory: "640Mi", cpu: "250m" }
     limits:   { memory: "1Gi",   cpu: "1" }
@@ -127,6 +136,9 @@ forms:
     # USER_TASK reaches it only by naming `topic: forms`, and one that names nothing is resolved
     # by the worker like any other step, which is what a workflow under test wants.
     SPRING_CLOUD_STREAM_BINDINGS_CONSUMEWORKEREVENTFORFORMSENGINE_IN_0_DESTINATION: "forms"
+  # Carries FORMS_GITIMPORT_WEBHOOKSECRET. One Secret holds both keys; each app reads the one it
+  # knows and ignores the other.
+  extraEnvFromSecret: ec-git-webhook
   resources:
     requests: { memory: "512Mi", cpu: "250m" }
     limits:   { memory: "1Gi",   cpu: "1" }

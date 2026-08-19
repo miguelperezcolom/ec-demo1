@@ -15,6 +15,24 @@ spring:
           predicates:
             - Path=/eventconductor/**
 
+        # Git webhooks. These are NOT under /_workflow and /_forms — those prefixes are the
+        # Mateu UI namespaces, while the webhook receivers are plain REST controllers at
+        # /workflow/webhooks/{provider} and /forms/webhooks/{provider}. Without a route of
+        # their own they fall through to the shell's catch-all, and GitHub gets a login page.
+        #
+        # Public, necessarily: GitHub cannot hold a Keycloak token. They authenticate by
+        # HMAC-SHA256 over the body instead — which is only true while the engine has a
+        # webhook secret configured. Blank means it verifies nothing.
+        - id: workflow-webhooks
+          uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
+          predicates:
+            - Path=/workflow/webhooks/**
+
+        - id: forms-webhooks
+          uri: ${FORMS_URL:http://forms:8106}
+          predicates:
+            - Path=/forms/webhooks/**
+
         - id: orchestrator
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:

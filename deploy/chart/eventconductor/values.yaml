@@ -95,6 +95,11 @@ orchestrator:
   # Extra environment variables injected verbatim (e.g. git-import config via Spring
   # relaxed binding: WORKFLOW_GITIMPORT_REPOSITORIES_0_URL / _0_BRANCH).
   extraEnv: {}
+  # Name of an existing Secret whose keys are injected as environment variables. For the
+  # values that must not be in version control — a git webhook secret, a token for a
+  # private definitions repo — which extraEnv above cannot carry, since it renders
+  # literals straight into the manifest.
+  extraEnvFromSecret: ""
   security:
     enabled: true
     user: admin
@@ -130,6 +135,11 @@ forms:
   # Extra environment variables injected verbatim (e.g. git-import config via Spring
   # relaxed binding: FORMS_GITIMPORT_REPOSITORIES_0_URL / _0_BRANCH / _0_DIRECTORY).
   extraEnv: {}
+  # Name of an existing Secret whose keys are injected as environment variables. For the
+  # values that must not be in version control — a git webhook secret, a token for a
+  # private definitions repo — which extraEnv above cannot carry, since it renders
+  # literals straight into the manifest.
+  extraEnvFromSecret: ""
   security:
     enabled: true
     user: admin
@@ -165,6 +175,11 @@ rules:
   # Extra environment variables injected verbatim (e.g. git-import config via Spring
   # relaxed binding: RULES_GITIMPORT_REPOSITORIES_0_URL / _0_BRANCH / _0_DIRECTORY).
   extraEnv: {}
+  # Name of an existing Secret whose keys are injected as environment variables. For the
+  # values that must not be in version control — a git webhook secret, a token for a
+  # private definitions repo — which extraEnv above cannot carry, since it renders
+  # literals straight into the manifest.
+  extraEnvFromSecret: ""
   security:
     enabled: true
     user: admin

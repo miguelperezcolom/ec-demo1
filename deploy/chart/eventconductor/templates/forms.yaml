@@ -89,6 +89,11 @@ spec:
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
+          {{- if .Values.forms.extraEnvFromSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.forms.extraEnvFromSecret }}
+          {{- end }}
           resources:
             {{- toYaml .Values.forms.resources | nindent 12 }}
           securityContext:

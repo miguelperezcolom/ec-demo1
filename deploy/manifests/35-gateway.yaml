@@ -31,7 +31,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: gateway
-          image: miguelperezcolom/ec-demo1-gateway:0.1.1
+          image: miguelperezcolom/ec-demo1-gateway:0.1.2
           env:
             - name: SERVER_PORT
               value: "8190"

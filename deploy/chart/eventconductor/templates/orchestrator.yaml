@@ -99,6 +99,11 @@ spec:
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
+          {{- if .Values.orchestrator.extraEnvFromSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.orchestrator.extraEnvFromSecret }}
+          {{- end }}
           resources:
             {{- toYaml .Values.orchestrator.resources | nindent 12 }}
           securityContext:
