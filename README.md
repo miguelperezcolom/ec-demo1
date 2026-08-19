@@ -104,6 +104,28 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
    (Prometheus). Traces are wired but not yet arriving — see below.
 
+## Giving it work
+
+```sh
+./deploy/loadgen.sh 1500 25 notify-parallel     # count, arrivals per second, definition
+./deploy/loadgen.sh 500 10 payment-review       # a human task the worker answers
+TEST_CONFIG='{"tasks":{"charge-card":{"outcome":"ERROR"}}}' ./deploy/loadgen.sh 200 5 order-fulfilment
+```
+
+A Job that produces `ProcessCreationRequested` events onto the same `upstream` topic everything
+else uses, so it drives this deployment rather than a rig of its own. No image to build — the
+Redpanda image already on the node ships `rpk`.
+
+Measured here on one orchestrator pod at a 250m CPU request: 300 instances of `notify-parallel`
+arriving at 25/s all completed, 2100 step executions, **no retries and nothing stalled**. It did
+queue — 222 processes in flight at the peak, and mean step duration stretched to ~10s while that
+backlog drained. The relay never became the bottleneck: `eventconductor_outbox_pending` peaked at
+4.
+
+`notify-parallel` is the useful default for volume: three parallel `ACTION`s and a barrier, no
+human in it. `order-fulfilment` stops at its `USER_TASK`, so loading it builds a backlog of
+waiting tasks instead — a different thing to watch, and also worth watching.
+
 ## Notes worth knowing
 
 - **A human task is opt-in.** The worker listens on `downstream`, the default destination for a
