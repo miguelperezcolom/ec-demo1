@@ -57,8 +57,14 @@ orchestrator:
   consumerConcurrency: 3
   dbPoolSize: 16
   # A step whose dispatch or reply is lost is never looked at again unless it has a deadline.
-  # Two minutes is well above anything the test worker is asked to simulate here.
-  defaultStepTimeoutMs: 120000
+  #
+  # Fifteen minutes, not two. Two was chosen against what the worker simulates — 200ms — and that
+  # is the wrong thing to size it against: the deadline starts when the step starts, and under a
+  # burst a step spends almost all of that time queued, not working. A 5000-process run put 13537
+  # steps into TIMEOUT with a minimum duration of exactly 120s, and since the ACTIONs declare no
+  # retries, every one of them took its process to ERROR. The timeout has to sit above the worst
+  # queueing delay you are willing to absorb, not above the work itself.
+  defaultStepTimeoutMs: 900000
   # Off: the shell is what authenticates. See the security note in deploy/README.md.
   security:
     enabled: false

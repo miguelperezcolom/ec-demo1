@@ -69,6 +69,16 @@ spec:
             # eventconductor.yaml), and a USER_TASK reaches it only by naming `topic: forms`.
             - name: SPRING_CLOUD_STREAM_BINDINGS_CONSUMEWORKEREVENT_IN_0_DESTINATION
               value: "downstream"
+            # jpa, and not by preference: `memory` does not start on 2.2.1. The profile excludes
+            # DataSourceAutoConfiguration, but ReceivedTaskEntityRepository and
+            # TaskOverrideEntityRepository are plain JpaRepository interfaces with no condition on
+            # them, so Spring Data scans them anyway, finds no entityManagerFactory and the context
+            # fails to refresh. No amount of spring.autoconfigure.exclude fixes that from outside —
+            # the repositories themselves have to become conditional.
+            #
+            # The cost is that the handler's blocking store calls run on Reactor threads under load,
+            # which is the trade its own javadoc calls acceptable "because the work it is
+            # interleaved with is a delay". With JPA it is interleaved with a database write.
             - name: WORKER_PERSISTENCE
               value: jpa
             # The worker owns its two tables outright and ships no migrations, so it creates

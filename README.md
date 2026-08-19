@@ -116,11 +116,19 @@ A Job that produces `ProcessCreationRequested` events onto the same `upstream` t
 else uses, so it drives this deployment rather than a rig of its own. No image to build — the
 Redpanda image already on the node ships `rpk`.
 
-Measured here on one orchestrator pod at a 250m CPU request: 300 instances of `notify-parallel`
-arriving at 25/s all completed, 2100 step executions, **no retries and nothing stalled**. It did
-queue — 222 processes in flight at the peak, and mean step duration stretched to ~10s while that
-backlog drained. The relay never became the bottleneck: `eventconductor_outbox_pending` peaked at
-4.
+Measured here on one orchestrator pod and one worker, both at a 250m CPU request: **5000 instances
+of `notify-parallel` at 50/s all completed, 35000 step executions, zero errors**, in 32 minutes —
+**18 step executions/s**, 7.7 worker tasks/s end to end.
+
+Two things that run took to learn. The first attempt failed almost entirely — 4722 of 5000 in
+ERROR — because `defaultStepTimeoutMs` was set to two minutes, sized against what the worker
+simulates (200ms) rather than against how long a step waits in a burst. A deadline starts when the
+step starts, and under load a step is queued for nearly all of it. Fifteen minutes is what makes
+the same load succeed, unchanged in every other respect.
+
+The second is that throughput sampled mid-burst reads less than half the steady-state figure, since
+the orchestrator is splitting its attention between accepting new processes and stepping the ones
+it has. Measure end to end, not while the producer is still running.
 
 `notify-parallel` is the useful default for volume: three parallel `ACTION`s and a barrier, no
 human in it. `order-fulfilment` stops at its `USER_TASK`, so loading it builds a backlog of
