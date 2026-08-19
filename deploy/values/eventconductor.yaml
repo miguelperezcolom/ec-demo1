@@ -111,6 +111,14 @@ forms:
     # about a lock file it could not create on every single run. The clone succeeds either way;
     # the errors are pure noise, and noise in an error log is what stops people reading it.
     XDG_CONFIG_HOME: "/tmp"
+    # A topic of its own, instead of the default `downstream` it shares with every worker.
+    #
+    # On `downstream` the forms engine and the test worker both receive every task — they are in
+    # different consumer groups — so the worker answered the human tasks itself and no form
+    # execution was ever waited on. Moving the forms engine here makes a human task opt-in: a
+    # USER_TASK reaches it only by naming `topic: forms`, and one that names nothing is resolved
+    # by the worker like any other step, which is what a workflow under test wants.
+    SPRING_CLOUD_STREAM_BINDINGS_CONSUMEWORKEREVENTFORFORMSENGINE_IN_0_DESTINATION: "forms"
   resources:
     requests: { memory: "512Mi", cpu: "250m" }
     limits:   { memory: "1Gi",   cpu: "1" }

@@ -12,6 +12,11 @@ steps:
     type: START
     name: Start
 
+  # Deliberately NOT routed to the forms engine: with no topic this goes to `downstream`, and the
+  # test worker answers it from TEST_CONFIG like any other task. That is what makes the 30-second
+  # deadline testable — `{"tasks":{"verify-payment":{"outcome":"NO_REPLY"}}}` is a person who never
+  # answered, on demand, which is a state no real reviewer can be asked to produce.
+  # Add `topic: forms` to make it a real human task instead.
   - id: verify-payment
     type: USER_TASK
     name: Verify payment received
@@ -23,7 +28,6 @@ steps:
   - id: confirm-booking
     type: ACTION
     name: Confirm booking
-    topic: work
     preconditions:
       - stepId: verify-payment
         expression: "paymentReceived == 'true'"
@@ -32,7 +36,6 @@ steps:
   - id: cancel-booking
     type: ACTION
     name: Cancel booking
-    topic: work
     preconditions:
       - stepId: verify-payment
         expression: "paymentReceived == 'false'"

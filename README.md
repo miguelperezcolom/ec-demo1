@@ -68,7 +68,8 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
    {"default": {"durationMs": 400, "outcome": "COMPLETED"}}
    ```
 4. **Watch it run.** It validates, then reserves stock and charges the card at the same time,
-   then stops at *Review shipping* — a human task.
+   then stops at *Review shipping* — a human task. The step stays `PENDING` and the forms engine
+   creates a form execution for it; nothing advances until a person answers.
 5. **Answer it** from **Forms → My tasks**. Tick *Approve shipping*, pick a carrier, submit. The
    field values become process variables, and `approved == 'true'` is what routes the flow to
    *Ship order* rather than *Cancel order*.
@@ -89,6 +90,12 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 
 ## Notes worth knowing
 
+- **Workers and people are separated by topic, not by consumer group.** Every `ACTION` names
+  `work`, which the test worker listens on; `USER_TASK` steps name no topic, so they go to
+  `downstream`, which the forms engine consumes to create the form execution. Put the worker on
+  `downstream` too and it answers the human tasks itself — they are in different consumer groups,
+  so both receive every message. One shared group is worse: they compete, and each human task
+  lands on whichever won the partition.
 - **The shell's Keycloak URL is compiled in.** Mateu writes `@KeycloakSecured` into the generated
   bootstrap page, so it cannot be an environment variable yet. Changing the hostname means
   rebuilding the shell image.

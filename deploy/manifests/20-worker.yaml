@@ -56,24 +56,17 @@ spec:
               value: "8091"
             - name: KAFKA_BROKERS
               value: redpanda:19092
-            # One topic, `work`, and deliberately NOT `downstream`.
+            # One topic, and the default one: a step that names no topic goes to `downstream`,
+            # which is every ACTION here and every USER_TASK that has not opted out. So this worker
+            # answers the whole workflow by default, human tasks included — which is what you want
+            # for a definition under test.
             #
-            # The engine sends each task to the destination its step's `topic` names; a step that
-            # names none goes to `downstream`. USER_TASK steps name none, and the forms engine
-            # consumes `downstream` to turn them into form executions — so `downstream` is the
-            # human-task channel, and every ACTION here names `work` instead.
-            #
-            # Sharing one topic between the two is not fixable by consumer group, in either
-            # direction. Different groups — which is what they have — means both receive every
-            # message, and this worker then answers the human tasks itself: `review-shipping`
-            # completed on its own, from TEST_CONFIG, and nobody was ever asked anything. One
-            # shared group would be worse: they would compete, and each human task would land on
-            # whichever of them got the partition.
-            #
-            # So the split is by topic. ACTION steps name `work` and are answered by workers;
-            # USER_TASK steps name nothing and are answered by people.
+            # The forms engine used to share this topic, and that does not work: the two are in
+            # different consumer groups, so both received every message and the worker answered the
+            # human tasks itself. It now listens on `forms` instead (see deploy/values/
+            # eventconductor.yaml), and a USER_TASK reaches it only by naming `topic: forms`.
             - name: SPRING_CLOUD_STREAM_BINDINGS_CONSUMEWORKEREVENT_IN_0_DESTINATION
-              value: "work"
+              value: "downstream"
             - name: WORKER_PERSISTENCE
               value: jpa
             # The worker owns its two tables outright and ships no migrations, so it creates

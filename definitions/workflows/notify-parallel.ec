@@ -19,19 +19,16 @@ steps:
   - id: email
     type: ACTION
     name: Send email
-    topic: work
     preconditionStepId: fanout
 
   - id: sms
     type: ACTION
     name: Send SMS
-    topic: work
     preconditionStepId: fanout
 
   - id: push
     type: ACTION
     name: Send push notification
-    topic: work
     preconditionStepId: fanout
 
   - id: all-sent

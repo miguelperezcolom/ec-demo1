@@ -25,7 +25,6 @@ steps:
   - id: validate-order
     type: ACTION
     name: Validate order
-    topic: work
     preconditionStepId: start
     timeout: PT30S
     retries: 2
@@ -39,7 +38,6 @@ steps:
   - id: reserve-stock
     type: ACTION
     name: Reserve stock
-    topic: work
     preconditionStepId: fanout
     timeout: PT1M
     retries: 1
@@ -49,7 +47,6 @@ steps:
   - id: charge-card
     type: ACTION
     name: Charge card
-    topic: work
     preconditionStepId: fanout
     timeout: PT30S
     retries: 1
@@ -63,12 +60,20 @@ steps:
     joinType: AND
     preconditionStepIds: [reserve-stock, charge-card]
 
-  # The human decision. Ten minutes to answer; if nobody does, the order ships standard
-  # rather than sitting there — onTimeoutStepId routes that natively, with no timer branch.
+  # The human decision, and the one step in this repository that really waits for a person.
+  #
+  # `topic: forms` is what makes that true. A USER_TASK that names no topic goes to `downstream`
+  # like every ACTION, where the test worker answers it from TEST_CONFIG — which is what you want
+  # for a workflow under test, and not what you want here. Naming the forms engine's topic routes
+  # it there instead, so the step stays PENDING and a form execution appears in My tasks.
+  #
+  # Ten minutes to answer; if nobody does, the order ships standard rather than sitting there —
+  # onTimeoutStepId routes that natively, with no timer branch.
   - id: review-shipping
     type: USER_TASK
     name: Review shipping
     formId: shipping-review
+    topic: forms
     preconditionStepId: reserved-and-charged
     timeout: PT10M
     onTimeoutStepId: ship-order
@@ -78,7 +83,6 @@ steps:
   - id: ship-order
     type: ACTION
     name: Ship order
-    topic: work
     preconditions:
       - stepId: review-shipping
         expression: "approved == 'true'"
@@ -86,7 +90,6 @@ steps:
   - id: cancel-order
     type: ACTION
     name: Cancel order
-    topic: work
     preconditions:
       - stepId: review-shipping
         expression: "approved == 'false'"
@@ -101,7 +104,6 @@ steps:
   - id: notify-customer
     type: ACTION
     name: Notify customer
-    topic: work
     preconditionStepId: outcome
 
   - id: end
@@ -116,13 +118,11 @@ steps:
   - id: release-stock
     type: ACTION
     name: Release stock
-    topic: work
     preconditionStepId: start
     preconditionExpression: "false"
 
   - id: refund-card
     type: ACTION
     name: Refund card
-    topic: work
     preconditionStepId: start
     preconditionExpression: "false"
