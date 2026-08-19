@@ -34,7 +34,7 @@ changed by a pull request rather than by an API call.
 |---|---|
 | `definitions/workflows/*.ec` | Three workflow definitions, imported by the orchestrator from Git |
 | `definitions/forms/*.ecform` | The forms their `USER_TASK` steps reference, imported by the forms engine |
-| `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus |
+| `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus, carries the branding |
 | `gateway/` | Spring Cloud Gateway — routes the console and enforces the token |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
 | `deploy/manifests/` | Keycloak, worker, shell, gateway, Kafka console, ingress, certificate issuers |

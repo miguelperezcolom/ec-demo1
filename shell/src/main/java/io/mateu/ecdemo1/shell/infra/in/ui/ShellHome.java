@@ -1,7 +1,9 @@
 package io.mateu.ecdemo1.shell.infra.in.ui;
 
 import io.mateu.uidl.StyleConstants;
+import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
+import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTitle;
 import io.mateu.uidl.annotations.Style;
@@ -40,6 +42,11 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 @Title("EventConductor demo")
 @PageTitle("EventConductor demo")
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
+// Served by this app from src/main/resources/static, so it arrives through the gateway's
+// catch-all like the rest of the shell — no route of its own, and no token: the browser loads a
+// logo with an <img> tag, which sends no Authorization header.
+@Logo("/images/riu.svg")
+@FavIcon("/images/riu.svg")
 // Edge-to-edge: the pages behind these menus are listings and workflow graphs, and capping the
 // content at the default ~900px container squeezes them into cards for lack of horizontal room.
 @Style(StyleConstants.FULL_WIDTH)
