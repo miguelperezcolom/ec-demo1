@@ -48,10 +48,10 @@ changed by a pull request rather than by an API call.
 ./deploy/deploy.sh            # everything else, idempotent
 ```
 
-Between the two, the DNS records have to exist: `ec1`, `auth.ec1` and `grafana.ec1` under your
-domain, pointing at the address `deploy.sh` prints after installing the ingress controller. A
-wildcard `*.ec1` covers the last two and anything added later. Certificates are issued
-automatically once the names resolve.
+Between the two, the DNS records have to exist, pointing at the address `deploy.sh` prints after
+installing the ingress controller: `ec1` and `*.ec1` under your domain. Two records rather than
+four, because the wildcard covers `auth.ec1`, `grafana.ec1`, `kafka.ec1` and whatever gets added
+next. Certificates are issued automatically once the names resolve.
 
 Passwords are generated on the first run into `deploy/.secrets/credentials.env`, which is
 git-ignored. The demo user is `demo` / `demo`, from the realm file.
