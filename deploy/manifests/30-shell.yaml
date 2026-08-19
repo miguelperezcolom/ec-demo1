@@ -1,0 +1,76 @@
+# The shell — the only page a user loads, and the only thing that authenticates.
+#
+# It renders no business screens of its own: each menu is a RemoteMenu naming a path, the
+# ingress routes that path to the app that owns it, and the shell shows whatever menu that app
+# declares. Adding a service to the console is an ingress path plus one field in ShellHome.
+#
+# The Keycloak URL is compiled into this image (Mateu bakes @KeycloakSecured into the generated
+# bootstrap page), so changing the hostname means rebuilding it — see deploy/build-shell.sh.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell
+  namespace: ec-demo1
+  labels: { app: shell }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: shell }
+  template:
+    metadata:
+      labels: { app: shell }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8101"
+    spec:
+      nodeSelector: { kubernetes.io/arch: amd64 }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: shell
+          image: miguelperezcolom/ec-demo1-shell:0.1.0
+          env:
+            - name: SERVER_PORT
+              value: "8101"
+            # The issuer is the public URL, because that is what the `iss` claim says and Spring
+            # checks it. The keys come from the Service, so startup does not wait on the ingress.
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8101 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "512Mi", cpu: "200m" }
+            limits:   { memory: "1Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8101 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8101 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shell
+  namespace: ec-demo1
+  labels: { app: shell }
+spec:
+  selector: { app: shell }
+  ports:
+    - { name: http, port: 8101, targetPort: 8101 }

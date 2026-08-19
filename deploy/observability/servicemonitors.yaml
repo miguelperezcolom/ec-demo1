@@ -1,0 +1,19 @@
+# The engine's own Micrometer metrics. The orchestrator and the forms engine are deployed by
+# the Helm chart, which sets no pod annotations, so they are scraped by selector rather than by
+# the annotated-pods job that picks up the worker and the shell.
+#
+# `release: kps` is what the kube-prometheus-stack operator matches on; without it these are
+# ignored no matter how correct the selector is.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: eventconductor
+  namespace: observability
+  labels: { release: kps }
+spec:
+  namespaceSelector: { matchNames: [ec-demo1] }
+  selector:
+    matchExpressions:
+      - { key: app.kubernetes.io/component, operator: In, values: [orchestrator, forms, rules] }
+  endpoints:
+    - { targetPort: 8080, path: /actuator/prometheus, interval: 30s }

@@ -1,0 +1,60 @@
+# Two hosts: the console and Keycloak. Grafana's Ingress lives in the observability namespace
+# instead (an Ingress can only name Services in its own namespace) and is declared in
+# deploy/observability/kube-prometheus-stack.yaml.
+#
+# The console is one origin with one backend — the gateway — and the path routing happens there,
+# not here. That is deliberate: the gateway has to see every request to be able to require a
+# token on /_workflow, /_forms and /_worker, and splitting the paths at the ingress would let
+# anything it did not know about reach a backend directly.
+#
+# One origin also matters to the UI. The shell's menus are RemoteMenus naming paths, not URLs,
+# so the browser fetches /_workflow and /_forms from the host it loaded the page from — no CORS
+# and no second token audience.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: console
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    # Mateu drives parts of its UI over SSE and the engine streams process logs the same way.
+    # nginx's default 60s read timeout closes those mid-stream, and response buffering holds
+    # events back until the buffer fills — the UI then looks frozen rather than broken.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [ec1.mateu.io]
+      secretName: console-tls
+  rules:
+    - host: ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    # Keycloak's admin console posts sizeable forms and sets large headers.
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [auth.ec1.mateu.io]
+      secretName: keycloak-tls
+  rules:
+    - host: auth.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: keycloak, port: { number: 8080 } } }

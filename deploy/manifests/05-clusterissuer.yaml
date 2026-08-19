@@ -1,0 +1,36 @@
+# Let's Encrypt over HTTP-01, solved by the ingress-nginx controller. Every Ingress in this
+# deployment carries `cert-manager.io/cluster-issuer: letsencrypt`, so its certificate is issued
+# and renewed without anything else to run.
+#
+# The staging issuer is here because Let's Encrypt rate-limits the production one hard (5 identical
+# failures per hour). Point an Ingress at `letsencrypt-staging` while debugging a solver, then move
+# it back — the certificate it issues is untrusted by browsers, which is the point.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: miguelperezcolom@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: miguelperezcolom@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

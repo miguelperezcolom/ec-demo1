@@ -1,0 +1,82 @@
+# The gateway — one entry point for the console, and the only thing that checks a token before
+# the backends see a request.
+#
+# The ingress hands it every path on ec1.mateu.io. It routes /_workflow, /_forms and /_worker to
+# the three apps that own them and everything else to the shell, and it rejects unauthenticated
+# calls to those three prefixes — which is what the orchestrator, forms and worker cannot do for
+# themselves, since none of them speaks OIDC. See gateway/.../SecurityConfig.java for what stays
+# public and why.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: ec-demo1
+  labels: { app: gateway }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: gateway }
+  template:
+    metadata:
+      labels: { app: gateway }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8190"
+    spec:
+      nodeSelector: { kubernetes.io/arch: amd64 }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: gateway
+          image: miguelperezcolom/ec-demo1-gateway:0.1.0
+          env:
+            - name: SERVER_PORT
+              value: "8190"
+            - name: ORCHESTRATOR_URL
+              value: http://orchestrator:8105
+            - name: FORMS_URL
+              value: http://forms:8106
+            - name: WORKER_URL
+              value: http://worker:8091
+            - name: SHELL_URL
+              value: http://shell:8101
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+          ports:
+            - { name: http, containerPort: 8190 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "384Mi", cpu: "150m" }
+            limits:   { memory: "768Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8190 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8190 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: ec-demo1
+  labels: { app: gateway }
+spec:
+  selector: { app: gateway }
+  ports:
+    - { name: http, port: 8190, targetPort: 8190 }

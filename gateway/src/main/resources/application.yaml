@@ -1,0 +1,65 @@
+server:
+  port: 8190
+
+spring:
+  application:
+    name: ec-demo1-gateway
+
+  cloud:
+    gateway:
+      routes:
+        # The workflow-graph web component is served from an absolute path, so it needs a route
+        # of its own or the definition viewer renders an empty box. Public — see SecurityConfig.
+        - id: eventconductor-assets
+          uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
+          predicates:
+            - Path=/eventconductor/**
+
+        - id: orchestrator
+          uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
+          predicates:
+            - Path=/_workflow/**
+
+        - id: forms
+          uri: ${FORMS_URL:http://forms:8106}
+          predicates:
+            - Path=/_forms/**
+
+        - id: worker
+          uri: ${WORKER_URL:http://worker:8091}
+          predicates:
+            - Path=/_worker/**
+
+        # Catch-all, and therefore last: the shell's bootstrap page, its /mateu/** endpoint and
+        # its static assets.
+        - id: shell
+          uri: ${SHELL_URL:http://shell:8101}
+          predicates:
+            - Path=/**
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched over the cluster network, so the gateway does not depend on its own
+          # ingress, on public DNS or on a certificate having been issued yet.
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs}
+          # The issuer as it appears in the token — the public URL, because that is what Keycloak
+          # was told its hostname is. Setting both properties means Spring validates the issuer
+          # while still taking the keys from jwk-set-uri, and never performs OIDC discovery at
+          # startup — which would otherwise make this pod's readiness depend on Keycloak's.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.ec1.mateu.io/realms/ec-demo1}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: info

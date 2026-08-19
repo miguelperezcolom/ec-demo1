@@ -1,0 +1,109 @@
+# The test worker — a worker that does no work.
+#
+# Every ACTION step in every workflow here is answered by this one pod. It does not implement
+# the steps: the process states what its tasks should do in a TEST_CONFIG variable and the
+# worker plays that back, which is how the demo produces a timeout, an error or a saga rollback
+# on demand without anyone writing a worker per scenario.
+#
+#   {"default":{"durationMs":200,"outcome":"COMPLETED"},
+#    "tasks":{"charge-card":{"outcome":"ERROR","reason":"card declined"}}}
+#
+# It runs on `jpa` persistence, sharing the engine's database, so its two tables survive a
+# restart and its UI at /_worker has a history to show. `SPRING_PROFILES_ACTIVE=memory` would
+# drop the database entirely — the right shape for CI, the wrong one for something you demo.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: ec-demo1
+  labels: { app: worker }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels: { app: worker }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8091"
+    spec:
+      nodeSelector: { kubernetes.io/arch: amd64 }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-redpanda
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for redpanda; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: worker
+          image: miguelperezcolom/worker-standalone-app:2.2.0
+          env:
+            - name: SERVER_PORT
+              value: "8091"
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            - name: WORKER_PERSISTENCE
+              value: jpa
+            # The worker owns its two tables outright and ships no migrations, so it creates
+            # them itself rather than validating against someone else's history.
+            - name: DDL_AUTO
+              value: update
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/workflow
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "8"
+            # How long a task takes when the scenario does not say. Kept short so a process
+            # walked through by hand does not feel stuck.
+            - name: WORKER_TASK_DURATION
+              value: 2s
+          ports:
+            - { name: http, containerPort: 8091 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "448Mi", cpu: "150m" }
+            limits:   { memory: "1Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8091 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8091 }
+            initialDelaySeconds: 90
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  namespace: ec-demo1
+  labels: { app: worker }
+spec:
+  selector: { app: worker }
+  ports:
+    - { name: http, port: 8091, targetPort: 8091 }

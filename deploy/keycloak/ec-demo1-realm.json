@@ -1,0 +1,49 @@
+{
+  "realm": "ec-demo1",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginTheme": "keycloak",
+  "roles": {
+    "realm": [
+      { "name": "user",  "description": "Can use the shell and complete human tasks" },
+      { "name": "admin", "description": "Can drive workflow definitions and processes" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "demo",
+      "name": "EventConductor demo shell",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "rootUrl": "https://ec1.mateu.io",
+      "baseUrl": "https://ec1.mateu.io",
+      "redirectUris": [
+        "https://ec1.mateu.io/*"
+      ],
+      "webOrigins": [
+        "https://ec1.mateu.io"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "+",
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "demo@mateu.io",
+      "firstName": "Demo",
+      "lastName": "User",
+      "credentials": [
+        { "type": "password", "value": "demo", "temporary": false }
+      ],
+      "realmRoles": ["user", "admin"]
+    }
+  ]
+}

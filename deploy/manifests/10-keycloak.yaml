@@ -1,0 +1,160 @@
+# Keycloak — the only identity in this deployment. The shell redirects here, the browser comes
+# back with a token, and the shell validates it against this realm's JWKS.
+#
+# It stores its data in the same PostgreSQL the engine uses, in a database of its own. That is
+# what the Job below creates: the chart's Postgres only ever creates the `workflow` database, and
+# Keycloak on the default `start-dev` storage would lose every account on restart.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-db-init
+  namespace: ec-demo1
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels: { app: keycloak-db-init }
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector: { kubernetes.io/arch: amd64 }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: createdb
+          image: postgres:16
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          env:
+            - name: PGHOST
+              value: postgres
+            - name: PGUSER
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: PGDATABASE
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_DB } }
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              until pg_isready -q; do echo "waiting for postgres"; sleep 2; done
+              # CREATE DATABASE has no IF NOT EXISTS, and the Job is retried on failure, so the
+              # existence check is what makes re-running this harmless.
+              if psql -tAc "SELECT 1 FROM pg_database WHERE datname='keycloak'" | grep -q 1; then
+                echo "database keycloak already exists"
+              else
+                psql -c "CREATE DATABASE keycloak"
+                echo "database keycloak created"
+              fi
+          resources:
+            requests: { memory: "64Mi", cpu: "50m" }
+            limits:   { memory: "128Mi" }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: ec-demo1
+  labels: { app: keycloak }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: keycloak }
+  template:
+    metadata:
+      labels: { app: keycloak }
+    spec:
+      nodeSelector: { kubernetes.io/arch: amd64 }
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-keycloak-db
+          image: postgres:16
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            runAsUser: 70
+          env:
+            - name: PGHOST
+              value: postgres
+            - name: PGUSER
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+          command: ['sh', '-c', 'until psql -d keycloak -c "SELECT 1" >/dev/null 2>&1; do echo "waiting for the keycloak database"; sleep 2; done']
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0
+          # start-dev, not start: this is a demo, and `start` wants an ahead-of-time build step
+          # and strict hostname handling. TLS is terminated at the ingress either way.
+          args: ["start-dev", "--import-realm"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: keycloak-admin, key: password } }
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres:5432/keycloak
+            - name: KC_DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: KC_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            # The public URL. Keycloak writes it into the issuer claim and the discovery
+            # document, so it must be what the browser typed — not the Service name.
+            - name: KC_HOSTNAME
+              value: https://auth.ec1.mateu.io
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            # TLS ends at ingress-nginx; without this Keycloak sees plain HTTP and builds
+            # http:// redirect URLs, which the browser then refuses as a mixed-content downgrade.
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - { name: http, containerPort: 8080 }
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+          resources:
+            requests: { memory: "640Mi", cpu: "250m" }
+            limits:   { memory: "1Gi",   cpu: "1" }
+          readinessProbe:
+            httpGet: { path: /realms/ec-demo1, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /realms/ec-demo1, port: 8080 }
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 6
+      volumes:
+        - name: realm-import
+          configMap: { name: keycloak-realm }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: ec-demo1
+  labels: { app: keycloak }
+spec:
+  selector: { app: keycloak }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }

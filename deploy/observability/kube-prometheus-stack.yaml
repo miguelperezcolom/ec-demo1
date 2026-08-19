@@ -1,0 +1,115 @@
+# kube-prometheus-stack — metrics, and the Grafana everything else plugs into.
+#
+#   helm upgrade --install kps prometheus-community/kube-prometheus-stack \
+#     -n observability -f deploy/observability/kube-prometheus-stack.yaml
+alertmanager:
+  enabled: false
+
+nodeExporter:
+  enabled: true
+kubeStateMetrics:
+  enabled: true
+
+# CloudFleet runs an admission policy that rejects — and its node autoprovisioner cannot size —
+# pods whose containers declare no requests. Three of this chart's subcharts ship without them,
+# so they are set here rather than left to default to BestEffort.
+prometheus-node-exporter:
+  nodeSelector: { kubernetes.io/arch: amd64 }
+  resources:
+    requests: { memory: "32Mi", cpu: "20m" }
+    limits:   { memory: "64Mi" }
+kube-state-metrics:
+  nodeSelector: { kubernetes.io/arch: amd64 }
+  resources:
+    requests: { memory: "64Mi", cpu: "20m" }
+    limits:   { memory: "128Mi" }
+
+prometheusOperator:
+  nodeSelector: { kubernetes.io/arch: amd64 }
+  resources:
+    requests: { memory: "128Mi", cpu: "50m" }
+    limits:   { memory: "256Mi", cpu: "500m" }
+
+prometheus:
+  prometheusSpec:
+    nodeSelector: { kubernetes.io/arch: amd64 }
+    retention: 24h
+    scrapeInterval: 30s
+    # No storageSpec on purpose: Prometheus keeps its TSDB on an emptyDir here because the
+    # Hetzner CSI rejects the PVC the operator writes ("invalid input in field 'labels'"), and
+    # the pod then never starts. 24h of demo metrics do not survive a restart; Loki and Tempo,
+    # whose PVCs the CSI does accept, are persistent.
+    # Discover every ServiceMonitor/PodMonitor in the cluster, not only chart-labelled ones.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests: { memory: "640Mi", cpu: "250m" }
+      limits:   { memory: "1536Mi", cpu: "1" }
+    # Pods that carry prometheus.io/scrape: "true" — the worker and the shell — are scraped
+    # without a ServiceMonitor each.
+    additionalScrapeConfigs:
+      - job_name: 'annotated-pods'
+        kubernetes_sd_configs: [ { role: pod } ]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+grafana:
+  nodeSelector: { kubernetes.io/arch: amd64 }
+  # No password in version control: the Secret is created at deploy time by deploy/deploy.sh.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  resources:
+    requests: { memory: "192Mi", cpu: "100m" }
+    limits:   { memory: "512Mi", cpu: "500m" }
+  # The dashboard/datasource sidecars ship with no requests either.
+  sidecar:
+    resources:
+      requests: { memory: "64Mi", cpu: "20m" }
+      limits:   { memory: "128Mi" }
+  grafana.ini:
+    server:
+      root_url: https://grafana.ec1.mateu.io
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt
+    hosts: [grafana.ec1.mateu.io]
+    path: /
+    pathType: Prefix
+    tls:
+      - hosts: [grafana.ec1.mateu.io]
+        secretName: grafana-tls
+  additionalDataSources:
+    - name: Loki
+      # Explicit uid so the Tempo datasource below can point trace→logs navigation at it. Left
+      # to Grafana the uid is generated, and tracesToLogsV2 then silently links to nothing.
+      uid: loki
+      type: loki
+      url: http://loki.observability.svc.cluster.local:3100
+      access: proxy
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      url: http://tempo.observability.svc.cluster.local:3100
+      access: proxy
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki

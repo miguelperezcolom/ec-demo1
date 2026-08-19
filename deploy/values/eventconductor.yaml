@@ -1,0 +1,128 @@
+# EventConductor engine for the ec-demo1 deployment (CloudFleet / Hetzner).
+#
+#   helm upgrade --install ec deploy/chart/eventconductor -n ec-demo1 \
+#     -f deploy/values/eventconductor.yaml
+#
+# Sizing note: the Karpenter nodepool is capped at 8 CPU and provisions 2-core nodes, so every
+# component runs a single replica. Raising `replicas` here is the only change needed for HA —
+# the engine coordinates through PostgreSQL advisory locks and the outbox, so extra orchestrator
+# pods are additive, not failover. Raise `redpanda.defaultTopicPartitions` alongside them.
+
+# The published images are amd64-only and this nodepool can also provision arm64.
+nodeSelector:
+  kubernetes.io/arch: amd64
+
+## ── PostgreSQL ───────────────────────────────────────────────────────────────
+postgres:
+  image: postgres:16
+  database: workflow
+  username: workflow
+  # No password in version control: the Secret is created at deploy time by deploy/deploy.sh.
+  existingSecret: ec-postgres
+  storage: 8Gi
+  storageClass: hcloud-volumes
+  maxConnections: 200
+  resources:
+    requests: { memory: "512Mi", cpu: "250m" }
+    limits:   { memory: "1Gi" }
+
+## ── Redpanda ─────────────────────────────────────────────────────────────────
+redpanda:
+  image: docker.redpanda.com/redpandadata/redpanda:v24.1.7
+  brokerInternal: redpanda:19092
+  # Pinned at 1, deliberately low: the shard count is written into the data directory as an
+  # invariant, and a broker that later lands on a smaller node refuses to start if it decreased.
+  # One shard is portable across every node size this pool can provision.
+  cores: 1
+  # Room to scale the orchestrator to 6 replicas without repartitioning.
+  defaultTopicPartitions: 6
+  storage: 8Gi
+  storageClass: hcloud-volumes
+  # No NodePort: the broker is internal to the cluster.
+  externalNodePort: null
+  resources:
+    requests: { memory: "1Gi",    cpu: "500m" }
+    limits:   { memory: "1536Mi", cpu: "1" }
+
+## ── Orchestrator ─────────────────────────────────────────────────────────────
+orchestrator:
+  image: miguelperezcolom/orchestrator-standalone-app
+  imageTag: "2.2.0"
+  replicas: 1
+  servicePort: 8105
+  # This deployment owns an empty database and no migration history worth preserving, so
+  # Hibernate creates the schema and Flyway stays out of the way.
+  ddlAuto: update
+  flywayEnabled: false
+  consumerConcurrency: 3
+  dbPoolSize: 16
+  # A step whose dispatch or reply is lost is never looked at again unless it has a deadline.
+  # Two minutes is well above anything the test worker is asked to simulate here.
+  defaultStepTimeoutMs: 120000
+  # Off: the shell is what authenticates. See the security note in deploy/README.md.
+  security:
+    enabled: false
+  extraEnv:
+    # Workflow definitions come from this very repository, on every start.
+    WORKFLOW_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-demo1.git"
+    WORKFLOW_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
+    WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/workflows"
+    # One process is one trace: the outbox row carries the producing trace's traceparent and the
+    # relay continues it, so a whole process is a single Tempo trace rather than one per hop.
+    OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
+    TRACING_SAMPLING: "1.0"
+  resources:
+    requests: { memory: "640Mi", cpu: "250m" }
+    limits:   { memory: "1Gi",   cpu: "1" }
+  # Off because there is one replica: a budget of minAvailable 1 over a single pod makes the
+  # node undrainable, which on an autoscaled pool blocks consolidation forever.
+  podDisruptionBudget:
+    enabled: false
+
+## ── Forms ────────────────────────────────────────────────────────────────────
+forms:
+  image: miguelperezcolom/forms-standalone-app
+  imageTag: "2.2.0"
+  replicas: 1
+  servicePort: 8106
+  ddlAuto: update
+  flywayEnabled: false
+  security:
+    enabled: false
+  extraEnv:
+    # Form definitions come from the same repository, a different subdirectory.
+    FORMS_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-demo1.git"
+    FORMS_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
+    FORMS_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/forms"
+    OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
+    TRACING_SAMPLING: "1.0"
+  resources:
+    requests: { memory: "512Mi", cpu: "250m" }
+    limits:   { memory: "1Gi",   cpu: "1" }
+  podDisruptionBudget:
+    enabled: false
+
+## ── Rules ────────────────────────────────────────────────────────────────────
+# Scaled to zero rather than removed: none of the three workflows here has a RULE step, and the
+# chart has no on/off switch for the component. The Deployment and Service stay, so enabling the
+# rule engine later is a one-line change and not a redeployment.
+rules:
+  image: miguelperezcolom/rule-standalone-app
+  imageTag: "2.2.0"
+  replicas: 0
+  servicePort: 8107
+  grpcEnabled: false
+  ddlAuto: update
+  flywayEnabled: false
+  security:
+    enabled: false
+  podDisruptionBudget:
+    enabled: false
+
+# Ingress is not the chart's: this deployment fronts several hosts (shell, Keycloak, Grafana)
+# from one controller, so it is written out in deploy/manifests/40-ingress.yaml.
+ingress:
+  enabled: false
+
+networkPolicy:
+  enabled: false
