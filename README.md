@@ -25,6 +25,7 @@ changed by a pull request rather than by an API call.
 
   https://auth.ec1.mateu.io     Keycloak (realm ec-demo1, client demo)
   https://grafana.ec1.mateu.io  Grafana ── Prometheus · Loki · Tempo
+  https://kafka.ec1.mateu.io    Redpanda Console ── the event stream itself
 ```
 
 ## What is in here
@@ -36,7 +37,7 @@ changed by a pull request rather than by an API call.
 | `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus |
 | `gateway/` | Spring Cloud Gateway — routes the console and enforces the token |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
-| `deploy/manifests/` | Keycloak, worker, shell, gateway, ingress, certificate issuers |
+| `deploy/manifests/` | Keycloak, worker, shell, gateway, Kafka console, ingress, certificate issuers |
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
 | `deploy/deploy.sh` | The whole thing, from an empty cluster |
 
@@ -94,7 +95,12 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
    The variable it hands back is what the guards read, so the process routes to *Confirm booking*
    and the `JOIN·XOR` cancels the other branch. Swap the value for `"false"`, or use
    `{"outcome": "NO_REPLY"}` to let the 30-second deadline fire instead.
-8. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
+8. **Watch the events themselves** at `https://kafka.ec1.mateu.io`. This engine is event-driven end
+   to end, so when a process does not move the question is always the same — was the message
+   produced, and did anyone consume it. Four topics answer it: `upstream` (what was asked of the
+   engine), `outbox` (every state change it recorded), `downstream` (tasks for workers) and `forms`
+   (tasks for people). Consumer-group lag per partition is on the Groups tab.
+9. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
    (Prometheus). Traces are wired but not yet arriving — see below.
 
@@ -136,5 +142,8 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 - **The worker exposes no metrics.** Same shape of gap: its image has actuator but no
   `micrometer-registry-prometheus`, so `/actuator/prometheus` is a 404. It is deliberately not
   annotated for scraping, rather than left as a target that is permanently down.
+- **The Kafka console is behind HTTP basic auth**, because Redpanda Console's open-source build
+  has no access control of its own and anyone who reaches it can produce and delete messages, not
+  just read them. Its password is generated alongside the others.
 - **Keycloak runs `start-dev`** behind the ingress, which is the right shape for a demo and not
   for production. It does keep its data in PostgreSQL, so accounts survive a restart.

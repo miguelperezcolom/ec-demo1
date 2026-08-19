@@ -63,6 +63,7 @@ if [ ! -f "$SECRETS" ]; then
     echo "EC_POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
     echo "KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
     echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
+    echo "KAFKA_CONSOLE_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
   } > "$SECRETS"
   chmod 600 "$SECRETS"
   echo "generated $SECRETS"
@@ -85,6 +86,11 @@ kubectl create secret generic grafana-admin -n "$OBS_NS" \
 kubectl create configmap keycloak-realm -n "$NS" \
   --from-file=ec-demo1-realm.json=deploy/keycloak/ec-demo1-realm.json \
   --dry-run=client -o yaml | kubectl apply -f -
+# htpasswd for the Kafka console's ingress. openssl's apr1 is the format nginx expects, and needs
+# no apache2-utils on whoever runs this.
+kubectl create secret generic kafka-console-auth -n "$NS" \
+  --from-literal=auth="admin:$(openssl passwd -apr1 "$KAFKA_CONSOLE_PASSWORD")" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
 echo "══ 3/6  EventConductor engine (PostgreSQL, Redpanda, orchestrator, forms) ══"
 helm upgrade --install ec deploy/chart/eventconductor -n "$NS" \
@@ -99,6 +105,7 @@ kubectl apply -f deploy/manifests/20-worker.yaml
 kubectl apply -f deploy/manifests/30-shell.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
+kubectl apply -f deploy/manifests/50-kafka-console.yaml
 
 echo "══ 5/6  Observability (Prometheus, Grafana, Loki, Tempo, Alloy) ══"
 helm upgrade --install kps prometheus-community/kube-prometheus-stack \
@@ -115,6 +122,7 @@ kubectl rollout status deployment/keycloak -n "$NS" --timeout=10m
 kubectl rollout status deployment/worker -n "$NS" --timeout=10m
 kubectl rollout status deployment/shell -n "$NS" --timeout=10m
 kubectl rollout status deployment/gateway -n "$NS" --timeout=10m
+kubectl rollout status deployment/kafka-console -n "$NS" --timeout=10m
 
 cat <<EOF
 
@@ -123,6 +131,7 @@ Done.
   Console   https://ec1.mateu.io          demo / demo
   Keycloak  https://auth.ec1.mateu.io     admin / \$KEYCLOAK_ADMIN_PASSWORD
   Grafana   https://grafana.ec1.mateu.io  admin / \$GRAFANA_ADMIN_PASSWORD
+  Kafka     https://kafka.ec1.mateu.io    admin / \$KAFKA_CONSOLE_PASSWORD
 
 Passwords are in $SECRETS.
 Certificates take a minute: kubectl get certificate -A
