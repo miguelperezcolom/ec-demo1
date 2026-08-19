@@ -25,7 +25,7 @@ steps:
   - id: validate-order
     type: ACTION
     name: Validate order
-    topic: order-validator
+    topic: work
     preconditionStepId: start
     timeout: PT30S
     retries: 2
@@ -39,7 +39,7 @@ steps:
   - id: reserve-stock
     type: ACTION
     name: Reserve stock
-    topic: inventory
+    topic: work
     preconditionStepId: fanout
     timeout: PT1M
     retries: 1
@@ -49,7 +49,7 @@ steps:
   - id: charge-card
     type: ACTION
     name: Charge card
-    topic: payments
+    topic: work
     preconditionStepId: fanout
     timeout: PT30S
     retries: 1
@@ -78,7 +78,7 @@ steps:
   - id: ship-order
     type: ACTION
     name: Ship order
-    topic: shipping
+    topic: work
     preconditions:
       - stepId: review-shipping
         expression: "approved == 'true'"
@@ -86,7 +86,7 @@ steps:
   - id: cancel-order
     type: ACTION
     name: Cancel order
-    topic: shipping
+    topic: work
     preconditions:
       - stepId: review-shipping
         expression: "approved == 'false'"
@@ -101,7 +101,7 @@ steps:
   - id: notify-customer
     type: ACTION
     name: Notify customer
-    topic: notifications
+    topic: work
     preconditionStepId: outcome
 
   - id: end
@@ -116,13 +116,13 @@ steps:
   - id: release-stock
     type: ACTION
     name: Release stock
-    topic: inventory
+    topic: work
     preconditionStepId: start
     preconditionExpression: "false"
 
   - id: refund-card
     type: ACTION
     name: Refund card
-    topic: payments
+    topic: work
     preconditionStepId: start
     preconditionExpression: "false"

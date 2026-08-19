@@ -71,6 +71,11 @@ orchestrator:
     # relay continues it, so a whole process is a single Tempo trace rather than one per hop.
     OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
     TRACING_SAMPLING: "1.0"
+    # JGit writes a user config as it clones, and these pods run with a read-only root
+    # filesystem where only /tmp is writable — without this the import logs two ERROR lines
+    # about a lock file it could not create on every single run. The clone succeeds either way;
+    # the errors are pure noise, and noise in an error log is what stops people reading it.
+    XDG_CONFIG_HOME: "/tmp"
   resources:
     requests: { memory: "640Mi", cpu: "250m" }
     limits:   { memory: "1Gi",   cpu: "1" }
@@ -93,9 +98,19 @@ forms:
     # Form definitions come from the same repository, a different subdirectory.
     FORMS_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-demo1.git"
     FORMS_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
+    # Ignored today: `directory` exists on the workflow engine's GitImportProperties but not on
+    # the forms engine's, so the forms import scans the whole clone and logs a warning for every
+    # chart template it tries to parse. Harmless — a file needs `name` and `fields` to be taken
+    # as a form — but it means any stray YAML shaped like one would be imported. Kept here so it
+    # starts working the day the property is added upstream.
     FORMS_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/forms"
     OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
     TRACING_SAMPLING: "1.0"
+    # JGit writes a user config as it clones, and these pods run with a read-only root
+    # filesystem where only /tmp is writable — without this the import logs two ERROR lines
+    # about a lock file it could not create on every single run. The clone succeeds either way;
+    # the errors are pure noise, and noise in an error log is what stops people reading it.
+    XDG_CONFIG_HOME: "/tmp"
   resources:
     requests: { memory: "512Mi", cpu: "250m" }
     limits:   { memory: "1Gi",   cpu: "1" }

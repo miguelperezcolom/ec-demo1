@@ -19,19 +19,19 @@ steps:
   - id: email
     type: ACTION
     name: Send email
-    topic: email-sender
+    topic: work
     preconditionStepId: fanout
 
   - id: sms
     type: ACTION
     name: Send SMS
-    topic: sms-sender
+    topic: work
     preconditionStepId: fanout
 
   - id: push
     type: ACTION
     name: Send push notification
-    topic: push-sender
+    topic: work
     preconditionStepId: fanout
 
   - id: all-sent

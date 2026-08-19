@@ -51,6 +51,18 @@
             <version>${mateu.version}</version>
         </dependency>
 
+        <!-- Health probes and the Prometheus endpoint the pod annotation points Prometheus at.
+             Without the registry, /actuator/prometheus does not exist even with actuator on the
+             classpath, and the scrape silently returns 404 forever. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

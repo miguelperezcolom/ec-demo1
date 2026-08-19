@@ -23,7 +23,7 @@ steps:
   - id: confirm-booking
     type: ACTION
     name: Confirm booking
-    topic: booking
+    topic: work
     preconditions:
       - stepId: verify-payment
         expression: "paymentReceived == 'true'"
@@ -32,7 +32,7 @@ steps:
   - id: cancel-booking
     type: ACTION
     name: Cancel booking
-    topic: booking
+    topic: work
     preconditions:
       - stepId: verify-payment
         expression: "paymentReceived == 'false'"
