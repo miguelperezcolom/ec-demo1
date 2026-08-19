@@ -128,7 +128,7 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
   horizontally by design — raising `replicas` in `deploy/values/eventconductor.yaml` is the only
   change needed, since orchestrator instances coordinate through PostgreSQL advisory locks and
   the outbox rather than through a leader.
-- **The rule engine is deployed at zero replicas.** None of these three workflows has a `RULE`
+- **The rule engine is delo de mateyuployed at zero replicas.** None of these three workflows has a `RULE`
   step. Its Deployment and Service exist, so turning it on is a one-line change.
 - **Traces do not flow yet, and it is not this deployment's fault.** Tempo is deployed, its OTLP
   endpoint accepts spans, and Grafana's datasource points at it correctly. The engine cannot

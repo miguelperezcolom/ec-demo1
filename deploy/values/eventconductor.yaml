@@ -47,7 +47,7 @@ redpanda:
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
   image: miguelperezcolom/orchestrator-standalone-app
-  imageTag: "2.2.0"
+  imageTag: "2.2.1"
   replicas: 1
   servicePort: 8105
   # This deployment owns an empty database and no migration history worth preserving, so
@@ -104,7 +104,7 @@ orchestrator:
 ## ── Forms ────────────────────────────────────────────────────────────────────
 forms:
   image: miguelperezcolom/forms-standalone-app
-  imageTag: "2.2.0"
+  imageTag: "2.2.1"
   replicas: 1
   servicePort: 8106
   ddlAuto: update
@@ -151,7 +151,7 @@ forms:
 # rule engine later is a one-line change and not a redeployment.
 rules:
   image: miguelperezcolom/rule-standalone-app
-  imageTag: "2.2.0"
+  imageTag: "2.2.1"
   replicas: 0
   servicePort: 8107
   grpcEnabled: false
