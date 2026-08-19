@@ -7,7 +7,6 @@ import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTitle;
 import io.mateu.uidl.annotations.Style;
-import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.UI;
 import io.mateu.uidl.data.Anchor;
 import io.mateu.uidl.data.HorizontalLayout;
@@ -39,7 +38,10 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
  * deployment's hostname means rebuilding this image.
  */
 @UI("")
-@Title("EventConductor demo")
+// No @Title on purpose. The renderer places the logo and the title side by side with a
+// margin-left on the image and nothing between them, so a title here reads as part of the mark —
+// "RIU EventConductor demo" as one phrase. The name is not lost: it is still the page heading and
+// still the browser tab, via @PageTitle.
 @PageTitle("EventConductor demo")
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
 // Served by this app from src/main/resources/static, so it arrives through the gateway's
