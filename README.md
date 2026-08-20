@@ -40,6 +40,9 @@ so a process is changed by a pull request rather than by an API call.
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
 | `deploy/deploy.sh` | The whole thing, from an empty cluster |
 
+New here? **[ONBOARDING.md](ONBOARDING.md)** — access, what lives in which repository, and the
+four things about this cluster that otherwise cost an afternoon.
+
 ## Deploy
 
 ```sh
@@ -285,15 +288,14 @@ allows.
   the outbox rather than through a leader.
 - **The rule engine is delo de mateyuployed at zero replicas.** None of these three workflows has a `RULE`
   step. Its Deployment and Service exist, so turning it on is a one-line change.
-- **Traces do not flow yet, and it is not this deployment's fault.** Tempo is deployed, its OTLP
-  endpoint accepts spans, and Grafana's datasource points at it correctly. The engine cannot
-  produce any: the published `2.2.0` images carry the OpenTelemetry libraries but not the Spring
-  Boot autoconfiguration that creates a `Tracer` and reads `management.otlp.tracing.endpoint` —
-  Boot 4 moved it into `spring-boot-tracing` / `spring-boot-opentelemetry`, which are not on the
-  classpath, so neither that property nor `management.tracing.sampling.probability` exists at all
-  and both env vars are inert. `WorkflowTracingAutoConfiguration` then finds no tracer and runs
-  every call untraced. Fixing it upstream is a dependency, not a config change; everything on this
-  side is already in place for when it lands.
+- **Traces work as of engine 2.5.0** — `eventconductor.step-over`, `eventconductor.dispatch-step`,
+  `outbox relay` and the rest arrive in Tempo. It took three releases, and the last one is worth
+  knowing about: the endpoint was configured under `management.otlp.tracing.endpoint`, which Boot 4
+  deprecates *at level error* — the property is no longer bound and its metadata entry survives
+  only to announce that. It reads back perfectly from the environment, so every check short of
+  looking for the exporter bean said it was configured, including one done here. `OTEL_SERVICE_NAME`
+  is set per engine as well, without which every span arrives as `unknown_service` and the three
+  are indistinguishable.
 - **Git webhooks are wired but return 500, and it is not this deployment's fault.** A push to
   master should reload the definitions instead of waiting for the next restart, and everything on
   this side is in place: the secret exists, the gateway routes `/workflow/webhooks/**` and
