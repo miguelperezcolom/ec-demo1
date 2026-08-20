@@ -1,0 +1,88 @@
+{
+  "title": "EventConductor — nodes",
+  "uid": "eventconductor-nodes",
+  "tags": ["eventconductor"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Who is actually busy",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU per component",
+      "description": "The whole reason each of these has a node to itself. On the previous topology the orchestrator sat at 11% of a core and looked idle — it was sharing two shared vCPUs with the broker. Read this against the limits panel below, not on its own.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"ec-demo1\", container!=\"\", container!=\"POD\"}[1m]))", "legendFormat": "{{pod}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU throttling",
+      "description": "Fraction of periods in which the kernel stopped the container because it had spent its quota. Read this as a rate over a window — the raw counters are cumulative, and dividing two lifetime totals once reports a number that means nothing.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{namespace=\"ec-demo1\", container!=\"\"}[5m])) / clamp_min(sum by (pod) (rate(container_cpu_cfs_periods_total{namespace=\"ec-demo1\", container!=\"\"}[5m])), 1)", "legendFormat": "{{pod}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Memory and nodes",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory per component",
+      "description": "Working set, against the container limit. A JVM that plateaus just under its limit is not comfortable — it is collecting hard to stay there.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"ec-demo1\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{pod}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Node CPU",
+      "description": "Per node, so the separation can be checked rather than assumed: postgres, orchestrator and worker each have a node to themselves, and if two of these lines move together something has been packed where it should not be.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[1m]))", "legendFormat": "{{instance}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "The database, which is usually the ceiling",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 }
+    },
+    {
+      "type": "timeseries",
+      "title": "JDBC pool",
+      "description": "Threads waiting for a connection is the number that matters — active-vs-idle only says how busy the pool is, while pending says the application is blocked on it. Zero pending with slow throughput means the bottleneck is somewhere else entirely.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (job) (hikaricp_connections_active)", "legendFormat": "{{job}} active", "refId": "A" },
+        { "expr": "sum by (job) (hikaricp_connections_pending)", "legendFormat": "{{job}} PENDING", "refId": "B" },
+        { "expr": "sum by (job) (hikaricp_connections_idle)", "legendFormat": "{{job}} idle", "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM garbage collection",
+      "description": "Seconds of pause per second. A CPU that looks busy while this is high is not doing your work; a CPU that looks idle while throughput is poor is waiting on something, and this panel is how you rule GC out in one glance.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (job) (rate(jvm_gc_pause_seconds_sum[1m]))", "legendFormat": "{{job}}", "refId": "A" }
+      ]
+    }
+  ]
+}

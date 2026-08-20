@@ -56,6 +56,14 @@ spec:
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: postgres
+      {{- if .Values.postgres.localDisk }}
+      annotations:
+        # On node-local disk the pod IS the database: moving it is not a reschedule, it is a
+        # wipe. Karpenter consolidated this pod once and took the whole schema with it — the
+        # engine's tables and Keycloak's database both — while everything else stayed up and
+        # looked healthy. Only meaningful with localDisk; a PersistentVolume follows the pod.
+        karpenter.sh/do-not-disrupt: "true"
+      {{- end }}
     spec:
       {{- with (default .Values.nodeSelector (get .Values "postgres").nodeSelector) }}
       nodeSelector:

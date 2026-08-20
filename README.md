@@ -115,19 +115,34 @@ A Job that produces `ProcessCreationRequested` events onto the same `upstream` t
 else uses, so it drives this deployment rather than a rig of its own. No image to build — the
 Redpanda image already on the node ships `rpk`.
 
-Measured here on one orchestrator pod and one worker, both at a 250m CPU request: **5000 instances
-of `notify-parallel` at 50/s all completed, 35000 step executions, zero errors**, in 32 minutes —
-**18 step executions/s**, 7.7 worker tasks/s end to end.
+Measured on the topology above, EventConductor 2.3.0: **5000 instances of `notify-parallel` at
+50/s, all 5000 completed, zero errors, in 291 seconds** — **17.2 processes/s and 120 step
+executions/s**.
 
-Two things that run took to learn. The first attempt failed almost entirely — 4722 of 5000 in
-ERROR — because `defaultStepTimeoutMs` was set to two minutes, sized against what the worker
-simulates (200ms) rather than against how long a step waits in a burst. A deadline starts when the
-step starts, and under load a step is queued for nearly all of it. Fifteen minutes is what makes
-the same load succeed, unchanged in every other respect.
+| | processes/s | steps/s | duration |
+|---|---|---|---|
+| shared nodes, 2.2.1 | 2.6 | 18 | 32 min |
+| separated nodes, 2.2.1 | 12.7 | 89 | 6.5 min |
+| separated nodes, 2.3.0 | **17.2** | **120** | **4.9 min** |
 
-The second is that throughput sampled mid-burst reads less than half the steady-state figure, since
-the orchestrator is splitting its attention between accepting new processes and stepping the ones
-it has. Measure end to end, not while the producer is still running.
+Almost all of the first jump is placement, not tuning: the orchestrator was pinned at 11% of a
+core on the shared topology and reached 860m once it had a node to itself, because it had been
+sharing two shared vCPUs with the broker.
+
+Three things those runs took to learn, all of them about measurement rather than about the engine.
+
+An early attempt failed almost entirely — 4722 of 5000 in ERROR — because `defaultStepTimeoutMs`
+was two minutes, sized against what the worker simulates (200ms) rather than against how long a
+step waits in a burst. A deadline starts when the step starts, and under load a step is queued for
+nearly all of it.
+
+Throughput sampled mid-burst reads less than half the steady-state figure, because the orchestrator
+is splitting its attention between accepting new processes and stepping the ones it has. Measure
+end to end.
+
+And a run started immediately after a restart measures the restart. The first 2.3.0 run read 5.5
+processes/s against 17.2 for the identical load minutes later, with nothing changed but a warm JVM
+and a schema that already existed.
 
 `notify-parallel` is the useful default for volume: three parallel `ACTION`s and a barrier, no
 human in it. `order-fulfilment` stops at its `USER_TASK`, so loading it builds a backlog of

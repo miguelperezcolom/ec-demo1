@@ -1,0 +1,142 @@
+{
+  "title": "EventConductor",
+  "uid": "eventconductor",
+  "tags": ["eventconductor"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Is it keeping up?",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Arrivals vs completions",
+      "description": "The first question about any queue. In steady state these two lines sit on top of each other; when the top one lifts away, work is arriving faster than it leaves and everything below is a consequence of that.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(eventconductor_process_started_total[1m]))", "legendFormat": "started", "refId": "A" },
+        { "expr": "sum(rate(eventconductor_process_completed_total[1m]))", "legendFormat": "completed", "refId": "B" },
+        { "expr": "sum(rate(eventconductor_process_errored_total[1m]))", "legendFormat": "errored", "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Processes in flight",
+      "description": "The backlog itself. A flat line under load means the engine is absorbing exactly what arrives; a rising one is the arrival rate winning, and the slope is how fast it is losing.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(eventconductor_process_running)", "legendFormat": "running", "refId": "A" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Where the time goes",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Step executions per second",
+      "description": "Throughput measured where the work actually happens. A process of N steps costs N of these, so this is the number to compare across runs — process-per-second hides how much each one asked for.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(eventconductor_step_executions_total[1m]))", "legendFormat": "step executions", "refId": "A" },
+        { "expr": "sum(rate(eventconductor_step_retries_total[1m]))", "legendFormat": "retries", "refId": "B" },
+        { "expr": "sum(rate(eventconductor_step_compensations_total[1m]))", "legendFormat": "compensations", "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Step duration (mean)",
+      "description": "Includes queueing, not just work. That is the point: this is what the step timeout has to sit above, and sizing the timeout against the work instead of against this is how a burst turns into mass TIMEOUT.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(eventconductor_step_duration_seconds_sum[1m])) / sum(rate(eventconductor_step_duration_seconds_count[1m]))", "legendFormat": "step", "refId": "A" },
+        { "expr": "sum(rate(eventconductor_process_duration_seconds_sum[1m])) / sum(rate(eventconductor_process_duration_seconds_count[1m]))", "legendFormat": "process", "refId": "B" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "The outbox relay",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox backlog",
+      "description": "The earliest warning there is. Every state change is written here before it is published, so if this climbs the engine is recording work faster than it can hand it on — and it will show up as latency everywhere else a minute later.",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(eventconductor_outbox_pending)", "legendFormat": "pending", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Relay: draining vs waiting",
+      "description": "Seconds per second. Draining near 1 means the relay is the constraint; waiting near 1 means it is starved and the constraint is upstream of it — whatever writes to the outbox.",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "fillOpacity": 20, "lineWidth": 2, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(eventconductor_outbox_relay_draining_seconds_sum[1m]))", "legendFormat": "draining", "refId": "A" },
+        { "expr": "sum(rate(eventconductor_outbox_relay_waiting_seconds_sum[1m]))", "legendFormat": "waiting", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Batch size, and how long a row waits",
+      "description": "A batch far below its configured limit while a backlog exists is the relay being fed slowly, not running slowly. Pickup latency is how long a row sat before anyone looked at it.",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "pickup latency" }, "properties": [{ "id": "unit", "value": "s" }] }
+      ] },
+      "targets": [
+        { "expr": "sum(rate(eventconductor_outbox_batch_size_sum[1m])) / sum(rate(eventconductor_outbox_batch_size_count[1m]))", "legendFormat": "batch size", "refId": "A" },
+        { "expr": "sum(rate(eventconductor_outbox_pickup_latency_seconds_sum[1m])) / sum(rate(eventconductor_outbox_pickup_latency_seconds_count[1m]))", "legendFormat": "pickup latency", "refId": "B" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Things that should be zero",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+    },
+    {
+      "type": "stat",
+      "title": "Stalled steps",
+      "description": "Steps live long enough that nobody is coming for them. A step with no deadline is invisible to the timeout scan by construction, so this gauge is the only thing that reports it.",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 27 },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+      "targets": [ { "expr": "sum(eventconductor_steps_stalled)", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Concurrent-write rejections",
+      "description": "Two pods reaching for the same process at once. Expected to be zero on a single orchestrator; if it is not, the process-level locking is being contended and that is worth understanding before scaling out.",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 27 },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] } }, "overrides": [] },
+      "targets": [ { "expr": "sum(increase(eventconductor_process_concurrent_writes_rejected_total[$__range]))", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Processes errored (range)",
+      "description": "Zero is the only acceptable number under a load test whose scenarios all say COMPLETED. Anything else means the engine gave up on work it was given.",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 27 },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+      "targets": [ { "expr": "sum(increase(eventconductor_process_errored_total[$__range]))", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Step retries (range)",
+      "description": "Work done twice. Not always wrong — a retry is the engine recovering — but a rising count under load usually means a timeout is set below the queueing delay rather than above it.",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 27 },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] } }, "overrides": [] },
+      "targets": [ { "expr": "sum(increase(eventconductor_step_retries_total[$__range]))", "refId": "A" } ]
+    }
+  ]
+}
