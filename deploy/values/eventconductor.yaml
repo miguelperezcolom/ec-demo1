@@ -66,7 +66,7 @@ redpanda:
   brokerInternal: redpanda:19092
   cores: 2
   # Six, matching upstream and outbox, so the orchestrator can be scaled without repartitioning.
-  defaultTopicPartitions: 6
+  defaultTopicPartitions: 24
   storage: 16Gi
   storageClass: hcloud-volumes
   externalNodePort: null
@@ -93,8 +93,8 @@ orchestrator:
   ddlAuto: update
   flywayEnabled: false
   # Six partitions on each binding, one pod: three threads leaves half of them unread.
-  consumerConcurrency: 6
-  dbPoolSize: 32
+  consumerConcurrency: 24
+  dbPoolSize: 64
   # Fifteen minutes, not two. A deadline starts when the step starts, and under a burst a step
   # spends nearly all of it queued — sizing this against what the worker simulates (200ms) put
   # 13537 steps into TIMEOUT and took 4722 of 5000 processes to ERROR. It has to sit above the
@@ -111,6 +111,38 @@ orchestrator:
     # JGit writes a user config as it clones, and this pod has a read-only root filesystem where
     # only /tmp is writable — without this every import logs two ERROR lines about a lock file.
     XDG_CONFIG_HOME: "/tmp"
+    # ── The outbox relay, which is what actually caps throughput here ────────────
+    # Defaults are a 500ms poll of at most 100 rows by one thread: 200 events/s, whatever the
+    # hardware. Measured on a pure-orchestration workflow that never touches a worker, this
+    # deployment sat at 94 transitions/s with the orchestrator at 46% CPU, PostgreSQL idle and
+    # 7335 rows waiting in the outbox — a queue in front of an engine that had capacity to spare.
+    #
+    # The poll interval is the cost of an empty pass, so lowering it costs a query against an
+    # indexed range when there is nothing to do. relay-concurrency is bounded by design — the
+    # claim holds row locks for the length of its transaction — so it is raised deliberately, not
+    # to the maximum, and it wants connections: keep dbPoolSize above it plus the consumers.
+    # The ceiling here is not any of these. The relay publishes with acks=all, one message at a
+    # time — SynchronousProducerDefaults, and deliberately: asynchronously a send to a broker that
+    # is down still reports success and the row is marked Sent anyway. Measured: 2.44s to publish a
+    # batch of 497, i.e. 4.9ms per message, against a Redpanda sitting at 0.14 of 2 CPU. Raising
+    # concurrency past this point made throughput WORSE — 183/s at relay=4 parallelism=8, 160/s at
+    # relay=12 parallelism=16, 125/s at 24 partitions — because the claim holds row locks and more
+    # threads only contend for them. These values are the measured optimum, not a guess.
+    WORKFLOW_OUTBOX_POLL_INTERVAL_MS: "50"
+    WORKFLOW_OUTBOX_BATCHSIZE: "500"
+    WORKFLOW_OUTBOX_RELAYCONCURRENCY: "4"
+    # How many of a poll batch's per-process groups one consumer thread may work at once.
+    #
+    # The default is 1, which ties in-pod parallelism to the partition count: six partitions, six
+    # threads, six processes in flight — and with a transition costing ~37ms of mostly waiting,
+    # that is a ceiling of roughly 160/s no matter how idle the CPU is. Raising the relay alone
+    # drained the outbox from 7335 rows to 12 and left throughput where it was, which is what
+    # pointed here.
+    #
+    # The groups are independent by construction — distinct processes, distinct rows — so this
+    # changes nothing about ownership or ordering. It does take a JDBC connection per busy thread:
+    # keep dbPoolSize above concurrency x parallelism plus the relay and the scanner.
+    WORKFLOW_CONSUMER_PROCESSPARALLELISM: "8"
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
     node.kubernetes.io/instance-type: ccx13

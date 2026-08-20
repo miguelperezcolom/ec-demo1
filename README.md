@@ -137,6 +137,58 @@ under saturation that gap is queueing and stops describing the engine at all. Re
 arrival rate as "the engine is fast", or a saturated one as "the engine is slow", are the same
 mistake pointing in opposite directions.
 
+## What one orchestrator can carry
+
+The question this deployment exists to answer: *how many processes a second, at N steps each,
+before the orchestrator is the bottleneck.* Measured on `orchestration-only`, a definition with no
+`ACTION` in it — only `START`, `END` and a chain of pass-through `JOIN`s, so no task is ever
+dispatched and no worker is involved. Twelve transitions per process; `processes/s x 12` is the
+orchestrator's transition rate and nothing else's.
+
+**The ceiling is not CPU, and it is not the hardware.** At every measured point the orchestrator
+sat below half its limit, PostgreSQL below 20%, Redpanda at 0.14 of 2 cores, no thread ever waited
+for a JDBC connection, and GC never registered — while tens of thousands of steps queued.
+
+It is the outbox relay publishing **synchronously**, one message at a time, waiting for `acks=all`
+on each:
+
+    batch deliver   2.44 s for a batch of 497   =>  4.9 ms per message
+    redpanda CPU    0.14 of 2.0                     idle while this happens
+
+That is deliberate and documented in the engine's own configuration: asynchronously, a send to a
+broker that is down still reports success and the relay marks the row `Sent`. The outbox stops
+being transactional. So the round-trip is the price of the guarantee, and it is the ceiling.
+
+### Turning knobs up made it slower
+
+| partitions | relay-concurrency | process-parallelism | transitions/s |
+|---|---|---|---|
+| 6 | 1 (default) | 1 (default) | 94, with 7335 rows stuck in the outbox |
+| 6 | 4 | 8 | **184** |
+| 6 | 12 | 16 | 160 |
+| 24 | 4 | 16 | 125 |
+
+The first row is the one worth reading twice: the defaults are a 500ms poll of at most 100 rows by
+a single thread — 200 events/s whatever the hardware — and the backlog that produces looks exactly
+like an engine that cannot keep up.
+
+Past that, more threads made it worse. The relay's claim holds row locks for the length of its
+transaction, so additional relay threads contend rather than parallelise, and more partitions
+spread the same synchronous publishing thinner.
+
+**Partitions cannot be reduced.** Raising `outbox` and `upstream` from 6 to 24 to test that
+hypothesis is not undoable, and it cost roughly a third of the throughput: the same optimal
+settings now measure 120 transitions/s instead of 184. Recreating the topics is the only way back,
+and it means dropping whatever they hold.
+
+So, on this deployment as it stands:
+
+    ~120 transitions/s   =>  10 processes/s at 12 steps
+                             17 processes/s at  7 steps
+
+and ~184 with `outbox` back at 6 partitions. Both figures are *the orchestrator not being the
+bottleneck in CPU terms* — it has 80% of its cores spare at either.
+
 ## Giving it work
 
 ```sh
