@@ -122,6 +122,27 @@ helm upgrade --install tempo grafana/tempo -n "$OBS_NS" -f deploy/observability/
 helm upgrade --install alloy grafana/alloy -n "$OBS_NS" -f deploy/observability/alloy.yaml --timeout 15m
 kubectl apply -f deploy/observability/servicemonitors.yaml
 
+# The two dashboards written for this deployment, as ConfigMaps the Grafana sidecar picks up —
+# never imported through the UI. Grafana keeps its database on an emptyDir here, so a dashboard
+# imported by hand lives exactly as long as the pod does: any upgrade that recreates it takes them
+# with it, without a word, and the first anyone knows is a panel that is not there any more. It
+# happened once, to both of them.
+#
+# The key each is filed under has to be unique across every dashboard ConfigMap in the cluster, not
+# merely within its own. The sidecar writes all of them into one flat /tmp/dashboards, and Grafana
+# derives a dashboard's internal id from that path — so a second `nodes.json` (the chart ships one,
+# for Node Exporter) is refused with "deprecatedInternalID is already in use" and simply never
+# appears, while the sidecar reports having written it. That is why the second is keyed
+# `eventconductor-nodes.json` and not by its own filename.
+apply_dashboard() {  # name, key, file
+  kubectl create configmap "grafana-dashboard-$1" -n "$OBS_NS" \
+    --from-file="$2=deploy/observability/dashboards/$3" --dry-run=client -o yaml \
+    | kubectl label --local -f - grafana_dashboard=1 -o yaml \
+    | kubectl apply -f -
+}
+apply_dashboard eventconductor       eventconductor.json       eventconductor.json
+apply_dashboard eventconductor-nodes eventconductor-nodes.json nodes.json
+
 echo "══ 6/6  Waiting for the workloads ══"
 kubectl rollout status deployment/ec-eventconductor-orchestrator -n "$NS" --timeout=10m
 kubectl rollout status deployment/ec-eventconductor-forms -n "$NS" --timeout=10m
