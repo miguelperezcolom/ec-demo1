@@ -16,6 +16,7 @@ stringData:
   POSTGRES_PASSWORD: {{ .Values.postgres.password | quote }}
 ---
 {{- end }}
+{{- if not .Values.postgres.localDisk }}
 ## ── PostgreSQL PVC ───────────────────────────────────────────────────────────
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -32,6 +33,7 @@ spec:
   storageClassName: {{ .Values.postgres.storageClass }}
   {{- end }}
 ---
+{{- end }}
 ## ── PostgreSQL Deployment ────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -55,8 +57,12 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: postgres
     spec:
-      {{- with .Values.nodeSelector }}
+      {{- with (default .Values.nodeSelector (get .Values "postgres").nodeSelector) }}
       nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (get .Values "postgres").affinity }}
+      affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:
@@ -101,8 +107,18 @@ spec:
             periodSeconds: 10
       volumes:
         - name: data
+        {{- if .Values.postgres.localDisk }}
+          # The node's own disk, not a network volume. On Hetzner that is local NVMe, and it is
+          # the difference between an fsync that costs microseconds and one that crosses the
+          # network — which is what a WAL commit does on every transaction.
+          #
+          # The price is absolute: an emptyDir dies with the pod, so this is a deliberate trade
+          # for a load rig, never for anything whose data matters.
+          emptyDir: {}
+        {{- else }}
           persistentVolumeClaim:
             claimName: {{ include "eventconductor.fullname" . }}-postgres
+        {{- end }}
 ---
 ## ── PostgreSQL Service ───────────────────────────────────────────────────────
 apiVersion: v1

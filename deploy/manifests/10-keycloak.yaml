@@ -17,7 +17,16 @@ spec:
       labels: { app: keycloak-db-init }
     spec:
       restartPolicy: OnFailure
-      nodeSelector: { kubernetes.io/arch: amd64 }
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 70
@@ -68,9 +77,20 @@ spec:
     matchLabels: { app: keycloak }
   template:
     metadata:
-      labels: { app: keycloak }
+      labels:
+        app: keycloak
+        app.kubernetes.io/component: keycloak
     spec:
-      nodeSelector: { kubernetes.io/arch: amd64 }
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
@@ -132,8 +152,8 @@ spec:
               mountPath: /opt/keycloak/data/import
               readOnly: true
           resources:
-            requests: { memory: "640Mi", cpu: "250m" }
-            limits:   { memory: "1Gi",   cpu: "1" }
+            requests: { memory: "1Gi", cpu: "250m" }
+            limits:   { memory: "2Gi", cpu: "1" }
           readinessProbe:
             httpGet: { path: /realms/ec-demo1, port: 8080 }
             initialDelaySeconds: 30

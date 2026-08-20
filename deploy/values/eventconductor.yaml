@@ -1,48 +1,88 @@
-# EventConductor engine for the ec-demo1 deployment (CloudFleet / Hetzner).
+# EventConductor for the ec-demo1 deployment (CloudFleet / Hetzner), sized to be stressed.
 #
 #   helm upgrade --install ec deploy/chart/eventconductor -n ec-demo1 \
 #     -f deploy/values/eventconductor.yaml
 #
-# Sizing note: the Karpenter nodepool is capped at 8 CPU and provisions 2-core nodes, so every
-# component runs a single replica. Raising `replicas` here is the only change needed for HA —
-# the engine coordinates through PostgreSQL advisory locks and the outbox, so extra orchestrator
-# pods are additive, not failover. Raise `redpanda.defaultTopicPartitions` alongside them.
-
-# The published images are amd64-only and this nodepool can also provision arm64.
-nodeSelector:
-  kubernetes.io/arch: amd64
+# ── The topology, and why ─────────────────────────────────────────────────────
+# Five node groups, each on hardware chosen for what it does. Separation is enforced by pod
+# anti-affinity on `app.kubernetes.io/component`, not by hope: an instance-type selector alone
+# lets Karpenter pack two components onto one node the moment they both fit.
+#
+#   postgres      ccx13   2 vCPU / 8 GB   alone, local NVMe
+#   orchestrator  ccx13   2 vCPU / 8 GB   alone
+#   worker        ccx13   2 vCPU / 8 GB   alone       (deploy/manifests/20-worker.yaml)
+#   platform      cx43    8 vCPU          redpanda, forms, rules, keycloak, shell, gateway, console
+#   observability ccx23   4 vCPU / 16 GB  its own namespace, its own instance type
+#
+# One 8-vCPU node for the whole platform group rather than several small ones: they fit together,
+# and the fleet's cpu limit is the binding constraint — 3x2 + 8 + 4, plus a small node for the
+# ingress controller, is 20 of 24.
+#
+# cx43 and not ccx33: this fleet's catalogue has no ccx33 at all. Karpenter answers a request for
+# one with "no instance type met all requirements" and creates nothing, which reads exactly like a
+# quota problem and is not — probe a type with a throwaway pod before designing around it. The
+# shared-vCPU line is the right trade here anyway: nothing in this group blocks on fsync the way
+# PostgreSQL does, which is what the dedicated vCPU is bought for.
+#
+# CCX rather than CX: dedicated vCPU. On the shared-vCPU line an fsync syscall is stalled by
+# noisy-neighbour CPU steal, which is exactly the syscall a WAL commit blocks on — the engine's
+# throughput ceiling is a database durability ceiling before it is anything else.
+#
+# CloudFleet does not allow creating NodePools with kubectl ("must be managed via the Cloudfleet
+# Fleet API"), so the instance type is requested per pod and Karpenter provisions it off the
+# existing unrestricted pool. That pool's own cpu limit is the real budget: this topology asks for
+# 18 vCPU of node, plus whatever the ingress controller sits on.
 
 ## ── PostgreSQL ───────────────────────────────────────────────────────────────
 postgres:
   image: postgres:16
   database: workflow
   username: workflow
-  # No password in version control: the Secret is created at deploy time by deploy/deploy.sh.
   existingSecret: ec-postgres
-  storage: 8Gi
-  storageClass: hcloud-volumes
-  maxConnections: 200
+  # Local NVMe. See the note on this key in the chart's values.yaml — the data does not survive
+  # the pod, which is the trade this deployment is explicitly making.
+  localDisk: true
+  maxConnections: 400
+  nodeSelector:
+    node.kubernetes.io/instance-type: ccx13
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              # Exists AND NotIn, deliberately. `NotIn` alone also matches pods that do not carry
+              # the label at all — every DaemonSet on the node — and the rule would then exclude
+              # every node in the cluster and schedule nothing.
+              - { key: app.kubernetes.io/component, operator: Exists }
+              - { key: app.kubernetes.io/component, operator: NotIn, values: [postgres] }
+          topologyKey: kubernetes.io/hostname
   resources:
-    requests: { memory: "512Mi", cpu: "250m" }
-    limits:   { memory: "1Gi" }
+    requests: { memory: "3Gi", cpu: "1" }
+    limits:   { memory: "6Gi" }
 
 ## ── Redpanda ─────────────────────────────────────────────────────────────────
 redpanda:
   image: docker.redpanda.com/redpandadata/redpanda:v24.1.7
   brokerInternal: redpanda:19092
-  # Pinned at 1, deliberately low: the shard count is written into the data directory as an
-  # invariant, and a broker that later lands on a smaller node refuses to start if it decreased.
-  # One shard is portable across every node size this pool can provision.
-  cores: 1
-  # Room to scale the orchestrator to 6 replicas without repartitioning.
+  cores: 2
+  # Six, matching upstream and outbox, so the orchestrator can be scaled without repartitioning.
   defaultTopicPartitions: 6
-  storage: 8Gi
+  storage: 16Gi
   storageClass: hcloud-volumes
-  # No NodePort: the broker is internal to the cluster.
   externalNodePort: null
+  nodeSelector:
+    node.kubernetes.io/instance-type: cx43
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/component, operator: Exists }
+              - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+          topologyKey: kubernetes.io/hostname
   resources:
-    requests: { memory: "1Gi",    cpu: "500m" }
-    limits:   { memory: "1536Mi", cpu: "1" }
+    requests: { memory: "2Gi", cpu: "500m" }
+    limits:   { memory: "4Gi",  cpu: "2" }
 
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
@@ -50,60 +90,41 @@ orchestrator:
   imageTag: "2.2.1"
   replicas: 1
   servicePort: 8105
-  # This deployment owns an empty database and no migration history worth preserving, so
-  # Hibernate creates the schema and Flyway stays out of the way.
   ddlAuto: update
   flywayEnabled: false
-  consumerConcurrency: 3
-  dbPoolSize: 16
-  # A step whose dispatch or reply is lost is never looked at again unless it has a deadline.
-  #
-  # Fifteen minutes, not two. Two was chosen against what the worker simulates — 200ms — and that
-  # is the wrong thing to size it against: the deadline starts when the step starts, and under a
-  # burst a step spends almost all of that time queued, not working. A 5000-process run put 13537
-  # steps into TIMEOUT with a minimum duration of exactly 120s, and since the ACTIONs declare no
-  # retries, every one of them took its process to ERROR. The timeout has to sit above the worst
-  # queueing delay you are willing to absorb, not above the work itself.
+  # Six partitions on each binding, one pod: three threads leaves half of them unread.
+  consumerConcurrency: 6
+  dbPoolSize: 32
+  # Fifteen minutes, not two. A deadline starts when the step starts, and under a burst a step
+  # spends nearly all of it queued — sizing this against what the worker simulates (200ms) put
+  # 13537 steps into TIMEOUT and took 4722 of 5000 processes to ERROR. It has to sit above the
+  # worst queueing delay you are willing to absorb, not above the work itself.
   defaultStepTimeoutMs: 900000
-  # Off: the shell is what authenticates. See the security note in deploy/README.md.
   security:
     enabled: false
   extraEnv:
-    # Workflow definitions come from this very repository, on every start.
-    WORKFLOW_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-demo1.git"
+    WORKFLOW_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-definitions.git"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/workflows"
-    # WORKFLOW_GITIMPORT_WEBHOOKSECRET is NOT here — it comes from the Secret below, because
-    # extraEnv renders literals into the manifest and this one must not be in version control.
-    # One process is one trace: the outbox row carries the producing trace's traceparent and the
-    # relay continues it, so a whole process is a single Tempo trace rather than one per hop.
-    #
-    # Inert on the 2.2.0 images, and kept anyway. They carry the OpenTelemetry libraries but not
-    # the Spring Boot autoconfiguration that creates a Tracer and reads these properties: Boot 4
-    # moved it into spring-boot-tracing / spring-boot-opentelemetry, neither of which is on the
-    # classpath, so `management.otlp.tracing.endpoint` and `management.tracing.sampling.probability`
-    # do not exist as properties at all. WorkflowTracingAutoConfiguration finds no tracer and runs
-    # untraced. Tempo is deployed and its datasource is correct, so this starts working the day the
-    # engine images pick the dependency back up — with no change here.
     OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
     TRACING_SAMPLING: "1.0"
-    # JGit writes a user config as it clones, and these pods run with a read-only root
-    # filesystem where only /tmp is writable — without this the import logs two ERROR lines
-    # about a lock file it could not create on every single run. The clone succeeds either way;
-    # the errors are pure noise, and noise in an error log is what stops people reading it.
+    # JGit writes a user config as it clones, and this pod has a read-only root filesystem where
+    # only /tmp is writable — without this every import logs two ERROR lines about a lock file.
     XDG_CONFIG_HOME: "/tmp"
-  # Carries WORKFLOW_GITIMPORT_WEBHOOKSECRET, so a push to master re-imports the definitions
-  # instead of waiting for the next restart. Created at deploy time by deploy/deploy.sh.
-  #
-  # Not optional in practice: a blank secret makes the engine skip signature verification, and
-  # POST /workflow/webhooks/github is then an unauthenticated endpoint that clones a repository
-  # on demand, as often as anyone asks.
   extraEnvFromSecret: ec-git-webhook
+  nodeSelector:
+    node.kubernetes.io/instance-type: ccx13
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/component, operator: Exists }
+              - { key: app.kubernetes.io/component, operator: NotIn, values: [orchestrator] }
+          topologyKey: kubernetes.io/hostname
   resources:
-    requests: { memory: "640Mi", cpu: "250m" }
-    limits:   { memory: "1Gi",   cpu: "1" }
-  # Off because there is one replica: a budget of minAvailable 1 over a single pod makes the
-  # node undrainable, which on an autoscaled pool blocks consolidation forever.
+    requests: { memory: "2Gi", cpu: "1" }
+    limits:   { memory: "5Gi", cpu: "2" }
   podDisruptionBudget:
     enabled: false
 
@@ -118,58 +139,77 @@ forms:
   security:
     enabled: false
   extraEnv:
-    # Form definitions come from the same repository, a different subdirectory.
-    FORMS_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-demo1.git"
+    FORMS_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-definitions.git"
     FORMS_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
-    # Ignored today: `directory` exists on the workflow engine's GitImportProperties but not on
-    # the forms engine's, so the forms import scans the whole clone and logs a warning for every
-    # chart template it tries to parse. Harmless — a file needs `name` and `fields` to be taken
-    # as a form — but it means any stray YAML shaped like one would be imported. Kept here so it
-    # starts working the day the property is added upstream.
+    # Ignored on 2.2.1: `directory` exists on the workflow engine's GitImportProperties and not on
+    # the forms engine's, so this is accepted by relaxed binding and does nothing. The import walks
+    # the whole clone and warns on every file that is not a form. Kept so it starts working the day
+    # the field is added upstream.
     FORMS_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/forms"
     OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
     TRACING_SAMPLING: "1.0"
-    # JGit writes a user config as it clones, and these pods run with a read-only root
-    # filesystem where only /tmp is writable — without this the import logs two ERROR lines
-    # about a lock file it could not create on every single run. The clone succeeds either way;
-    # the errors are pure noise, and noise in an error log is what stops people reading it.
     XDG_CONFIG_HOME: "/tmp"
-    # A topic of its own, instead of the default `downstream` it shares with every worker.
-    #
-    # On `downstream` the forms engine and the test worker both receive every task — they are in
-    # different consumer groups — so the worker answered the human tasks itself and no form
-    # execution was ever waited on. Moving the forms engine here makes a human task opt-in: a
-    # USER_TASK reaches it only by naming `topic: forms`, and one that names nothing is resolved
-    # by the worker like any other step, which is what a workflow under test wants.
+    # A topic of its own. On the default `downstream` the forms engine and the test worker both
+    # receive every task — different consumer groups — and the worker answers the human ones
+    # itself. Here a USER_TASK reaches the forms engine only by naming `topic: forms`.
     SPRING_CLOUD_STREAM_BINDINGS_CONSUMEWORKEREVENTFORFORMSENGINE_IN_0_DESTINATION: "forms"
-  # Carries FORMS_GITIMPORT_WEBHOOKSECRET. One Secret holds both keys; each app reads the one it
-  # knows and ignores the other.
   extraEnvFromSecret: ec-git-webhook
+  nodeSelector:
+    node.kubernetes.io/instance-type: cx43
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/component, operator: Exists }
+              - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+          topologyKey: kubernetes.io/hostname
   resources:
-    requests: { memory: "512Mi", cpu: "250m" }
-    limits:   { memory: "1Gi",   cpu: "1" }
+    requests: { memory: "1Gi", cpu: "500m" }
+    limits:   { memory: "2Gi", cpu: "2" }
   podDisruptionBudget:
     enabled: false
 
 ## ── Rules ────────────────────────────────────────────────────────────────────
-# Scaled to zero rather than removed: none of the three workflows here has a RULE step, and the
-# chart has no on/off switch for the component. The Deployment and Service stay, so enabling the
-# rule engine later is a one-line change and not a redeployment.
+# Running now, and reading from the same repository. It has nothing to import yet — ec-definitions
+# carries no definitions/rules directory — so it will start, clone, find no rules and say so. That
+# is the honest state: the engine is there and wired, the catalogue is empty.
 rules:
   image: miguelperezcolom/rule-standalone-app
   imageTag: "2.2.1"
-  replicas: 0
+  replicas: 1
   servicePort: 8107
   grpcEnabled: false
   ddlAuto: update
   flywayEnabled: false
   security:
     enabled: false
+  extraEnv:
+    RULES_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-definitions.git"
+    RULES_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
+    RULES_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/rules"
+    OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
+    TRACING_SAMPLING: "1.0"
+    XDG_CONFIG_HOME: "/tmp"
+  extraEnvFromSecret: ec-git-webhook
+  nodeSelector:
+    node.kubernetes.io/instance-type: cx43
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/component, operator: Exists }
+              - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+          topologyKey: kubernetes.io/hostname
+  resources:
+    requests: { memory: "1Gi", cpu: "500m" }
+    limits:   { memory: "2Gi", cpu: "2" }
   podDisruptionBudget:
     enabled: false
 
-# Ingress is not the chart's: this deployment fronts several hosts (shell, Keycloak, Grafana)
-# from one controller, so it is written out in deploy/manifests/40-ingress.yaml.
+# Ingress is not the chart's: this deployment fronts several hosts from one controller, so it is
+# written out in deploy/manifests/40-ingress.yaml.
 ingress:
   enabled: false
 

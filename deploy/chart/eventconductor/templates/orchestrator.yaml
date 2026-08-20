@@ -18,8 +18,12 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: orchestrator
     spec:
-      {{- with .Values.nodeSelector }}
+      {{- with (default .Values.nodeSelector (get .Values "orchestrator").nodeSelector) }}
       nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (get .Values "orchestrator").affinity }}
+      affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:

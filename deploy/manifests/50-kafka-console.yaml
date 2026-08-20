@@ -36,13 +36,24 @@ spec:
     matchLabels: { app: kafka-console }
   template:
     metadata:
-      labels: { app: kafka-console }
+      labels:
+        app: kafka-console
+        app.kubernetes.io/component: kafka-console
       annotations:
         # Rolls the pod when the config changes; a ConfigMap edit alone would leave the old file
         # mounted until something else happened to restart it.
         checksum/config: "brokers-redpanda-19092-v1"
     spec:
-      nodeSelector: { kubernetes.io/arch: amd64 }
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 99

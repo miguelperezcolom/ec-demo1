@@ -1,5 +1,8 @@
 controller:
   type: daemonset
+  # No instance-type selector, unlike the rest of the stack. This is the DaemonSet that reads
+  # every pod's logs, so it has to run on every node — pinning it to the observability node would
+  # leave it collecting only its own, and blind to the engine it exists to watch.
   nodeSelector: { kubernetes.io/arch: amd64 }
 alloy:
   resources:

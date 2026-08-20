@@ -4,9 +4,10 @@ A complete EventConductor deployment: the engine, a human-task front end, an ide
 a message broker, a database and a full observability stack — running on a CloudFleet/Hetzner
 cluster, deployable from an empty cluster with one script.
 
-It is also the **source of its own workflows**. The orchestrator and the forms engine clone this
-repository at startup and import what they find under `definitions/`, so a process here is
-changed by a pull request rather than by an API call.
+The definitions live in a repository of their own,
+[`ec-definitions`](https://github.com/miguelperezcolom/ec-definitions): the orchestrator, the forms
+engine and the rule engine each clone it at startup and import what they find under `definitions/`,
+so a process is changed by a pull request rather than by an API call.
 
 ```
                          https://ec1.mateu.io
@@ -32,8 +33,6 @@ changed by a pull request rather than by an API call.
 
 | | |
 |---|---|
-| `definitions/workflows/*.ec` | Three workflow definitions, imported by the orchestrator from Git |
-| `definitions/forms/*.ecform` | The forms their `USER_TASK` steps reference, imported by the forms engine |
 | `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus, carries the branding |
 | `gateway/` | Spring Cloud Gateway — routes the console and enforces the token |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
@@ -133,6 +132,31 @@ it has. Measure end to end, not while the producer is still running.
 `notify-parallel` is the useful default for volume: three parallel `ACTION`s and a barrier, no
 human in it. `order-fulfilment` stops at its `USER_TASK`, so loading it builds a backlog of
 waiting tasks instead — a different thing to watch, and also worth watching.
+
+## The node topology
+
+Five groups, each on hardware chosen for what it does, and kept apart by pod anti-affinity rather
+than by hope — an instance-type selector alone lets Karpenter pack two components onto one node
+the moment they both fit.
+
+| group | instance | why |
+|---|---|---|
+| `postgres` | ccx13, alone | dedicated vCPU and **local NVMe**: a WAL commit blocks on fsync, and on the shared-vCPU line that syscall is stalled by noisy-neighbour CPU steal |
+| `orchestrator` | ccx13, alone | the thing under test should not share a core with what it drives |
+| `worker` | ccx13, alone | same |
+| platform | cx43 | redpanda, forms, rules, keycloak, shell, gateway, kafka console — none of them blocks on fsync |
+| observability | ccx23 | its own namespace and its own instance type; anti-affinity is namespace-scoped and could not keep it off the engine's nodes from here |
+
+Two things worth knowing before changing it. **Postgres is on an `emptyDir`** — that is what makes
+it local NVMe rather than a network volume, and it means the data dies with the pod. It is the
+right trade for a load rig and the wrong one for anything else. And **this fleet has no `ccx33`**:
+Karpenter answers a request for one with "no instance type met all requirements" and creates
+nothing, which reads exactly like a quota problem and is not. Probe a type with a throwaway pod
+before designing around it.
+
+The fleet's own cpu limit is the binding constraint, and it can only be changed through the
+CloudFleet Fleet API — `kubectl` is refused. This topology asks for 20 of the 24 it currently
+allows.
 
 ## Notes worth knowing
 

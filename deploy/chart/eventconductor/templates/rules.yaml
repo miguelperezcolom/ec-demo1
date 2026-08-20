@@ -18,8 +18,12 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: rules
     spec:
-      {{- with .Values.nodeSelector }}
+      {{- with (default .Values.nodeSelector (get .Values "rules").nodeSelector) }}
       nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (get .Values "rules").affinity }}
+      affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:

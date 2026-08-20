@@ -18,13 +18,24 @@ spec:
     matchLabels: { app: gateway }
   template:
     metadata:
-      labels: { app: gateway }
+      labels:
+        app: gateway
+        app.kubernetes.io/component: gateway
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8190"
     spec:
-      nodeSelector: { kubernetes.io/arch: amd64 }
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -54,8 +65,9 @@ spec:
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           resources:
-            requests: { memory: "384Mi", cpu: "150m" }
-            limits:   { memory: "768Mi", cpu: "1" }
+            # Every request to the console crosses it, so under load it is on the hot path.
+            requests: { memory: "768Mi", cpu: "500m" }
+            limits:   { memory: "2Gi",   cpu: "2" }
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
           readinessProbe:

@@ -2,6 +2,13 @@
 #
 #   helm upgrade --install kps prometheus-community/kube-prometheus-stack \
 #     -n observability -f deploy/observability/kube-prometheus-stack.yaml
+# Pinned to ccx33 (8 vCPU / 32 GB), which nothing in the ec-demo1 namespace requests. That is the
+# separation: pod anti-affinity is namespace-scoped by default, so it cannot keep these pods off
+# the engine's nodes from here — a distinct instance type can, and needs no rule on either side.
+#
+# One node for the whole stack rather than one each: Prometheus, Grafana, Loki and Tempo are the
+# thing that has to keep working while the engine is being stressed, and what they must not share
+# is the engine, not each other.
 alertmanager:
   enabled: false
 
@@ -14,25 +21,28 @@ kubeStateMetrics:
 # pods whose containers declare no requests. Three of this chart's subcharts ship without them,
 # so they are set here rather than left to default to BestEffort.
 prometheus-node-exporter:
+  # A DaemonSet, so no instance-type selector: it reports each node's own CPU, memory and disk,
+  # and pinning it to the observability node would report that node four times over and nothing
+  # about the ones under load.
   nodeSelector: { kubernetes.io/arch: amd64 }
   resources:
     requests: { memory: "32Mi", cpu: "20m" }
     limits:   { memory: "64Mi" }
 kube-state-metrics:
-  nodeSelector: { kubernetes.io/arch: amd64 }
+  nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
   resources:
     requests: { memory: "64Mi", cpu: "20m" }
     limits:   { memory: "128Mi" }
 
 prometheusOperator:
-  nodeSelector: { kubernetes.io/arch: amd64 }
+  nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
   resources:
     requests: { memory: "128Mi", cpu: "50m" }
     limits:   { memory: "256Mi", cpu: "500m" }
 
 prometheus:
   prometheusSpec:
-    nodeSelector: { kubernetes.io/arch: amd64 }
+    nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
     retention: 24h
     scrapeInterval: 30s
     # No storageSpec on purpose: Prometheus keeps its TSDB on an emptyDir here because the
@@ -69,7 +79,7 @@ prometheus:
             target_label: pod
 
 grafana:
-  nodeSelector: { kubernetes.io/arch: amd64 }
+  nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
   # No password in version control: the Secret is created at deploy time by deploy/deploy.sh.
   admin:
     existingSecret: grafana-admin

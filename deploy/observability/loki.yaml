@@ -21,7 +21,7 @@ loki:
 deploymentMode: SingleBinary
 singleBinary:
   replicas: 1
-  nodeSelector: { kubernetes.io/arch: amd64 }
+  nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
   persistence: { storageClass: hcloud-volumes, size: 10Gi }
   resources:
     requests: { memory: 256Mi, cpu: 100m }

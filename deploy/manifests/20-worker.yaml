@@ -23,7 +23,9 @@ spec:
     matchLabels: { app: worker }
   template:
     metadata:
-      labels: { app: worker }
+      labels:
+        app: worker
+        app.kubernetes.io/component: worker
       # No prometheus.io/scrape here, unlike the shell and the gateway. The published
       # worker-standalone-app image carries actuator but not micrometer-registry-prometheus, so
       # /actuator/prometheus answers 404 — the endpoint does not exist without a registry on the
@@ -31,7 +33,18 @@ spec:
       # worse than no target at all. Add the registry to the worker app upstream (the orchestrator
       # and forms images already have it) and this becomes three lines.
     spec:
-      nodeSelector: { kubernetes.io/arch: amd64 }
+      nodeSelector:
+        node.kubernetes.io/instance-type: ccx13
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  # Exists AND NotIn: `NotIn` alone also matches pods without the label — every
+                  # DaemonSet — and the rule would then exclude every node in the cluster.
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: NotIn, values: [worker] }
+              topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -104,8 +117,11 @@ spec:
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           resources:
-            requests: { memory: "448Mi", cpu: "150m" }
-            limits:   { memory: "1Gi",   cpu: "1" }
+            # It has a ccx13 to itself, so it may as well use it. The handler blocks a Reactor
+            # thread per task under jpa persistence, and headroom is the only lever available
+            # from here — the concurrency itself is the engine's to fix.
+            requests: { memory: "2Gi", cpu: "1" }
+            limits:   { memory: "5Gi", cpu: "2" }
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
           readinessProbe:

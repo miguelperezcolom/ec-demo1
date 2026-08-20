@@ -18,6 +18,12 @@ postgres:
   port: 5432
   storage: 8Gi
   storageClass: ""
+  # Put PGDATA on the node's own disk (an emptyDir) instead of a PersistentVolume. On Hetzner that
+  # means local NVMe rather than a network volume, which is what decides how fast a WAL commit can
+  # fsync — the measured ceiling on shared-vCPU nodes with network storage was ~890-1600
+  # fdatasync/s. The data does not survive the pod: for a load rig that is the right trade, and
+  # for anything else it is not.
+  localDisk: false
   # Not a sizing hint — a pod with no requests is BestEffort, and BestEffort is what the kubelet
   # evicts first when a node runs short of memory. Left empty, the database and the broker are
   # the two pods most likely to be killed to make room for another stateless replica of the
@@ -29,6 +35,13 @@ postgres:
       cpu: "500m"
     limits:
       memory: "2Gi"
+  # Placement, per component. Falls back to the chart-wide `nodeSelector` when unset.
+  #   nodeSelector: { node.kubernetes.io/instance-type: ccx13 }
+  #   affinity: { podAntiAffinity: ... }
+  # The chart-wide selector cannot express "this component gets a node to itself", which is what
+  # separating the database from the engine needs.
+  nodeSelector: {}
+  affinity: {}
 
 ## ── Redpanda ─────────────────────────────────────────────────────────────────
 redpanda:
@@ -58,6 +71,13 @@ redpanda:
       cpu: "500m"
     limits:
       memory: "3Gi"
+  # Placement, per component. Falls back to the chart-wide `nodeSelector` when unset.
+  #   nodeSelector: { node.kubernetes.io/instance-type: ccx13 }
+  #   affinity: { podAntiAffinity: ... }
+  # The chart-wide selector cannot express "this component gets a node to itself", which is what
+  # separating the database from the engine needs.
+  nodeSelector: {}
+  affinity: {}
 
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
@@ -100,6 +120,13 @@ orchestrator:
   # private definitions repo — which extraEnv above cannot carry, since it renders
   # literals straight into the manifest.
   extraEnvFromSecret: ""
+  # Placement, per component. Falls back to the chart-wide `nodeSelector` when unset.
+  #   nodeSelector: { node.kubernetes.io/instance-type: ccx13 }
+  #   affinity: { podAntiAffinity: ... }
+  # The chart-wide selector cannot express "this component gets a node to itself", which is what
+  # separating the database from the engine needs.
+  nodeSelector: {}
+  affinity: {}
   security:
     enabled: true
     user: admin
@@ -140,6 +167,13 @@ forms:
   # private definitions repo — which extraEnv above cannot carry, since it renders
   # literals straight into the manifest.
   extraEnvFromSecret: ""
+  # Placement, per component. Falls back to the chart-wide `nodeSelector` when unset.
+  #   nodeSelector: { node.kubernetes.io/instance-type: ccx13 }
+  #   affinity: { podAntiAffinity: ... }
+  # The chart-wide selector cannot express "this component gets a node to itself", which is what
+  # separating the database from the engine needs.
+  nodeSelector: {}
+  affinity: {}
   security:
     enabled: true
     user: admin
@@ -180,6 +214,13 @@ rules:
   # private definitions repo — which extraEnv above cannot carry, since it renders
   # literals straight into the manifest.
   extraEnvFromSecret: ""
+  # Placement, per component. Falls back to the chart-wide `nodeSelector` when unset.
+  #   nodeSelector: { node.kubernetes.io/instance-type: ccx13 }
+  #   affinity: { podAntiAffinity: ... }
+  # The chart-wide selector cannot express "this component gets a node to itself", which is what
+  # separating the database from the engine needs.
+  nodeSelector: {}
+  affinity: {}
   security:
     enabled: true
     user: admin
