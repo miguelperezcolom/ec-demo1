@@ -129,10 +129,17 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 30
+            # One second — Kubernetes' default — is not a health check on a JVM, it is a check that
+            # the JVM is idle. Under load this worker answers tasks on Reactor threads while its
+            # store calls block; the actuator endpoint is behind that, not in front of it.
+            timeoutSeconds: 5
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8091 }
             initialDelaySeconds: 90
             periodSeconds: 20
+            # Liveness restarts the container, so it has to mean "wedged", never "busy".
+            timeoutSeconds: 5
+            failureThreshold: 6
       volumes:
         - { name: tmp, emptyDir: {} }
 ---

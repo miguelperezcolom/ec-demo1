@@ -118,12 +118,21 @@ spec:
               port: {{ .Values.rules.port }}
             initialDelaySeconds: 30
             periodSeconds: 10
+            # Kubernetes defaults timeoutSeconds to 1, and one second is not a health check on a
+            # JVM — it is a check that the JVM is idle. A single expensive request is enough to put
+            # the actuator endpoint past it; /workflow/analytics did exactly that here and the
+            # liveness probe SIGKILLed a pod that was working, not stuck.
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: {{ .Values.rules.port }}
             initialDelaySeconds: 60
             periodSeconds: 20
+            # Liveness restarts the container, so it has to mean "wedged", never "busy". Five
+            # seconds to answer and six consecutive misses is two minutes of silence before a kill.
+            timeoutSeconds: 5
+            failureThreshold: 6
       volumes:
         - name: tmp
           emptyDir: {}

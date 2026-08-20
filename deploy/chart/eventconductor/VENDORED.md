@@ -6,7 +6,8 @@ checkout of the engine repo beside it.
 
 ## The changes
 
-Two, both filling gaps that make a real deployment impossible rather than inconvenient.
+Three. The first two fill gaps that make a real deployment impossible rather than inconvenient;
+the third is a default of Kubernetes' that is wrong for a JVM.
 
 ### 1. `extraEnv` on `forms` and `rules`
 
@@ -42,3 +43,18 @@ enough for both.
 
 Everything else is byte-identical to upstream. `diff -r` against
 `eventconductor/charts/eventconductor` should show only the blocks above and this file.
+
+### 3. `timeoutSeconds` on every probe
+
+The chart sets `initialDelaySeconds` and `periodSeconds` and leaves `timeoutSeconds` alone, so
+Kubernetes applies its default of **one second**. One second is not a health check on a JVM; it is a
+check that the JVM is idle. A single expensive request is enough to push `/actuator/health` past it,
+and for a *liveness* probe the consequence is a SIGKILL of a pod that was working rather than stuck
+— which is what `/workflow/analytics` did here, three missed probes and `exitCode: 137`, twice.
+
+Readiness now allows 5s (take it out of rotation while it is busy, which is correct), and liveness
+allows 5s with `failureThreshold: 6` — two full minutes of silence before restarting anything.
+Liveness has to mean wedged, never busy.
+
+Worth upstreaming as configurable values rather than as these numbers; every deployment's idea of
+"wedged" is different.
