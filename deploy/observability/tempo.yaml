@@ -1,5 +1,43 @@
 nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
 tempo:
+  # Grafana's Tempo datasource runs TraceQL with `rate() by(...)` for its service graph and RED
+  # views, and those are computed by the metrics generator rather than read from the traces. With
+  # it off — the chart's default — every one of those panels fails with
+  #
+  #   error finding generators: empty ring
+  #
+  # which says nothing about what is actually missing. Individual traces and search work fine
+  # either way; it is only the aggregate views that need this.
+  #
+  # It writes the metrics it derives into Prometheus, which therefore has to accept remote writes
+  # (enableRemoteWriteReceiver in the kube-prometheus-stack values).
+  # Configuring the generator is only half of it: the processors also have to be switched on for
+  # the tenant. Left at the chart's default (`overrides.defaults: {}`) the generator starts, its
+  # config appears in the ConfigMap, and it receives nothing at all — a query then returns an empty
+  # series rather than an error, which looks like "no data yet" and never stops looking like it.
+  overrides:
+    defaults:
+      metrics_generator:
+        processors:
+          - local-blocks
+          - service-graphs
+          - span-metrics
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: "http://kps-kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090/api/v1/write"
+    processor:
+      # local_blocks is what answers a TraceQL metrics query — anything with `| rate()`, which is
+      # exactly what Grafana's trace views run. service_graphs and span_metrics feed the Prometheus
+      # remote write instead, so with only those two the query stops failing and starts returning
+      # an empty series, which is a different kind of confusing.
+      local_blocks:
+        flush_to_storage: true
+        filter_server_spans: false
+        max_block_duration: 1m
+      service_graphs:
+        wait: 10s
+      span_metrics:
+        dimensions: [service.name, span.name, status.code]
   storage:
     trace: { backend: local }
   receivers:
@@ -7,9 +45,16 @@ tempo:
       protocols:
         http: { endpoint: "0.0.0.0:4318" }
         grpc: { endpoint: "0.0.0.0:4317" }
+  # 640Mi was enough for a Tempo that only ingested and read back traces. It is not enough for one
+  # running the metrics generator above: `local_blocks` keeps recent spans in memory to answer the
+  # TraceQL `| rate()` queries Grafana's trace views issue, and `filter_server_spans: false` means
+  # it keeps the client spans too. Under a 5000-process load run with `TRACING_SAMPLING: "1.0"` on
+  # all three engines it OOMKilled every ~70 seconds, and a Grafana query landing in one of those
+  # windows reports `dial tcp ...:3200: connect: no route to host` — the pod is gone, so the
+  # EndpointSlice has no backend. It reads like a network fault and is not one.
   resources:
-    requests: { memory: 256Mi, cpu: 100m }
-    limits: { memory: 640Mi, cpu: 1 }
+    requests: { memory: 1Gi, cpu: 100m }
+    limits: { memory: 3Gi, cpu: 1 }
 persistence:
   enabled: true
   storageClassName: hcloud-volumes

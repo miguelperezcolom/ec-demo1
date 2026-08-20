@@ -45,6 +45,10 @@ prometheus:
     nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
     retention: 24h
     scrapeInterval: 30s
+    # Tempo's metrics generator derives service-graph and span metrics from traces and writes them
+    # here. Without this the write is refused and Grafana's trace aggregate views stay broken even
+    # once the generator itself is running.
+    enableRemoteWriteReceiver: true
     # No storageSpec on purpose: Prometheus keeps its TSDB on an emptyDir here because the
     # Hetzner CSI rejects the PVC the operator writes ("invalid input in field 'labels'"), and
     # the pod then never starts. 24h of demo metrics do not survive a restart; Loki and Tempo,
@@ -85,9 +89,14 @@ grafana:
     existingSecret: grafana-admin
     userKey: admin-user
     passwordKey: admin-password
+  # 512Mi is enough for Grafana rendering dashboards off Prometheus, and not enough for the same
+  # Grafana running TraceQL `| rate()` queries against Tempo while a load run is in flight: it
+  # OOMKilled twice doing exactly that, at a measured 685MB working set across the pod. The CPU
+  # limit is raised with it because it was throttled 39% of periods in the same window — a Grafana
+  # that cannot draw the panel is indistinguishable, from the browser, from a backend that is down.
   resources:
-    requests: { memory: "192Mi", cpu: "100m" }
-    limits:   { memory: "512Mi", cpu: "500m" }
+    requests: { memory: "256Mi", cpu: "200m" }
+    limits:   { memory: "1Gi", cpu: "1" }
   # The dashboard/datasource sidecars ship with no requests either.
   sidecar:
     resources:
