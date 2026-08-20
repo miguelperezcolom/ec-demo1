@@ -87,7 +87,7 @@ redpanda:
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
   image: miguelperezcolom/orchestrator-standalone-app
-  imageTag: "2.5.0"
+  imageTag: "2.6.0"
   replicas: 1
   servicePort: 8105
   ddlAuto: update
@@ -167,7 +167,7 @@ orchestrator:
 ## ── Forms ────────────────────────────────────────────────────────────────────
 forms:
   image: miguelperezcolom/forms-standalone-app
-  imageTag: "2.5.0"
+  imageTag: "2.6.0"
   replicas: 1
   servicePort: 8106
   ddlAuto: update
@@ -213,7 +213,7 @@ forms:
 # is the honest state: the engine is there and wired, the catalogue is empty.
 rules:
   image: miguelperezcolom/rule-standalone-app
-  imageTag: "2.5.0"
+  imageTag: "2.6.0"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false
