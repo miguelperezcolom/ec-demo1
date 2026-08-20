@@ -103,6 +103,40 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
    (Prometheus). Traces are wired but not yet arriving — see below.
 
+## Measuring it
+
+```sh
+./deploy/loadgen.sh 20 1        # unsaturated
+./deploy/measure.sh             # -> cost per transition
+
+./deploy/loadgen.sh 5000 50     # saturated
+./deploy/measure.sh             # -> throughput
+```
+
+Two numbers, and they cannot come from the same run.
+
+**Cost per transition** is the gap between one step finishing and the next starting. Nothing but
+the engine happens in that window — writing the transition, publishing it to the outbox, relaying
+it, routing it, dispatching the next task — so it does not move when the workers get faster or
+slower. It is the answer to *does the orchestrator resolve steps quickly*.
+
+**Throughput** is steps and processes per second across the whole run. It answers *how much can
+this deployment absorb*, and it includes the worker's simulated 200ms and every second a step
+spent queued. Raise `durationMs` in `TEST_CONFIG` and it collapses without the engine having
+changed at all.
+
+Measured here, the same workflow on the same cluster:
+
+| | transitions | throughput |
+|---|---|---|
+| 20 processes at 1/s | **37 ms** mean, 34 p50, 54 p95 | 3.6 steps/s |
+| 5000 processes at 50/s | 18 590 ms mean | **120 steps/s** |
+
+A factor of 500 between the two transition figures, and none of it is the engine getting slower —
+under saturation that gap is queueing and stops describing the engine at all. Reading a low
+arrival rate as "the engine is fast", or a saturated one as "the engine is slow", are the same
+mistake pointing in opposite directions.
+
 ## Giving it work
 
 ```sh
