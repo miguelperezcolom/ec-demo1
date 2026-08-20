@@ -133,9 +133,9 @@ Measured here, the same workflow on the same cluster:
 | | transitions | throughput |
 |---|---|---|
 | 20 processes at 1/s | **37 ms** mean, 34 p50, 54 p95 | 3.6 steps/s |
-| 5000 processes at 50/s | 18 590 ms mean | **120 steps/s** |
+| 5000 processes at 50/s | 24 355 ms mean | **135 steps/s** |
 
-A factor of 500 between the two transition figures, and none of it is the engine getting slower —
+A factor of 650 between the two transition figures, and none of it is the engine getting slower —
 under saturation that gap is queueing and stops describing the engine at all. Reading a low
 arrival rate as "the engine is fast", or a saturated one as "the engine is slow", are the same
 mistake pointing in opposite directions.
@@ -148,9 +148,35 @@ before the orchestrator is the bottleneck.* Measured on `orchestration-only`, a 
 dispatched and no worker is involved. Twelve transitions per process; `processes/s x 12` is the
 orchestrator's transition rate and nothing else's.
 
-**The ceiling is not CPU, and it is not the hardware.** At every measured point the orchestrator
-sat below half its limit, PostgreSQL below 20%, Redpanda at 0.14 of 2 cores, no thread ever waited
-for a JDBC connection, and GC never registered — while tens of thousands of steps queued.
+**Measured as a ladder**, because one saturated run gives you a rate and cannot tell you whether
+that rate is a ceiling. Four runs, each at an arrival rate the producer actually held — these are
+the first figures on this page taken at the rate written on their label, and `loadgen.sh` now
+prints the rate it achieved so the claim is checkable:
+
+| arrivals/s | processes | throughput | transitions/s | drained |
+|---|---|---|---|---|
+| 20 | 1200 | 13.06/s | 157 | yes |
+| 40 | 1600 | 13.34/s | 160 | yes |
+| 80 | 2400 | 13.50/s | 162 | yes |
+| 160 | 3200 | 13.76/s | **165** | yes |
+
+**Eight times the arrival rate buys five percent more throughput.** That is the shape of a ceiling,
+and it is a shape rather than a number — which is why the ladder is worth the four runs. All four
+drained completely: 8400 processes, zero errors, zero timeouts. It queues; it does not fall over.
+
+**The ceiling is not CPU, and it is not the hardware.** At the top of the ladder, with **2903
+processes in flight**:
+
+    orchestrator CPU     0.44 of 2.0     22%, and never throttled
+    outbox pending       18 rows
+    threads waiting on a JDBC connection 0
+    PostgreSQL           0.39 cores
+    Redpanda             0.14 of 2.0
+
+Nearly three thousand processes waiting, and nothing in the deployment is busy. The outbox does not
+even back up, and those 18 rows locate the constraint more precisely than the spare CPU does: the
+relay is not slow at *reading* its backlog, it is slow at *publishing*. The queue forms in front of
+it, not inside it.
 
 It is the outbox relay publishing **synchronously**, one message at a time, waiting for `acks=all`
 on each:
@@ -169,7 +195,7 @@ being transactional. So the round-trip is the price of the guarantee, and it is 
 | 6 | 1 (default) | 1 (default) | 94, with 7335 rows stuck in the outbox |
 | 6 | 4 | 8 | **184** |
 | 6 | 12 | 16 | 160 |
-| 24 | 4 | 16 | 125 |
+| 24 | 4 | 16 | 125 — superseded, see the ladder: 165 |
 
 The first row is the one worth reading twice: the defaults are a 500ms poll of at most 100 rows by
 a single thread — 200 events/s whatever the hardware — and the backlog that produces looks exactly
@@ -180,17 +206,25 @@ transaction, so additional relay threads contend rather than parallelise, and mo
 spread the same synchronous publishing thinner.
 
 **Partitions cannot be reduced.** Raising `outbox` and `upstream` from 6 to 24 to test that
-hypothesis is not undoable, and it cost roughly a third of the throughput: the same optimal
-settings now measure 120 transitions/s instead of 184. Recreating the topics is the only way back,
-and it means dropping whatever they hold.
+hypothesis is not undoable. Recreating the topics is the only way back, and it means dropping
+whatever they hold — which is also why the 6-partition rows above cannot be re-measured.
+
+**Those three rows were measured with the old rig**, before `loadgen.sh` was fixed to hold the rate
+it is given, so each was fed below its label and each is a floor rather than a ceiling: 184 is
+probably low too. The 24-partition row is the live configuration, and the ladder supersedes it —
+165 transitions/s, not 125. That gap is not a change to the engine. It is what happens when a
+deployment is finally fed at the rate it was always being asked for.
 
 So, on this deployment as it stands:
 
-    ~120 transitions/s   =>  10 processes/s at 12 steps
-                             17 processes/s at  7 steps
+    ~165 transitions/s   =>  13.8 processes/s at 12 steps
+                             23.6 processes/s at  7 steps, if the orchestrator were the only cost
 
-and ~184 with `outbox` back at 6 partitions. Both figures are *the orchestrator not being the
-bottleneck in CPU terms* — it has 80% of its cores spare at either.
+The measurement disagrees with that second line, and the disagreement is the useful part:
+`notify-parallel` has 7 steps and runs at 19.2 processes/s, not 23.6. The missing 4 is the worker —
+a real round trip over Kafka to a process that has to answer — which `orchestration-only`
+deliberately does not have. The projection is the orchestrator's share of the budget, never the
+whole of it, and the difference between the two is the only honest way to see the worker's.
 
 ## Giving it work
 
@@ -204,21 +238,28 @@ A Job that produces `ProcessCreationRequested` events onto the same `upstream` t
 else uses, so it drives this deployment rather than a rig of its own. No image to build — the
 Redpanda image already on the node ships `rpk`.
 
-Measured on the topology above, EventConductor 2.3.0: **5000 instances of `notify-parallel` at
-50/s, all 5000 completed, zero errors, in 291 seconds** — **17.2 processes/s and 120 step
+Measured on the topology above, EventConductor 2.5.0: **5000 instances of `notify-parallel` at
+50/s, all 5000 completed, zero errors, in 260 seconds** — **19.2 processes/s and 135 step
 executions/s**.
 
 | | processes/s | steps/s | duration |
 |---|---|---|---|
 | shared nodes, 2.2.1 | 2.6 | 18 | 32 min |
 | separated nodes, 2.2.1 | 12.7 | 89 | 6.5 min |
-| separated nodes, 2.3.0 | **17.2** | **120** | **4.9 min** |
+| separated nodes, 2.3.0 | 17.2 | 120 | 4.9 min |
+| 2.5.0, at a rate actually held | **19.2** | **135** | **4.3 min** |
+
+**Only the last row was taken at the rate on its label.** The first three say 50/s and were
+produced at 29 — see the fourth lesson below. The gap between the last two is almost entirely that:
+the same cluster and the same definition, measured on the same afternoon, read 17.6 processes/s at
+29 arrivals/s and 19.2 at 50. Feeding it properly is worth more than the version bump, and at 29/s
+it had moments with nothing to do.
 
 Almost all of the first jump is placement, not tuning: the orchestrator was pinned at 11% of a
 core on the shared topology and reached 860m once it had a node to itself, because it had been
 sharing two shared vCPUs with the broker.
 
-Three things those runs took to learn, all of them about measurement rather than about the engine.
+Four things those runs took to learn, all of them about measurement rather than about the engine.
 
 An early attempt failed almost entirely — 4722 of 5000 in ERROR — because `defaultStepTimeoutMs`
 was two minutes, sized against what the worker simulates (200ms) rather than against how long a
@@ -232,6 +273,15 @@ end to end.
 And a run started immediately after a restart measures the restart. The first 2.3.0 run read 5.5
 processes/s against 17.2 for the identical load minutes later, with nothing changed but a warm JVM
 and a schema that already existed.
+
+And a rig that could not produce the rate it was given, silently. `loadgen.sh` slept a whole
+second after each batch, on top of however long `rpk` took to start, connect, produce and exit — so
+a run asking for 50/s produced 5000 events in 174 seconds rather than 100, at 29/s, and nothing
+reported it because nothing was measuring the rate achieved. It now paces against a deadline and
+prints `arrival rate: X/s produced, N/s requested` on every run, warning when a batch was already
+late. A throughput figure is only as good as the arrival rate it was taken at, and that rate has to
+be measured rather than assumed — including, and especially, when you wrote it on the command line
+yourself.
 
 `notify-parallel` is the useful default for volume: three parallel `ACTION`s and a barrier, no
 human in it. `order-fulfilment` stops at its `USER_TASK`, so loading it builds a backlog of
