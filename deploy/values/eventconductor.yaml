@@ -151,11 +151,20 @@ orchestrator:
     #     uncapped (default 0)    65-72 transitions/s
     #     capped at 4             95-103 transitions/s
     #
-    # Uncapped is about 35% slower. With batch-size at 500, "no cap" means up to five hundred sends
-    # in flight inside one transaction that holds row locks for all of them, and the cost of that
-    # shows up before the benefit does. The cap is doing something other than throttling the broker,
-    # which sat at 0.16 of 2 cores throughout — Redpanda has never been the constraint at any point
-    # in these measurements.
+    # Do not read that as "the cap wins". The comparison is not sound and the mechanism offered for
+    # it was wrong. batch-size is a LIMIT on the claim, not a threshold to fill: the relay takes up
+    # to 500 pending rows and sends however many it finds. Pending sat at 3 during the uncapped run
+    # and 0 at the end of the capped one, so batches were a few rows either way and concurrency had
+    # almost nothing to bite on — a cap cannot explain 35% when the relay is not the constraint in
+    # either arm. The uncapped samples were also still climbing when they were taken (0.93, 4.63,
+    # 11.24, 9.32, 10.32) while the capped ones were flat (14.77, 13.72, 13.57): a ramp measured
+    # against a plateau. Redpanda sat at 0.16 of 2 cores throughout, as it has in every measurement
+    # here.
+    #
+    # 4 is kept because it is what this deployment has always run and nothing has been shown to beat
+    # it — not because the A/B above showed anything. Redoing it properly means equal elapsed time
+    # per arm, a plateau confirmed on both, and the outbox retention below set first, so the arms do
+    # not sit on a table that grew by 75 000 rows between them.
     #
     # Removing it did move the bottleneck, which is worth recording: the outbox stopped backing up
     # entirely (3 rows pending, 29ms relay passes) and PostgreSQL became the busiest component at
