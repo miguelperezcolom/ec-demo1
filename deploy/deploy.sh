@@ -19,7 +19,7 @@ NS=ec-demo1
 OBS_NS=observability
 SECRETS=deploy/.secrets/credentials.env
 
-echo "══ 1/7  Cluster prerequisites: ingress controller and certificate issuer ══"
+echo "══ 1/6  Cluster prerequisites: ingress controller and certificate issuer ══"
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
 helm repo add jetstack https://charts.jetstack.io >/dev/null 2>&1 || true
 helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
@@ -50,7 +50,7 @@ echo "── LoadBalancer address (the DNS records must point here) ──"
 kubectl get svc -n ingress-nginx ingress-nginx-controller \
   -o jsonpath='{.status.loadBalancer.ingress[*].ip}{"\n"}'
 
-echo "══ 2/7  Namespaces and secrets ══"
+echo "══ 2/6  Namespaces and secrets ══"
 kubectl apply -f deploy/manifests/00-namespace.yaml
 kubectl create namespace "$OBS_NS" --dry-run=client -o yaml | kubectl apply -f -
 
@@ -99,11 +99,11 @@ kubectl create secret generic ec-git-webhook -n "$NS" \
   --from-literal=FORMS_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-echo "══ 3/7  EventConductor engine (PostgreSQL, Redpanda, orchestrator, forms) ══"
+echo "══ 3/6  EventConductor engine (PostgreSQL, Redpanda, orchestrator, forms) ══"
 helm upgrade --install ec deploy/chart/eventconductor -n "$NS" \
   -f deploy/values/eventconductor.yaml
 
-echo "══ 4/7  Keycloak, worker, shell, gateway, ingress ══"
+echo "══ 4/6  Keycloak, worker, shell, gateway, ingress ══"
 kubectl apply -f deploy/manifests/05-clusterissuer.yaml
 # The Job is immutable once created, so a re-run has to replace it rather than patch it.
 kubectl delete job keycloak-db-init -n "$NS" --ignore-not-found
@@ -114,7 +114,7 @@ kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
 kubectl apply -f deploy/manifests/50-kafka-console.yaml
 
-echo "══ 5/7  Observability (Prometheus, Grafana, Loki, Tempo, Alloy) ══"
+echo "══ 5/6  Observability (Prometheus, Grafana, Loki, Tempo, Alloy) ══"
 helm upgrade --install kps prometheus-community/kube-prometheus-stack \
   -n "$OBS_NS" -f deploy/observability/kube-prometheus-stack.yaml --timeout 15m
 helm upgrade --install loki grafana/loki -n "$OBS_NS" -f deploy/observability/loki.yaml --timeout 15m
@@ -143,7 +143,7 @@ apply_dashboard() {  # name, key, file
 apply_dashboard eventconductor       eventconductor.json       eventconductor.json
 apply_dashboard eventconductor-nodes eventconductor-nodes.json nodes.json
 
-echo "══ 6/7  Waiting for the workloads ══"
+echo "══ 6/6  Waiting for the workloads ══"
 kubectl rollout status deployment/ec-eventconductor-orchestrator -n "$NS" --timeout=10m
 kubectl rollout status deployment/ec-eventconductor-forms -n "$NS" --timeout=10m
 kubectl rollout status deployment/keycloak -n "$NS" --timeout=10m
@@ -151,18 +151,6 @@ kubectl rollout status deployment/worker -n "$NS" --timeout=10m
 kubectl rollout status deployment/shell -n "$NS" --timeout=10m
 kubectl rollout status deployment/gateway -n "$NS" --timeout=10m
 kubectl rollout status deployment/kafka-console -n "$NS" --timeout=10m
-
-echo "══ 7/7  Indexes the engine's own migrations would create ══"
-# After the rollouts and not before: these tables do not exist until an engine has started and
-# Hibernate has built them, and CREATE INDEX against a missing table is an error, not a wait.
-#
-# They are applied from a file here because nothing else applies them — the engines run with
-# flywayEnabled=false, so no migration ever runs and Hibernate creates only the indexes declared in
-# JPA annotations. See the header of the SQL for what that costs. Idempotent: every statement is
-# IF NOT EXISTS, so re-running this changes nothing.
-PGPOD=$(kubectl get pod -n "$NS" -l app.kubernetes.io/component=postgres -o name | head -1)
-kubectl exec -i -n "$NS" "$PGPOD" -- \
-  psql -U workflow -d workflow -v ON_ERROR_STOP=1 -f - < deploy/sql/listing-indexes.sql
 
 cat <<EOF
 
