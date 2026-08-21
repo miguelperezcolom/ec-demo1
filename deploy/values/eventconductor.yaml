@@ -87,7 +87,7 @@ redpanda:
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
   image: miguelperezcolom/orchestrator-standalone-app
-  imageTag: "2.7.0"
+  imageTag: "2.8.0"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -137,13 +137,40 @@ orchestrator:
     # indexed range when there is nothing to do. relay-concurrency is bounded by design — the
     # claim holds row locks for the length of its transaction — so it is raised deliberately, not
     # to the maximum, and it wants connections: keep dbPoolSize above it plus the consumers.
-    # The ceiling here is not any of these. The relay publishes with acks=all, one message at a
-    # time — SynchronousProducerDefaults, and deliberately: asynchronously a send to a broker that
-    # is down still reports success and the row is marked Sent anyway. Measured: 2.44s to publish a
-    # batch of 497, i.e. 4.9ms per message, against a Redpanda sitting at 0.14 of 2 CPU. Raising
-    # concurrency past this point made throughput WORSE — 183/s at relay=4 parallelism=8, 160/s at
-    # relay=12 parallelism=16, 125/s at 24 partitions — because the claim holds row locks and more
-    # threads only contend for them. These values are the measured optimum, not a guess.
+    # relay-concurrency stays at 4, and 2.8.0 is the release that made that a measurement rather
+    # than an inheritance.
+    #
+    # 2.8.0 runs the relay's sends on virtual threads and defaults this to 0 — one per partition key
+    # in the batch, no cap. The expectation was that removing the cap would lift the ceiling, since
+    # a blocking send per message means the producer never holds more than relay-concurrency records
+    # and amortises its round trip across four of them instead of across the batch.
+    #
+    # It did not, here. A/B on this deployment, same engine, same database, capped run taken on the
+    # larger table of the two so the bias runs against it:
+    #
+    #     uncapped (default 0)    65-72 transitions/s
+    #     capped at 4             95-103 transitions/s
+    #
+    # Uncapped is about 35% slower. With batch-size at 500, "no cap" means up to five hundred sends
+    # in flight inside one transaction that holds row locks for all of them, and the cost of that
+    # shows up before the benefit does. The cap is doing something other than throttling the broker,
+    # which sat at 0.16 of 2 cores throughout — Redpanda has never been the constraint at any point
+    # in these measurements.
+    #
+    # Removing it did move the bottleneck, which is worth recording: the outbox stopped backing up
+    # entirely (3 rows pending, 29ms relay passes) and PostgreSQL became the busiest component at
+    # 0.502 cores against the orchestrator's 0.384. Whatever caps this deployment now, it is not the
+    # relay. See the note on outbox retention below.
+    #
+    # What has not changed: the send is still synchronous in the sense that matters — a refusal is
+    # knowable and an unacked row stays Pending. That is what the outbox is for, and it is what an
+    # asynchronous send once cost, losing 71 of 642 912 messages during a ninety-second outage.
+    #
+    # Not set, and it should be: workflow.outbox.retention. Sent rows are never deleted without it,
+    # and this database is at 1 020 435 outbox rows / 516 MB after two days of load runs. The engine
+    # warns that the failure mode is "invisible at sixty thousand rows, which is where every
+    # measurement so far has been taken", and that it is felt as a table autovacuum has to keep
+    # rewriting rather than as a slow query. That matches PostgreSQL being the busiest thing here.
     WORKFLOW_OUTBOX_POLL_INTERVAL_MS: "50"
     WORKFLOW_OUTBOX_BATCHSIZE: "500"
     WORKFLOW_OUTBOX_RELAYCONCURRENCY: "4"
@@ -179,7 +206,7 @@ orchestrator:
 ## ── Forms ────────────────────────────────────────────────────────────────────
 forms:
   image: miguelperezcolom/forms-standalone-app
-  imageTag: "2.7.0"
+  imageTag: "2.8.0"
   replicas: 1
   servicePort: 8106
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -237,7 +264,7 @@ forms:
 # is the honest state: the engine is there and wired, the catalogue is empty.
 rules:
   image: miguelperezcolom/rule-standalone-app
-  imageTag: "2.7.0"
+  imageTag: "2.8.0"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false

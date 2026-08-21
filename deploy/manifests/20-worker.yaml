@@ -65,7 +65,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: worker
-          image: miguelperezcolom/worker-standalone-app:2.7.0
+          image: miguelperezcolom/worker-standalone-app:2.8.0
           env:
             - name: SERVER_PORT
               value: "8091"
