@@ -87,11 +87,23 @@ redpanda:
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
   image: miguelperezcolom/orchestrator-standalone-app
-  imageTag: "2.6.1"
+  imageTag: "2.7.0"
   replicas: 1
   servicePort: 8105
-  ddlAuto: update
-  flywayEnabled: false
+  # The engine owns its schema now. It always could — the image ships flyway-core and
+  # flyway-database-postgresql — and with these two lines the other way round it did not: Hibernate
+  # built the tables, no migration ever ran, and the engine said so at every startup ("its
+  # migrations were not applied, so the database may be missing the engine's indexes"). It was
+  # right. Every index that lives only in SQL was absent, including the two that 2.6.0 added for
+  # the listings, and they had to be applied by hand.
+  #
+  # Turning this on required emptying the schema first: Flyway will not adopt tables it did not
+  # create, and baselining would have meant declaring a Hibernate-built schema equivalent to
+  # migration history it never ran. The database here is disposable by design — it lives on an
+  # emptyDir — so dropping it was cheaper than pretending. Keycloak is untouched, it has its own
+  # database on the same server.
+  ddlAuto: none
+  flywayEnabled: true
   # Six partitions on each binding, one pod: three threads leaves half of them unread.
   consumerConcurrency: 6
   dbPoolSize: 64
@@ -167,11 +179,23 @@ orchestrator:
 ## ── Forms ────────────────────────────────────────────────────────────────────
 forms:
   image: miguelperezcolom/forms-standalone-app
-  imageTag: "2.6.1"
+  imageTag: "2.7.0"
   replicas: 1
   servicePort: 8106
-  ddlAuto: update
-  flywayEnabled: false
+  # The engine owns its schema now. It always could — the image ships flyway-core and
+  # flyway-database-postgresql — and with these two lines the other way round it did not: Hibernate
+  # built the tables, no migration ever ran, and the engine said so at every startup ("its
+  # migrations were not applied, so the database may be missing the engine's indexes"). It was
+  # right. Every index that lives only in SQL was absent, including the two that 2.6.0 added for
+  # the listings, and they had to be applied by hand.
+  #
+  # Turning this on required emptying the schema first: Flyway will not adopt tables it did not
+  # create, and baselining would have meant declaring a Hibernate-built schema equivalent to
+  # migration history it never ran. The database here is disposable by design — it lives on an
+  # emptyDir — so dropping it was cheaper than pretending. Keycloak is untouched, it has its own
+  # database on the same server.
+  ddlAuto: none
+  flywayEnabled: true
   security:
     enabled: false
   extraEnv:
@@ -213,12 +237,24 @@ forms:
 # is the honest state: the engine is there and wired, the catalogue is empty.
 rules:
   image: miguelperezcolom/rule-standalone-app
-  imageTag: "2.6.1"
+  imageTag: "2.7.0"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false
-  ddlAuto: update
-  flywayEnabled: false
+  # The engine owns its schema now. It always could — the image ships flyway-core and
+  # flyway-database-postgresql — and with these two lines the other way round it did not: Hibernate
+  # built the tables, no migration ever ran, and the engine said so at every startup ("its
+  # migrations were not applied, so the database may be missing the engine's indexes"). It was
+  # right. Every index that lives only in SQL was absent, including the two that 2.6.0 added for
+  # the listings, and they had to be applied by hand.
+  #
+  # Turning this on required emptying the schema first: Flyway will not adopt tables it did not
+  # create, and baselining would have meant declaring a Hibernate-built schema equivalent to
+  # migration history it never ran. The database here is disposable by design — it lives on an
+  # emptyDir — so dropping it was cheaper than pretending. Keycloak is untouched, it has its own
+  # database on the same server.
+  ddlAuto: none
+  flywayEnabled: true
   security:
     enabled: false
   extraEnv:
