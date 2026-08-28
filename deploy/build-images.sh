@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REGISTRY="${REGISTRY:-miguelperezcolom}"
-TAG="${1:-0.6.0}"
+TAG="${1:-0.7.0}"
 
 APPS="shell gateway booking content users ia-agent ia-control-plane control-shell"
 
