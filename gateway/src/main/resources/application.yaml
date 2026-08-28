@@ -13,6 +13,7 @@ spring:
         - id: eventconductor-assets
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
             - Path=/eventconductor/**
 
         # Git webhooks. These are NOT under /_workflow and /_forms — those prefixes are the
@@ -26,33 +27,93 @@ spring:
         - id: workflow-webhooks
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
             - Path=/workflow/webhooks/**
 
         - id: forms-webhooks
           uri: ${FORMS_URL:http://forms:8106}
           predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
             - Path=/forms/webhooks/**
 
         - id: orchestrator
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
             - Path=/_workflow/**
 
         - id: forms
           uri: ${FORMS_URL:http://forms:8106}
           predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
             - Path=/_forms/**
 
         - id: worker
           uri: ${WORKER_URL:http://worker:8091}
           predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
             - Path=/_worker/**
 
-        # Catch-all, and therefore last: the shell's bootstrap page, its /mateu/** endpoint and
-        # its static assets.
+        # The four demo services. Each one's Mateu UI is served under the prefix its @UI
+        # annotation declares, and the shell names the same prefix in a RemoteMenu — so a path
+        # here, a field in ShellHome and the @UI value have to agree or the menu renders empty.
+        - id: booking
+          uri: ${BOOKING_URL:http://booking:8108}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Path=/_booking/**
+
+        - id: content
+          uri: ${CONTENT_URL:http://content:8104}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Path=/_content/**
+
+        - id: users
+          uri: ${USERS_URL:http://users:8102}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Path=/_users/**
+
+        # The chat agent, at the path Mateu's @AI client posts to. Not a Mateu UI and so not a
+        # /_ prefix: the shell's chat panel calls /ai/api/agent/stream directly.
+        - id: ia-agent
+          uri: ${IA_AGENT_URL:http://ia-agent:8095}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Path=/ai/**
+
+        # Catch-all for the demo console, and therefore last among its routes: the shell's
+        # bootstrap page, its /mateu/** endpoint and its static assets.
         - id: shell
           uri: ${SHELL_URL:http://shell:8101}
           predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Path=/**
+
+        # ── The control console, on a host of its own ────────────────────────────────────
+        #
+        # A second origin rather than a path under the first, so the two consoles are two
+        # Keycloak clients: a token minted for the demo console is not a token for this one,
+        # and SecurityConfig can demand the `admin` realm role here without touching the demo.
+        #
+        # Every route above names the demo host explicitly, so nothing falls through to here
+        # by accident and nothing here is reachable from there.
+        - id: ia-control-plane
+          uri: ${IA_CONTROL_PLANE_URL:http://ia-control-plane:8110}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Path=/_ia-cp/**
+
+        # Note what is NOT routed: /internal/**, the control plane's own endpoint that serves a
+        # resolved agent configuration with its API key in the clear. It is reachable only
+        # inside the cluster, and a route for it here would publish every credential this
+        # deployment holds.
+
+        - id: control-shell
+          uri: ${CONTROL_SHELL_URL:http://control-shell:8111}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io}
             - Path=/**
 
   security:

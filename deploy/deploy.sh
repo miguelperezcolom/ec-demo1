@@ -9,9 +9,11 @@
 # invalidate the ones already stored in the cluster.
 #
 # What it does NOT do, because both are outside the cluster:
-#   • build the shell and gateway images — see build-images.sh
-#   • create the DNS records — ec1, auth.ec1 and grafana.ec1 must resolve to the ingress
-#     controller's LoadBalancer address before Let's Encrypt can issue anything
+#   • build the eight images this repository owns — see build-images.sh
+#   • create the DNS records — ec1 and *.ec1 must resolve to the ingress controller's
+#     LoadBalancer address before Let's Encrypt can issue anything. The wildcard is what makes
+#     console.ec1 work without a new record; it still needs its own certificate, which
+#     cert-manager issues on the first request once the name resolves.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -65,10 +67,32 @@ if [ ! -f "$SECRETS" ]; then
     echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
     echo "KAFKA_CONSOLE_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
     echo "GIT_WEBHOOK_SECRET=$(openssl rand -hex 24)"
+    echo "CP_POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
+    # AES-256 for the control plane's stored LLM credentials. 32 bytes, base64, and it must not
+    # be regenerated: nothing re-wraps the stored ciphertext, so a new key makes every catalogued
+    # credential undecryptable and they have to be entered again.
+    echo "CP_CRYPTO_KEY=$(openssl rand -base64 32)"
+    echo "# Not generated: paste an Anthropic API key here to enable the console's chat panel."
+    echo "# ANTHROPIC_API_KEY="
   } > "$SECRETS"
   chmod 600 "$SECRETS"
   echo "generated $SECRETS"
 fi
+# Keys added after a deployment already exists would otherwise never be generated: the block
+# above only runs on the very first deploy, and `set -u` then aborts on the first unbound one.
+# Appending the missing ones keeps a re-run against an existing cluster working, and leaves every
+# password already stored in that cluster exactly as it was.
+append_if_missing() {  # name, value
+  if ! grep -q "^$1=" "$SECRETS"; then
+    echo "$1=$2" >> "$SECRETS"
+    echo "added $1 to $SECRETS"
+  fi
+}
+append_if_missing CP_POSTGRES_PASSWORD "$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
+# Regenerating this one would make every stored LLM credential undecryptable — nothing re-wraps
+# them — so it is written once and then left alone, like the PostgreSQL password above.
+append_if_missing CP_CRYPTO_KEY "$(openssl rand -base64 32)"
+
 # shellcheck disable=SC1090
 set -a; . "$SECRETS"; set +a
 
@@ -98,12 +122,35 @@ kubectl create secret generic ec-git-webhook -n "$NS" \
   --from-literal=WORKFLOW_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   --from-literal=FORMS_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -
+# The control plane's own database and the key its credentials are encrypted with. Both are
+# generated, unlike the Anthropic key, because both are derived rather than bought.
+kubectl create secret generic ec-cp-postgres -n "$NS" \
+  --from-literal=POSTGRES_DB=controlplane \
+  --from-literal=POSTGRES_USER=controlplane \
+  --from-literal=POSTGRES_PASSWORD="$CP_POSTGRES_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic ec-cp-crypto -n "$NS" \
+  --from-literal=CP_CRYPTO_KEY="$CP_CRYPTO_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# The chat agent's Anthropic key. Not generated — it is bought, not derived — so it is only
+# created when ANTHROPIC_API_KEY is in the environment or in credentials.env, which is also why
+# the deployment marks it optional. Without it the agent still starts and logs why, and the first
+# prompt fails with a 401 from Anthropic; every other part of the console is unaffected.
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  kubectl create secret generic ec-anthropic -n "$NS" \
+    --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "ANTHROPIC_API_KEY not set — skipping the ec-anthropic secret."
+  echo "  The chat panel will answer with a 401 until you add it to $SECRETS and re-run this."
+fi
 
 echo "══ 3/6  EventConductor engine (PostgreSQL, Redpanda, orchestrator, forms) ══"
 helm upgrade --install ec deploy/chart/eventconductor -n "$NS" \
   -f deploy/values/eventconductor.yaml
 
-echo "══ 4/6  Keycloak, worker, shell, gateway, ingress ══"
+echo "══ 4/6  Keycloak, worker, shells, gateway, ingress, demo services, control plane ══"
 kubectl apply -f deploy/manifests/05-clusterissuer.yaml
 # The Job is immutable once created, so a re-run has to replace it rather than patch it.
 kubectl delete job keycloak-db-init -n "$NS" --ignore-not-found
@@ -113,6 +160,18 @@ kubectl apply -f deploy/manifests/30-shell.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
 kubectl apply -f deploy/manifests/50-kafka-console.yaml
+# The demo services. Their databases first, and by the same replace-not-patch rule as Keycloak's:
+# a Job is immutable once created.
+kubectl delete job demo-db-init -n "$NS" --ignore-not-found
+kubectl apply -f deploy/manifests/55-demo-db-init.yaml
+kubectl apply -f deploy/manifests/60-booking.yaml
+kubectl apply -f deploy/manifests/61-content.yaml
+kubectl apply -f deploy/manifests/62-users.yaml
+kubectl apply -f deploy/manifests/63-ia-agent.yaml
+# The control console: its database first, then the service, then its shell.
+kubectl apply -f deploy/manifests/70-cp-postgres.yaml
+kubectl apply -f deploy/manifests/71-ia-control-plane.yaml
+kubectl apply -f deploy/manifests/72-control-shell.yaml
 
 echo "══ 5/6  Observability (Prometheus, Grafana, Loki, Tempo, Alloy) ══"
 helm upgrade --install kps prometheus-community/kube-prometheus-stack \
@@ -151,12 +210,20 @@ kubectl rollout status deployment/worker -n "$NS" --timeout=10m
 kubectl rollout status deployment/shell -n "$NS" --timeout=10m
 kubectl rollout status deployment/gateway -n "$NS" --timeout=10m
 kubectl rollout status deployment/kafka-console -n "$NS" --timeout=10m
+kubectl rollout status deployment/booking -n "$NS" --timeout=10m
+kubectl rollout status deployment/content -n "$NS" --timeout=10m
+kubectl rollout status deployment/users -n "$NS" --timeout=10m
+kubectl rollout status deployment/ia-agent -n "$NS" --timeout=10m
+kubectl rollout status deployment/cp-postgres -n "$NS" --timeout=10m
+kubectl rollout status deployment/ia-control-plane -n "$NS" --timeout=10m
+kubectl rollout status deployment/control-shell -n "$NS" --timeout=10m
 
 cat <<EOF
 
 Done.
 
   Console   https://ec1.mateu.io          demo / demo
+  Control   https://console.ec1.mateu.io  demo / demo  (needs the realm role \`admin\`)
   Keycloak  https://auth.ec1.mateu.io     admin / \$KEYCLOAK_ADMIN_PASSWORD
   Grafana   https://grafana.ec1.mateu.io  admin / \$GRAFANA_ADMIN_PASSWORD
   Kafka     https://kafka.ec1.mateu.io    admin / \$KAFKA_CONSOLE_PASSWORD

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds and pushes the two images this repository owns: the shell and the gateway.
+# Builds and pushes the eight images this repository owns: the two shells, the gateway, the four
+# demo services and the IA control plane.
 #
 # Everything else runs from published images — the engine's orchestrator/forms/rules/worker from
 # Docker Hub, Keycloak from Quay, Postgres and Redpanda from their own registries.
@@ -15,7 +16,16 @@ cd "$(dirname "$0")/.."
 REGISTRY="${REGISTRY:-miguelperezcolom}"
 TAG="${1:-0.6.0}"
 
-for app in shell gateway; do
+APPS="shell gateway booking content users ia-agent ia-control-plane control-shell"
+
+# grpc-interface first, and installed rather than packaged: it is not an application and gets no
+# image, but `users` compiles against the protobuf stubs generated from its .proto, so it has to
+# be in the local repository before that module is built. It is also the one module that reaches
+# the network for something other than dependencies — the protobuf plugin downloads protoc.
+echo "── installing grpc-interface (the stubs users compiles against) ──"
+( cd grpc-interface && mvn -B -ntp -DskipTests install )
+
+for app in $APPS; do
   echo "── building $app ──"
   # Built outside the image on purpose: the Dockerfiles copy target/*.jar, so Maven's cache works
   # and a code change does not re-resolve the whole dependency tree.
@@ -25,5 +35,5 @@ for app in shell gateway; do
 done
 
 echo
-echo "Pushed $REGISTRY/ec-demo1-shell:$TAG and $REGISTRY/ec-demo1-gateway:$TAG"
-echo "Point deploy/manifests/30-shell.yaml and 35-gateway.yaml at the tag if it is not $TAG."
+for app in $APPS; do echo "Pushed $REGISTRY/ec-demo1-$app:$TAG"; done
+echo "Point the manifests in deploy/manifests/ at the tag if it is not $TAG."
