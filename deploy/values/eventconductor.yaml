@@ -182,7 +182,16 @@ orchestrator:
     # rewriting rather than as a slow query. That matches PostgreSQL being the busiest thing here.
     WORKFLOW_OUTBOX_POLL_INTERVAL_MS: "50"
     WORKFLOW_OUTBOX_BATCHSIZE: "500"
-    WORKFLOW_OUTBOX_RELAYCONCURRENCY: "4"
+    WORKFLOW_OUTBOX_RELAYCONCURRENCY: "0"
+    # Sent rows are kept for a day and then deleted, in bounded repeated batches. Without this the
+    # property has no default and nothing is ever removed: this database reached 1 315 832 rows and
+    # 516 MB in a morning of load runs. Only Sent rows older than the window go — a Pending row is
+    # undelivered work and an Error row is parked for a human, and both outlive any retention.
+    #
+    # It is not retroactive relief for a table that is already large: every row here was written
+    # after this morning's schema rebuild, so none is older than 24h and the first passes delete
+    # nothing. It stops the growth from here on, which is the point.
+    WORKFLOW_OUTBOX_RETENTION: "24h"
     # How many of a poll batch's per-process groups one consumer thread may work at once.
     #
     # The default is 1, which ties in-pod parallelism to the partition count: six partitions, six
