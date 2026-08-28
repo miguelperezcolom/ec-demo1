@@ -1,0 +1,72 @@
+package io.mateu.ecdemo1.iacp.infra.out.persistence;
+
+import io.mateu.ecdemo1.iacp.application.out.query.LlmQueryService;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.LlmDto;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.LlmRow;
+import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmProvider;
+import io.mateu.uidl.data.ListingData;
+import io.mateu.uidl.data.Page;
+import io.mateu.uidl.data.Pageable;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Optional;
+
+@Component
+@RequiredArgsConstructor
+public class LlmDBQueryService implements LlmQueryService {
+
+    final LlmEntityRepository entities;
+
+    @Override
+    public ListingData<LlmRow> findAll(String searchText, Object filters, Pageable pageable) {
+        var springPageable = org.springframework.data.domain.Pageable
+                .ofSize(pageable.size()).withPage(pageable.page());
+        var page = searchText == null || searchText.isBlank()
+                ? entities.findAll(springPageable)
+                : entities.findByNameContainingIgnoreCase(searchText, springPageable);
+        return new ListingData<>(new Page<>(searchText, page.getSize(), page.getNumber(),
+                page.getTotalElements(),
+                page.getContent().stream().map(LlmDBQueryService::toRow).toList()));
+    }
+
+    @Override
+    public String getLabel(String id) {
+        return entities.findById(id).map(LlmEntity::getName).orElse("Unknown");
+    }
+
+    @Override
+    public Optional<LlmDto> getById(String id) {
+        return entities.findById(id).map(LlmDBQueryService::toDto);
+    }
+
+    @Override
+    public List<LlmDto> all() {
+        return entities.findAll().stream().map(LlmDBQueryService::toDto).toList();
+    }
+
+    @Override
+    public long count() {
+        return entities.count();
+    }
+
+    @Override
+    public long countEnabled() {
+        return entities.countByEnabledTrue();
+    }
+
+    static LlmDto toDto(LlmEntity e) {
+        return new LlmDto(e.getId(), e.getName(), LlmProvider.valueOf(e.getProvider()),
+                e.getModel(), e.getBaseUrl(), e.getTemperature(), e.getMaxTokens(),
+                e.getCredential() != null && !e.getCredential().isBlank(),
+                e.isEnabled(), e.getCreated());
+    }
+
+    static LlmRow toRow(LlmEntity e) {
+        var credentialSet = e.getCredential() != null && !e.getCredential().isBlank();
+        return new LlmRow(e.getId(), e.getName(), e.getProvider(), e.getModel(),
+                credentialSet ? "set" : "missing",
+                e.isEnabled() ? (credentialSet ? "usable" : "no credential") : "disabled");
+    }
+}

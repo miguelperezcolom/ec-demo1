@@ -1,0 +1,61 @@
+server:
+  port: 8110
+
+spring:
+  application:
+    name: ec-demo1-ia-control-plane
+
+  datasource:
+    # Its own PostgreSQL, not the engine's. The engine's is on an emptyDir and dies with the pod,
+    # which is the right trade for a load rig and the wrong one for the only copy of this
+    # deployment's LLM credentials — see deploy/manifests/70-cp-postgres.yaml.
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/controlplane}
+    username: ${DB_USERNAME:controlplane}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: ${DB_POOL_SIZE:8}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+cp:
+  # Seeded once, only onto a control plane whose four catalogues are all empty — see
+  # CatalogueSeeder. It is what keeps `deploy.sh` producing a console whose chat panel works,
+  # now that the agent takes its configuration from here instead of from its own properties.
+  seed:
+    agent-id: ${SEED_AGENT_ID:console-agent}
+    anthropic-api-key: ${ANTHROPIC_API_KEY:}
+    orchestrator-url: ${ORCHESTRATOR_URL:}
+    forms-url: ${FORMS_URL:}
+    booking-url: ${BOOKING_URL:}
+    # Where a seeded RAG source points. This deployment's own cp-postgres, which carries the
+    # pgvector extension — but a source can point anywhere, and this one is only a starting point.
+    rag-url: ${RAG_STORE_URL:}
+
+  crypto:
+    # 32 bytes, base64, from the ec-cp-crypto secret. Unset is a legible failure rather than a
+    # silent one: the service starts, the catalogues work, and only the credential field refuses.
+    #
+    # Rotating it makes every stored credential undecryptable — there is no re-wrapping here, so
+    # rotation means entering the keys again.
+    key: ${CP_CRYPTO_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.hibernate.SQL: error
+    org.hibernate.orm.jdbc.bind: error

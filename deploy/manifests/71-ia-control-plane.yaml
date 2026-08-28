@@ -1,0 +1,140 @@
+# The IA control plane — the four catalogues the chat agent is configured from.
+#
+# Two surfaces on one pod, and the difference between them matters:
+#
+#   /_ia-cp/**    the Mateu UI, hosted by the control shell as a remote menu. Routed by the
+#                 gateway, on the control host only, behind the `admin` realm role.
+#   /internal/**  a resolved agent configuration, API key in the clear. This is what `ia-agent`
+#                 reads on every prompt — it is the only source of its model, credential, system
+#                 prompt and MCP list. NOT routed by the gateway and it must never be: there is
+#                 no route for it, and adding one would publish every credential here.
+#
+# The second is protected by that absence and by the Service being cluster-internal. It
+# authenticates nothing itself — the same arrangement as the users service's gRPC port, and the
+# same warning applies with more force.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ia-control-plane
+  namespace: ec-demo1
+  labels: { app: ia-control-plane }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ia-control-plane }
+  template:
+    metadata:
+      labels:
+        app: ia-control-plane
+        app.kubernetes.io/component: ia-control-plane
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8110"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-cp-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z cp-postgres 5432; do echo waiting for cp-postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: ia-control-plane
+          image: miguelperezcolom/ec-demo1-ia-control-plane:0.6.0
+          env:
+            - name: SERVER_PORT
+              value: "8110"
+            # cp-postgres, not postgres. The engine's database is on an emptyDir and this one is
+            # not — see 70-cp-postgres.yaml for why that distinction is the whole design.
+            - name: DB_URL
+              value: jdbc:postgresql://cp-postgres:5432/controlplane
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-cp-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-cp-postgres, key: POSTGRES_PASSWORD } }
+            # AES-256 key for the stored LLM credentials, base64 of 32 bytes. Generated once by
+            # deploy.sh into deploy/.secrets/credentials.env and kept there: rotating it makes
+            # every stored credential undecryptable, because nothing here re-wraps them.
+            - name: CP_CRYPTO_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ec-cp-crypto
+                  key: CP_CRYPTO_KEY
+                  # So a missing key is a running pod that says so, rather than one stuck Pending.
+                  # The catalogues work without it; only the credential field refuses.
+                  optional: true
+            # ── Seeding, and only ever onto four empty catalogues ─────────────────────────
+            #
+            # These are not this service's own configuration — it calls none of them. They are
+            # what CatalogueSeeder writes into the catalogues the first time it starts against an
+            # empty database, so a fresh deploy.sh still produces a working chat panel now that
+            # the agent takes its configuration from here. After that they are ignored and the
+            # entries are the operator's to edit.
+            - name: ORCHESTRATOR_URL
+              value: http://orchestrator:8105
+            - name: FORMS_URL
+              value: http://forms:8106
+            - name: BOOKING_URL
+              value: http://booking:8108
+            # Where the seeded RAG source points: this pod's own database, which carries the
+            # pgvector extension. The credentials are in the URL rather than separate because
+            # that is the shape the catalogue stores — a RAG source is a connection string.
+            - name: RAG_STORE_URL
+              value: jdbc:postgresql://cp-postgres:5432/controlplane?user=$(DB_USERNAME)&password=$(DB_PASSWORD)
+            # The Anthropic key moved here from the agent: this is where credentials live now.
+            # Absent, the seeded model is catalogued with no credential and says so in the
+            # console — a better failure than the same key missing invisibly inside a pod.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ec-anthropic
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+          ports:
+            - { name: http, containerPort: 8110 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8110 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8110 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ia-control-plane
+  namespace: ec-demo1
+  labels: { app: ia-control-plane }
+spec:
+  selector: { app: ia-control-plane }
+  ports:
+    - { name: http, port: 8110, targetPort: 8110 }

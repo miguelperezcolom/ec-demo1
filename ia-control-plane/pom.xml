@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.4</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.mateu.ecdemo1</groupId>
+    <artifactId>ia-control-plane</artifactId>
+    <version>0.1.0</version>
+    <name>ec-demo1 ia-control-plane</name>
+    <description>The catalogues the chat agent is configured from: LLMs and their credentials, MCP servers, RAG sources, and the agents that compose them</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Pinned rather than floating, like the shell's. -->
+        <mateu.version>3.0-alpha.298</mateu.version>
+        <!-- Only for `shared`, the engine's DTO jar: this service uses its AggregateRoot base
+             class, the same as booking, content and users. -->
+        <eventconductor.version>2.8.0</eventconductor.version>
+        <spring-ai.version>1.0.0</spring-ai.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>shared</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.mateu</groupId>
+            <artifactId>mvc-core</artifactId>
+            <version>${mateu.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu</groupId>
+            <artifactId>vaadin-lit</artifactId>
+            <version>${mateu.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu</groupId>
+            <artifactId>annotation-processor-mvc</artifactId>
+            <version>${mateu.version}</version>
+        </dependency>
+
+        <!-- Retrieval. Both halves live here rather than in the agent, and deliberately: the
+             store connection and the embedding credential are both in the catalogue, so keeping
+             the retrieval next to them means neither has to travel. The cost is that this service
+             is on the data path for a RAG lookup — see the class comment on RagSearchController. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-pgvector-store</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+        <!-- Note what is NOT here: spring-ai-openai. Anthropic has no embeddings API, so a
+             catalogued embedding model is an OpenAI-shaped one — but that artifact is built
+             against Spring Framework 6 and calls HttpHeaders.addAll(MultiValueMap), which is gone
+             in Framework 7. On this module's Boot 4 it compiles and then dies at the first
+             request with a NoSuchMethodError. The choice was to move this module back to Boot 3.4
+             or to write the one POST it was being used for; see
+             OpenAiCompatibleEmbeddingModel, which is that POST. -->
+
+        <!-- Health probes and the Prometheus endpoint the pod annotation points Prometheus at.
+             Without the registry, /actuator/prometheus does not exist even with actuator on the
+             classpath, and the scrape silently returns 404 forever. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>io.mateu</groupId>
+                            <artifactId>annotation-processor-mvc</artifactId>
+                            <version>${mateu.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

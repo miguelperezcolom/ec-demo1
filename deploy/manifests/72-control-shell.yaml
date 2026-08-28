@@ -1,0 +1,86 @@
+# The control console's shell — a second Mateu shell, on console.ec1.mateu.io.
+#
+# It renders no screens of its own: one RemoteMenu naming /_ia-cp, which the gateway routes to the
+# control plane. Separate from the demo shell rather than a menu inside it, because two hosts mean
+# two Keycloak clients, and that is what lets the gateway require the `admin` realm role here
+# without requiring it on the demo console.
+#
+# Its Keycloak URL, realm and client id are compiled into the image — Mateu bakes @KeycloakSecured
+# into the generated bootstrap page — so changing the hostname means rebuilding it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-shell
+  namespace: ec-demo1
+  labels: { app: control-shell }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: control-shell }
+  template:
+    metadata:
+      labels:
+        app: control-shell
+        app.kubernetes.io/component: control-shell
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8111"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: control-shell
+          image: miguelperezcolom/ec-demo1-control-shell:0.6.0
+          env:
+            - name: SERVER_PORT
+              value: "8111"
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8111 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8111 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8111 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-shell
+  namespace: ec-demo1
+  labels: { app: control-shell }
+spec:
+  selector: { app: control-shell }
+  ports:
+    - { name: http, port: 8111, targetPort: 8111 }
