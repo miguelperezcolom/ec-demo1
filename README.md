@@ -14,17 +14,32 @@ so a process is changed by a pull request rather than by an API call.
                                  │
                         ingress-nginx (TLS, Let's Encrypt)
                                  │
-                            gateway  ── requires a Keycloak token on the three backend paths
-                    ┌────────────┼────────────┬──────────────┐
-                    │            │            │              │
-                 /_workflow   /_forms     /_worker          /**
-                    │            │            │              │
-              orchestrator     forms       worker          shell  ── the only page a user loads
-                    │            │            │              │
-                    └────── PostgreSQL ───────┴──────────────┘
-                    └────── Redpanda (Kafka) ─┘
+                            gateway  ── requires a Keycloak token on every backend path
+      ┌──────────┬──────────┬────┴─────┬──────────┬─────────┬────────┬──────┐
+      │          │          │          │          │         │        │      │
+ /_workflow  /_forms   /_worker   /_booking  /_content  /_users    /ai     /**
+      │          │          │          │          │         │        │      │
+ orchestrator  forms     worker    booking    content    users   ia-agent  shell
+      │          │          │          │          │         │        │      │
+      │          │          │          │          │         │        │   the only
+      │          │          │          │          │         │        │   page a user
+      │          │          │          │          │         │        │   loads
+      └── PostgreSQL ───────┴──────────┴──────────┴─────────┘        │
+      └── Redpanda (Kafka) ─┴──────────┘                             │
+                            └───────── MCP ───────────────────────────┘
+                       (ia-agent calls the tools the engine and booking expose)
 
-  https://auth.ec1.mateu.io     Keycloak (realm ec-demo1, client demo)
+  https://console.ec1.mateu.io  the control console ── needs the `admin` realm role
+                                    │
+                              (same gateway)
+                                    │
+                              /_ia-cp    /**
+                                 │        │
+                          ia-control-plane · control-shell
+                                 │
+                            cp-postgres ── its own volume, unlike everything above
+
+  https://auth.ec1.mateu.io     Keycloak (realm ec-demo1, clients demo + control-plane)
   https://grafana.ec1.mateu.io  Grafana ── Prometheus · Loki · Tempo
   https://kafka.ec1.mateu.io    Redpanda Console ── the event stream itself
 ```
@@ -35,8 +50,15 @@ so a process is changed by a pull request rather than by an API call.
 |---|---|
 | `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus, carries the branding |
 | `gateway/` | Spring Cloud Gateway — routes the console and enforces the token |
+| `booking/` | Bookings: a CRUD, the MCP tools the agent calls, and the worker side of the booking saga |
+| `content/` | Content, labels and content types — a CRUD and nothing else |
+| `users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
+| `ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
+| `ia-control-plane/` | The four catalogues the agent is configured from: LLMs and their credentials, MCP servers, RAG sources, and the agents that compose them |
+| `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `admin` role |
+| `grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
-| `deploy/manifests/` | Keycloak, worker, shell, gateway, Kafka console, ingress, certificate issuers |
+| `deploy/manifests/` | Keycloak, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
 | `deploy/deploy.sh` | The whole thing, from an empty cluster |
 
@@ -46,14 +68,15 @@ four things about this cluster that otherwise cost an afternoon.
 ## Deploy
 
 ```sh
-./deploy/build-images.sh      # shell + gateway → Docker Hub (only when their code changed)
+./deploy/build-images.sh      # the eight images this repo owns → Docker Hub (only when their code changed)
 ./deploy/deploy.sh            # everything else, idempotent
 ```
 
 Between the two, the DNS records have to exist, pointing at the address `deploy.sh` prints after
 installing the ingress controller: `ec1` and `*.ec1` under your domain. Two records rather than
-four, because the wildcard covers `auth.ec1`, `grafana.ec1`, `kafka.ec1` and whatever gets added
-next. Certificates are issued automatically once the names resolve.
+five, because the wildcard covers `auth.ec1`, `grafana.ec1`, `kafka.ec1`, `console.ec1` and
+whatever gets added next. The wildcard is in DNS only — each host still gets its own certificate,
+issued automatically by HTTP-01 once the name resolves.
 
 Passwords are generated on the first run into `deploy/.secrets/credentials.env`, which is
 git-ignored. The demo user is `demo` / `demo`, from the realm file.
@@ -105,6 +128,276 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 9. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
    (Prometheus). Traces are wired but not yet arriving — see below.
+10. **Then look at the menus that are not the engine.** *Booking*, *Content* and *Users* are three
+    more applications, each serving its own screens from its own pod — the shell states a path and
+    nothing else about them.
+11. **Ask the chat panel for something.** "Lista las reservas", "crea una reserva para Ana". It has
+    no database and no screens: it answers by calling the MCP tools the orchestrator, the forms
+    engine and the booking service advertise, and it is told to report a tool failure rather than
+    answer around one. Ask it for something no tool covers and it will say so. It needs an
+    Anthropic key — see the note below — and every prompt is billed.
+
+## The services around the engine
+
+Four applications that are not the engine, each one a pod, each one reached through the gateway on
+a path of its own. They came from the `demo/` tree of the engine's own repository; what follows is
+what they are here, not what they were there.
+
+| | path | what it is |
+|---|---|---|
+| `booking` | `/_booking` | A booking CRUD, an MCP server, and a worker. The three are one pod on purpose: the tools the agent calls and the saga steps that confirm a booking act on the same aggregate |
+| `content` | `/_content` | Content, labels and content types. A CRUD over its own database and nothing else |
+| `users` | `/_users` | Users, groups, roles and permissions, plus `GetAuthInfo` over gRPC on 9191 |
+| `ia-agent` | `/ai` | The chat panel's other half. It implements nothing: every answer is an MCP tool call or a refusal |
+
+**They keep their own UIs.** Nothing about their screens is written in the shell — each declares a
+`@UI` path, `ShellHome` names the same path in a `RemoteMenu`, and the gateway routes it. Adding
+the fifth is those three lines and a manifest, and the path has to match in all three or the menu
+renders empty.
+
+**A database each, not a schema in the engine's.** The engine owns `workflow` through Flyway and
+validates its schema against its own migration history at startup; three services running
+`ddl-auto: update` inside it would be three writers with no shared history. `55-demo-db-init.yaml`
+creates `booking`, `content` and `users` in the same PostgreSQL, the same way Keycloak's database
+is created. They inherit that PostgreSQL's `emptyDir`, so treat what they hold as disposable.
+
+**Only `booking` touches Kafka.** It consumes the `booking` topic and replies on `upstream` — one
+consumer group of its own, subscribed to one topic, which is the arrangement the engine's own
+configuration argues for at length. `content` and `users` arrived declaring a binder and three
+bindings (`consumeOutbox`, `consumeUpstream`, `consumeWorkerEvent`) and implementing none of them,
+under the engine's own group names — `orchestrator-outbox`, `orchestrator-upstream`,
+`worker-group`. Deployed beside a real engine that would have taken partitions away from the
+orchestrator and the test worker and dropped whatever it was handed. It is gone, not disabled.
+
+### The agent
+
+The chat panel posts to `/ai/api/agent/stream`. The agent asks the control plane which model,
+which credential, which system prompt and which MCP servers; opens a fresh connection to each of
+those servers — per prompt, not pooled, because Spring AI's auto-configured client holds one
+persistent SSE connection and stays broken for the life of the pod once it drops — collects
+whatever tools they advertise, and hands them to the LLM.
+
+**It holds no configuration of its own.** Two environment variables, and that is the lot: where the
+control plane is, and which agent it is.
+
+The tools are the whole of what it can do. There is no path from a prompt to this deployment that
+does not go through a server that chose to expose it, and the system prompt tells it to report a
+tool failure rather than answer around it.
+
+Two things follow from it being an LLM:
+
+- **Every prompt is billed** to whatever credential the control plane serves. That is why the
+  gateway requires a Keycloak token on `/ai/**` and not only on the CRUD paths. Mateu's chat client
+  sends the bearer token itself, so requiring it costs nothing.
+- **The key is not generated.** `deploy.sh` writes a commented `ANTHROPIC_API_KEY=` line into
+  `deploy/.secrets/credentials.env`. If it is filled in, the control plane seeds its LLM with it;
+  if not, the model is catalogued with `credential: missing` and the console is where you fix that.
+
+The seeded model is `claude-sonnet-4-5`, a generation behind what the API offers. Changing it is
+now a field in the console rather than a Deployment variable — which is most of what the control
+plane is for.
+
+### What is not wired yet
+
+`booking`'s saga half needs a definition whose `ACTION` steps name `topic: booking`. The one it
+was written for is `verify-booking-payment` — a human verifies a payment, a 30-second
+`onTimeoutStepId` routes to cancellation, and an `XOR` join ends whichever branch wins — and it is
+**not in [`ec-definitions`](https://github.com/miguelperezcolom/ec-definitions)**. Until it is
+added there by a pull request, that pod joins its consumer group and is handed nothing. The CRUD
+and the MCP tools do not depend on it.
+
+The form it needs, `verify-payment`, is already there.
+
+## The control console
+
+A second console, on a host of its own: **`https://console.ec1.mateu.io`**, behind the `admin`
+realm role. Behind it is `ia-control-plane`, which holds the four catalogues the chat agent is
+configured from.
+
+| catalogue | what an entry is |
+|---|---|
+| **LLMs** | A model this deployment may call, and the API key that pays for it |
+| **MCP servers** | A server an agent may be given the tools of. Not the tools — those the server declares at connection time, and a copy here would go stale in silence |
+| **RAG sources** | A vector store, a collection inside it, and the model that embedded it. Searchable — see below |
+| **Agents** | A prompt, one LLM, and the servers and sources it may reach. The only thing a running service is ever handed |
+
+An agent refers to the other three by id and holds nothing of them, so a server's URL changes in
+one place and every agent composed from it follows.
+
+### Why a second host and not another menu
+
+Two hosts mean two Keycloak clients, and that is the whole reason. A token minted for the demo
+console is not a token for this one, so the gateway can demand `admin` here and leave the demo
+console alone. Both still enter through the same gateway, so there is still one place that checks
+a token before any backend sees a request — and one place, `SecurityConfig.java`, where that rule
+is written.
+
+The realm already had `user` and `admin`; the `demo` user has both. A new public client
+`control-plane` is in the realm file, with `directAccessGrantsEnabled` off — unlike the demo
+client's — because trading a username and password for a token with no browser is not a
+convenience anyone needs on the client that reaches the credentials.
+
+### Why it has a database of its own
+
+`postgres.localDisk: true` in `deploy/values/eventconductor.yaml` puts the engine's PostgreSQL on
+an `emptyDir`. That is what makes it local NVMe rather than a network volume, which is what decides
+how fast a WAL commit can fsync, which is the number this whole deployment exists to measure. The
+price is that the data dies with the pod, and for an engine schema and three demo services' rows
+that is the right trade.
+
+It is the wrong trade for the only copy of this deployment's LLM credentials. A control plane whose
+catalogue is gone after a pod restart is worse than the YAML file it replaces, because the point of
+moving configuration into a UI is that it stays put. Flipping `localDisk` to false would have fixed
+it in one line and slowed the measured path for everything, so instead there is a second, small
+PostgreSQL — `cp-postgres`, 10Gi on `hcloud-volumes`, the same storage class Redpanda already uses.
+
+### The credentials
+
+Stored AES-256-GCM encrypted, with the key in the `ec-cp-crypto` secret and held nowhere else. In
+the console the field is **write-only**: it shows `set` or `missing`, never the key, and saving the
+edit form does not touch it — `UpdateLlmCommand` has no field for a credential, so replacing one is
+a separate, confirmed action. That is not ceremony: a write-only field wired through an ordinary
+update is how a working key gets blanked by someone changing a temperature.
+
+Exactly one method in the service decrypts anything, and one endpoint serves the result:
+
+```
+GET /internal/agents/{agentId}/config     →  the resolved agent, API key in the clear
+```
+
+**It has no gateway route and must never get one.** The gateway routes `/_ia-cp/**` to this
+service and nothing else; `/internal/**` on either host falls through to a shell's catch-all and
+404s. Verified rather than assumed — a request for that path through the gateway reaches the
+shell, not the control plane. The endpoint authenticates nothing itself, exactly like the users
+service's gRPC port, and the same warning applies with more force.
+
+What this protects: a database dump, a stolen volume snapshot, a backup, anyone with read access
+to the table, and — the common case — a key appearing on a screen, in a listing, or in a log line.
+What it does not protect against: someone holding both the database and `CP_CRYPTO_KEY`, which
+includes anyone who can exec into the pod. That is the honest boundary.
+
+**Rotating `CP_CRYPTO_KEY` makes every stored credential undecryptable.** Nothing re-wraps them, so
+rotation means entering the keys again. `deploy.sh` generates it once into
+`deploy/.secrets/credentials.env` and then leaves it alone, like the PostgreSQL passwords.
+
+### Resolving an agent degrades rather than fails
+
+An agent composed months ago may name an MCP server since disabled, or one since deleted. Refusing
+to serve the whole configuration would take a chat panel down over a missing tool, so the missing
+pieces are dropped and reported:
+
+```json
+{ "llm": { "model": "claude-opus-5", "apiKey": "..." },
+  "mcps": [ { "name": "Booking service", "url": "http://booking:8108" } ],
+  "warnings": [ "MCP 'Forms engine' is disabled — skipped",
+                "MCP 'ghost' is no longer in the catalogue — skipped" ] }
+```
+
+A missing or unusable **LLM** is the exception — there is no degraded mode without a model — and it
+answers 409 saying which of the two it was, `disabled` or `missing its credential`, because the fix
+differs. *Agents → Preview resolved configuration* runs exactly this and shows the warnings, which
+is the only way a dropped server is visible before a user notices the agent got less capable.
+
+### How the agent reads it
+
+`ia-agent` has no model, no credential, no prompt and no server list of its own. It fetches an
+agent's configuration and answers with what came back.
+
+**Cached for 30 seconds, and the last good copy outlives the control plane.** Two separate
+decisions. The cache keeps the control plane off the hot path — a burst of prompts is one fetch —
+and 30 seconds is short enough that changing a model in the console lands within a prompt or two.
+Serving the stale copy when a refresh fails is the more important half: a chat panel must not go
+down because a catalogue is briefly unreachable, and the configuration from a minute ago is almost
+certainly still right. Every stale answer is logged at warn and shows up in the pod's health
+details, so "running on stale configuration" is visible rather than silent.
+
+**Readiness follows the configuration.** A pod that has never reached the control plane reports
+DOWN and stays out of the Service's endpoints — it has no model, so letting it answer would only
+produce errors more slowly. Losing the control plane *later* does not do that: the pod stays UP
+with a `degraded` detail. Liveness deliberately ignores all of this, because restarting a container
+because another service is unreachable fixes nothing and throws away the cache that was keeping it
+working.
+
+**The readiness probe is also the refresh loop**, which is not obvious and is load-bearing: without
+it, nothing would fetch until a prompt arrived, and no prompt can arrive while readiness is DOWN.
+That deadlock was real, and it is what the probe now breaks.
+
+**There is no fallback to local configuration.** A second source of truth that appears only when
+the first is unreachable is how two configurations quietly diverge.
+
+**One asymmetry in Spring AI shapes the code.** Model, temperature and max-tokens can be overridden
+per request; an API key cannot — it lives inside `AnthropicApi`, which is constructor-injected into
+the chat model. So a rotated credential is not a parameter change but a new client, and
+`ChatClientRegistry` caches one per (provider, base URL, key). Changing a model builds nothing.
+
+**A brand-new deployment seeds itself.** Moving the configuration out of a properties file would
+otherwise mean `deploy.sh` producing a chat panel that does nothing until somebody typed four
+things into a console. So `CatalogueSeeder` writes this deployment's own agent — an Anthropic LLM,
+the three MCP servers, and `console-agent` composing them — **only when all four catalogues are
+empty**. Not create-if-missing per entry: that would resurrect an MCP server someone deliberately
+deleted, on every restart.
+
+### Retrieval
+
+A RAG source is not just catalogued: it can be written to and read from, and an agent composed with
+one gets a tool for it.
+
+**The retrieval happens in the control plane, not in the agent.** That is the one place in this
+design where the control plane is on a data path, so it is worth saying why rather than leaving it
+to be discovered. Searching needs two things — the store's connection and the embedding model's
+credential — and both are already here. Doing it in the agent would mean sending a second
+credential to a service that only needs an answer, and putting the same pgvector and embedding
+plumbing in two modules, because ingestion needs exactly the same two things and is unambiguously
+an admin action. What it costs: if the control plane is down, RAG tools fail. The chat panel does
+not, because the agent caches its configuration and its MCP tools do not come through here. An
+outage costs the agent its documents, not its voice.
+
+**In the agent, a RAG source becomes a tool.** Not a prompt stuffed with context: classic retrieval
+embeds the question before the model sees it and pastes the results into the system prompt, which
+retrieves on every turn whether or not the question has anything to do with the documents. As a
+tool, the model decides — and this agent is already told to answer only by calling tools and to
+report a tool failure rather than answering around it, so an empty or unreachable source produces a
+sentence saying so. An MCP tool and a RAG tool are both `ToolCallback`s, so the model sees one list.
+
+The source's **description in the catalogue is the tool's description**, which is what the model
+reads when deciding whether to search it. A vague one produces a tool that is never called.
+
+**Only `PGVECTOR` is implemented.** The other two kinds can be catalogued and are refused with a
+sentence when queried. The table, its index and the `vector` extension are created on first use,
+which is what lets a source be declared before it holds anything — and is why the database user in
+the connection URL needs rights to create an extension.
+
+**Getting content in** is *Content → Ingest text* on the source: paste, and it is split, embedded
+and stored. Deliberately the smallest thing that makes the catalogue demonstrable rather than a
+document pipeline — no crawler, no upload, no incremental sync, and not idempotent. A source whose
+content is loaded by something else is exactly what the catalogue is for.
+
+The store this deployment provides is `cp-postgres`, which runs `pgvector/pgvector:pg16` — the same
+PostgreSQL as before plus the extension. So configuration tables and document vectors share a
+database, which is the right size for a demo; a source pointed somewhere else is a field in the
+console and no code at all.
+
+**One dependency is conspicuously absent**: `spring-ai-openai`. It is built against Spring Framework
+6 and calls `HttpHeaders.addAll(MultiValueMap)`, gone in Framework 7, so on this module's Boot 4 it
+compiles and then dies at the first request with a `NoSuchMethodError`. The choice was to move the
+whole module back to Boot 3.4 or to write the one POST it was being used for; `/v1/embeddings` takes
+a model and a list of strings and returns vectors, so it is the second. `PgVectorStore` itself is
+fine on Boot 4 — it speaks JDBC, not HTTP.
+
+### What it does not do yet
+
+**Embeddings need their own credential.** Anthropic has no embeddings API, so a catalogued
+embedding model is an OpenAI-shaped one and this deployment's Anthropic key cannot pay for it. A
+fresh deploy seeds the source and the model with no credential; filling it in is one field in the
+console.
+
+**The seeded RAG source is not on the seeded agent.** A tool that always answers "nothing found" is
+worse than no tool — it teaches the model the source is useless and costs a round trip per prompt to
+prove it. Ingest something first, then add it.
+
+**The id fields are text, not pickers.** An agent's MCP and RAG lists are comma-separated ids, so a
+typo is not refused on save — it becomes a reference the resolver drops with a warning. The preview
+button is what surfaces that.
 
 ## Measuring it
 
@@ -298,7 +591,8 @@ the moment they both fit.
 | `postgres` | ccx13, alone | dedicated vCPU and **local NVMe**: a WAL commit blocks on fsync, and on the shared-vCPU line that syscall is stalled by noisy-neighbour CPU steal |
 | `orchestrator` | ccx13, alone | the thing under test should not share a core with what it drives |
 | `worker` | ccx13, alone | same |
-| platform | cx43 | redpanda, forms, rules, keycloak, shell, gateway, kafka console — none of them blocks on fsync |
+| platform | cx43 | redpanda, forms, rules, keycloak, shell, gateway, kafka console, booking, content, users, ia-agent, ia-control-plane, control-shell — none of them blocks on fsync |
+| `cp-postgres` | cx43, with the platform group | the control plane's own database. The one thing here on a PersistentVolume rather than an `emptyDir`, because it holds configuration rather than measurements |
 | observability | ccx23 | its own namespace and its own instance type; anti-affinity is namespace-scoped and could not keep it off the engine's nodes from here |
 
 Two things worth knowing before changing it. **Postgres is on an `emptyDir`** — that is what makes
@@ -311,6 +605,15 @@ before designing around it.
 The fleet's own cpu limit is the binding constraint, and it can only be changed through the
 CloudFleet Fleet API — `kubectl` is refused. This topology asks for 20 of the 24 it currently
 allows.
+
+**The four demo services and the three control-plane pods land in the platform group, and that
+budget has not been re-measured since.** They carry the same anti-affinity as the shell and the gateway — off the postgres,
+orchestrator and worker nodes — so they compete for the platform node's room with everything
+already there, and between them they request about 1.6 CPU and 4.6 GiB. If that does not fit,
+Karpenter provisions a second `cx43` and the fleet is asked for 8 more vCPU than it allows: the
+node is never created and the pods sit `Pending`, which reads like a scheduling bug and is a quota.
+Check `kubectl get pods -n ec-demo1` and `kubectl describe node` after the first deploy, and shrink
+their requests or raise the fleet limit through the Fleet API — not `kubectl` — if they do not fit.
 
 ## Notes worth knowing
 
@@ -329,14 +632,33 @@ allows.
   rebuilding the shell image.
 - **The gateway is what protects the backends.** The orchestrator, the forms engine and the
   worker only understand HTTP basic auth, so their UIs — which can pause definitions and cancel
-  processes — would otherwise be open to anyone who typed the path. The gateway validates the
-  realm's access token before any of them sees a request; see `SecurityConfig.java` for the two
-  paths that stay public, and why they have to.
+  processes — would otherwise be open to anyone who typed the path. The three demo services are
+  worse: they authenticate nothing at all, and one of them arrived with a `permitAll()` chain and a
+  `JwtDecoder` built from a hardcoded secret, which was removed rather than deployed. The chat
+  agent is worse again, because an open prompt endpoint is a bill. The gateway validates the
+  realm's access token on all seven prefixes before any of them sees a request; see
+  `SecurityConfig.java` for the paths that stay public, and why they have to.
+- **`ddl-auto: update` never drops a column.** Renaming a JPA field adds the new column and leaves
+  the old one, `NOT NULL`, and every insert then fails on a column no code mentions any more. It
+  happened here while building the control plane — `topK` maps to `topk`, not `top_k`, so naming it
+  explicitly meant both existed. A fresh deployment never sees it; an upgraded one needs the old
+  column dropped by hand. Four services here run `ddl-auto: update` and none of them ships
+  migrations, which is the trade: no migration history to maintain, and renames are manual.
+- **`users`' gRPC port authenticates nothing.** 9191 is on its Service and on no ingress, so it is
+  reachable from inside the namespace and nowhere else — and from there anything can ask it for any
+  user's roles and scopes. Nothing in this deployment calls it; the gateway validates Keycloak's
+  token directly rather than enriching it from here, which is what the demo's own api-gw used it
+  for. It is carried because it is half of what that service is, and it must not be exposed as it
+  stands.
+- **The control console's Keycloak client is compiled into its shell**, like the demo shell's:
+  Mateu bakes `@KeycloakSecured` into the generated bootstrap page, so the hostname, realm and
+  client id cannot be environment variables yet. Changing any of them means rebuilding
+  `control-shell`.
 - **One replica of everything.** The Karpenter pool is capped at 8 CPU. The engine scales
   horizontally by design — raising `replicas` in `deploy/values/eventconductor.yaml` is the only
   change needed, since orchestrator instances coordinate through PostgreSQL advisory locks and
   the outbox rather than through a leader.
-- **The rule engine is delo de mateyuployed at zero replicas.** None of these three workflows has a `RULE`
+- **The rule engine is deployed at zero replicas.** None of these three workflows has a `RULE`
   step. Its Deployment and Service exist, so turning it on is a one-line change.
 - **Traces work as of engine 2.5.0** — `eventconductor.step-over`, `eventconductor.dispatch-step`,
   `outbox relay` and the rest arrive in Tempo. It took three releases, and the last one is worth
