@@ -1,0 +1,54 @@
+package io.mateu.ecdemo1.users.infra.out.persistence;
+
+import io.mateu.uidl.data.ListingData;
+import io.mateu.uidl.data.Page;
+import io.mateu.uidl.data.Pageable;
+import io.mateu.ecdemo1.users.application.query.UserGroupQueryService;
+import io.mateu.ecdemo1.users.application.query.dto.UserGroupDto;
+import io.mateu.ecdemo1.users.application.query.dto.UserGroupRow;
+import io.mateu.ecdemo1.users.domain.aggregates.usergroup.vo.UserGroupId;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class UserGroupDBQueryService implements UserGroupQueryService {
+
+    final UserGroupEntityRepository repository;
+
+    private UserGroupRow toDomain(UserGroupEntity entity) {
+        return new UserGroupRow(
+                entity.id,
+                entity.name,
+                entity.description
+        );
+    }
+
+    @Override
+    public String getLabel(String id) {
+        return repository.findById(id).map(UserGroupEntity::getName).orElse("Unknown user group");
+    }
+
+    @Override
+    public Optional<UserGroupDto> getById(String id) {
+        return repository.findById(id).map(entity -> new UserGroupDto(
+                entity.getId(),
+                entity.getName(),
+                entity.getDescription()
+        ));
+    }
+
+    @Override
+    public ListingData<UserGroupRow> findAll(String searchText,
+                                        Object filters, Pageable pageable) {
+        var page = repository.findAllByNameContainingIgnoreCase(searchText, org.springframework.data.domain.Pageable
+                .ofSize(pageable.size())
+                .withPage(pageable.page())
+        );
+        return new ListingData(new Page(searchText, page.getSize(), page.getNumber(), page.getTotalElements(),
+                page.getContent().stream().map(this::toDomain).toList()));
+    }
+
+}

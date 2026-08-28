@@ -1,0 +1,112 @@
+# The booking service — the only one of the three demo services that is wired into the engine.
+#
+# Three things live in this one pod:
+#   • a Mateu CRUD at /_booking, which the shell hosts as a remote menu;
+#   • an MCP server, which is where the chat agent's booking tools come from;
+#   • the worker side of the booking saga: it consumes the `booking` topic and replies on
+#     `upstream`, which is what confirms or cancels a booking when a process says so.
+#
+# That third part needs a definition that names `topic: booking` on its ACTION steps. The one it
+# was written for is verify-booking-payment, and it is NOT in ec-definitions yet — until it is
+# added there by a pull request, this pod starts, joins the consumer group and is handed nothing.
+# The CRUD and the MCP tools work regardless.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking
+  namespace: ec-demo1
+  labels: { app: booking }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: booking }
+  template:
+    metadata:
+      labels:
+        app: booking
+        app.kubernetes.io/component: booking
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8108"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # Both, because this one is a Kafka consumer as well as a JPA application: without the
+        # broker its binder retries in a loop that looks like a healthy pod doing nothing.
+        - name: wait-for-redpanda
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for redpanda; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: booking
+          image: miguelperezcolom/ec-demo1-booking:0.6.0
+          env:
+            - name: SERVER_PORT
+              value: "8108"
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            # Its own database, created by 55-demo-db-init.yaml. Not the engine's `workflow`:
+            # this service creates its table with ddl-auto and Flyway owns the schema there.
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/booking
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "8"
+          ports:
+            - { name: http, containerPort: 8108 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8108 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8108 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking
+  namespace: ec-demo1
+  labels: { app: booking }
+spec:
+  selector: { app: booking }
+  ports:
+    - { name: http, port: 8108, targetPort: 8108 }

@@ -1,0 +1,51 @@
+server:
+  port: 8102
+
+spring:
+  application:
+    name: ec-demo1-users
+
+  grpc:
+    server:
+      port: 9191
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/users}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # This service owns its tables outright and ships no migrations, so it creates them itself
+      # rather than validating against someone else's history. It has a database of its own —
+      # nothing Flyway manages for the engine is in reach.
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+# No HTTP security here, and none is missing: this pod is only reachable through the gateway,
+# which requires a Keycloak token on /_users/** before anything gets this far.
+#
+# The gRPC port is a different matter — it is inside the cluster only, listed on the Service but
+# not on any ingress, and it authenticates nothing. Anything that gets a pod in this namespace can
+# ask it for any user's roles and scopes. That is acceptable while nothing outside the namespace
+# can reach it and stops being acceptable the moment it is exposed.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.hibernate.SQL: error
+    org.hibernate.orm.jdbc.bind: error

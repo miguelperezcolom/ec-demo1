@@ -1,0 +1,89 @@
+server:
+  port: 8108
+
+spring:
+  application:
+    name: ec-demo1-booking
+
+  ai:
+    mcp:
+      server:
+        name: booking
+        version: 1.0.0
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  cloud:
+    function:
+      # This service is a worker and nothing else: it consumes tasks and answers them. The engine
+      # runs in the orchestrator pod, so consumeOutbox and consumeUpstream do not belong here —
+      # naming them left two phantom bindings, one of them sharing a consumer group with the
+      # engine's own.
+      definition: consumeWorkerEvent
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+      bindings:
+        # IN: the tasks the engine dispatches for this worker.
+        #
+        # `booking` — the topic named by the confirm-booking and cancel-booking steps of the
+        # verify-booking-payment definition. The engine dispatches each task to the destination
+        # its step declares, so this service sees only its own; a step that names no topic goes to
+        # `downstream`, where the test worker listens.
+        #
+        # A group of its own, never one shared with another binding: members of one group
+        # subscribed to different topics leave partitions with no consumer at all, and those
+        # messages are never read.
+        consumeWorkerEvent-in-0:
+          destination: booking
+          group: ec-demo1-booking
+        # OUT, via StreamBridge: the replies back to the engine.
+        upstream:
+          destination: upstream
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/booking}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # This service owns its one table outright and ships no migrations, so it creates it itself
+      # rather than validating against someone else's history — the same trade the test worker
+      # makes. It is a database of its own, not the engine's: nothing Flyway manages is in reach.
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # ByteArray, not String: the binder hands the payload down already serialized, and a String
+      # serializer here fails with "[B cannot be cast to String" on the first reply.
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.hibernate.SQL: error
+    org.hibernate.orm.jdbc.bind: error
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

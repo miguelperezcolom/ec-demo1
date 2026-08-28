@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.shell.infra.in.ui;
 
 import io.mateu.uidl.StyleConstants;
+import io.mateu.uidl.annotations.AI;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Logo;
@@ -29,9 +30,11 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
  * The one page a user ever loads.
  *
  * <p>Everything below the menu bar is served by another pod: each {@link RemoteMenu} names a
- * path, the ingress routes that path to the app that owns it, and the shell renders whatever
- * menu that app declares. So the orchestrator, the forms engine and the worker keep their own
- * UIs — nothing about them is restated here — and the shell only has to know where they live.
+ * path, the gateway routes that path to the app that owns it, and the shell renders whatever
+ * menu that app declares. So the orchestrator, the forms engine, the worker and the three demo
+ * services keep their own UIs — nothing about them is restated here — and the shell only has to
+ * know where they live. Adding one is a field below, a route in the gateway and a manifest; the
+ * path in all three has to match the {@code @UI} value the service itself declares.
  *
  * <p>The Keycloak URL is baked in at compile time: Mateu writes {@code @KeycloakSecured} into
  * the generated bootstrap page, so it cannot be an environment variable yet. Changing the
@@ -52,6 +55,11 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 // Edge-to-edge: the pages behind these menus are listings and workflow graphs, and capping the
 // content at the default ~900px container squeezes them into cards for lack of horizontal room.
 @Style(StyleConstants.FULL_WIDTH)
+// The chat panel. Mateu's client POSTs the prompt here and reads the answer as a stream; the
+// gateway routes /ai/** to the agent pod and requires a token on it, which this client sends.
+// The agent itself knows nothing about these menus: it reaches the orchestrator, the forms engine
+// and the booking service over MCP, and each of those decides what it is willing to expose.
+@AI(sse = "/ai/api/agent/stream")
 public class ShellHome implements WidgetSupplier {
 
     /** Workflow definitions, running processes, step executions, analytics. */
@@ -65,6 +73,18 @@ public class ShellHome implements WidgetSupplier {
     /** What the test worker was asked to do, and the overrides that answer it by hand. */
     @Menu
     RemoteMenu worker = new RemoteMenu("/_worker");
+
+    /** Bookings — the CRUD, and the aggregate the booking saga confirms or cancels. */
+    @Menu
+    RemoteMenu booking = new RemoteMenu("/_booking");
+
+    /** Content, labels and content types. */
+    @Menu
+    RemoteMenu content = new RemoteMenu("/_content");
+
+    /** Users, groups, roles and permissions. */
+    @Menu
+    RemoteMenu users = new RemoteMenu("/_users");
 
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {

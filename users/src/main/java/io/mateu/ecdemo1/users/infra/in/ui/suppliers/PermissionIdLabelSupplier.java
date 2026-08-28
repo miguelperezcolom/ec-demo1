@@ -1,0 +1,20 @@
+package io.mateu.ecdemo1.users.infra.in.ui.suppliers;
+
+import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.interfaces.LookupLabelSupplier;
+import io.mateu.ecdemo1.users.application.query.PermissionQueryService;
+import io.mateu.ecdemo1.users.domain.aggregates.permission.vo.PermissionId;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class PermissionIdLabelSupplier implements LookupLabelSupplier {
+
+    final PermissionQueryService queryService;
+
+    @Override
+    public String label(String fieldId, Object id, HttpRequest httpRequest) {
+        return queryService.getLabel((String) id);
+    }
+}

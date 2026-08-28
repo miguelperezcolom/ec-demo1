@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Boot 3.4.3 rather than the shell's Boot 4: Spring AI 1.0.0, which is what serves the MCP
+         tools this service exposes to the agent, is built against Boot 3.4 and does not start on
+         4. These are separate processes and do not have to match — the gateway already runs 3.4.1
+         next to a Boot 4 shell. -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.mateu.ecdemo1</groupId>
+    <artifactId>booking</artifactId>
+    <version>0.1.0</version>
+    <name>ec-demo1 booking</name>
+    <description>Bookings: a CRUD UI, MCP tools for the agent, and the worker side of the booking saga</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Pinned, like the shell's: the versions this deployment was built and verified
+             against. `shared` is the engine's own DTO jar and tracks the engine image tag in
+             deploy/values/eventconductor.yaml — the events on the wire are defined there, so a
+             mismatch is a deserialization failure at runtime and not a compile error. -->
+        <mateu.version>3.0-alpha.298</mateu.version>
+        <eventconductor.version>2.8.0</eventconductor.version>
+        <spring-cloud.version>2024.0.0</spring-cloud.version>
+        <spring-ai.version>1.0.0</spring-ai.version>
+        <!-- Ahead of what Boot 3.4.3 manages (1.18.36), which does not run on a JDK 25 javac and
+             fails the build with "TypeTag :: UNKNOWN" rather than anything that names Lombok.
+             1.18.44 is what the Boot 4 modules here already resolve to. -->
+        <lombok.version>1.18.44</lombok.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- The worker side of the saga: it consumes the `booking` topic and answers on
+             `upstream`. Both bindings are Spring Cloud Stream, so the Kafka binder is not
+             optional here the way it is for the content and users services. -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-stream-kafka</artifactId>
+        </dependency>
+
+        <!-- The engine's event DTOs — TaskExecutionRequested, WorkerReply, Variable. Published to
+             Maven Central by the engine, so nothing here needs eventconductor checked out. -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>shared</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.mateu</groupId>
+            <artifactId>mvc-core</artifactId>
+            <version>${mateu.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu</groupId>
+            <artifactId>vaadin-lit</artifactId>
+            <version>${mateu.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu</groupId>
+            <artifactId>annotation-processor-mvc</artifactId>
+            <version>${mateu.version}</version>
+        </dependency>
+
+        <!-- MCP server: the tools ia-agent calls to create, list and change bookings. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+
+        <!-- Health probes and the Prometheus endpoint the pod annotation points Prometheus at.
+             Without the registry, /actuator/prometheus does not exist even with actuator on the
+             classpath, and the scrape silently returns 404 forever. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>io.mateu</groupId>
+                            <artifactId>annotation-processor-mvc</artifactId>
+                            <version>${mateu.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

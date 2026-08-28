@@ -1,0 +1,108 @@
+# The chat agent behind the console's chat panel.
+#
+# It implements no screens, holds no database, and — since the control plane exists — holds no
+# configuration either. A prompt arrives at /ai/api/agent/stream; this pod asks the control plane
+# which model, which credential, which system prompt and which MCP servers, opens a fresh
+# connection to each of those servers, hands the LLM whatever tools they advertise, and streams
+# the answer back.
+#
+# So there are exactly two things it knows about itself, and they are the only two variables below
+# that are not plumbing: where the control plane is, and which agent it is.
+#
+# A connection per prompt, and not a pool, deliberately — Spring AI's auto-configured MCP client
+# holds one persistent SSE connection and stays broken for the life of the pod once it drops.
+#
+# Three things to know before this is running in front of anyone:
+#   • Every prompt is billed to whatever credential the control plane serves. The gateway requires
+#     a Keycloak token on /ai/**, which is what keeps that from being an open endpoint.
+#   • Its readiness follows the configuration: a pod that has never reached the control plane
+#     reports DOWN and stays out of the Service's endpoints, because it has no model to answer
+#     with. Losing the control plane *later* does not do that — the last good configuration keeps
+#     being served and the pod reports UP with a `degraded` detail.
+#   • The Anthropic key is no longer here. It lives in the control plane's catalogue, encrypted,
+#     and reaches this pod per prompt.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ia-agent
+  namespace: ec-demo1
+  labels: { app: ia-agent }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ia-agent }
+  template:
+    metadata:
+      labels:
+        app: ia-agent
+        app.kubernetes.io/component: ia-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8095"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: ia-agent
+          image: miguelperezcolom/ec-demo1-ia-agent:0.6.0
+          env:
+            - name: SERVER_PORT
+              value: "8095"
+            # Reached over the cluster network rather than through the gateway: this is
+            # pod-to-pod, carries no user token, and /internal/** has no gateway route at all.
+            - name: IA_CONTROL_PLANE_URL
+              value: http://ia-control-plane:8110
+            # Which agent this pod is. It has to name one that exists in the catalogue — the
+            # control plane seeds `console-agent` on a brand-new deployment.
+            - name: AGENT_ID
+              value: console-agent
+          ports:
+            - { name: http, containerPort: 8095 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "512Mi", cpu: "200m" }
+            limits:   { memory: "1536Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8095 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8095 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            # A prompt can hold a thread for a minute while it waits on the LLM; liveness has to
+            # mean "wedged", never "busy".
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ia-agent
+  namespace: ec-demo1
+  labels: { app: ia-agent }
+spec:
+  selector: { app: ia-agent }
+  ports:
+    - { name: http, port: 8095, targetPort: 8095 }

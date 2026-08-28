@@ -1,0 +1,46 @@
+server:
+  port: 8104
+
+spring:
+  application:
+    name: ec-demo1-content
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/content}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # This service owns its tables outright and ships no migrations, so it creates them itself
+      # rather than validating against someone else's history. It has a database of its own —
+      # nothing Flyway manages for the engine is in reach.
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+# No security here, and none is missing: this pod is only reachable through the gateway, which
+# requires a Keycloak token on /_content/** before anything gets this far — the same arrangement
+# the orchestrator, the forms engine and the worker are under, none of which speaks OIDC either.
+# What was removed on the way in was a permitAll() chain plus a JwtDecoder built from a hardcoded
+# 40-character secret, which validated nothing and would have been the only credential in this
+# repository.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.hibernate.SQL: error
+    org.hibernate.orm.jdbc.bind: error

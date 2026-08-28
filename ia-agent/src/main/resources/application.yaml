@@ -1,0 +1,71 @@
+server:
+  port: 8095
+
+spring:
+  application:
+    name: ec-demo1-ia-agent
+
+  threads:
+    virtual:
+      enabled: true
+
+  autoconfigure:
+    exclude:
+      # Spring AI's Anthropic auto-configuration builds one AnthropicApi and one
+      # AnthropicChatModel at startup, from spring.ai.anthropic.* properties. This service has no
+      # such properties any more: the model and the credential arrive per prompt from the control
+      # plane, and ChatClientRegistry builds a client per credential. Left enabled, it would
+      # either fail for a missing api-key or — worse — supply a second, stale ChatClient bean that
+      # nothing means to use.
+      - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration
+
+  ai:
+    mcp:
+      client:
+        # Off, and now for a second reason on top of the original one. The original: Spring AI's
+        # auto-configured client holds one persistent SSE connection and stays broken for the life
+        # of the pod once it drops, so PerRequestMcpClientFactory opens a fresh set per prompt.
+        # The new one: there is no static list to configure it from — which servers this agent
+        # reaches is the control plane's answer, and it can change between two prompts.
+        enabled: false
+
+ia:
+  # The two things this pod knows about itself. Everything else — model, credential, system
+  # prompt, MCP servers — comes from the control plane at /internal/agents/{agent-id}/config.
+  control-plane:
+    url: ${IA_CONTROL_PLANE_URL:http://localhost:8110}
+  agent-id: ${AGENT_ID:console-agent}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      # A deliberate divergence from the other services here, and the only one: this pod can be UP
+      # while serving a configuration from an hour ago, and without details that is
+      # indistinguishable from UP. The distinction is the whole point of the indicator.
+      #
+      # It is safe because this endpoint is not reachable from outside the cluster: the gateway
+      # routes /ai/** to this service and nothing else, so /actuator on either host lands on a
+      # shell's catch-all. What the details contain is an agent id and a connection error.
+      show-details: always
+      group:
+        # Readiness follows the configuration: a pod that has never reached the control plane has
+        # no model and no tools, and taking it out of the Service's endpoints is more useful than
+        # letting it answer every prompt with an error.
+        readiness:
+          include: readinessState, agentConfiguration
+        # Liveness deliberately does NOT include it. Liveness restarts the container, and
+        # restarting because another service is unreachable fixes nothing and throws away the
+        # cached configuration that was keeping this pod working.
+        liveness:
+          include: livenessState
+
+logging:
+  level:
+    org.springframework.ai: WARN
+    io.mateu.ecdemo1: INFO

@@ -1,0 +1,76 @@
+# A database per demo service, in the PostgreSQL the engine already runs.
+#
+# Not a schema inside `workflow`, and not Hibernate pointed at the engine's own database. The
+# engine owns `workflow` through Flyway — it validates its schema against its own migration
+# history at startup — and three services running `ddl-auto: update` against that same schema
+# would be three writers with no shared history, which fails in the direction that is hardest to
+# read: the engine refuses to start, days later, on an upgrade.
+#
+# The chart's PostgreSQL only ever creates `workflow`, so the databases have to be made here. The
+# same Job shape as keycloak-db-init, for the same reason, and it is deleted and re-applied by
+# deploy.sh because a Job is immutable once created.
+#
+# One thing this inherits from the rest of the deployment: PostgreSQL is on an emptyDir. Whatever
+# these three write dies with the pod, along with the engine's schema and Keycloak's accounts.
+# Treat any data here as disposable — the README says so about the engine and it is no less true
+# of a booking.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-db-init
+  namespace: ec-demo1
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels: { app: demo-db-init }
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: createdb
+          image: postgres:16
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          env:
+            - name: PGHOST
+              value: postgres
+            - name: PGUSER
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: PGDATABASE
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_DB } }
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              until pg_isready -q; do echo "waiting for postgres"; sleep 2; done
+              # CREATE DATABASE has no IF NOT EXISTS, and the Job is retried on failure, so the
+              # existence check is what makes re-running this harmless.
+              for db in booking content users; do
+                if psql -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1; then
+                  echo "database $db already exists"
+                else
+                  psql -c "CREATE DATABASE $db"
+                  echo "database $db created"
+                fi
+              done
+          resources:
+            requests: { memory: "64Mi", cpu: "50m" }
+            limits:   { memory: "128Mi" }

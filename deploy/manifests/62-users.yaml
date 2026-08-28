@@ -1,0 +1,98 @@
+# The users service — users, groups, roles and permissions, as a Mateu CRUD at /_users.
+#
+# It also answers GetAuthInfo over gRPC on 9191, returning a user's roles and scopes. Nothing in
+# this deployment calls it: the gateway validates Keycloak's token directly rather than enriching
+# it from here, which is what the demo's own api-gw used this port for. It is carried because it
+# is half of what this service is, and it is on the Service but on no ingress — the port is
+# unauthenticated, so anything that gets a pod in this namespace can ask it about any user. That
+# is fine while it stays inside the namespace and stops being fine the moment it does not.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users
+  namespace: ec-demo1
+  labels: { app: users }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: users }
+  template:
+    metadata:
+      labels:
+        app: users
+        app.kubernetes.io/component: users
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8102"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: users
+          image: miguelperezcolom/ec-demo1-users:0.6.0
+          env:
+            - name: SERVER_PORT
+              value: "8102"
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/users
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "8"
+          ports:
+            - { name: http, containerPort: 8102 }
+            - { name: grpc, containerPort: 9191 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8102 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8102 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users
+  namespace: ec-demo1
+  labels: { app: users }
+spec:
+  selector: { app: users }
+  ports:
+    - { name: http, port: 8102, targetPort: 8102 }
+    - { name: grpc, port: 9191, targetPort: 9191 }

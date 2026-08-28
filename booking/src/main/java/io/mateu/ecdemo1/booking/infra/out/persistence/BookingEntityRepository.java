@@ -1,0 +1,9 @@
+package io.mateu.ecdemo1.booking.infra.out.persistence;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface BookingEntityRepository extends JpaRepository<BookingEntity, String> {
+    Page<BookingEntity> findAllByLeadNameContainingIgnoreCaseOrderByCreatedDesc(String searchText, Pageable pageable);
+}

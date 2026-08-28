@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.4</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.mateu.ecdemo1</groupId>
+    <artifactId>grpc-interface</artifactId>
+    <version>0.1.0</version>
+    <name>ec-demo1 grpc-interface</name>
+    <description>The generated stubs for the users service's gRPC contract — the only module here that is not an application</description>
+
+    <!-- Why this exists at all: `users` answers GetAuthInfo over gRPC, returning a user's roles
+         and scopes, and the stubs for that contract have to be generated from the .proto by
+         protoc. Keeping them in a module of their own is what lets a client — one that does not
+         exist in this deployment yet — depend on the contract without depending on the service.
+
+         Nothing in this repository calls it today: the gateway validates Keycloak's token
+         directly rather than enriching it from the users service, which is what the demo's own
+         api-gw used this for. It is carried because dropping it would be dropping half of what
+         `users` is, not because anything here needs it yet. -->
+
+    <properties>
+        <java.version>21</java.version>
+        <grpc.version>1.77.0</grpc.version>
+        <protobuf-java.version>3.25.8</protobuf-java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-services</artifactId>
+            <version>${grpc.version}</version>
+            <exclusions>
+                <!-- grpc-services pulls a protobuf-java of its own; excluded so the version
+                     pinned below is the only one on the classpath. -->
+                <exclusion>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>${protobuf-java.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java-util</artifactId>
+            <version>${protobuf-java.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Downloads protoc and the gRPC codegen plugin from Maven Central at build time, so
+                 building this module needs network the first time even with a warm ~/.m2. -->
+            <plugin>
+                <groupId>io.github.ascopes</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+                <version>4.0.3</version>
+                <configuration>
+                    <protocVersion>${protobuf-java.version}</protocVersion>
+                    <binaryMavenPlugins>
+                        <binaryMavenPlugin>
+                            <groupId>io.grpc</groupId>
+                            <artifactId>protoc-gen-grpc-java</artifactId>
+                            <version>${grpc.version}</version>
+                            <options>@generated=omit</options>
+                        </binaryMavenPlugin>
+                    </binaryMavenPlugins>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>generate</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

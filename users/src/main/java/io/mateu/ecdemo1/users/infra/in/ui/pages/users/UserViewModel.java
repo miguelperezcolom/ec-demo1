@@ -1,0 +1,74 @@
+package io.mateu.ecdemo1.users.infra.in.ui.pages.users;
+
+import io.mateu.uidl.annotations.Colspan;
+import io.mateu.uidl.annotations.EditableOnlyWhenCreating;
+import io.mateu.uidl.annotations.Lookup;
+import io.mateu.uidl.annotations.Style;
+import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.interfaces.Identifiable;
+import io.mateu.ecdemo1.users.application.query.dto.UserDto;
+import io.mateu.ecdemo1.users.application.usecases.user.create.CreateUserCommand;
+import io.mateu.ecdemo1.users.application.usecases.user.create.CreateUserUseCase;
+import io.mateu.ecdemo1.users.application.usecases.user.save.SaveUserCommand;
+import io.mateu.ecdemo1.users.application.usecases.user.save.SaveUserUseCase;
+import io.mateu.ecdemo1.users.domain.aggregates.role.vo.RoleId;
+import io.mateu.ecdemo1.users.domain.aggregates.user.User;
+import io.mateu.ecdemo1.users.domain.aggregates.usergroup.vo.UserGroupId;
+import io.mateu.ecdemo1.users.infra.in.ui.suppliers.RoleIdLabelSupplier;
+import io.mateu.ecdemo1.users.infra.in.ui.suppliers.RoleIdOptionsSupplier;
+import io.mateu.ecdemo1.users.infra.in.ui.suppliers.UserGroupIdLabelSupplier;
+import io.mateu.ecdemo1.users.infra.in.ui.suppliers.UserGroupIdOptionsSupplier;
+import jakarta.validation.constraints.NotEmpty;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@Scope("prototype")
+@RequiredArgsConstructor
+public class UserViewModel implements Identifiable {
+    @EditableOnlyWhenCreating
+            @NotEmpty
+    String id;
+    @NotEmpty String name;
+    String email;
+    @Lookup(search = UserGroupIdOptionsSupplier.class, label = UserGroupIdLabelSupplier.class)
+    List<String> groups;
+    @Lookup(search = RoleIdOptionsSupplier.class, label = RoleIdLabelSupplier.class)
+            @Colspan(2)
+            @Style("width: 100%;")
+    List<String> roles;
+
+    final CreateUserUseCase createUserUseCase;
+    final SaveUserUseCase saveUserUseCase;
+
+    public String create(HttpRequest httpRequest) {
+        createUserUseCase.handle(new CreateUserCommand(id, name, email, groups, roles));
+        return id;
+    }
+
+    public void save(HttpRequest httpRequest) {
+        saveUserUseCase.handle(new SaveUserCommand(id, name, email, groups, roles));
+    }
+
+    @Override
+    public String id() {
+        return id;
+    }
+
+    public UserViewModel load(UserDto user) {
+        id = user.id();
+        name = user.name();
+        email = user.email();
+        roles = user.roleIds();
+        groups = user.groupIds();
+        return this;
+    }
+
+    @Override
+    public String toString() {
+        return id != null ? name : "New user";
+    }
+}
