@@ -5,6 +5,7 @@ import io.mateu.ecdemo1.iacp.infra.in.ui.pages.budget.BudgetCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.llm.LlmCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.mcp.McpCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.rag.RagCrudOrchestrator;
+import io.mateu.ecdemo1.iacp.infra.in.ui.pages.route.RouteCrudOrchestrator;
 import io.mateu.uidl.annotations.Menu;
 
 /**
@@ -29,5 +30,8 @@ public class ControlPlaneMenu {
 
     @Menu
     BudgetCrudOrchestrator budgets;
+
+    @Menu
+    RouteCrudOrchestrator routes;
 
 }

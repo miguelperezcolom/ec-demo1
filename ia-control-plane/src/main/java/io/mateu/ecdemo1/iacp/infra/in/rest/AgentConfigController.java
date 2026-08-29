@@ -1,14 +1,19 @@
 package io.mateu.ecdemo1.iacp.infra.in.rest;
 
 import io.mateu.ecdemo1.iacp.application.usecases.agent.ResolveAgentConfigUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.agent.ResolveByContextUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * The one endpoint that hands out a resolved agent configuration, credential included.
@@ -30,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgentConfigController {
 
     final ResolveAgentConfigUseCase resolveAgentConfig;
+    final ResolveByContextUseCase resolveByContext;
 
     /** The shape a consumer gets. Same as Resolved, minus nothing — named here so it is greppable. */
     @GetMapping("/{agentId}/config")
@@ -43,6 +49,34 @@ public class AgentConfigController {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new Problem(agentId, e.getMessage()));
         }
+    }
+
+    /**
+     * The context-aware sibling of {@code /config}: the agent posts who is asking and from where,
+     * and gets back the configuration of the agent the routes chose — refused with a 409 if that
+     * agent is unusable or a budget is spent. This is the endpoint the agent calls once it knows how
+     * to route; {@code /config} stays for a caller that names an agent directly.
+     */
+    @PostMapping("/resolve")
+    public ResponseEntity<?> resolve(@RequestBody ResolveRequest request) {
+        var agentId = request.defaultAgentId();
+        try {
+            var resolved = resolveByContext.handle(new ResolveByContextUseCase.RequestContext(
+                    request.userId(), request.roles() == null ? List.of() : request.roles(),
+                    request.tenant(), request.locale(), request.route(), request.defaultAgentId()));
+            return ResponseEntity.ok(resolved);
+        } catch (ResolveByContextUseCase.BudgetExceededException e) {
+            log.warn("Resolve refused (budget) for default agent {}: {}", agentId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new Problem(agentId, e.getMessage()));
+        } catch (ResolveAgentConfigUseCase.AgentNotUsableException e) {
+            log.warn("Resolve refused for agent {}: {}", agentId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new Problem(agentId, e.getMessage()));
+        }
+    }
+
+    /** What the agent posts to {@code /resolve}: its identity read from the token, plus context. */
+    public record ResolveRequest(String userId, String username, List<String> roles, String tenant,
+                                 String locale, String route, String defaultAgentId) {
     }
 
     public record Problem(String agentId, String reason) {}
