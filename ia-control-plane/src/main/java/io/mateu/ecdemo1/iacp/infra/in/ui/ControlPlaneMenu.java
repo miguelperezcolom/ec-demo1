@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui;
 
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.agent.AgentCrudOrchestrator;
+import io.mateu.ecdemo1.iacp.infra.in.ui.pages.budget.BudgetCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.llm.LlmCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.mcp.McpCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.rag.RagCrudOrchestrator;
@@ -25,5 +26,8 @@ public class ControlPlaneMenu {
 
     @Menu
     RagCrudOrchestrator ragSources;
+
+    @Menu
+    BudgetCrudOrchestrator budgets;
 
 }
