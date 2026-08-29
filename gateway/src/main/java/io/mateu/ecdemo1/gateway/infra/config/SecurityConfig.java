@@ -118,11 +118,17 @@ public class SecurityConfig {
                         // bearer token — it reads it from localStorage and sets the header
                         // itself, unlike the @Action(sse) client described above.
                         .pathMatchers("/ai/**").authenticated()
+                        // The GitOps webhook, public on the control host and verified by HMAC in
+                        // the control plane — GitHub cannot carry an ai-admin token. Listed before
+                        // the rule below so it is decided here and cannot be swept under it; the
+                        // catch-all would permit it anyway, but silence is the wrong way to make a
+                        // public endpoint public.
+                        .matchers(onControlHost("/cp-webhooks/**")).permitAll()
                         // The control console. Both of these, because the catalogues are rendered
                         // by two pods: /_ia-cp/** is the control plane's own UI, and /mateu/** is
                         // the control shell's endpoint that assembles the page around it. Leaving
                         // either open would leave the console usable.
-                        .matchers(onControlHost("/_ia-cp/**", "/mateu/**")).hasRole("admin")
+                        .matchers(onControlHost("/_ia-cp/**", "/mateu/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and

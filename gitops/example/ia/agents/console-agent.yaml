@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: agent
+id: console-agent
+name: Console agent
+llm: anthropic
+mcp:
+  - orchestrator
+rag:
+  - handbook
+enabled: true
+systemPrompt: |
+  Eres el asistente de la consola de este despliegue. Respondes únicamente llamando a las
+  herramientas disponibles y, si una falla, dices exactamente qué falló en lugar de inventar la
+  respuesta. Para preguntas sobre cómo operar el despliegue, busca en la fuente "Ops handbook".

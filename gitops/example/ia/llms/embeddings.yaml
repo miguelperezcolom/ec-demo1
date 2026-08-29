@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: llm
+id: embeddings
+name: Embeddings (multilingual e5-small)
+# An OpenAI-compatible endpoint that is not OpenAI — here the in-cluster TEI pod.
+provider: OPENAI_COMPATIBLE
+model: intfloat/multilingual-e5-small
+baseUrl: http://embeddings/v1
+# TEI needs no credential, so none is named.

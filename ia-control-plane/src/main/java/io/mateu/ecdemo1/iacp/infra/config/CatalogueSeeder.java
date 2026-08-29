@@ -57,6 +57,7 @@ public class CatalogueSeeder {
             CreateLlmUseCase createLlm, CreateMcpUseCase createMcp, CreateRagUseCase createRag,
             CreateAgentUseCase createAgent,
             AesGcmSecretCipher cipher,
+            @Value("${cp.gitops.enabled:false}") boolean gitopsEnabled,
             @Value("${cp.seed.agent-id:console-agent}") String agentId,
             @Value("${cp.seed.anthropic-api-key:}") String anthropicApiKey,
             @Value("${cp.seed.orchestrator-url:}") String orchestratorUrl,
@@ -64,6 +65,13 @@ public class CatalogueSeeder {
             @Value("${cp.seed.booking-url:}") String bookingUrl,
             @Value("${cp.seed.rag-url:}") String ragUrl) {
         return args -> {
+            if (gitopsEnabled) {
+                // Git provides the catalogues when GitOps is on. Seeding here would create entries
+                // the console owns, which the reconciler then refuses to touch — a confusing
+                // half-state where the repo cannot manage its own agent. Let git seed it instead.
+                log.info("GitOps is enabled — the repo owns the catalogues, so nothing is seeded.");
+                return;
+            }
             if (llms.count() > 0 || mcps.count() > 0 || rags.count() > 0 || agents.count() > 0) {
                 log.info("Catalogues already hold something — nothing seeded.");
                 return;

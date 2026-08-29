@@ -363,6 +363,40 @@ includes anyone who can exec into the pod. That is the honest boundary.
 rotation means entering the keys again. `deploy.sh` generates it once into
 `deploy/.secrets/credentials.env` and then leaves it alone, like the PostgreSQL passwords.
 
+### Configuring it from git (GitOps)
+
+The console is one way to change the catalogues; a git repo is the other. Turned on, the control
+plane reads the four catalogues from YAML in a GitHub repo — one entry per file, a `kind` field
+saying which catalogue — and reconciles itself to match whenever the repo changes. Off by default;
+a deployment that does not set `GITOPS_ENABLED` and a repo is untouched. The schema, the layout and
+the editor setup live in [`gitops/`](gitops/README.md).
+
+**Git owns only what git created, and that is the whole of the model.** Each entry the reconciler
+writes is recorded as git-managed. Remove its file and the next sync deletes it; but an entry made
+in the console is in no such record, so a sync never touches it — not overwritten, not deleted, only
+removable from the console. The two coexist because they are for different things: the console is
+for trying a configuration out and quick fixes, the repo is the durable source. This is why there is
+a small `gitops_managed` table beside the catalogues rather than a `source` column on each — the
+provenance is the reconciler's concern, and keeping it out of the aggregates left them untouched.
+
+**A push drives it, not a clock.** GitHub calls a webhook at `/cp-webhooks/github` on the control
+host — public, because GitHub cannot carry an `ai-admin` token, and verified instead by HMAC over the
+body with a shared secret, exactly like the engine's git webhooks. A reconcile also runs once at
+startup, to catch a pod up on what it missed. The periodic poll is deliberately **off by default**:
+its only job is to re-assert the repo on a timer, which would undo a console quick-fix before the
+next push — so it exists for those who want drift corrected and stays out of the way otherwise.
+
+**Secrets never enter the repo.** An LLM entry names an env var in `credentialEnv`; the control plane
+resolves it from its own Secret at sync time and sets the credential through the same use case the
+console does. The repo, public or private, holds only which env to read — never a key. The read
+token for a private repo and the webhook's HMAC secret are the deployment's, in the `cp-gitops`
+Secret; the fetch is all-or-nothing, so a half-failed read never reads as "the repo was emptied" and
+deletes the catalogue.
+
+**The seeder stands down when this is on.** Git provides the content, so seeding would only create
+console-owned entries the repo then cannot manage — a confusing half-state. With GitOps enabled the
+seeder logs that it is leaving the catalogues to git and does nothing.
+
 ### Resolving an agent degrades rather than fails
 
 An agent composed months ago may name an MCP server since disabled, or one since deleted. Refusing

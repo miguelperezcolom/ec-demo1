@@ -1,0 +1,9 @@
+{
+  "//": "Maps the IA catalogue schema onto the YAML files, so VS Code autocompletes and validates them. Needs the 'YAML' extension by Red Hat (redhat.vscode-yaml). The per-file '# yaml-language-server' modeline does the same thing and travels with the file; this covers files that lack it.",
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json": [
+      "ia/**/*.yaml",
+      "ia/**/*.yml"
+    ]
+  }
+}

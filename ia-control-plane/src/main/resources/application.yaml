@@ -45,6 +45,33 @@ cp:
     # rotation means entering the keys again.
     key: ${CP_CRYPTO_KEY:}
 
+  # GitOps: the catalogues as YAML in a GitHub repo, this control plane reconciling to match.
+  #
+  # Git owns only what git created. Each entry the reconciler writes is recorded as git-managed; an
+  # entry removed from the repo is deleted here only if it is git-managed. Anything created in the
+  # console is invisible to this — never overwritten, never deleted by a sync — and can only be
+  # removed from the console. The console stays a real editor, for trying a configuration out or a
+  # quick fix, not a viewer.
+  #
+  # Sync is driven by the webhook — a real push — not by a clock. The periodic poll is off by
+  # default precisely so a console edit is not reverted between pushes; turn it on only if you want
+  # drift corrected without waiting for the next push, and accept that it re-asserts the repo.
+  #
+  # Secrets never live in the repo. An LLM entry names an env var in `credentialEnv`; this service
+  # resolves it from its own environment at sync time, so the API key stays in a Secret here and
+  # the repo holds only which env to read.
+  gitops:
+    enabled: ${GITOPS_ENABLED:false}
+    repo: ${GITOPS_REPO:}                        # owner/name, e.g. miguelperezcolom/ia-config
+    branch: ${GITOPS_BRANCH:main}
+    path: ${GITOPS_PATH:ia}                       # the directory in the repo that holds the YAML
+    token: ${GITOPS_GITHUB_TOKEN:}               # a GitHub token with read access, from a Secret
+    webhook-secret: ${GITOPS_WEBHOOK_SECRET:}    # HMAC shared secret; blank verifies nothing
+    sync-on-startup: ${GITOPS_SYNC_ON_STARTUP:true}  # reconcile once at boot to converge on the repo
+    poll-enabled: ${GITOPS_POLL_ENABLED:false}   # off: console edits survive until a real push
+    poll-interval-ms: ${GITOPS_POLL_MS:300000}   # only used when poll-enabled — every 5 min
+    api-base: ${GITOPS_API_BASE:https://api.github.com}
+
 management:
   endpoints:
     web:

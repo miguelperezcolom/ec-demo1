@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: rag
+id: handbook
+name: Ops handbook
+store: PGVECTOR
+connectionUrl: jdbc:postgresql://cp-postgres:5432/controlplane
+collection: handbook_vectors
+embeddingLlmId: embeddings
+topK: 5
+description: >-
+  Notes about running this deployment: what the topics are for, what the known gaps are,
+  and what to check when a process is stuck. Search here for how-to and operational questions.

@@ -74,6 +74,15 @@ if [ ! -f "$SECRETS" ]; then
     echo "CP_CRYPTO_KEY=$(openssl rand -base64 32)"
     echo "# Not generated: paste an Anthropic API key here to enable the console's chat panel."
     echo "# ANTHROPIC_API_KEY="
+    echo "# Not generated: paste a Gmail App Password (Workspace account miguel@mateu.io) so Keycloak"
+    echo "# can send mail through the postfix relay — e.g. a new user's set-password link. Requires"
+    echo "# 2-Step Verification on the account; a normal password will not work over SMTP."
+    echo "# POSTFIX_RELAY_PASSWORD="
+    echo "# GitOps for the IA control plane. The webhook secret is generated; the GitHub read token"
+    echo "# is pasted. Both only matter once GITOPS_ENABLED=true and GITOPS_REPO name a repo in"
+    echo "# deploy/manifests/71-ia-control-plane.yaml."
+    echo "GITOPS_WEBHOOK_SECRET=$(openssl rand -hex 24)"
+    echo "# GITOPS_GITHUB_TOKEN="
   } > "$SECRETS"
   chmod 600 "$SECRETS"
   echo "generated $SECRETS"
@@ -89,6 +98,7 @@ append_if_missing() {  # name, value
   fi
 }
 append_if_missing CP_POSTGRES_PASSWORD "$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
+append_if_missing GITOPS_WEBHOOK_SECRET "$(openssl rand -hex 24)"
 # Regenerating this one would make every stored LLM credential undecryptable — nothing re-wraps
 # them — so it is written once and then left alone, like the PostgreSQL password above.
 append_if_missing CP_CRYPTO_KEY "$(openssl rand -base64 32)"
@@ -145,6 +155,30 @@ else
   echo "ANTHROPIC_API_KEY not set — skipping the ec-anthropic secret."
   echo "  The chat panel will answer with a 401 until you add it to $SECRETS and re-run this."
 fi
+
+# The postfix relay's Gmail App Password. Bought, not derived, like the Anthropic key — so the
+# secret is created only when it is present. Without it postfix starts but Gmail refuses the relay,
+# and any mail Keycloak sends stays queued; nothing else is affected.
+if [ -n "${POSTFIX_RELAY_PASSWORD:-}" ]; then
+  kubectl create secret generic postfix-relay -n "$NS" \
+    --from-literal=password="$POSTFIX_RELAY_PASSWORD" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "POSTFIX_RELAY_PASSWORD not set — creating an empty postfix-relay secret."
+  echo "  Keycloak's outbound mail will queue until you add it to $SECRETS and re-run this."
+  # An empty secret so the postfix Deployment can still mount it and start; it just cannot relay.
+  kubectl create secret generic postfix-relay -n "$NS" \
+    --from-literal=password="" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
+# GitOps for the control plane: the webhook HMAC secret (generated) and the GitHub read token
+# (pasted, may be empty). Always created so the control plane can mount it; it does nothing until
+# GITOPS_ENABLED is turned on. The token is only needed for a private config repo.
+kubectl create secret generic cp-gitops -n "$NS" \
+  --from-literal=webhook-secret="${GITOPS_WEBHOOK_SECRET:-}" \
+  --from-literal=github-token="${GITOPS_GITHUB_TOKEN:-}" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
 echo "══ 3/6  EventConductor engine (PostgreSQL, Redpanda, orchestrator, forms) ══"
 helm upgrade --install ec deploy/chart/eventconductor -n "$NS" \

@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: llm
+id: anthropic
+name: Anthropic
+provider: ANTHROPIC
+model: claude-sonnet-4-5
+temperature: 0.1
+maxTokens: 4096
+# The key is not here. The control plane reads it from this env var (a Secret in the deployment).
+credentialEnv: ANTHROPIC_API_KEY

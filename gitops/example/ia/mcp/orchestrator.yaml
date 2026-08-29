@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: mcp
+id: orchestrator
+name: Orchestrator
+url: http://orchestrator:8105/sse
+transport: SSE
+timeoutSeconds: 60
+description: The workflow engine — processes, definitions, step executions.

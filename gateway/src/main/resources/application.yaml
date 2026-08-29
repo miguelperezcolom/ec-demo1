@@ -105,6 +105,17 @@ spring:
             - Host=${CONTROL_HOST:console.ec1.mateu.io}
             - Path=/_ia-cp/**
 
+        # The GitOps webhook. NOT under /_ia-cp — that prefix is the Mateu UI namespace and carries
+        # the ai-admin rule, which GitHub cannot satisfy with a token it does not have. This is a
+        # plain REST endpoint that authenticates itself by HMAC over the body, exactly like the
+        # engine's /workflow/webhooks receiver, so it needs a route of its own and no role. Public
+        # is the point: a merge in the config repo has to be able to reach it.
+        - id: ia-control-plane-webhooks
+          uri: ${IA_CONTROL_PLANE_URL:http://ia-control-plane:8110}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Path=/cp-webhooks/**
+
         # Note what is NOT routed: /internal/**, the control plane's own endpoint that serves a
         # resolved agent configuration with its API key in the clear. It is reachable only
         # inside the cluster, and a route for it here would publish every credential this

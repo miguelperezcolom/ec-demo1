@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json",
+  "title": "IA control plane catalogue entry",
+  "description": "One agent, model, MCP server or RAG source, as the control plane reads it from GitOps. One entry per file; the 'kind' field says which of the four this is.",
+  "type": "object",
+  "required": ["kind", "id"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["llm", "mcp", "rag", "agent"],
+      "description": "Which catalogue this entry belongs to."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "description": "Stable, unique id within its catalogue. Other entries reference it by this. Never changes."
+    }
+  },
+  "oneOf": [
+    {
+      "title": "LLM",
+      "description": "A model the agent may call, and how to reach it. The API key is never here — name an env var in credentialEnv instead.",
+      "properties": {
+        "kind": { "const": "llm" },
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "provider": {
+          "type": "string",
+          "enum": ["ANTHROPIC", "OPENAI", "OPENAI_COMPATIBLE", "BEDROCK", "VERTEX"],
+          "description": "Who serves the model. Only the API-key-based ones (ANTHROPIC, OPENAI, OPENAI_COMPATIBLE) are callable today."
+        },
+        "model": { "type": "string", "description": "The model id the provider expects, e.g. claude-sonnet-4-5." },
+        "baseUrl": { "type": "string", "description": "Override the provider's default endpoint. For OPENAI_COMPATIBLE (Ollama, vLLM, a gateway) this is required." },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "maxTokens": { "type": "integer", "minimum": 1 },
+        "credentialEnv": {
+          "type": "string",
+          "description": "The name of an environment variable the control plane resolves the API key from at sync time. The secret stays in the deployment; the repo holds only this name."
+        },
+        "enabled": { "type": "boolean", "default": true }
+      },
+      "required": ["kind", "id", "provider", "model"],
+      "additionalProperties": false
+    },
+    {
+      "title": "MCP server",
+      "description": "A server whose tools an agent may be given.",
+      "properties": {
+        "kind": { "const": "mcp" },
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "url": { "type": "string", "description": "The server's endpoint, e.g. http://orchestrator:8105/sse." },
+        "transport": {
+          "type": "string",
+          "enum": ["SSE", "STREAMABLE_HTTP"],
+          "description": "How a client reaches it. Every MCP server in this deployment speaks SSE today."
+        },
+        "timeoutSeconds": { "type": "integer", "minimum": 1, "default": 60 },
+        "description": { "type": "string", "description": "What the server is for. Read by the model when deciding whether to use its tools." },
+        "enabled": { "type": "boolean", "default": true }
+      },
+      "required": ["kind", "id", "url", "transport"],
+      "additionalProperties": false
+    },
+    {
+      "title": "RAG source",
+      "description": "A vector store an agent may search. 'store' is the backend; the file-level 'kind' is always 'rag'.",
+      "properties": {
+        "kind": { "const": "rag" },
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "store": {
+          "type": "string",
+          "enum": ["PGVECTOR", "QDRANT", "ELASTICSEARCH"],
+          "description": "Which vector store backs this source."
+        },
+        "connectionUrl": { "type": "string", "description": "How to reach the store." },
+        "collection": { "type": "string", "description": "The collection/table inside the store this source reads." },
+        "embeddingLlmId": { "type": "string", "description": "The id of an llm entry used to embed queries. Must be an embeddings-capable, OpenAI-shaped model." },
+        "topK": { "type": "integer", "minimum": 1, "default": 5, "description": "How many chunks a search returns." },
+        "description": { "type": "string", "description": "What this source holds. The model reads it as the tool description when deciding whether to search here — a vague one produces a tool it never calls." },
+        "enabled": { "type": "boolean", "default": true }
+      },
+      "required": ["kind", "id", "store", "connectionUrl", "collection", "embeddingLlmId"],
+      "additionalProperties": false
+    },
+    {
+      "title": "Agent",
+      "description": "A prompt, one model, and the servers and sources it may reach. The only thing a running service is handed.",
+      "properties": {
+        "kind": { "const": "agent" },
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "systemPrompt": { "type": "string", "description": "The system prompt. Use a YAML block scalar (|) for multi-line." },
+        "llm": { "type": "string", "description": "The id of the llm entry this agent uses." },
+        "mcp": { "type": "array", "items": { "type": "string" }, "description": "Ids of mcp entries whose tools this agent may call." },
+        "rag": { "type": "array", "items": { "type": "string" }, "description": "Ids of rag entries this agent may search." },
+        "description": { "type": "string" },
+        "enabled": { "type": "boolean", "default": true }
+      },
+      "required": ["kind", "id", "llm"],
+      "additionalProperties": false
+    }
+  ]
+}
