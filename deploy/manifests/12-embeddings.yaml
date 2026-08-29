@@ -19,10 +19,18 @@ metadata:
 spec:
   replicas: 1
   selector: { matchLabels: { app: embeddings } }
+  # Recreate, not rolling: the model is hundreds of MB in memory and there is only headroom for one
+  # replica on the pinned node, so a surge pod during a rollout has nowhere to schedule. Take the old
+  # one down first. It is a singleton with no traffic guarantee anyway.
+  strategy: { type: Recreate }
   template:
     metadata:
       labels: { app: embeddings }
     spec:
+      # Same pin as every workload here: cx43 is Hetzner amd64, matching the single-arch images and
+      # keeping CFKE's provisioner from placing this on an arm64 node.
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
       containers:
         - name: tei
           image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9

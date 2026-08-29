@@ -28,6 +28,10 @@ spec:
     metadata:
       labels: { app: postfix }
     spec:
+      # Same pin as every workload here: cx43 is Hetzner amd64, matching the single-arch images and
+      # keeping CFKE's provisioner from placing this on an arm64 node.
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
       containers:
         - name: postfix
           image: boky/postfix:v5.1.0
@@ -57,13 +61,10 @@ spec:
             # negotiate and no self-signed cert for Keycloak to distrust. Submission (587), which
             # would expect TLS, is the wrong shape for a trusted same-network leg.
             - { name: smtp, containerPort: 25 }
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-              # Binding the privileged port 25, and dropping to the postfix user to run, are the
-              # only capabilities kept.
-              add: ["NET_BIND_SERVICE", "SETUID", "SETGID"]
+          # No hardened securityContext here, unlike the Java services: boky/postfix starts as root,
+          # reowns its spool directories (which needs CHOWN) and then drops to the postfix user for
+          # smtpd itself. Dropping ALL capabilities makes that first chown fail and the container
+          # crash-loops. Running it as the image intends is the supported shape.
           resources:
             requests: { memory: "64Mi", cpu: "50m" }
             limits:   { memory: "256Mi", cpu: "250m" }
