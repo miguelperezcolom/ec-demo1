@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: route
+id: support-to-console-agent
+name: Support staff use the console agent
+priority: 10
+# All conditions AND; omit any to mean "any". This one matches callers with the 'support' realm role.
+role: support
+targetAgent: console-agent

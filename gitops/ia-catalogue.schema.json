@@ -8,7 +8,7 @@
   "properties": {
     "kind": {
       "type": "string",
-      "enum": ["llm", "mcp", "rag", "agent"],
+      "enum": ["llm", "mcp", "rag", "agent", "budget", "route"],
       "description": "Which catalogue this entry belongs to."
     },
     "id": {
@@ -100,6 +100,48 @@
         "enabled": { "type": "boolean", "default": true }
       },
       "required": ["kind", "id", "llm"],
+      "additionalProperties": false
+    },
+    {
+      "title": "Budget",
+      "description": "A token spend cap on a subject per window. Opt-in: nothing is capped until a budget names it.",
+      "properties": {
+        "kind": { "const": "budget" },
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "scope": {
+          "type": "string",
+          "enum": ["AGENT", "LLM", "USER", "TENANT"],
+          "description": "What the cap follows — one agent, model, user or tenant."
+        },
+        "subject": { "type": "string", "description": "The id of the agent / model / user / tenant this caps." },
+        "period": {
+          "type": "string",
+          "enum": ["DAY", "MONTH"],
+          "description": "The window the limit applies over. Resets at midnight (DAY) or the 1st (MONTH), UTC."
+        },
+        "limitTokens": { "type": "integer", "minimum": 1, "description": "The most tokens the subject may spend in a window." },
+        "enabled": { "type": "boolean", "default": true }
+      },
+      "required": ["kind", "id", "scope", "subject", "period", "limitTokens"],
+      "additionalProperties": false
+    },
+    {
+      "title": "Route",
+      "description": "A rule that picks which agent answers, by the caller's context. First match by priority wins.",
+      "properties": {
+        "kind": { "const": "route" },
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "priority": { "type": "integer", "description": "Lower is tried first. A specific rule needs a lower number than the catch-all it beats. Defaults to 100." },
+        "role": { "type": "string", "description": "A realm role the caller must have. Omit for any." },
+        "tenant": { "type": "string", "description": "A tenant the caller must belong to. Omit for any." },
+        "locale": { "type": "string", "description": "A UI locale the request must carry, e.g. es. Omit for any." },
+        "routePrefix": { "type": "string", "description": "A prefix the current UI route must start with. Omit for any." },
+        "targetAgent": { "type": "string", "description": "The id of the agent that answers when this rule matches." },
+        "enabled": { "type": "boolean", "default": true }
+      },
+      "required": ["kind", "id", "targetAgent"],
       "additionalProperties": false
     }
   ]

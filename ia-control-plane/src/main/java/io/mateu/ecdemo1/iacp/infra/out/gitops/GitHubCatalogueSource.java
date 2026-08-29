@@ -6,9 +6,11 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import io.mateu.ecdemo1.iacp.application.out.gitops.CatalogueSource;
 import io.mateu.ecdemo1.iacp.application.out.gitops.DesiredCatalogue;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.AgentManifest;
+import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.BudgetManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.LlmManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.McpManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.RagManifest;
+import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.RouteManifest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
@@ -75,6 +77,8 @@ public class GitHubCatalogueSource implements CatalogueSource {
         var mcps = new ArrayList<McpManifest>();
         var rags = new ArrayList<RagManifest>();
         var agents = new ArrayList<AgentManifest>();
+        var budgets = new ArrayList<BudgetManifest>();
+        var routes = new ArrayList<RouteManifest>();
 
         for (var file : listYamlFiles()) {
             var node = parse(file);
@@ -88,13 +92,16 @@ public class GitHubCatalogueSource implements CatalogueSource {
                 case "mcp" -> mcps.add(convert(node, McpManifest.class, file));
                 case "rag" -> rags.add(convert(node, RagManifest.class, file));
                 case "agent" -> agents.add(convert(node, AgentManifest.class, file));
+                case "budget" -> budgets.add(convert(node, BudgetManifest.class, file));
+                case "route" -> routes.add(convert(node, RouteManifest.class, file));
                 default -> throw new IllegalStateException("File '" + file + "' has kind '" + kind
-                        + "', which is not one of llm, mcp, rag, agent.");
+                        + "', which is not one of llm, mcp, rag, agent, budget, route.");
             }
         }
-        log.info("GitOps fetched {} llm, {} mcp, {} rag, {} agent from {}/{}",
-                llms.size(), mcps.size(), rags.size(), agents.size(), repo, path);
-        return new DesiredCatalogue(llms, mcps, rags, agents);
+        log.info("GitOps fetched {} llm, {} mcp, {} rag, {} agent, {} budget, {} route from {}/{}",
+                llms.size(), mcps.size(), rags.size(), agents.size(), budgets.size(), routes.size(),
+                repo, path);
+        return new DesiredCatalogue(llms, mcps, rags, agents, budgets, routes);
     }
 
     /** Every {@code .yaml}/{@code .yml} blob under the configured path, via the git-trees API. */

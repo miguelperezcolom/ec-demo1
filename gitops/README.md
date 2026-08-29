@@ -13,10 +13,14 @@ config repo (private)                 this deployment
     mcp/orchestrator.yaml                  ReconcileCatalogueUseCase
     rag/handbook.yaml       ◀─ webhook ──  /cp-webhooks/github    (HMAC-verified, public on the control host)
     agents/console-agent.yaml
+    budgets/daily-per-user.yaml
+    routes/support-to-console-agent.yaml
 ```
 
-One entry per file. The `kind` field (`llm` | `mcp` | `rag` | `agent`) says which catalogue it is;
-the schema keys everything else off that.
+One entry per file. The `kind` field (`llm` | `mcp` | `rag` | `agent` | `budget` | `route`) says
+which catalogue it is; the schema keys everything else off that. Budgets cap token spend on a
+subject per window; routes pick which agent answers by the caller's context. Both reconcile under
+the same provenance rule as the rest.
 
 ## The rules that matter
 

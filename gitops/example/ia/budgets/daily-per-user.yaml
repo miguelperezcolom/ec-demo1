@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: budget
+id: daily-per-user
+name: Daily cap per user
+scope: USER
+# The subject is a user id (Keycloak sub / username). "*" is not special — cap each user with its own.
+subject: demo
+period: DAY
+limitTokens: 200000

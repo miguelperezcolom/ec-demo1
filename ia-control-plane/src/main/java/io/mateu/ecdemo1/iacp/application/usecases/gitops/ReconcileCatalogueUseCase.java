@@ -5,13 +5,29 @@ import io.mateu.ecdemo1.iacp.application.out.gitops.CredentialResolver;
 import io.mateu.ecdemo1.iacp.application.out.gitops.DesiredCatalogue;
 import io.mateu.ecdemo1.iacp.application.out.gitops.GitopsManagedRegistry;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.AgentManifest;
+import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.BudgetManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.LlmManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.McpManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.RagManifest;
+import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.RouteManifest;
 import io.mateu.ecdemo1.iacp.application.out.query.AgentQueryService;
+import io.mateu.ecdemo1.iacp.application.out.query.BudgetQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.LlmQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.McpQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.RagQueryService;
+import io.mateu.ecdemo1.iacp.application.out.query.RouteQueryService;
+import io.mateu.ecdemo1.iacp.application.usecases.budget.create.CreateBudgetCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.budget.create.CreateBudgetUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.budget.delete.DeleteBudgetCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.budget.delete.DeleteBudgetUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.budget.update.UpdateBudgetCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.budget.update.UpdateBudgetUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.route.create.CreateRouteCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.route.create.CreateRouteUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.route.delete.DeleteRouteCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.route.delete.DeleteRouteUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.route.update.UpdateRouteCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.route.update.UpdateRouteUseCase;
 import io.mateu.ecdemo1.iacp.application.usecases.agent.create.CreateAgentCommand;
 import io.mateu.ecdemo1.iacp.application.usecases.agent.create.CreateAgentUseCase;
 import io.mateu.ecdemo1.iacp.application.usecases.agent.delete.DeleteAgentCommand;
@@ -83,6 +99,8 @@ public class ReconcileCatalogueUseCase {
     private static final String MCP = "mcp";
     private static final String RAG = "rag";
     private static final String AGENT = "agent";
+    private static final String BUDGET = "budget";
+    private static final String ROUTE = "route";
 
     private final CatalogueSource source;
     private final CredentialResolver credentials;
@@ -92,6 +110,8 @@ public class ReconcileCatalogueUseCase {
     private final McpQueryService mcpQuery;
     private final RagQueryService ragQuery;
     private final AgentQueryService agentQuery;
+    private final BudgetQueryService budgetQuery;
+    private final RouteQueryService routeQuery;
 
     private final CreateLlmUseCase createLlm;
     private final UpdateLlmUseCase updateLlm;
@@ -106,6 +126,12 @@ public class ReconcileCatalogueUseCase {
     private final CreateAgentUseCase createAgent;
     private final UpdateAgentUseCase updateAgent;
     private final DeleteAgentUseCase deleteAgent;
+    private final CreateBudgetUseCase createBudget;
+    private final UpdateBudgetUseCase updateBudget;
+    private final DeleteBudgetUseCase deleteBudget;
+    private final CreateRouteUseCase createRoute;
+    private final UpdateRouteUseCase updateRoute;
+    private final DeleteRouteUseCase deleteRoute;
 
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -131,7 +157,15 @@ public class ReconcileCatalogueUseCase {
             desired.mcps().forEach(m -> upsertMcp(m, report));
             desired.rags().forEach(m -> upsertRag(m, report));
             desired.agents().forEach(m -> upsertAgent(m, report));
+            desired.budgets().forEach(m -> upsertBudget(m, report));
+            desired.routes().forEach(m -> upsertRoute(m, report));
 
+            deleteRemoved(ROUTE, ids(desired.routes(), RouteManifest::id),
+                    id -> routeQuery.getById(id).isPresent(),
+                    id -> deleteRoute.handle(new DeleteRouteCommand(List.of(id))), report);
+            deleteRemoved(BUDGET, ids(desired.budgets(), BudgetManifest::id),
+                    id -> budgetQuery.getById(id).isPresent(),
+                    id -> deleteBudget.handle(new DeleteBudgetCommand(List.of(id))), report);
             deleteRemoved(AGENT, ids(desired.agents(), AgentManifest::id),
                     id -> agentQuery.getById(id).isPresent(),
                     id -> deleteAgent.handle(new DeleteAgentCommand(List.of(id))), report);
@@ -238,6 +272,41 @@ public class ReconcileCatalogueUseCase {
                 if (!enabled(m.enabled())) {
                     updateAgent.handle(new UpdateAgentCommand(m.id(), name, m.systemPrompt(), m.llm(),
                             mcpIds, ragIds, m.description(), false));
+                }
+            }
+        });
+    }
+
+    private void upsertBudget(BudgetManifest m, Report report) {
+        guardAndRun(BUDGET, m.id(), () -> budgetQuery.getById(m.id()).isPresent(), report, exists -> {
+            var name = orId(m.name(), m.id());
+            if (exists) {
+                updateBudget.handle(new UpdateBudgetCommand(m.id(), name, m.scope(), m.subject(),
+                        m.period(), m.limitTokens(), enabled(m.enabled())));
+            } else {
+                createBudget.handle(new CreateBudgetCommand(m.id(), name, m.scope(), m.subject(),
+                        m.period(), m.limitTokens()));
+                if (!enabled(m.enabled())) {
+                    updateBudget.handle(new UpdateBudgetCommand(m.id(), name, m.scope(), m.subject(),
+                            m.period(), m.limitTokens(), false));
+                }
+            }
+        });
+    }
+
+    private void upsertRoute(RouteManifest m, Report report) {
+        guardAndRun(ROUTE, m.id(), () -> routeQuery.getById(m.id()).isPresent(), report, exists -> {
+            var name = orId(m.name(), m.id());
+            var priority = m.priority() == null ? 100 : m.priority();
+            if (exists) {
+                updateRoute.handle(new UpdateRouteCommand(m.id(), name, priority, m.role(),
+                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), enabled(m.enabled())));
+            } else {
+                createRoute.handle(new CreateRouteCommand(m.id(), name, priority, m.role(),
+                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent()));
+                if (!enabled(m.enabled())) {
+                    updateRoute.handle(new UpdateRouteCommand(m.id(), name, priority, m.role(),
+                            m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), false));
                 }
             }
         });
