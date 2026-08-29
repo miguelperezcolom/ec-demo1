@@ -2,7 +2,7 @@
 #
 # It renders no screens of its own: one RemoteMenu naming /_ia-cp, which the gateway routes to the
 # control plane. Separate from the demo shell rather than a menu inside it, because two hosts mean
-# two Keycloak clients, and that is what lets the gateway require the `admin` realm role here
+# two Keycloak clients, and that is what lets the gateway require the `ai-admin` realm role here
 # without requiring it on the demo console.
 #
 # Its Keycloak URL, realm and client id are compiled into the image — Mateu bakes @KeycloakSecured

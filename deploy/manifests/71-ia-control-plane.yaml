@@ -3,7 +3,7 @@
 # Two surfaces on one pod, and the difference between them matters:
 #
 #   /_ia-cp/**    the Mateu UI, hosted by the control shell as a remote menu. Routed by the
-#                 gateway, on the control host only, behind the `admin` realm role.
+#                 gateway, on the control host only, behind the `ai-admin` realm role.
 #   /internal/**  a resolved agent configuration, API key in the clear. This is what `ia-agent`
 #                 reads on every prompt — it is the only source of its model, credential, system
 #                 prompt and MCP list. NOT routed by the gateway and it must never be: there is

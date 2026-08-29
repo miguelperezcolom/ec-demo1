@@ -223,7 +223,7 @@ cat <<EOF
 Done.
 
   Console   https://ec1.mateu.io          demo / demo
-  Control   https://console.ec1.mateu.io  demo / demo  (needs the realm role \`admin\`)
+  Control   https://console.ec1.mateu.io  demo / demo  (needs the realm role \`ai-admin\`)
   Keycloak  https://auth.ec1.mateu.io     admin / \$KEYCLOAK_ADMIN_PASSWORD
   Grafana   https://grafana.ec1.mateu.io  admin / \$GRAFANA_ADMIN_PASSWORD
   Kafka     https://kafka.ec1.mateu.io    admin / \$KAFKA_CONSOLE_PASSWORD

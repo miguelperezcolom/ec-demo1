@@ -7,14 +7,15 @@ What someone joining needs, in the order they need it.
 | | | |
 |---|---|---|
 | Console | https://ec1.mateu.io | `demo` / `demo` |
-| Control console | https://console.ec1.mateu.io | `demo` / `demo`, and the realm role `admin` |
+| Control console | https://console.ec1.mateu.io | `demo` / `demo`, and the realm role `ai-admin` |
 | Keycloak | https://auth.ec1.mateu.io | `admin` / *ask* |
 | Grafana | https://grafana.ec1.mateu.io | `admin` / *ask* |
 | Kafka console | https://kafka.ec1.mateu.io | `admin` / *ask* |
 
 Only the demo user is in version control, because it is in the realm file and is meant to be
-public. It reaches both consoles: it holds the realm roles `user` and `admin`, and `admin` is what
-the control console requires. **Every other password lives in `deploy/.secrets/credentials.env`,
+public. It reaches both consoles: it holds the realm roles `user`, `admin` and `ai-admin`, and
+`ai-admin` — a role of its own, kept separate from `admin` because only this host reaches the LLM
+credentials — is what the control console requires. **Every other password lives in `deploy/.secrets/credentials.env`,
 which is git-ignored, and has to be sent to you out of band** — never pasted into an issue, a
 commit or a chat that is logged. They are generated per deployment: a colleague who runs
 `deploy.sh` against a different cluster gets different ones.

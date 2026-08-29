@@ -29,7 +29,7 @@ so a process is changed by a pull request rather than by an API call.
                             └───────── MCP ───────────────────────────┘
                        (ia-agent calls the tools the engine and booking expose)
 
-  https://console.ec1.mateu.io  the control console ── needs the `admin` realm role
+  https://console.ec1.mateu.io  the control console ── needs the `ai-admin` realm role
                                     │
                               (same gateway)
                                     │
@@ -55,10 +55,10 @@ so a process is changed by a pull request rather than by an API call.
 | `users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
 | `ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
 | `ia-control-plane/` | The four catalogues the agent is configured from: LLMs and their credentials, MCP servers, RAG sources, and the agents that compose them |
-| `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `admin` role |
+| `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `ai-admin` role |
 | `grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
-| `deploy/manifests/` | Keycloak, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
+| `deploy/manifests/` | Keycloak, the postfix mail relay, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
 | `deploy/deploy.sh` | The whole thing, from an empty cluster |
 
@@ -210,7 +210,7 @@ The form it needs, `verify-payment`, is already there.
 
 ## The control console
 
-A second console, on a host of its own: **`https://console.ec1.mateu.io`**, behind the `admin`
+A second console, on a host of its own: **`https://console.ec1.mateu.io`**, behind the `ai-admin`
 realm role. Behind it is `ia-control-plane`, which holds the four catalogues the chat agent is
 configured from.
 
@@ -227,15 +227,20 @@ one place and every agent composed from it follows.
 ### Why a second host and not another menu
 
 Two hosts mean two Keycloak clients, and that is the whole reason. A token minted for the demo
-console is not a token for this one, so the gateway can demand `admin` here and leave the demo
+console is not a token for this one, so the gateway can demand `ai-admin` here and leave the demo
 console alone. Both still enter through the same gateway, so there is still one place that checks
 a token before any backend sees a request — and one place, `SecurityConfig.java`, where that rule
 is written.
 
-The realm already had `user` and `admin`; the `demo` user has both. A new public client
-`control-plane` is in the realm file, with `directAccessGrantsEnabled` off — unlike the demo
-client's — because trading a username and password for a token with no browser is not a
-convenience anyone needs on the client that reaches the credentials.
+The realm defines three roles: `user` and `admin` for the demo console, and `ai-admin` for this
+one. It is a role of its own and not the demo's `admin` on purpose — this host reaches the LLM API
+keys and the demo's `admin` never does, so the two are separate grants and neither implies the
+other. That is what lets an AI operator hold `ai-admin` without being able to drive workflows, and
+a platform admin hold `admin` without being able to read a credential. The `demo` user carries all
+three, because a single demo login is meant to reach everything; a real deployment would split
+them. A new public client `control-plane` is in the realm file, with `directAccessGrantsEnabled`
+off — unlike the demo client's — because trading a username and password for a token with no
+browser is not a convenience anyone needs on the client that reaches the credentials.
 
 ### Why it has a database of its own
 

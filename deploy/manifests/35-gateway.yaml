@@ -9,8 +9,9 @@
 # public and why.
 #
 # It also serves console.ec1.mateu.io, the control console, where it additionally requires the
-# `admin` realm role — that host reaches the LLM credentials, and this is the only place that
-# requirement is written.
+# `ai-admin` realm role — that host reaches the LLM credentials, and this is the only place that
+# requirement is written. Kept distinct from the demo console's `admin` so that reaching the AI
+# credentials and driving workflows are separate grants, neither implying the other.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -69,7 +70,7 @@ spec:
               value: http://ia-agent:8095
             # The two consoles. Every route names one of these explicitly, so nothing falls
             # through from one host to the other, and SecurityConfig reads CONTROL_HOST for the
-            # admin-role rule — the value has to be the host a browser actually asks for.
+            # ai-admin-role rule — the value has to be the host a browser actually asks for.
             - name: CONSOLE_HOST
               value: ec1.mateu.io
             - name: CONTROL_HOST

@@ -95,7 +95,7 @@ spring:
         #
         # A second origin rather than a path under the first, so the two consoles are two
         # Keycloak clients: a token minted for the demo console is not a token for this one,
-        # and SecurityConfig can demand the `admin` realm role here without touching the demo.
+        # and SecurityConfig can demand the `ai-admin` realm role here without touching the demo.
         #
         # Every route above names the demo host explicitly, so nothing falls through to here
         # by accident and nothing here is reachable from there.

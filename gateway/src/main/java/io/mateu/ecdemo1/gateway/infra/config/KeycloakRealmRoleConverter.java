@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 /**
  * Turns Keycloak's realm roles into Spring authorities, which is the whole of what
- * {@code hasRole("admin")} needs and the one thing Spring does not do by itself.
+ * {@code hasRole("ai-admin")} needs and the one thing Spring does not do by itself.
  *
  * <p>Out of the box a resource server reads the {@code scope} claim and nothing else. Keycloak
  * does not put realm roles there — they are nested under {@code realm_access.roles} — so without
@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
  * comment.
  *
  * <p>Realm roles only. Keycloak also has per-client roles under {@code resource_access}, and this
- * deployment's realm defines {@code user} and {@code admin} at realm level; reading both would
- * mean two places to grant the same thing.
+ * deployment's realm defines {@code user}, {@code admin} and {@code ai-admin} at realm level;
+ * reading both realm and client roles would mean two places to grant the same thing.
  */
 @Component
 public class KeycloakRealmRoleConverter

@@ -13,6 +13,10 @@
       {
         "name": "admin",
         "description": "Can drive workflow definitions and processes"
+      },
+      {
+        "name": "ai-admin",
+        "description": "Can configure the AI: agents, models, MCP and RAG sources, and the credentials they hold. Distinct from admin on purpose — the control console reaches the LLM API keys, and driving workflows does not, so neither role implies the other."
       }
     ]
   },
@@ -40,7 +44,7 @@
     {
       "clientId": "control-plane",
       "name": "IA control plane console",
-      "description": "Second console, second audience. A token minted for the demo shell is not one for this client, so the gateway can demand the admin realm role on console.ec1.mateu.io without touching ec1.mateu.io.",
+      "description": "Second console, second audience. A token minted for the demo shell is not one for this client, so the gateway can demand the ai-admin realm role on console.ec1.mateu.io without touching ec1.mateu.io.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
@@ -76,7 +80,8 @@
       ],
       "realmRoles": [
         "user",
-        "admin"
+        "admin",
+        "ai-admin"
       ]
     }
   ]

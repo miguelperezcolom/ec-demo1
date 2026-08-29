@@ -14,7 +14,7 @@
 #
 # The control console is a second origin for exactly that reason inverted: it is meant to be a
 # different audience. Its own Keycloak client, its own token, and the gateway requiring the
-# `admin` realm role on that host and not on this one. Both still enter through the gateway, so
+# `ai-admin` realm role on that host and not on this one. Both still enter through the gateway, so
 # there is still one place that checks a token before any backend sees a request.
 ---
 apiVersion: networking.k8s.io/v1
@@ -69,7 +69,7 @@ spec:
         paths:
           - path: /
             pathType: Prefix
-            # The gateway again, not the control shell directly. It is what requires the admin
+            # The gateway again, not the control shell directly. It is what requires the ai-admin
             # role on this host; pointing the ingress at the shell would route around the only
             # place that check exists.
             backend: { service: { name: gateway, port: { number: 8190 } } }

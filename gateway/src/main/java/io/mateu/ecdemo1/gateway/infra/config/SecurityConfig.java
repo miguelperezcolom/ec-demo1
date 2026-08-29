@@ -54,9 +54,17 @@ import java.util.Arrays;
  * <p>The second host is not another prefix, it is another audience. Everything behind
  * {@code console.ec1.mateu.io} decides what the chat agent is and what it spends — its model, its
  * system prompt, the API key it authenticates with — so a login is not enough there: the
- * {@code admin} realm role is required, and this is the only place that requirement is written.
+ * {@code ai-admin} realm role is required, and this is the only place that requirement is written.
  * The control shell and the control plane behind it authenticate nothing of their own, exactly
  * like the demo console's backends.
+ *
+ * <p><strong>{@code ai-admin} and not {@code admin}, and the distinction is the point.</strong>
+ * The demo console's {@code admin} drives workflow definitions and processes; it never reaches an
+ * LLM credential. This host does, and nothing else. Keeping them as separate realm roles is what
+ * lets an operator hold one without the other — the person who rotates the Anthropic key need not
+ * be able to cancel a process, and the person who does need not be able to read the key. A single
+ * {@code admin} covering both would make every platform admin an AI admin by accident, which is
+ * the failure this split exists to prevent.
  *
  * <p>The rule is scoped by host as well as by path because both consoles serve {@code /mateu/**}
  * and both have a catch-all. Scoping it by path alone would either lock the demo console's own
