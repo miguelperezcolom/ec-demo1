@@ -11,11 +11,18 @@ import java.util.List;
  * @param menuContext Full application menu flattened as a list of navigable screens.
  *                    Only needs to be sent when the menu changes; subsequent requests
  *                    may omit it and the last cached value will be used.
+ * @param currentRoute The UI route the prompt was sent from, if the client sends it. Used by the
+ *                    control plane's routing rules that key on a screen; null when not sent, in
+ *                    which case screen-based rules simply do not match.
+ * @param locale      The UI locale, e.g. "es", if the client sends it. Used by locale-based routing
+ *                    rules; null when not sent.
  */
 public record ChatRequest(
         String message,
         String sessionId,
-        List<MenuEntry> menuContext
+        List<MenuEntry> menuContext,
+        String currentRoute,
+        String locale
 ) {
     public record MenuEntry(
             List<String> path,

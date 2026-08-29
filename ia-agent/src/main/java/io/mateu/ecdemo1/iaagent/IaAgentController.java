@@ -96,14 +96,14 @@ public class IaAgentController {
      * over-budget one — a refusal arrives here as {@link NoConfigurationException} and reaches the
      * panel as its message, the same path a missing configuration already took.
      *
-     * <p>Locale and current screen are passed as null for now: the chat client does not send them
-     * yet, so routing rules that key on a role or a tenant work today, and rules that key on a
-     * screen or a locale wait for the frontend to carry those. Adding them is two nullable fields on
-     * the request, not a redesign.
+     * <p>Locale and the current screen come from the request when the chat client sends them, and
+     * are null when it does not — so routing rules that key on a role or a tenant work regardless,
+     * and rules that key on a screen or a locale start working the moment the frontend carries
+     * those fields, with no change here.
      */
-    private AgentConfig resolveConfig(String authorization) {
+    private AgentConfig resolveConfig(String authorization, ChatRequest request) {
         var caller = jwtIdentityReader.read(authorization);
-        var resolution = agentResolver.resolve(caller, null, null);
+        var resolution = agentResolver.resolve(caller, request.locale(), request.currentRoute());
         if (!resolution.allowed()) {
             throw new NoConfigurationException(resolution.deniedReason());
         }
@@ -191,7 +191,7 @@ public class IaAgentController {
             // Resolved before anything else: it decides the agent (by the caller's context), the
             // model, the credential, the prompt and which MCP servers to even open a connection to
             // — and refuses an over-budget request here rather than after spending on it.
-            AgentConfig config = resolveConfig(authorization);
+            AgentConfig config = resolveConfig(authorization, request);
 
             try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
                 // Only a hard stop when there is nothing at all to call. An agent whose MCP
@@ -287,7 +287,7 @@ public class IaAgentController {
         Mono<LlmResult> resultMono = Mono.fromCallable(() -> {
                     // Same order as /chat: resolve first, because it decides which agent, which
                     // servers to connect to and with which model to answer — and can refuse.
-                    AgentConfig config = resolveConfig(authorization);
+                    AgentConfig config = resolveConfig(authorization, request);
                     try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
                         if (tools.hasNoServers() && config.rags().isEmpty()) {
                             String err = "No hay ningún servidor MCP disponible ("
