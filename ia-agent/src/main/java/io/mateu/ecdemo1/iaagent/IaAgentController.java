@@ -38,6 +38,8 @@ public class IaAgentController {
     private final ConversationStore conversationStore;
     private final MenuContextStore menuContextStore;
     private final ObjectMapper objectMapper;
+    private final io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader jwtIdentityReader;
+    private final io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter;
 
     public IaAgentController(AgentConfigClient configClient,
                              ChatClientRegistry chatClients,
@@ -45,7 +47,9 @@ public class IaAgentController {
                              RagToolFactory ragTools,
                              ConversationStore conversationStore,
                              MenuContextStore menuContextStore,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader jwtIdentityReader,
+                             io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter) {
         this.configClient = configClient;
         this.chatClients = chatClients;
         this.mcpFactory = mcpFactory;
@@ -53,6 +57,8 @@ public class IaAgentController {
         this.conversationStore = conversationStore;
         this.menuContextStore = menuContextStore;
         this.objectMapper = objectMapper;
+        this.jwtIdentityReader = jwtIdentityReader;
+        this.usageReporter = usageReporter;
     }
 
     /**
@@ -215,6 +221,9 @@ public class IaAgentController {
                 String result = parseNavigation(raw).cleanText();
                 conversationStore.addExchange(sessionId, request.message(), result);
                 conversationStore.accumulateTokens(sessionId, inputTokens, outputTokens, totalTokens);
+                usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
+                        inputTokens, outputTokens, totalTokens,
+                        jwtIdentityReader.read(authorization), sessionId);
                 return result;
             }
         } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
@@ -305,6 +314,9 @@ public class IaAgentController {
                         String raw = (content != null && !content.isBlank()) ? content : "(sin respuesta)";
                         conversationStore.addExchange(sessionId, request.message(), raw);
                         conversationStore.accumulateTokens(sessionId, inputTokens, outputTokens, totalTokens);
+                        usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
+                                inputTokens, outputTokens, totalTokens,
+                                jwtIdentityReader.read(authorization), sessionId);
                         int[] cumulative = conversationStore.getTotalTokens(sessionId);
                         return new LlmResult(raw, cumulative[0], cumulative[1], cumulative[2]);
                     }
