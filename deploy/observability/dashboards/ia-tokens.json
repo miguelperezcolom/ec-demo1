@@ -1,0 +1,52 @@
+{
+  "title": "IA token usage",
+  "uid": "ia-tokens",
+  "tags": ["ia"],
+  "timezone": "",
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Token usage (ia_tokens_total)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Tokens in selected range",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(ia_tokens_total[$__range]))", "legendFormat": "total", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens/sec by type",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 8, "lineWidth": 2, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (type) (rate(ia_tokens_total[5m]))", "legendFormat": "{{type}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens/sec by agent",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (agent) (rate(ia_tokens_total[5m]))", "legendFormat": "{{agent}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens/sec by model",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 8, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (llm) (rate(ia_tokens_total[5m]))", "legendFormat": "{{llm}}", "refId": "A" }
+      ]
+    }
+  ]
+}

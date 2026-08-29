@@ -237,6 +237,7 @@ apply_dashboard() {  # name, key, file
 }
 apply_dashboard eventconductor       eventconductor.json       eventconductor.json
 apply_dashboard eventconductor-nodes eventconductor-nodes.json nodes.json
+apply_dashboard ia-tokens            ia-tokens.json            ia-tokens.json
 
 echo "══ 6/6  Waiting for the workloads ══"
 kubectl rollout status deployment/ec-eventconductor-orchestrator -n "$NS" --timeout=10m
