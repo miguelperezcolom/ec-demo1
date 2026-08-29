@@ -96,6 +96,12 @@ spec:
             # that is the shape the catalogue stores — a RAG source is a connection string.
             - name: RAG_STORE_URL
               value: jdbc:postgresql://cp-postgres:5432/controlplane?user=$(DB_USERNAME)&password=$(DB_PASSWORD)
+            # The embedding model the seeded RAG source uses: the in-cluster TEI pod. Its OpenAI
+            # route; the /v1 is where OpenAiCompatibleEmbeddingModel appends /embeddings.
+            - name: EMBEDDINGS_URL
+              value: http://embeddings/v1
+            - name: EMBEDDINGS_MODEL
+              value: intfloat/multilingual-e5-small
             # The Anthropic key moved here from the agent: this is where credentials live now.
             # Absent, the seeded model is catalogued with no credential and says so in the
             # console — a better failure than the same key missing invisibly inside a pod.

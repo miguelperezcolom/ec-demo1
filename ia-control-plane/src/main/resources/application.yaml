@@ -36,6 +36,12 @@ cp:
     # Where a seeded RAG source points. This deployment's own cp-postgres, which carries the
     # pgvector extension — but a source can point anywhere, and this one is only a starting point.
     rag-url: ${RAG_STORE_URL:}
+    # The embedding model the seeded RAG source uses: the in-cluster Text Embeddings Inference pod,
+    # OpenAI-shaped, multilingual. The api-key is a placeholder — TEI needs none, but the pgvector
+    # store refuses a blank one — so it stands in rather than authenticates.
+    embedding-model: ${EMBEDDINGS_MODEL:intfloat/multilingual-e5-small}
+    embedding-base-url: ${EMBEDDINGS_URL:http://embeddings/v1}
+    embedding-api-key: ${EMBEDDINGS_API_KEY:tei-local}
 
   crypto:
     # 32 bytes, base64, from the ec-cp-crypto secret. Unset is a legible failure rather than a

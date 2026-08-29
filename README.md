@@ -58,7 +58,7 @@ so a process is changed by a pull request rather than by an API call.
 | `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `ai-admin` role |
 | `grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
-| `deploy/manifests/` | Keycloak, the postfix mail relay, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
+| `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
 | `deploy/deploy.sh` | The whole thing, from an empty cluster |
 
@@ -489,6 +489,22 @@ and stored. Deliberately the smallest thing that makes the catalogue demonstrabl
 document pipeline — no crawler, no upload, no incremental sync, and not idempotent. A source whose
 content is loaded by something else is exactly what the catalogue is for.
 
+**A fresh deploy comes up with one source that already answers.** The seeder catalogues an *Ops
+handbook* source, puts it on the agent, and ingests a small bundled corpus about running this
+deployment — the same first-start, only-when-empty guard as the rest of the seed, so it runs once
+and does not re-add on a restart. That is why the seeded source is on the agent from the start,
+where an empty one would not be: ask the chat panel an operational question and the answer comes
+from the handbook. Ingestion runs in the background and retries, because the embedding pod may still
+be loading its model when the control plane starts.
+
+**Embedding is local, and multilingual, so there is no second vendor.** The `embeddings` pod runs
+Hugging Face Text Embeddings Inference with `intfloat/multilingual-e5-small`, an OpenAI-shaped
+`/v1/embeddings` endpoint inside the cluster — so Spanish and English both embed and this
+deployment's only paid credential stays the Anthropic one. TEI needs no key; the placeholder the
+catalogue carries is there only because the pgvector store refuses to embed against a blank
+credential. The `model` field it is sent is ignored — TEI serves whatever model it was started
+with.
+
 The store this deployment provides is `cp-postgres`, which runs `pgvector/pgvector:pg16` — the same
 PostgreSQL as before plus the extension. So configuration tables and document vectors share a
 database, which is the right size for a demo; a source pointed somewhere else is a field in the
@@ -502,15 +518,6 @@ a model and a list of strings and returns vectors, so it is the second. `PgVecto
 fine on Boot 4 — it speaks JDBC, not HTTP.
 
 ### What it does not do yet
-
-**Embeddings need their own credential.** Anthropic has no embeddings API, so a catalogued
-embedding model is an OpenAI-shaped one and this deployment's Anthropic key cannot pay for it. A
-fresh deploy seeds the source and the model with no credential; filling it in is one field in the
-console.
-
-**The seeded RAG source is not on the seeded agent.** A tool that always answers "nothing found" is
-worse than no tool — it teaches the model the source is useless and costs a round trip per prompt to
-prove it. Ingest something first, then add it.
 
 **The id fields are text, not pickers.** An agent's MCP and RAG lists are comma-separated ids, so a
 typo is not refused on save — it becomes a reference the resolver drops with a warning. The preview

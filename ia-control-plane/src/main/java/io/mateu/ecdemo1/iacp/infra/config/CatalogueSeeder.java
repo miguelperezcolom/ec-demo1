@@ -57,13 +57,17 @@ public class CatalogueSeeder {
             CreateLlmUseCase createLlm, CreateMcpUseCase createMcp, CreateRagUseCase createRag,
             CreateAgentUseCase createAgent,
             AesGcmSecretCipher cipher,
+            HandbookIngester handbookIngester,
             @Value("${cp.gitops.enabled:false}") boolean gitopsEnabled,
             @Value("${cp.seed.agent-id:console-agent}") String agentId,
             @Value("${cp.seed.anthropic-api-key:}") String anthropicApiKey,
             @Value("${cp.seed.orchestrator-url:}") String orchestratorUrl,
             @Value("${cp.seed.forms-url:}") String formsUrl,
             @Value("${cp.seed.booking-url:}") String bookingUrl,
-            @Value("${cp.seed.rag-url:}") String ragUrl) {
+            @Value("${cp.seed.rag-url:}") String ragUrl,
+            @Value("${cp.seed.embedding-model:intfloat/multilingual-e5-small}") String embeddingModel,
+            @Value("${cp.seed.embedding-base-url:http://embeddings/v1}") String embeddingBaseUrl,
+            @Value("${cp.seed.embedding-api-key:tei-local}") String embeddingApiKey) {
         return args -> {
             if (gitopsEnabled) {
                 // Git provides the catalogues when GitOps is on. Seeding here would create entries
@@ -103,34 +107,44 @@ public class CatalogueSeeder {
             seedMcp(createMcp, mcpIds, "booking", "Booking service", bookingUrl,
                     "Bookings: create, list and change the status of one.");
 
-            // A retrieval source, and an embedding model for it. Both are seeded with no
-            // credential: Anthropic has no embeddings API, so the model here has to be an
-            // OpenAI-shaped one and this deployment's Anthropic key cannot pay for it. It is
-            // catalogued so the wiring is visible and one field away from working.
+            // A retrieval source, and an embedding model for it. The model is the in-cluster Text
+            // Embeddings Inference pod — an OpenAI-shaped endpoint, because Anthropic has no
+            // embeddings API — running a multilingual model so questions in either language embed.
+            // Its credential is a placeholder: TEI needs none, but the pgvector store refuses to
+            // embed against a model with a blank one, so a non-blank dummy stands in for it.
             var ragIds = new ArrayList<String>();
             if (ragUrl != null && !ragUrl.isBlank()) {
-                createLlm.handle(new CreateLlmCommand("embeddings", "Embeddings",
-                        LlmProvider.OPENAI, "text-embedding-3-small", null, 0.0, 256, null));
+                createLlm.handle(new CreateLlmCommand("embeddings", "Embeddings (local, multilingual)",
+                        LlmProvider.OPENAI_COMPATIBLE, embeddingModel, embeddingBaseUrl, 0.0, 256,
+                        embeddingApiKey));
                 createRag.handle(new CreateRagCommand("handbook", "Ops handbook",
                         RagKind.PGVECTOR, ragUrl, "handbook_vectors", "embeddings", 5,
-                        "Notes about running this deployment: what the topics are for, what the "
-                                + "known gaps are, and what to check when a process is stuck."));
+                        "Notes about running this deployment: the services, identity and access, the "
+                                + "control plane, and what to check when something is stuck. Search "
+                                + "here for how-to and operational questions."));
                 ragIds.add("handbook");
             }
 
-            // The RAG source is NOT put on the agent. A tool that always answers "nothing found"
-            // is worse than no tool: it teaches the model that the source is useless and costs a
-            // round trip per prompt to prove it. Ingest something first — Content → Ingest text
-            // on the source — then add it to the agent.
+            // The RAG source IS put on the agent, because it will not be empty: the handbook is
+            // ingested below at this same first start. An empty source on an agent is worse than
+            // none — a tool that always answers "nothing found" — which is exactly why the ingest
+            // and the attach happen together and only here.
             createAgent.handle(new CreateAgentCommand(agentId, "Console agent",
-                    defaultPrompt(), "anthropic", mcpIds, List.of(),
+                    defaultPrompt(), "anthropic", mcpIds, ragIds,
                     "The agent behind the demo console's chat panel. Seeded on first start."));
 
+            // Fill the source in the background: the embedding pod may still be starting, so this
+            // retries rather than blocks. Only when the source was actually seeded.
+            if (!ragIds.isEmpty()) {
+                handbookIngester.ingestInBackground("handbook");
+            }
+
             log.info("Seeded LLM 'anthropic'{}, {} MCP server(s), {} RAG source(s) and agent '{}'. "
-                            + "The RAG source is catalogued but not on the agent — ingest into it "
-                            + "and add it once it holds something.",
+                            + "{}",
                     anthropicApiKey == null || anthropicApiKey.isBlank() ? " (no credential yet)" : "",
-                    mcpIds.size(), ragIds.size(), agentId);
+                    mcpIds.size(), ragIds.size(), agentId,
+                    ragIds.isEmpty() ? "No RAG source seeded (no rag-url)."
+                            : "The handbook is being ingested in the background.");
         };
     }
 

@@ -204,6 +204,7 @@ kubectl apply -f deploy/manifests/61-content.yaml
 kubectl apply -f deploy/manifests/62-users.yaml
 kubectl apply -f deploy/manifests/63-ia-agent.yaml
 # The control console: its database first, then the service, then its shell.
+kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml
 kubectl apply -f deploy/manifests/71-ia-control-plane.yaml
 kubectl apply -f deploy/manifests/72-control-shell.yaml

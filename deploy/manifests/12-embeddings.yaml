@@ -1,0 +1,75 @@
+# Text Embeddings Inference — the RAG embedding model, in the cluster.
+#
+# The control plane's RAG sources need an OpenAI-shaped /v1/embeddings endpoint, and Anthropic has
+# none. Rather than take a second vendor and a second key, this serves a small multilingual model
+# locally: intfloat/multilingual-e5-small, so questions in Spanish or English both embed. TEI ignores
+# the request's `model` field and serves whatever --model-id it loaded, and it needs no credential —
+# the placeholder key the catalogue carries is only there because the pgvector store refuses a blank
+# one.
+#
+# Cluster-internal only: a ClusterIP Service on no ingress. The model is pulled from the Hugging Face
+# hub at startup into an emptyDir, so a fresh pod re-downloads it (a few hundred MB) — fine for a
+# demo, and the readiness probe holds traffic until it is loaded.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embeddings
+  namespace: ec-demo1
+  labels: { app: embeddings }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: embeddings } }
+  template:
+    metadata:
+      labels: { app: embeddings }
+    spec:
+      containers:
+        - name: tei
+          image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+          args:
+            - --model-id
+            - intfloat/multilingual-e5-small
+            # A non-privileged port, so no NET_BIND_SERVICE; the Service maps 80 onto it.
+            - --port
+            - "3000"
+            # The token splitter can hand over chunks longer than the model's 512-token limit;
+            # truncate them rather than reject the whole ingest.
+            - --auto-truncate
+          env:
+            # Where TEI caches the downloaded weights — the mounted emptyDir.
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /data
+          ports:
+            - { name: http, containerPort: 3000 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "1Gi", cpu: "500m" }
+            limits:   { memory: "3Gi", cpu: "2" }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          readinessProbe:
+            httpGet: { path: /health, port: 3000 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /health, port: 3000 }
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 6
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embeddings
+  namespace: ec-demo1
+  labels: { app: embeddings }
+spec:
+  selector: { app: embeddings }
+  ports:
+    - { name: http, port: 80, targetPort: 3000 }
