@@ -27,4 +27,7 @@ public interface TokenUsageEntityRepository extends JpaRepository<TokenUsageEnti
     @Query("select coalesce(sum(u.totalTokens), 0) from TokenUsageEntity u "
             + "where u.tenant = :tenant and u.occurredAt >= :since")
     long sumByTenantSince(@Param("tenant") String tenant, @Param("since") Instant since);
+
+    /** Delete rows older than the cutoff. Returns how many went. */
+    long deleteByOccurredAtLessThan(Instant cutoff);
 }

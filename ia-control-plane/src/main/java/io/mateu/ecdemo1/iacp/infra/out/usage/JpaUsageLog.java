@@ -60,4 +60,10 @@ public class JpaUsageLog implements UsageLog {
     public long spentByTenantSince(String tenant, Instant since) {
         return tenant == null || tenant.isBlank() ? 0 : repository.sumByTenantSince(tenant, since);
     }
+
+    @Override
+    @Transactional
+    public int purgeOlderThan(java.time.Duration retention) {
+        return (int) repository.deleteByOccurredAtLessThan(Instant.now().minus(retention));
+    }
 }

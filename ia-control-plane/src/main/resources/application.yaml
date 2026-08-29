@@ -78,6 +78,13 @@ cp:
     poll-interval-ms: ${GITOPS_POLL_MS:300000}   # only used when poll-enabled — every 5 min
     api-base: ${GITOPS_API_BASE:https://api.github.com}
 
+  # Token usage: the log the agent reports into, and how long it is kept. Retention must outlast the
+  # longest budget window (a month), or a monthly budget would sum a month whose start was purged —
+  # the code floors it at 32 days whatever is set here.
+  usage:
+    retention-days: ${USAGE_RETENTION_DAYS:90}
+    purge-cron: ${USAGE_PURGE_CRON:0 30 3 * * *}
+
 management:
   endpoints:
     web:

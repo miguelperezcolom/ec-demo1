@@ -23,4 +23,13 @@ public interface UsageLog {
     long spentByUserSince(String userId, Instant since);
 
     long spentByTenantSince(String tenant, Instant since);
+
+    /**
+     * Delete usage older than {@code retention}, bounding the log. The retention must exceed the
+     * longest budget window, or a monthly budget would sum a month it has already forgotten the
+     * start of.
+     *
+     * @return how many rows were removed
+     */
+    int purgeOlderThan(java.time.Duration retention);
 }
