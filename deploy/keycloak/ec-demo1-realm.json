@@ -4,6 +4,15 @@
   "sslRequired": "external",
   "registrationAllowed": false,
   "loginTheme": "keycloak",
+  "smtpServer": {
+    "host": "postfix",
+    "port": "25",
+    "from": "miguel@mateu.io",
+    "fromDisplayName": "EventConductor demo",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  },
   "roles": {
     "realm": [
       {

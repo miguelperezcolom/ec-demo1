@@ -61,6 +61,20 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
             - name: DB_POOL_SIZE
               value: "8"
+            # User creates and edits are propagated to Keycloak through the identity outbox. The
+            # Service name, not the public host — this is a cluster-internal call to the Admin API,
+            # not a browser redirect, so it wants the in-cluster address.
+            - name: KEYCLOAK_URL
+              value: http://keycloak:8080
+            - name: KEYCLOAK_REALM
+              value: ec-demo1
+            # The bootstrap admin, reused rather than a client of its own — see KeycloakAdminClient
+            # for the trade-off. Same Secret the Keycloak pod reads its bootstrap password from, so
+            # the two cannot drift.
+            - name: KEYCLOAK_ADMIN_USERNAME
+              value: admin
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: keycloak-admin, key: password } }
           ports:
             - { name: http, containerPort: 8102 }
             - { name: grpc, containerPort: 9191 }

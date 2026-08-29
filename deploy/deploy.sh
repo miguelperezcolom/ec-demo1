@@ -155,6 +155,7 @@ kubectl apply -f deploy/manifests/05-clusterissuer.yaml
 # The Job is immutable once created, so a re-run has to replace it rather than patch it.
 kubectl delete job keycloak-db-init -n "$NS" --ignore-not-found
 kubectl apply -f deploy/manifests/10-keycloak.yaml
+kubectl apply -f deploy/manifests/11-postfix.yaml
 kubectl apply -f deploy/manifests/20-worker.yaml
 kubectl apply -f deploy/manifests/30-shell.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml

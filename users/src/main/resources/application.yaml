@@ -35,6 +35,35 @@ spring:
 # ask it for any user's roles and scopes. That is acceptable while nothing outside the namespace
 # can reach it and stops being acceptable the moment it is exposed.
 
+# Where user creates and edits are propagated to. This service stays the source of truth for who a
+# user is and what they may do; Keycloak holds the authentication copy, kept in step through the
+# identity outbox. The password is the deploy-time bootstrap admin, from the keycloak-admin Secret —
+# see KeycloakAdminClient for why that is broad and how to narrow it. Empty by default so a local
+# run without Keycloak simply fails to deliver and retries, rather than pointing at someone's realm.
+keycloak:
+  base-url: ${KEYCLOAK_URL:http://localhost:8080}
+  realm: ${KEYCLOAK_REALM:ec-demo1}
+  admin:
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+    username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:}
+  # On create, mark the new user "must set password" and have Keycloak email them the link. Needs a
+  # working SMTP server on the realm (the postfix relay); best-effort, so a mail failure never fails
+  # the create. Turn off to provision credential-less users some other way.
+  password-setup-email: ${KEYCLOAK_PASSWORD_SETUP_EMAIL:true}
+
+# The identity outbox relay. poll-interval drains what is due; the rest govern retries and how long
+# delivered rows are kept before the daily purge removes them.
+identity:
+  outbox:
+    poll-interval-ms: ${IDENTITY_OUTBOX_POLL_MS:5000}
+    batch-size: ${IDENTITY_OUTBOX_BATCH:50}
+    max-attempts: ${IDENTITY_OUTBOX_MAX_ATTEMPTS:10}
+    backoff-seconds: ${IDENTITY_OUTBOX_BACKOFF_SECONDS:10}
+    backoff-cap-seconds: ${IDENTITY_OUTBOX_BACKOFF_CAP_SECONDS:600}
+    retention-days: ${IDENTITY_OUTBOX_RETENTION_DAYS:7}
+    purge-cron: ${IDENTITY_OUTBOX_PURGE_CRON:0 0 3 * * *}
+
 management:
   endpoints:
     web:

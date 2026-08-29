@@ -197,6 +197,84 @@ The seeded model is `claude-sonnet-4-5`, a generation behind what the API offers
 now a field in the console rather than a Deployment variable — which is most of what the control
 plane is for.
 
+### Propagating users to Keycloak
+
+`users` is the source of truth for who a person is; Keycloak holds the copy that authenticates
+them. Creating, editing or deleting a user here has to reach there, or the two drift — a user
+edited in the console but not in Keycloak signs in under stale details, and one deleted here but
+left there can still sign in at all. So every create, update and delete is propagated.
+
+**It is identity only.** Username — which is this service's own user id — email, display name, and
+whether the account is enabled. Roles and scopes are deliberately not sent: this service stays the
+one place they are decided, and the gateway is meant to read them from it to enrich a token (the
+gRPC half of that is [not yet wired](#notes-worth-knowing)). Copying them into Keycloak as well
+would make two places that disagree.
+
+**It goes through a transactional outbox, not a direct call.** Saving the user and calling Keycloak
+cannot commit together — one is Postgres, the other an HTTP API — so the use case does not call
+Keycloak at all. It writes the change to an `identity_outbox` table *in the same transaction* as the
+user: either both land or neither does, and there is no window where the user is saved but the
+intent to propagate is lost. A relay (`@Scheduled`, every few seconds) then drains the table,
+delivers each change, and marks it done; failures are retried with a growing backoff and abandoned
+after ten attempts so a permanently-bad change stops blocking the queue behind it. Delivered rows
+are kept a week as an audit of what was propagated, then purged.
+
+**Delivery is at-least-once, so it is idempotent.** The relay may hand the same change over twice
+(delivered, then died before recording it), which is why the Keycloak side is an upsert keyed on
+username — `POST` if absent, `PUT` if present, a losing `POST` race treated as an update — and a
+deletion of an already-absent user is a success, not an error. Exactly-once across a database and a
+foreign API is not on offer; at-least-once plus idempotent is the arrangement that is.
+
+**The credential it uses is broad, on purpose-for-now.** The relay authenticates to the Admin API
+as the realm's bootstrap admin, reusing the `keycloak-admin` Secret rather than a client of its own.
+It needs only `manage-users`; the bootstrap admin can do anything. The clean version is a
+confidential `users-service` client with a service account granted exactly that role, and it was
+left out because it puts a client secret into the committed realm import while the bootstrap
+password is a deploy-time Secret. The seam is one method in `KeycloakAdminClient`. Until then the
+blast radius of this pod's credential is a Secret, not a file in git.
+
+A user created this way has no credential yet, so it cannot sign in until one is set. That is what
+[the SMTP relay](#email-and-smtp) is for: on create, the user is marked *must set password* and
+Keycloak emails them the link. It is best-effort — a mail failure is logged and never fails the
+create — so a user always lands in Keycloak; whether the email went is a separate, visible outcome.
+
+### Email and SMTP
+
+Keycloak has to send mail — the set-password link above, and password resets after — and it needs
+somewhere to send it through. That somewhere is a **postfix relay**: a small, send-only pod that
+exists to take mail off Keycloak and hand it to Gmail.
+
+**It relays; it does not deliver.** Keycloak talks plain SMTP to `postfix:25` inside the cluster —
+no TLS, no auth, because the hop never leaves the pod network — and postfix forwards everything to
+`smtp.gmail.com:587` over an authenticated, encrypted connection. The split is the point. The one
+secret, the Gmail App Password, lives only in postfix (the `postfix-relay` Secret), so the realm
+import that points Keycloak at it carries **no credential and stays in version control** with
+`auth: false`. And the actual delivery is Gmail's, with Gmail's reputation, rather than a cluster IP
+that every provider would sink as spam.
+
+**The App Password is pasted, not generated.** Like the Anthropic key, `deploy.sh` writes a
+commented `POSTFIX_RELAY_PASSWORD=` line into `deploy/.secrets/credentials.env`. It needs a Google
+account with 2-Step Verification on (a normal password will not authenticate over SMTP), and for
+`miguel@mateu.io` that is the Workspace account for the domain. Without it, postfix starts but Gmail
+refuses the relay and mail queues; user create/update/delete is unaffected, because that path does
+not touch mail.
+
+**DNS is what keeps the mail out of spam.** Because the envelope leaves through Gmail as an
+authenticated `@mateu.io` sender, deliverability rides on the domain's existing Google email
+authentication. For a Workspace domain this is normally already in place; verify, and add what is
+missing:
+
+| record | type | value | why |
+|---|---|---|---|
+| `mateu.io` | TXT (SPF) | `v=spf1 include:_spf.google.com ~all` | authorizes Google's servers to send as `@mateu.io` |
+| `google._domainkey.mateu.io` | TXT (DKIM) | the key from Workspace → Apps → Gmail → *Authenticate email* | lets Google sign the mail so receivers can verify it |
+| `_dmarc.mateu.io` | TXT (DMARC) | `v=DMARC1; p=none; rua=mailto:miguel@mateu.io` | asks receivers to report, and sets a policy once SPF/DKIM pass |
+
+No `MX` change is needed — that governs *receiving*, and this relay only sends. If the account is a
+personal `@gmail.com` with `mateu.io` as a "send as" alias rather than a Workspace domain, Gmail
+rewrites the envelope sender and the `From:` will not align with these records; the Workspace domain
+is the arrangement that makes the table above true.
+
 ### What is not wired yet
 
 `booking`'s saga half needs a definition whose `ACTION` steps name `topic: booking`. The one it

@@ -1,0 +1,88 @@
+# Postfix as a send-only smarthost. The one job: give Keycloak somewhere to hand outbound mail so a
+# new user can be sent a set-password link.
+#
+# It relays rather than delivers. Keycloak talks plain SMTP to it inside the cluster — no auth, no
+# TLS, because the hop never leaves the pod network — and Postfix forwards everything to Gmail over
+# an authenticated, encrypted submission connection. That split is deliberate: the sensitive leg
+# (the Gmail App Password, the TLS) is Postfix's, so the realm import that points Keycloak here
+# carries no secret and stays in version control, while Gmail's reputation does the actual delivery
+# instead of a cluster IP that every provider would treat as spam.
+#
+# Cluster-internal only. The Service is a ClusterIP on no ingress; nothing outside the namespace can
+# reach port 25, which is what lets it accept mail without authenticating the sender.
+#
+# The App Password is the one secret it needs, in `postfix-relay`. deploy.sh creates that secret
+# only when POSTFIX_RELAY_PASSWORD is set in credentials.env — like the Anthropic key, it is pasted,
+# not generated. Without it Postfix starts but Gmail refuses the relay, and the set-password mail
+# stays queued; user create/update/delete is unaffected, since that path does not touch mail.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postfix
+  namespace: ec-demo1
+  labels: { app: postfix }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: postfix } }
+  template:
+    metadata:
+      labels: { app: postfix }
+    spec:
+      containers:
+        - name: postfix
+          image: boky/postfix:v5.1.0
+          env:
+            # Only mail claiming to be from our own domain is accepted for relay — a stray sender
+            # cannot use this as an open relay even from inside the cluster.
+            - name: ALLOWED_SENDER_DOMAINS
+              value: mateu.io
+            # Gmail's submission endpoint. The [brackets] tell Postfix not to look up an MX for it
+            # and to use this host verbatim.
+            - name: RELAYHOST
+              value: "[smtp.gmail.com]:587"
+            - name: RELAYHOST_USERNAME
+              value: miguel@mateu.io
+            - name: RELAYHOST_PASSWORD
+              valueFrom: { secretKeyRef: { name: postfix-relay, key: password } }
+            # Require TLS on the leg to Gmail. This is the hop that leaves the cluster.
+            - name: RELAYHOST_TLS_LEVEL
+              value: encrypt
+            # Accept mail from the pod network without authentication. The private ranges cover the
+            # CNI's pod CIDR whatever it is; the ClusterIP Service is what keeps this unreachable
+            # from outside.
+            - name: MYNETWORKS
+              value: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.0/8"
+          ports:
+            # Plain SMTP on 25, the predictable port for the in-cluster hop: no STARTTLS to
+            # negotiate and no self-signed cert for Keycloak to distrust. Submission (587), which
+            # would expect TLS, is the wrong shape for a trusted same-network leg.
+            - { name: smtp, containerPort: 25 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              # Binding the privileged port 25, and dropping to the postfix user to run, are the
+              # only capabilities kept.
+              add: ["NET_BIND_SERVICE", "SETUID", "SETGID"]
+          resources:
+            requests: { memory: "64Mi", cpu: "50m" }
+            limits:   { memory: "256Mi", cpu: "250m" }
+          readinessProbe:
+            tcpSocket: { port: 25 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 25 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postfix
+  namespace: ec-demo1
+  labels: { app: postfix }
+spec:
+  selector: { app: postfix }
+  ports:
+    - { name: smtp, port: 25, targetPort: 25 }

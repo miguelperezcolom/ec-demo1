@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.users.application.usecases.user.save;
 
 import io.mateu.ecdemo1.users.application.out.UserRepository;
+import io.mateu.ecdemo1.users.application.usecases.user.identity.IdentityOutboxAppender;
 import io.mateu.ecdemo1.users.domain.aggregates.role.vo.RoleId;
 import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Email;
 import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Name;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SaveUserUseCase {
 
     final UserRepository repository;
+    final IdentityOutboxAppender identityOutboxAppender;
 
     @Transactional
     public void handle(SaveUserCommand command) {
@@ -25,6 +27,9 @@ public class SaveUserUseCase {
                 command.roles().stream().map(RoleId::new).toList()
                 );
         repository.save(user);
+        // Same transaction as the save: the change to propagate commits with the user. See
+        // IdentityOutbox.
+        identityOutboxAppender.drain(user);
     }
 
 }
