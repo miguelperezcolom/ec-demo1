@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iaagent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.iaagent.config.AgentConfig;
 import io.mateu.ecdemo1.iaagent.config.AgentConfigClient;
+import io.mateu.ecdemo1.iaagent.config.AgentResolver;
 import io.mateu.ecdemo1.iaagent.config.ChatClientRegistry;
 import io.mateu.ecdemo1.iaagent.config.RagToolFactory;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ public class IaAgentController {
     private final ObjectMapper objectMapper;
     private final io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader jwtIdentityReader;
     private final io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter;
+    private final AgentResolver agentResolver;
 
     public IaAgentController(AgentConfigClient configClient,
                              ChatClientRegistry chatClients,
@@ -49,7 +51,8 @@ public class IaAgentController {
                              MenuContextStore menuContextStore,
                              ObjectMapper objectMapper,
                              io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader jwtIdentityReader,
-                             io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter) {
+                             io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter,
+                             AgentResolver agentResolver) {
         this.configClient = configClient;
         this.chatClients = chatClients;
         this.mcpFactory = mcpFactory;
@@ -59,6 +62,7 @@ public class IaAgentController {
         this.objectMapper = objectMapper;
         this.jwtIdentityReader = jwtIdentityReader;
         this.usageReporter = usageReporter;
+        this.agentResolver = agentResolver;
     }
 
     /**
@@ -86,11 +90,24 @@ public class IaAgentController {
         return all.toArray(new org.springframework.ai.tool.ToolCallback[0]);
     }
 
-    private AgentConfig configOrFail() {
-        return configClient.current().orElseThrow(() -> new NoConfigurationException(
-                "Este agente no tiene configuración: el plano de control no responde, o no puede "
-                        + "servir el agente '" + configClient.agentId()
-                        + "'. Revísalo en la consola de control."));
+    /**
+     * The configuration for this prompt, chosen by context. The caller's identity is read from the
+     * bearer token and posted to the control plane, which routes to an agent and refuses an
+     * over-budget one — a refusal arrives here as {@link NoConfigurationException} and reaches the
+     * panel as its message, the same path a missing configuration already took.
+     *
+     * <p>Locale and current screen are passed as null for now: the chat client does not send them
+     * yet, so routing rules that key on a role or a tenant work today, and rules that key on a
+     * screen or a locale wait for the frontend to carry those. Adding them is two nullable fields on
+     * the request, not a redesign.
+     */
+    private AgentConfig resolveConfig(String authorization) {
+        var caller = jwtIdentityReader.read(authorization);
+        var resolution = agentResolver.resolve(caller, null, null);
+        if (!resolution.allowed()) {
+            throw new NoConfigurationException(resolution.deniedReason());
+        }
+        return resolution.config();
     }
 
     // ── Internal types ───────────────────────────────────────────────────────
@@ -171,9 +188,10 @@ public class IaAgentController {
         menuContextStore.update(sessionId, request.menuContext());
 
         try {
-            // Fetched before anything else: it decides the model, the credential, the prompt and
-            // which MCP servers to even open a connection to.
-            AgentConfig config = configOrFail();
+            // Resolved before anything else: it decides the agent (by the caller's context), the
+            // model, the credential, the prompt and which MCP servers to even open a connection to
+            // — and refuses an over-budget request here rather than after spending on it.
+            AgentConfig config = resolveConfig(authorization);
 
             try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
                 // Only a hard stop when there is nothing at all to call. An agent whose MCP
@@ -267,9 +285,9 @@ public class IaAgentController {
 
         // Blocking LLM call on a dedicated thread; cache() so both subscribers share the result.
         Mono<LlmResult> resultMono = Mono.fromCallable(() -> {
-                    // Same order as /chat: configuration first, because it decides which servers
-                    // to connect to and with which model to answer.
-                    AgentConfig config = configOrFail();
+                    // Same order as /chat: resolve first, because it decides which agent, which
+                    // servers to connect to and with which model to answer — and can refuse.
+                    AgentConfig config = resolveConfig(authorization);
                     try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
                         if (tools.hasNoServers() && config.rags().isEmpty()) {
                             String err = "No hay ningún servidor MCP disponible ("
