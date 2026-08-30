@@ -87,7 +87,7 @@ redpanda:
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
   image: miguelperezcolom/orchestrator-standalone-app
-  imageTag: "2.10.2"
+  imageTag: "2.10.3"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
