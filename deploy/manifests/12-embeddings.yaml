@@ -53,7 +53,10 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: { drop: ["ALL"] }
           resources:
-            requests: { memory: "1Gi", cpu: "500m" }
+            # Request modestly — the node reserves by request, and there is only one cx43 node with
+            # everything else on it. The model needs ~900Mi resident, which the 3Gi limit covers;
+            # over-reserving at request time just starves other pods of a scheduling slot.
+            requests: { memory: "512Mi", cpu: "250m" }
             limits:   { memory: "3Gi", cpu: "2" }
           volumeMounts:
             - { name: data, mountPath: /data }
