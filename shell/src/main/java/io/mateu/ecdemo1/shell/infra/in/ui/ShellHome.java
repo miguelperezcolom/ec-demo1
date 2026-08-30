@@ -82,9 +82,9 @@ public class ShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu content = new RemoteMenu("/_content");
 
-    /** Users, groups, roles and permissions. */
-    @Menu
-    RemoteMenu users = new RemoteMenu("/_users");
+    // Users, groups, roles and permissions moved to the control console: administering access is a
+    // control-plane concern, not part of using the product. It is served by the same users pod,
+    // now mounted by the control shell behind the ai-admin gate. See ControlShellHome.
 
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {

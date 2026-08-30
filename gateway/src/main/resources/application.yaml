@@ -69,10 +69,13 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io}
             - Path=/_content/**
 
+        # Users moved to the control console: on the CONTROL host now, not the demo host, because
+        # administering access is a control-plane concern. Behind the ai-admin role, like the IA
+        # catalogues — see SecurityConfig.
         - id: users
           uri: ${USERS_URL:http://users:8102}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONTROL_HOST:console.ec1.mateu.io}
             - Path=/_users/**
 
         # The chat agent, at the path Mateu's @AI client posts to. Not a Mateu UI and so not a

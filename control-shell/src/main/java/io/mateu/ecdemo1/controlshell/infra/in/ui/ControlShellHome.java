@@ -45,9 +45,19 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 @Style(StyleConstants.FULL_WIDTH)
 public class ControlShellHome implements WidgetSupplier {
 
-    /** The four catalogues. Everything below the menu bar is served by the control-plane pod. */
+    /** The IA catalogues, served by the control-plane pod, which labels the section "IA". */
     @Menu
     RemoteMenu controlPlane = new RemoteMenu("/_ia-cp");
+
+    /**
+     * User, group, role and permission management, served by the users pod, which labels the
+     * section "Usuarios". It moved here from the demo console on purpose: administering who may
+     * access the platform and what they may do is a control-plane concern, not part of using the
+     * product. Both halves of the admin console — IA and Usuarios — now live behind the same
+     * ai-admin gate on this host.
+     */
+    @Menu
+    RemoteMenu users = new RemoteMenu("/_users");
 
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {

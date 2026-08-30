@@ -108,10 +108,12 @@ public class SecurityConfig {
                         // HMAC-SHA256 over the body, verified by the engine itself.
                         .pathMatchers("/workflow/webhooks/**", "/forms/webhooks/**").permitAll()
                         .pathMatchers("/_workflow/**", "/_forms/**", "/_worker/**").authenticated()
-                        // The three demo CRUD services, guarded the same way and for the same
+                        // The two demo CRUD services, guarded the same way and for the same
                         // reason: none of them authenticates anything of its own, so this is
-                        // the only thing between their screens and whoever types the path.
-                        .pathMatchers("/_booking/**", "/_content/**", "/_users/**").authenticated()
+                        // the only thing between their screens and whoever types the path. Users
+                        // used to be here too; it moved to the control host, behind ai-admin — see
+                        // below — because administering access is a control-plane concern.
+                        .pathMatchers("/_booking/**", "/_content/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the
@@ -124,11 +126,12 @@ public class SecurityConfig {
                         // catch-all would permit it anyway, but silence is the wrong way to make a
                         // public endpoint public.
                         .matchers(onControlHost("/cp-webhooks/**")).permitAll()
-                        // The control console. Both of these, because the catalogues are rendered
-                        // by two pods: /_ia-cp/** is the control plane's own UI, and /mateu/** is
-                        // the control shell's endpoint that assembles the page around it. Leaving
-                        // either open would leave the console usable.
-                        .matchers(onControlHost("/_ia-cp/**", "/mateu/**")).hasRole("ai-admin")
+                        // The control console — an admin console with two halves, both behind the
+                        // ai-admin role. /_ia-cp/** is the IA catalogues; /_users/** is user and
+                        // access management, which moved here from the demo host; and /mateu/** is
+                        // the control shell's endpoint that assembles the page around them. Leaving
+                        // any of them open would leave the console usable.
+                        .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and
