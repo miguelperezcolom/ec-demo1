@@ -63,8 +63,8 @@ public class LlmViewModel implements Identifiable {
             + "new models appear faster than this service is rebuilt.")
     String model;
 
-    @Help("Only for OpenAI-compatible servers that are not OpenAI — Ollama, vLLM, a gateway. "
-            + "Leave empty for the provider's own endpoint.")
+    @Help("Required for OPENAI_COMPATIBLE — Ollama, vLLM, a gateway — and left empty for a "
+            + "provider's own endpoint. With or without a trailing /v1: both are accepted.")
     String baseUrl;
 
     @Section("Sampling")

@@ -51,6 +51,17 @@
             <artifactId>spring-ai-starter-model-anthropic</artifactId>
             <version>${spring-ai.version}</version>
         </dependency>
+        <!-- The model artifact, NOT spring-ai-starter-model-openai. The starter adds six
+             auto-configurations (chat, embedding, image, moderation, transcription, speech) that
+             all build a client at startup from spring.ai.openai.* properties this service does
+             not have, so it would be six exclusions in application.yaml to get back to where this
+             one line already is. Nothing here is auto-configured: ChatClientRegistry builds a
+             client per credential, from the catalogue. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
 
         <!-- Per-session conversation history, in memory and nowhere else. -->
         <dependency>
