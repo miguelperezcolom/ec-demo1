@@ -11,7 +11,9 @@ import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -101,13 +103,37 @@ public class ChatClientRegistry {
      * {@code /v1/chat/completions}, which is the path these servers agree on.
      */
     private static ChatClient openAiCompatible(AgentConfig.Llm llm) {
-        var apiBuilder = OpenAiApi.builder().apiKey(llm.apiKey());
+        var apiBuilder = OpenAiApi.builder()
+                .apiKey(llm.apiKey())
+                .restClientBuilder(reportingWhatWasRefused());
         if (!isBlank(llm.baseUrl())) {
             apiBuilder.baseUrl(openAiBaseUrl(llm.baseUrl()));
         }
         return ChatClient.create(OpenAiChatModel.builder()
                 .openAiApi(apiBuilder.build())
                 .build());
+    }
+
+    /**
+     * Logs the request body whenever the provider refuses it.
+     *
+     * <p>A gateway in front of another provider answers a 4xx with its own words, and those words
+     * routinely name neither the field nor the reason — "Vertex AI rejected the request" is the
+     * whole of it. Without the body that produced it there is nothing to work from but guesses,
+     * and the guesses are expensive: every one costs a build, an image and a rollout before it can
+     * be tested at all. The credential is a header, not part of what this prints.
+     */
+    private static RestClient.Builder reportingWhatWasRefused() {
+        return RestClient.builder().requestInterceptor((request, body, execution) -> {
+            var response = execution.execute(request, body);
+            if (response.getStatusCode().isError()) {
+                var sent = new String(body, StandardCharsets.UTF_8);
+                log.error("{} refused this request with {}. This is what was sent:\n{}",
+                        request.getURI(), response.getStatusCode(),
+                        sent.length() > 20000 ? sent.substring(0, 20000) + "…[truncated]" : sent);
+            }
+            return response;
+        });
     }
 
     /**
