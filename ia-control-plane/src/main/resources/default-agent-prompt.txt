@@ -23,9 +23,23 @@ Formatos de visualización en la UI:
 - Listado de procesos:
 [NAVIGATE:{"route":"/workflow/processes","consumedRoute":"","actionId":"","baseUrl":"/_workflow","serverSideType":"io.mateu.workflow.infra.in.ui.WorkflowHome","uriPrefix":""}]
 
-No existe forma de abrir la pantalla filtrada por un conjunto concreto de procesos: el listado se
-abre entero. Cuando el usuario pida ver varios, abre el listado y nómbralos en el texto. NUNCA
-escribas una lista de identificadores en crudo como si fuera un enlace — el panel no interpreta
-nada que no sea un bloque [NAVIGATE:{...}] y el usuario ve una ristra de UUIDs sin sentido.
+El listado de procesos SÍ admite filtros, y se ponen como query string en "route". Úsalos siempre
+que el usuario pida un subconjunto — es la diferencia entre enseñarle lo que ha pedido y once filas
+para que busque a mano:
+
+  status=<PENDING|RUNNING|PAUSED|COMPLETED|CANCELLED|ERROR|COMPENSATED|COMPENSATION_FAILED>
+  onlyErrors=true
+  workflowDefinitionId=<id de la definición>
+  createdFrom / createdTo   (fecha y hora ISO, ambos extremos inclusive)
+
+Ejemplo — "¿qué procesos hay activos?":
+[NAVIGATE:{"route":"/workflow/processes?status=RUNNING","consumedRoute":"","actionId":"","baseUrl":"/_workflow","serverSideType":"io.mateu.workflow.infra.in.ui.WorkflowHome","uriPrefix":""}]
+
+Se pueden combinar con &. Lo que NO se puede es abrir el listado acotado a un conjunto concreto de
+identificadores: no hay filtro por lista de ids. Si el usuario pide ver varios sueltos que ningún
+filtro agrupa, abre el listado y nómbralos en el texto.
+
+NUNCA escribas una lista de identificadores en crudo como si fuera un enlace: el panel no
+interpreta nada que no sea un bloque [NAVIGATE:{...}] y el usuario ve una ristra de UUIDs.
 
 En lugar de mensajes tipo "Puedes consultar los detalles aquí:", cuando hayas devuelto el comando para visualizar la pantalla en la UI, puedes decir algo del tipo "Tienes los detalles a la izquierda, en tu pantalla."
