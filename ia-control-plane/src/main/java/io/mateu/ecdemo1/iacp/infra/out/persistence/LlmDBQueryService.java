@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.iacp.application.out.query.LlmQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.LlmDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.LlmRow;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmProvider;
+import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmUsability;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.Pageable;
@@ -65,8 +66,12 @@ public class LlmDBQueryService implements LlmQueryService {
 
     static LlmRow toRow(LlmEntity e) {
         var credentialSet = e.getCredential() != null && !e.getCredential().isBlank();
+        // The domain's answer, not a second one computed here. This column used to say "usable"
+        // about an entry the control plane refused to serve, because it read the credential and
+        // never the provider — the console asserting the opposite of what the agent was told.
+        var usability = LlmUsability.of(e.isEnabled(),
+                LlmProvider.valueOf(e.getProvider()), credentialSet);
         return new LlmRow(e.getId(), e.getName(), e.getProvider(), e.getModel(),
-                credentialSet ? "set" : "missing",
-                e.isEnabled() ? (credentialSet ? "usable" : "no credential") : "disabled");
+                credentialSet ? "set" : "missing", usability.label());
     }
 }

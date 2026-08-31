@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.domain.aggregates.llm;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.Credential;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmProvider;
+import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmUsability;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.ModelName;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.SamplingOptions;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Enabled;
@@ -76,17 +77,17 @@ public class Llm extends AggregateRoot {
     }
 
     /**
-     * Whether an agent may be served this LLM: enabled, and actually able to authenticate.
+     * Why an agent may or may not be served this LLM.
      *
-     * <p>An API-key provider with no key is catalogued but not usable. The other two providers
-     * authenticate out of band — an instance profile, a workload identity — so a missing key is
-     * not what stops them; nothing here supports them yet, and
-     * {@link LlmProvider#isApiKeyBased()} is what says so.
+     * <p>The reason, not a boolean: the two callers that needed one used to derive it themselves
+     * and both got it wrong for the same entry. See {@link LlmUsability}.
      */
+    public LlmUsability usability() {
+        return LlmUsability.of(enabled.value(), provider, credential.isSet());
+    }
+
+    /** Whether an agent may be served this LLM. The reason is in {@link #usability()}. */
     public boolean isUsable() {
-        if (!enabled.value()) {
-            return false;
-        }
-        return provider.isApiKeyBased() && credential.isSet();
+        return usability().isUsable();
     }
 }

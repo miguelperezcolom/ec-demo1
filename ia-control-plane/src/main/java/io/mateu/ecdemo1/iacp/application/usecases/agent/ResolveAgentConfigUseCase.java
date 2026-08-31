@@ -31,7 +31,8 @@ import java.util.List;
  * configuration takes the panel down. What was dropped is returned alongside the config —
  * {@link Resolved#warnings()} — so the caller can say so instead of silently being less capable
  * than its catalogue claims. A missing or unusable <em>LLM</em> is the exception, because there is
- * no degraded mode without a model: that one is a failure, and it says which of the two it was.
+ * no degraded mode without a model: that one is a failure, and it names which of the three reasons
+ * it was — disabled, an unsupported provider, or no credential.
  */
 @Service
 @RequiredArgsConstructor
@@ -87,12 +88,15 @@ public class ResolveAgentConfigUseCase {
                 .orElseThrow(() -> new AgentNotUsableException(
                         "Agent '" + agentId + "' names LLM '" + agent.getLlmId()
                                 + "', which is not in the catalogue"));
-        if (!llm.isUsable()) {
-            // Two different operator mistakes, and the fix differs, so say which one it is rather
-            // than "not usable".
+        var usability = llm.usability();
+        if (!usability.isUsable()) {
+            // Three different operator mistakes and three different fixes, so the message names
+            // the one that applies. It used to name only two, and an unsupported provider came
+            // out disguised as a missing credential — sending whoever read it to paste a key that
+            // could not have helped.
             throw new AgentNotUsableException("Agent '" + agentId + "' names LLM '"
-                    + llm.getId() + "', which is " + (llm.getEnabled().value()
-                    ? "missing its credential" : "disabled"));
+                    + llm.getId() + "' (" + llm.getProvider() + "), which is "
+                    + usability.label() + ".");
         }
 
         var mcps = new ArrayList<ResolvedMcp>();
