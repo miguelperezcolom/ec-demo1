@@ -62,25 +62,39 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 @AI(sse = "/ai/api/agent/stream")
 public class ShellHome implements WidgetSupplier {
 
+    // Every entry names its label, and that is not decoration.
+    //
+    // A RemoteMenu built from a base URL alone has no label, so Mateu fills one in from the FIELD
+    // NAME until the remote pod answers with its own — see ActionableCompleter.completeActionable.
+    // The two are then swapped in the browser, which is what makes the menu bar visibly change a
+    // moment after it is drawn, and again on every navigation to the app root: clicking the logo
+    // is the easiest way to see it. Four of these happened to match the field name and one did
+    // not; naming all five is what stops that from being luck, and from breaking the day a field
+    // is renamed.
+    //
+    // The cost is real and worth stating: these strings live in two repositories now. A section
+    // renamed in its own pod and not here goes back to flickering, with the shell's version
+    // showing first.
+
     /** Workflow definitions, running processes, step executions, analytics. */
     @Menu
-    RemoteMenu workflow = new RemoteMenu("/_workflow");
+    RemoteMenu workflow = new RemoteMenu("/_workflow").withLabel("Workflow");
 
     /** Form definitions, the drag-and-drop editor, and the human tasks waiting to be done. */
     @Menu
-    RemoteMenu forms = new RemoteMenu("/_forms");
+    RemoteMenu forms = new RemoteMenu("/_forms").withLabel("Forms");
 
     /** What the test worker was asked to do, and the overrides that answer it by hand. */
     @Menu
-    RemoteMenu worker = new RemoteMenu("/_worker");
+    RemoteMenu worker = new RemoteMenu("/_worker").withLabel("Worker");
 
     /** Bookings — the CRUD, and the aggregate the booking saga confirms or cancels. */
     @Menu
-    RemoteMenu booking = new RemoteMenu("/_booking");
+    RemoteMenu booking = new RemoteMenu("/_booking").withLabel("Booking");
 
-    /** Content, labels and content types. */
+    /** Content, labels and content types. The one whose label the field name did not predict. */
     @Menu
-    RemoteMenu content = new RemoteMenu("/_content");
+    RemoteMenu content = new RemoteMenu("/_content").withLabel("Contenidos");
 
     // Users, groups, roles and permissions moved to the control console: administering access is a
     // control-plane concern, not part of using the product. It is served by the same users pod,

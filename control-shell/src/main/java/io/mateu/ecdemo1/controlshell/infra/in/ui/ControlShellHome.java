@@ -45,9 +45,15 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 @Style(StyleConstants.FULL_WIDTH)
 public class ControlShellHome implements WidgetSupplier {
 
+    // Both entries name their label. Without one Mateu labels a RemoteMenu from the field name
+    // until the remote pod answers — "Control plane" and "Users" here — and then swaps in the real
+    // one, which is the menu bar changing under the reader a moment after it is drawn. Neither of
+    // these two ever matched, so this console flickered on both. See ShellHome for the same note
+    // and the cost that comes with it.
+
     /** The IA catalogues, served by the control-plane pod, which labels the section "IA". */
     @Menu
-    RemoteMenu controlPlane = new RemoteMenu("/_ia-cp");
+    RemoteMenu controlPlane = new RemoteMenu("/_ia-cp").withLabel("IA");
 
     /**
      * User, group, role and permission management, served by the users pod, which labels the
@@ -57,7 +63,7 @@ public class ControlShellHome implements WidgetSupplier {
      * ai-admin gate on this host.
      */
     @Menu
-    RemoteMenu users = new RemoteMenu("/_users");
+    RemoteMenu users = new RemoteMenu("/_users").withLabel("Usuarios");
 
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
