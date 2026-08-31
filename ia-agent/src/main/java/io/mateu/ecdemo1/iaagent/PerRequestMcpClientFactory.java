@@ -11,9 +11,11 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -102,7 +104,7 @@ public class PerRequestMcpClientFactory {
         }
 
         ToolCallback[] rawCallbacks = new SyncMcpToolCallbackProvider(clients).getToolCallbacks();
-        ToolCallback[] wrapped = wrapWithExecutor(rawCallbacks);
+        ToolCallback[] wrapped = wrapWithExecutor(dropDuplicateNames(rawCallbacks));
         log.info("Per-request MCP tools ready: {} tools from {}/{} servers",
                 wrapped.length, clients.size(), serverUrls.size());
         return new PerRequestTools(clients, wrapped, serverContexts, serverUrls.size());
@@ -120,7 +122,7 @@ public class PerRequestMcpClientFactory {
             }
             McpSyncClient client = McpClient.sync(transportBuilder.build())
                     .requestTimeout(REQUEST_TIMEOUT)
-                    .clientInfo(new McpSchema.Implementation("ia-agent-service", "1.0"))
+                    .clientInfo(new McpSchema.Implementation(clientNameFor(url), "1.0"))
                     .build();
             client.initialize();
             log.debug("MCP client connected: {}", url);
@@ -153,6 +155,52 @@ public class PerRequestMcpClientFactory {
             log.warn("Could not read system-context prompt from {}: {}", url, e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * A name per server, and the reason is not cosmetic.
+     *
+     * <p>Spring AI builds every tool's name as {@code <client name>_<tool name>}, taken from the
+     * CLIENT's info — see {@code SyncMcpToolCallback.getToolDefinition} — not from the server's.
+     * One shared client name for every connection therefore erases the only thing that
+     * distinguishes two servers, and two of them exposing a tool of the same name produce two
+     * functions with one name in the request. Anthropic tolerated that; a Vertex model behind an
+     * OpenAI-compatible gateway rejects the whole call with a 400 that names neither the tool nor
+     * the reason, so every prompt fails and nothing says why.
+     *
+     * <p>The host is what actually distinguishes these servers — {@code http://booking:8108}
+     * becomes {@code booking} — so the tool the model sees is {@code booking_findBookings} rather
+     * than {@code ia_agent_service_findBookings}, which is also the more useful name.
+     */
+    static String clientNameFor(String url) {
+        String host = null;
+        try {
+            host = URI.create(url).getHost();
+        } catch (Exception e) {
+            // A URL this malformed will fail at connection time with a better message than
+            // anything this method could produce. Fall through to the raw string.
+        }
+        var basis = (host == null || host.isBlank()) ? url : host;
+        var sanitised = basis.replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return sanitised.isBlank() ? "mcp" : sanitised;
+    }
+
+    /**
+     * Last line of defence for the same failure: two servers behind the same host, or a provider
+     * stricter still. One tool missing is a degraded answer; a duplicate function name is every
+     * prompt failing, so the first one wins and the collision is reported rather than hidden.
+     */
+    private ToolCallback[] dropDuplicateNames(ToolCallback[] callbacks) {
+        var byName = new LinkedHashMap<String, ToolCallback>();
+        for (ToolCallback callback : callbacks) {
+            var name = callback.getToolDefinition().name();
+            if (byName.putIfAbsent(name, callback) != null) {
+                log.warn("Two MCP servers expose a tool named '{}'. Keeping the first and dropping"
+                        + " the second — a duplicate function name is refused outright by some"
+                        + " providers, which costs every prompt rather than one tool.", name);
+            }
+        }
+        return byName.values().toArray(ToolCallback[]::new);
     }
 
     private ToolCallback[] wrapWithExecutor(ToolCallback[] callbacks) {
