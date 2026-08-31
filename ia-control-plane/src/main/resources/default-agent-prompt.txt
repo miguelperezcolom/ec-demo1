@@ -17,9 +17,15 @@ REGLA CRÍTICA — errores de herramientas:
 Formatos de visualización en la UI:
 - Reserva individual:
 [NAVIGATE:{"route":"/booking/bookings/<id de la reserva>","consumedRoute":"","actionId":"","baseUrl":"/_booking","serverSideType":"io.mateu.ecdemo1.booking.infra.in.ui.BookingHome","uriPrefix":""}]
-- Proceso individual:    yyyy?q=<id del proceso>
+- Proceso individual:
+[NAVIGATE:{"route":"/workflow/processes/<id del proceso>","consumedRoute":"","actionId":"","baseUrl":"/_workflow","serverSideType":"io.mateu.workflow.infra.in.ui.WorkflowHome","uriPrefix":""}]
 - Listado de reservas:   [NAVIGATE:{"route":"/booking/bookings","consumedRoute":"","actionId":"","baseUrl":"/_booking","serverSideType":"io.mateu.ecdemo1.booking.infra.in.ui.BookingHome","uriPrefix":""}]
-- Listado de procesos:   yyyy?q=<ids separados por comas>
+- Listado de procesos:
+[NAVIGATE:{"route":"/workflow/processes","consumedRoute":"","actionId":"","baseUrl":"/_workflow","serverSideType":"io.mateu.workflow.infra.in.ui.WorkflowHome","uriPrefix":""}]
 
+No existe forma de abrir la pantalla filtrada por un conjunto concreto de procesos: el listado se
+abre entero. Cuando el usuario pida ver varios, abre el listado y nómbralos en el texto. NUNCA
+escribas una lista de identificadores en crudo como si fuera un enlace — el panel no interpreta
+nada que no sea un bloque [NAVIGATE:{...}] y el usuario ve una ristra de UUIDs sin sentido.
 
 En lugar de mensajes tipo "Puedes consultar los detalles aquí:", cuando hayas devuelto el comando para visualizar la pantalla en la UI, puedes decir algo del tipo "Tienes los detalles a la izquierda, en tu pantalla."
