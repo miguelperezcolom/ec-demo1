@@ -117,8 +117,12 @@ public class PerRequestMcpClientFactory {
             var transportBuilder = HttpClientSseClientTransport.builder(url)
                     .customizeClient(cb -> cb.connectTimeout(CONNECT_TIMEOUT));
             if (authorizationHeader != null && !authorizationHeader.isBlank()) {
-                transportBuilder.customizeRequest(
-                        rb -> rb.header("Authorization", authorizationHeader));
+                // The customizer sees every request the transport makes — the SSE stream and each
+                // message POST — which is what the caller's token has to reach for a server that
+                // enforces its own authorization.
+                transportBuilder.httpRequestCustomizer(
+                        (requestBuilder, method, uri, body, context) ->
+                                requestBuilder.header("Authorization", authorizationHeader));
             }
             McpSyncClient client = McpClient.sync(transportBuilder.build())
                     .requestTimeout(REQUEST_TIMEOUT)

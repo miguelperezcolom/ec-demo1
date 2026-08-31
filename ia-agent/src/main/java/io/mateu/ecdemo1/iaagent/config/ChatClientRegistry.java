@@ -3,17 +3,15 @@ package io.mateu.ecdemo1.iaagent.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.anthropic.AnthropicCacheOptions;
+import org.springframework.ai.anthropic.AnthropicCacheStrategy;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
-import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -88,12 +86,8 @@ public class ChatClientRegistry {
     }
 
     private static ChatClient anthropic(AgentConfig.Llm llm) {
-        var apiBuilder = AnthropicApi.builder().apiKey(llm.apiKey());
-        if (!isBlank(llm.baseUrl())) {
-            apiBuilder.baseUrl(llm.baseUrl());
-        }
         return ChatClient.create(AnthropicChatModel.builder()
-                .anthropicApi(apiBuilder.build())
+                .options(anthropicOptions(llm).build())
                 .build());
     }
 
@@ -103,86 +97,77 @@ public class ChatClientRegistry {
      * {@code /v1/chat/completions}, which is the path these servers agree on.
      */
     private static ChatClient openAiCompatible(AgentConfig.Llm llm) {
-        var apiBuilder = OpenAiApi.builder()
-                .apiKey(llm.apiKey())
-                .restClientBuilder(reportingWhatWasRefused());
-        if (!isBlank(llm.baseUrl())) {
-            apiBuilder.baseUrl(openAiBaseUrl(llm.baseUrl()));
-        }
         return ChatClient.create(OpenAiChatModel.builder()
-                .openAiApi(apiBuilder.build())
+                .options(openAiOptions(llm).build())
                 .build());
-    }
-
-    /**
-     * Logs the request body whenever the provider refuses it.
-     *
-     * <p>A gateway in front of another provider answers a 4xx with its own words, and those words
-     * routinely name neither the field nor the reason — "Vertex AI rejected the request" is the
-     * whole of it. Without the body that produced it there is nothing to work from but guesses,
-     * and the guesses are expensive: every one costs a build, an image and a rollout before it can
-     * be tested at all. The credential is a header, not part of what this prints.
-     */
-    private static RestClient.Builder reportingWhatWasRefused() {
-        return RestClient.builder().requestInterceptor((request, body, execution) -> {
-            var response = execution.execute(request, body);
-            if (response.getStatusCode().isError()) {
-                var sent = new String(body, StandardCharsets.UTF_8);
-                log.error("{} refused this request with {}. This is what was sent:\n{}",
-                        request.getURI(), response.getStatusCode(),
-                        sent.length() > 20000 ? sent.substring(0, 20000) + "…[truncated]" : sent);
-            }
-            return response;
-        });
     }
 
     /**
      * Accepts a base URL written either way, because both are written.
      *
-     * <p>Spring AI appends its own completions path — {@code /v1/chat/completions} — to whatever
-     * it is given, so it wants the host and nothing else. Every other OpenAI client is configured
-     * with the {@code /v1} form instead ({@code OPENAI_BASE_URL}), which is how these endpoints
-     * are advertised and therefore how they get pasted into the catalogue. Handing that form
-     * straight to Spring AI produces {@code /v1/v1/chat/completions} and a 404 that says nothing
-     * about the cause, so the trailing {@code /v1} is dropped here rather than being a rule
-     * operators have to know.
+     * <p>The OpenAI SDK's own default is {@code https://api.openai.com/v1} and it appends only
+     * {@code chat/completions}, so the version segment belongs in the base URL — the same form
+     * {@code OPENAI_BASE_URL} takes everywhere else, and therefore the form that gets pasted into
+     * the catalogue. A base URL without it produces a 404 that names nothing.
+     *
+     * <p>It was the opposite before Spring AI 2.0: its own client appended {@code
+     * /v1/chat/completions}, so the {@code /v1} had to be taken off instead. Accepting both forms
+     * is what stops that from being a rule anyone has to know, or re-learn.
      */
     static String openAiBaseUrl(String baseUrl) {
         var trimmed = baseUrl.replaceAll("/+$", "");
-        if (trimmed.endsWith("/v1")) {
-            var withoutVersion = trimmed.substring(0, trimmed.length() - "/v1".length());
-            // "/v1" on its own leaves nothing to call: keep what was given and let the request
-            // fail against it rather than against a base URL this method invented.
-            return withoutVersion.isBlank() ? trimmed : withoutVersion;
-        }
-        return trimmed;
+        return trimmed.endsWith("/v1") ? trimmed : trimmed + "/v1";
     }
 
     /**
-     * The per-request half: model, temperature and max tokens, which do not need a new client.
-     * The options class has to match the model the client was built with — a chat model is handed
-     * its own options type and ignores a foreign one, which would quietly answer with the
-     * provider's defaults rather than the catalogue's model.
+     * The credential travels in the options, and so does everything per-request.
+     *
+     * <p>Spring AI 2.0 moved the api key and the base URL onto the options object, which is also
+     * what the model builds its client from — so one options object is both halves, and the two
+     * are built together here rather than being separated by a builder each. The options class
+     * still has to match the model it is handed to: a chat model ignores a foreign one, and
+     * ignoring it means answering with the provider's defaults instead of the catalogue's model.
      */
-    public ChatOptions optionsFor(AgentConfig.Llm llm) {
-        if ("ANTHROPIC".equals(llm.provider())) {
-            var builder = AnthropicChatOptions.builder().model(llm.model());
-            if (llm.temperature() != null) {
-                builder.temperature(llm.temperature());
-            }
-            if (llm.maxTokens() != null) {
-                builder.maxTokens(llm.maxTokens());
-            }
-            return builder.build();
+    public ChatOptions.Builder<?> optionsFor(AgentConfig.Llm llm) {
+        return "ANTHROPIC".equals(llm.provider()) ? anthropicOptions(llm) : openAiOptions(llm);
+    }
+
+    private static AnthropicChatOptions.Builder anthropicOptions(AgentConfig.Llm llm) {
+        var builder = AnthropicChatOptions.builder();
+        // Native since 2.0, and it replaces the request interceptor that used to rewrite the
+        // system prompt into cache_control blocks by hand — that interceptor was written against
+        // a RestClient this version no longer uses, so it would have gone silently inert.
+        builder.cacheOptions(AnthropicCacheOptions.builder()
+                .strategy(AnthropicCacheStrategy.SYSTEM_AND_TOOLS)
+                .build());
+        builder.apiKey(llm.apiKey());
+        builder.model(llm.model());
+        if (!isBlank(llm.baseUrl())) {
+            builder.baseUrl(llm.baseUrl());
         }
-        var builder = OpenAiChatOptions.builder().model(llm.model());
         if (llm.temperature() != null) {
             builder.temperature(llm.temperature());
         }
         if (llm.maxTokens() != null) {
             builder.maxTokens(llm.maxTokens());
         }
-        return builder.build();
+        return builder;
+    }
+
+    private static OpenAiChatOptions.Builder openAiOptions(AgentConfig.Llm llm) {
+        var builder = OpenAiChatOptions.builder();
+        builder.apiKey(llm.apiKey());
+        builder.model(llm.model());
+        if (!isBlank(llm.baseUrl())) {
+            builder.baseUrl(openAiBaseUrl(llm.baseUrl()));
+        }
+        if (llm.temperature() != null) {
+            builder.temperature(llm.temperature());
+        }
+        if (llm.maxTokens() != null) {
+            builder.maxTokens(llm.maxTokens());
+        }
+        return builder;
     }
 
     private static boolean isSupported(String provider) {

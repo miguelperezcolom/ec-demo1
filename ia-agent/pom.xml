@@ -3,13 +3,15 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Boot 3.4.1, like the gateway: Spring AI 1.0.0 is built against Boot 3.4 and this service
-         is nothing but Spring AI. These are separate processes and do not have to match the
-         shell's Boot 4. -->
+    <!-- Boot 4.1.1 for Spring AI 2.0.1, which is built against Spring Framework 7.0.9 — the
+         version 4.1.1 manages, and the reason for 4.1.1 rather than the 4.0.4 the control plane
+         runs. The move off Boot 3.4 was not a tidy-up: 2.0 is the first release whose OpenAI
+         client carries a tool call's unknown fields back into the next request, which is what a
+         Gemini-backed OpenAI-compatible gateway requires and what 1.x cannot do at all. -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.1</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -21,7 +23,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <spring-ai.version>1.0.0</spring-ai.version>
+        <spring-ai.version>2.0.1</spring-ai.version>
         <!-- Ahead of what Boot 3.4.1 manages, which does not run on a JDK 25 javac and fails the
              build with "TypeTag :: UNKNOWN" rather than anything that names Lombok. -->
         <lombok.version>1.18.44</lombok.version>
@@ -56,7 +58,7 @@
              all build a client at startup from spring.ai.openai.* properties this service does
              not have, so it would be six exclusions in application.yaml to get back to where this
              one line already is. Nothing here is auto-configured: ChatClientRegistry builds a
-             client per credential, from the catalogue. -->
+             model per credential, from the catalogue. -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai</artifactId>
