@@ -76,11 +76,24 @@ public class ShellHome implements WidgetSupplier {
     // renamed in its own pod and not here goes back to flickering, with the shell's version
     // showing first.
 
-    /** Workflow definitions, running processes, step executions, analytics. */
+    /**
+     * Running processes and their step executions.
+     *
+     * <p>Not definitions and not analytics: those are the orchestrator's other {@code @UI},
+     * {@code /_workflow-admin}, mounted by the control console behind {@code ai-admin}. Same pod,
+     * two front doors — see ControlShellHome. This one is the work; that one is how the engine is
+     * configured and how it has been behaving.
+     */
     @Menu
     RemoteMenu workflow = new RemoteMenu("/_workflow").withLabel("Workflow");
 
-    /** Form definitions, the drag-and-drop editor, and the human tasks waiting to be done. */
+    /**
+     * Form executions and the human tasks waiting to be done.
+     *
+     * <p>The form definitions and the drag-and-drop editor moved to the control console the same
+     * way, on {@code /_forms-admin}. Designing a form and answering one are done by different
+     * people.
+     */
     @Menu
     RemoteMenu forms = new RemoteMenu("/_forms").withLabel("Forms");
 

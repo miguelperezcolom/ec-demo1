@@ -15,29 +15,32 @@ so a process is changed by a pull request rather than by an API call.
                         ingress-nginx (TLS, Let's Encrypt)
                                  │
                             gateway  ── requires a Keycloak token on every backend path
-      ┌──────────┬──────────┬────┴─────┬──────────┬─────────┬────────┬──────┐
-      │          │          │          │          │         │        │      │
- /_workflow  /_forms   /_worker   /_booking  /_content  /_users    /ai     /**
-      │          │          │          │          │         │        │      │
- orchestrator  forms     worker    booking    content    users   ia-agent  shell
-      │          │          │          │          │         │        │      │
-      │          │          │          │          │         │        │   the only
-      │          │          │          │          │         │        │   page a user
-      │          │          │          │          │         │        │   loads
-      └── PostgreSQL ───────┴──────────┴──────────┴─────────┘        │
-      └── Redpanda (Kafka) ─┴──────────┘                             │
-                            └───────── MCP ───────────────────────────┘
+      ┌──────────┬──────────┬────┴─────┬──────────┬────────┬──────┐
+      │          │          │          │          │        │      │
+ /_workflow  /_forms   /_worker   /_booking  /_content    /ai     /**
+      │          │          │          │          │        │      │
+ orchestrator  forms     worker    booking    content  ia-agent  shell
+      │          │          │          │          │        │      │
+      │          │          │          │          │        │   the only
+      │          │          │          │          │        │   page a user
+      │          │          │          │          │        │   loads
+      └── PostgreSQL ───────┴──────────┴──────────┘        │
+      └── Redpanda (Kafka) ─┴──────────┘                   │
+                            └───────── MCP ────────────────┘
                        (ia-agent calls the tools the engine and booking expose)
 
   https://console.ec1.mateu.io  the control console ── needs the `ai-admin` realm role
                                     │
                               (same gateway)
-                                    │
-                              /_ia-cp    /**
-                                 │        │
-                          ia-control-plane · control-shell
-                                 │
-                            cp-postgres ── its own volume, unlike everything above
+         ┌─────────────┬───────────┴─────┬───────────────────┬─────────────┐
+         │             │                 │                   │             │
+      /_ia-cp       /_users      /_workflow-admin      /_forms-admin      /**
+         │             │                 │                   │             │
+ ia-control-plane    users         orchestrator            forms     control-shell
+         │                        the same two pods that answer
+    cp-postgres                   /_workflow and /_forms above, through
+    its own volume,               a second @UI each
+    unlike everything above
 
   https://auth.ec1.mateu.io     Keycloak (realm ec-demo1, clients demo + control-plane)
   https://grafana.ec1.mateu.io  Grafana ── Prometheus · Loki · Tempo
@@ -85,8 +88,11 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 
 1. **Open the console** at `https://ec1.mateu.io` and log in as `demo` / `demo`. The menu bar is
    assembled from three separate applications; none of their screens is written in the shell.
-2. **Workflow → Definitions.** The three definitions are already there — the orchestrator cloned
-   this repository at startup. Open *Order fulfilment* to see its graph.
+2. **Workflow → Definitions**, on the *control* console at `https://console.ec1.mateu.io`. The
+   three definitions are already there — the orchestrator cloned this repository at startup. Open
+   *Order fulfilment* to see its graph. Definitions live on that console rather than this one
+   because they are configuration; see [The control console](#the-control-console). Same
+   orchestrator pod, reached through a second `@UI` of its own.
 3. **Start a process** and give it a `TEST_CONFIG` variable. Nothing here implements a single
    business step: one test worker answers every task, and this variable is what tells it how.
 
@@ -128,8 +134,8 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 9. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
    (Prometheus). Traces are wired but not yet arriving — see below.
-10. **Then look at the menus that are not the engine.** *Booking*, *Content* and *Users* are three
-    more applications, each serving its own screens from its own pod — the shell states a path and
+10. **Then look at the menus that are not the engine.** *Booking* and *Contenidos* are two more
+    applications, each serving its own screens from its own pod — the shell states a path and
     nothing else about them.
 11. **Ask the chat panel for something.** "Lista las reservas", "crea una reserva para Ana". It has
     no database and no screens: it answers by calling the MCP tools the orchestrator, the forms
@@ -289,8 +295,35 @@ The form it needs, `verify-payment`, is already there.
 ## The control console
 
 A second console, on a host of its own: **`https://console.ec1.mateu.io`**, behind the `ai-admin`
-realm role. Behind it is `ia-control-plane`, which holds the four catalogues the chat agent is
-configured from.
+realm role. Three applications answer on it:
+
+| section | pod | what it is |
+|---|---|---|
+| **IA** | `ia-control-plane` | The four catalogues the chat agent is configured from — below |
+| **Usuarios** | `users` | Users, groups, roles and permissions. Moved here from the demo console: administering access is not part of using the product |
+| **Workflow** · **Forms** | `orchestrator`, `forms` | Workflow definitions and analytics, and the form definitions with their editor. The same two pods that serve the demo console, each through a second `@UI` |
+
+The last row is the one worth reading twice. `orchestrator` and `forms` are not deployed a second
+time; each declares two `@UI`s — `/_workflow` and `/_workflow-admin`, `/_forms` and `/_forms-admin`
+— and the gateway routes the plain pair on the demo host and the `-admin` pair here. Two front
+doors into one pod, and the host is what decides which role is required at each.
+
+That is how the split can exist at all: a `RemoteMenu` mounts the whole menu a pod declares and
+nothing less, so a shell cannot show half of one. The engine had to offer two menus for a
+deployment to be able to put them in two places.
+
+**The routes underneath did not change.** `/workflow/definitions` is still
+`/workflow/definitions` — Mateu builds a menu entry's route from the field name, and the
+administration menus keep the names they were split from. A deep link, or a `[NAVIGATE:]` block the
+chat agent holds, kept working across the move without being told.
+
+**What stayed on the demo console** is the work itself: processes and step executions, form
+executions and the task lists. The line is the same one that moved Usuarios — configuration and
+measurement here, doing the job there.
+
+### The catalogues
+
+`ia-control-plane` holds the four the chat agent is configured from.
 
 | catalogue | what an entry is |
 |---|---|
@@ -313,10 +346,16 @@ is written.
 The realm defines three roles: `user` and `admin` for the demo console, and `ai-admin` for this
 one. It is a role of its own and not the demo's `admin` on purpose — this host reaches the LLM API
 keys and the demo's `admin` never does, so the two are separate grants and neither implies the
-other. That is what lets an AI operator hold `ai-admin` without being able to drive workflows, and
-a platform admin hold `admin` without being able to read a credential. The `demo` user carries all
-three, because a single demo login is meant to reach everything; a real deployment would split
-them. A new public client `control-plane` is in the realm file, with `directAccessGrantsEnabled`
+other. That is what lets a platform admin hold `admin` without being able to read a credential. The
+`demo` user carries all three, because a single demo login is meant to reach everything; a real
+deployment would split them.
+
+**One thing `ai-admin` now grants that it did not**: reading the workflow and form definitions, and
+the engine's analytics, since those moved to this host. It still cannot start, cancel or retry
+anything — processes, steps and the task lists are on the demo console — so the grant is read
+access to configuration, not the ability to drive the engine. If that is the wrong grant for a
+deployment, the fix is a fourth role on the `onControlHost` matcher rather than a fourth host: the
+paths are already separate. A new public client `control-plane` is in the realm file, with `directAccessGrantsEnabled`
 off — unlike the demo client's — because trading a username and password for a token with no
 browser is not a convenience anyone needs on the client that reaches the credentials.
 

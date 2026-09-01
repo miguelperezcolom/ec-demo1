@@ -126,12 +126,17 @@ public class SecurityConfig {
                         // catch-all would permit it anyway, but silence is the wrong way to make a
                         // public endpoint public.
                         .matchers(onControlHost("/cp-webhooks/**")).permitAll()
-                        // The control console — an admin console with two halves, both behind the
-                        // ai-admin role. /_ia-cp/** is the IA catalogues; /_users/** is user and
-                        // access management, which moved here from the demo host; and /mateu/** is
-                        // the control shell's endpoint that assembles the page around them. Leaving
-                        // any of them open would leave the console usable.
-                        .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**")).hasRole("ai-admin")
+                        // The control console — an admin console whose halves are the IA
+                        // catalogues, user and access management, and the two engines'
+                        // administration UIs. /_workflow-admin and /_forms-admin are served by the
+                        // same orchestrator and forms pods that answer /_workflow and /_forms on
+                        // the demo host, so this is the only thing standing between a workflow
+                        // definition and a user who holds nothing but the demo role. It is also
+                        // why they are separate path segments rather than a suffix: the
+                        // /_workflow/** rule further up matches on any host, and a path it caught
+                        // would be decided as `authenticated` before this line was ever reached.
+                        .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**",
+                                "/_workflow-admin/**", "/_forms-admin/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and

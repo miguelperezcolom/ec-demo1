@@ -119,6 +119,27 @@ spring:
             - Host=${CONTROL_HOST:console.ec1.mateu.io}
             - Path=/cp-webhooks/**
 
+        # The engines' administration UIs, served by the very same orchestrator and forms pods
+        # that answer /_workflow and /_forms on the demo host. Each engine declares a second @UI
+        # on its own base URL, so the definitions and the form editor can be mounted here while
+        # processes and task lists stay where the work is done.
+        #
+        # Two routes rather than reusing the demo host's, because the host is what decides the
+        # rule: on this one SecurityConfig requires ai-admin, and it can do that without touching
+        # the demo console because the paths are different segments — /_workflow-admin is not
+        # matched by /_workflow/**.
+        - id: orchestrator-admin
+          uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Path=/_workflow-admin/**
+
+        - id: forms-admin
+          uri: ${FORMS_URL:http://forms:8106}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Path=/_forms-admin/**
+
         # Note what is NOT routed: /internal/**, the control plane's own endpoint that serves a
         # resolved agent configuration with its API key in the clear. It is reachable only
         # inside the cluster, and a route for it here would publish every credential this
