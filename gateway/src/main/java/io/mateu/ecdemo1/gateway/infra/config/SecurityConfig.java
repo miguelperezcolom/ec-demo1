@@ -15,6 +15,10 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * What this gateway is for, beyond routing.
@@ -79,15 +83,26 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     /**
-     * The control console's host, as the browser asks for it. It has to match what the gateway's
-     * routes use, which is why both read the same property.
+     * The control console's hosts, as a browser asks for them. They have to match what the
+     * gateway's routes use, which is why both read the same properties.
+     *
+     * <p>There are two of them because the control console is served by two shells — the Vaadin
+     * one and the Redwood one — and they are the same console: same backends, same catalogues,
+     * same credentials behind them. A host missing from this set does not fail closed; its
+     * /_ia-cp and /_users requests fall through to the catch-all rule at the bottom, which permits
+     * everything. So the set is the security boundary, and adding a console host without adding it
+     * here publishes that console.
      */
-    private final String controlHost;
+    private final Set<String> controlHosts;
     private final KeycloakRealmRoleConverter roleConverter;
 
     public SecurityConfig(@Value("${CONTROL_HOST:console.ec1.mateu.io}") String controlHost,
+                          @Value("${RW_CONTROL_HOST:rw-console.ec1.mateu.io}") String redwoodControlHost,
                           KeycloakRealmRoleConverter roleConverter) {
-        this.controlHost = controlHost;
+        this.controlHosts = Stream.of(controlHost, redwoodControlHost)
+                .filter(host -> host != null && !host.isBlank())
+                .map(host -> host.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
         this.roleConverter = roleConverter;
     }
 
@@ -166,7 +181,7 @@ public class SecurityConfig {
             return ServerWebExchangeMatcher.MatchResult.notMatch();
         }
         var withoutPort = host.contains(":") ? host.substring(0, host.indexOf(':')) : host;
-        return withoutPort.equalsIgnoreCase(controlHost)
+        return controlHosts.contains(withoutPort.toLowerCase(Locale.ROOT))
                 ? ServerWebExchangeMatcher.MatchResult.match()
                 : ServerWebExchangeMatcher.MatchResult.notMatch();
     }

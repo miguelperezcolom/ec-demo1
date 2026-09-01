@@ -40,10 +40,12 @@
       "rootUrl": "https://ec1.mateu.io",
       "baseUrl": "https://ec1.mateu.io",
       "redirectUris": [
-        "https://ec1.mateu.io/*"
+        "https://ec1.mateu.io/*",
+        "https://rw.ec1.mateu.io/*"
       ],
       "webOrigins": [
-        "https://ec1.mateu.io"
+        "https://ec1.mateu.io",
+        "https://rw.ec1.mateu.io"
       ],
       "attributes": {
         "post.logout.redirect.uris": "+",
@@ -61,10 +63,12 @@
       "rootUrl": "https://console.ec1.mateu.io",
       "baseUrl": "https://console.ec1.mateu.io",
       "redirectUris": [
-        "https://console.ec1.mateu.io/*"
+        "https://console.ec1.mateu.io/*",
+        "https://rw-console.ec1.mateu.io/*"
       ],
       "webOrigins": [
-        "https://console.ec1.mateu.io"
+        "https://console.ec1.mateu.io",
+        "https://rw-console.ec1.mateu.io"
       ],
       "attributes": {
         "post.logout.redirect.uris": "+",

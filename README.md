@@ -42,6 +42,11 @@ so a process is changed by a pull request rather than by an API call.
     its own volume,               a second @UI each
     unlike everything above
 
+  https://rw.ec1.mateu.io       the same demo console, rendered by Redwood
+  https://rw-console.ec1.mateu.io  the same control console, rendered by Redwood
+                                ── same gateway, same backends, same Keycloak clients: the only
+                                   difference is one line in each shell's pom
+
   https://auth.ec1.mateu.io     Keycloak (realm ec-demo1, clients demo + control-plane)
   https://grafana.ec1.mateu.io  Grafana ── Prometheus · Loki · Tempo
   https://kafka.ec1.mateu.io    Redpanda Console ── the event stream itself
@@ -52,6 +57,7 @@ so a process is changed by a pull request rather than by an API call.
 | | |
 |---|---|
 | `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus, carries the branding |
+| `shell-redwood/` | The same shell with `io.mateu:redwood` in place of `io.mateu:vaadin-lit`, and nothing else changed |
 | `gateway/` | Spring Cloud Gateway — routes the console and enforces the token |
 | `booking/` | Bookings: a CRUD, the MCP tools the agent calls, and the worker side of the booking saga |
 | `content/` | Content, labels and content types — a CRUD and nothing else |
@@ -59,6 +65,8 @@ so a process is changed by a pull request rather than by an API call.
 | `ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
 | `ia-control-plane/` | The four catalogues the agent is configured from: LLMs and their credentials, MCP servers, RAG sources, and the agents that compose them |
 | `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `ai-admin` role |
+| `control-shell-redwood/` | The same, rendered by Redwood, on `rw-console.ec1.mateu.io` |
+| `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
 | `grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
 | `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
@@ -561,6 +569,63 @@ fine on Boot 4 — it speaks JDBC, not HTTP.
 **The id fields are text, not pickers.** An agent's MCP and RAG lists are comma-separated ids, so a
 typo is not refused on save — it becomes a reference the resolver drops with a warning. The preview
 button is what surfaces that.
+
+## The same consoles, rendered twice
+
+Four consoles, two planes, two renderers:
+
+| | Vaadin | Redwood |
+|---|---|---|
+| **the product** | `ec1.mateu.io` | `rw.ec1.mateu.io` |
+| **the platform** | `console.ec1.mateu.io` | `rw-console.ec1.mateu.io` |
+
+`shell-redwood` and `control-shell-redwood` are copies of the two shells with **one line changed**
+in each pom — `io.mateu:redwood` where the original has `io.mateu:vaadin-lit`. Nothing else about
+them is renderer-aware.
+
+That works because a `RemoteMenu` carries **UIDL, not HTML**. The orchestrator, the forms engine
+and the demo services answer with a description of a screen, and whichever renderer the shell
+loaded draws it. So the Redwood consoles render the same backends, through the same gateway
+routes, behind the same Keycloak clients, with no change on any of them. That is the contract this
+deployment exists to show, and it is hard to believe until the two are open side by side against
+one cluster.
+
+**They run beside the Vaadin ones rather than replacing them**, because either alone is just an
+application. And they make Mateu's renderer conformance suite concrete: what Redwood does not
+cover paints a placeholder on a real screen here instead of in a fixture.
+
+**No Keycloak clients of their own.** `@KeycloakSecured` names the Keycloak URL, not the app's own
+host, so the `demo` and `control-plane` clients serve both consoles of their plane — each lists
+both hosts in its redirect URIs. And no DNS to add: the `*.ec1` wildcard already covers them, and
+each certificate is issued by HTTP-01 the first time its name resolves.
+
+**One thing to know before adding a fifth console.** The gateway's backend routes name both hosts
+of their plane (`Host=a,b`) and only the catch-all is per host — that is the whole of the routing
+difference. But `SecurityConfig` holds a **set** of control hosts, and a console host missing from
+that set does not fail closed: its `/_ia-cp` and `/_users` requests fall through to the catch-all
+rule, which permits everything. The set is the security boundary, not the ingress.
+
+## End-to-end coverage
+
+```sh
+cd e2e && npm install && npx playwright install chromium
+npm test
+```
+
+Every screen of every console, on both planes and through both renderers, against the **deployed**
+cluster rather than anything the suite starts itself — only a real deployment has all four
+consoles, the gateway that routes them and the Keycloak that gates them.
+
+The same expectations are asserted four times, and that repetition is the test: a screen that
+renders under Vaadin and not under Redwood is a renderer gap; one that renders on one plane and
+not the other is a routing or authorisation gap. Neither is visible from a single console.
+
+Worth knowing about what it asserts. **Status codes prove nothing here** — Mateu answers a route it
+cannot resolve with a fragment reading `Not found.` and an HTTP 200 — so a screen counts as
+rendered only if it put something on screen and no renderer placeholder on it. And the menu bar is
+read by walking shadow roots by hand rather than with a selector, because the two renderers nest
+their components differently and a selector tuned to one returns nothing on the other, which would
+make a renderer gap look like a passing test.
 
 ## Measuring it
 
