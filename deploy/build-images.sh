@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Builds and pushes the eight images this repository owns: the two shells, the gateway, the four
-# demo services and the IA control plane.
+# Builds and pushes the eleven images this repository owns: the four shells, the gateway, the four
+# demo services, the IA control plane and the pod that serves catalogued APIs as MCP servers.
+#
+# Four shells and not two: each console is served by a Vaadin one and a Redwood one, differing
+# only in which Mateu frontend artifact their pom depends on. They render the same backends
+# through different renderers, which is the point — see deploy/manifests/31-shell-redwood.yaml.
 #
 # Everything else runs from published images — the engine's orchestrator/forms/rules/worker from
 # Docker Hub, Keycloak from Quay, Postgres and Redpanda from their own registries.
@@ -16,7 +20,7 @@ cd "$(dirname "$0")/.."
 REGISTRY="${REGISTRY:-miguelperezcolom}"
 TAG="${1:-0.8.0}"
 
-APPS="shell gateway booking content users ia-agent ia-control-plane control-shell"
+APPS="shell shell-redwood gateway booking content users ia-agent ia-control-plane api-mcp control-shell control-shell-redwood"
 
 # grpc-interface first, and installed rather than packaged: it is not an application and gets no
 # image, but `users` compiles against the protobuf stubs generated from its .proto, so it has to

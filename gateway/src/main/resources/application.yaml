@@ -10,10 +10,18 @@ spring:
       routes:
         # The workflow-graph web component is served from an absolute path, so it needs a route
         # of its own or the definition viewer renders an empty box. Public — see SecurityConfig.
+        # The engine's own static assets — workflow-graph.js among them, which is what draws a
+        # definition's graph and a process's.
+        #
+        # All FOUR consoles, not just the demo ones. This route named only the demo host until the
+        # definitions screen moved to the control console, and then the graph silently stopped
+        # drawing there: the element was on the page, its script 404'd, and a custom element whose
+        # definition never arrives renders as nothing at all. Any screen that moves between planes
+        # has to bring the assets it loads with it, and this is the one that did not.
         - id: eventconductor-assets
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/eventconductor/**
 
         # Git webhooks. These are NOT under /_workflow and /_forms — those prefixes are the
@@ -27,31 +35,31 @@ spring:
         - id: workflow-webhooks
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/workflow/webhooks/**
 
         - id: forms-webhooks
           uri: ${FORMS_URL:http://forms:8106}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/forms/webhooks/**
 
         - id: orchestrator
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_workflow/**
 
         - id: forms
           uri: ${FORMS_URL:http://forms:8106}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_forms/**
 
         - id: worker
           uri: ${WORKER_URL:http://worker:8091}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_worker/**
 
         # The four demo services. Each one's Mateu UI is served under the prefix its @UI
@@ -60,13 +68,13 @@ spring:
         - id: booking
           uri: ${BOOKING_URL:http://booking:8108}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_booking/**
 
         - id: content
           uri: ${CONTENT_URL:http://content:8104}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_content/**
 
         # Users moved to the control console: on the CONTROL host now, not the demo host, because
@@ -75,7 +83,7 @@ spring:
         - id: users
           uri: ${USERS_URL:http://users:8102}
           predicates:
-            - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_users/**
 
         # The chat agent, at the path Mateu's @AI client posts to. Not a Mateu UI and so not a
@@ -83,15 +91,25 @@ spring:
         - id: ia-agent
           uri: ${IA_AGENT_URL:http://ia-agent:8095}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/ai/**
 
         # Catch-all for the demo console, and therefore last among its routes: the shell's
         # bootstrap page, its /mateu/** endpoint and its static assets.
+        # The catch-all is per host, and it is the ONLY thing that differs between the Vaadin
+        # console and the Redwood one: same gateway, same backends, a different shell serving the
+        # page. Everything above matches both hosts, so a RemoteMenu resolves identically on each
+        # and the renderer is decided by whichever shell the browser loaded.
         - id: shell
           uri: ${SHELL_URL:http://shell:8101}
           predicates:
             - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Path=/**
+
+        - id: shell-redwood
+          uri: ${SHELL_REDWOOD_URL:http://shell-redwood:8102}
+          predicates:
+            - Host=${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/**
 
         # ── The control console, on a host of its own ────────────────────────────────────
@@ -105,7 +123,7 @@ spring:
         - id: ia-control-plane
           uri: ${IA_CONTROL_PLANE_URL:http://ia-control-plane:8110}
           predicates:
-            - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_ia-cp/**
 
         # The GitOps webhook. NOT under /_ia-cp — that prefix is the Mateu UI namespace and carries
@@ -116,8 +134,29 @@ spring:
         - id: ia-control-plane-webhooks
           uri: ${IA_CONTROL_PLANE_URL:http://ia-control-plane:8110}
           predicates:
-            - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/cp-webhooks/**
+
+        # The engines' administration UIs, served by the very same orchestrator and forms pods
+        # that answer /_workflow and /_forms on the demo host. Each engine declares a second @UI
+        # on its own base URL, so the definitions and the form editor can be mounted here while
+        # processes and task lists stay where the work is done.
+        #
+        # Two routes rather than reusing the demo host's, because the host is what decides the
+        # rule: on this one SecurityConfig requires ai-admin, and it can do that without touching
+        # the demo console because the paths are different segments — /_workflow-admin is not
+        # matched by /_workflow/**.
+        - id: orchestrator-admin
+          uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_workflow-admin/**
+
+        - id: forms-admin
+          uri: ${FORMS_URL:http://forms:8106}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_forms-admin/**
 
         # Note what is NOT routed: /internal/**, the control plane's own endpoint that serves a
         # resolved agent configuration with its API key in the clear. It is reachable only
@@ -128,6 +167,12 @@ spring:
           uri: ${CONTROL_SHELL_URL:http://control-shell:8111}
           predicates:
             - Host=${CONTROL_HOST:console.ec1.mateu.io}
+            - Path=/**
+
+        - id: control-shell-redwood
+          uri: ${CONTROL_SHELL_REDWOOD_URL:http://control-shell-redwood:8112}
+          predicates:
+            - Host=${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/**
 
   security:

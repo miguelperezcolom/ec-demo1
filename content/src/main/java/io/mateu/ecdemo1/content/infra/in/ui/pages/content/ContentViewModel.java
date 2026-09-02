@@ -28,6 +28,10 @@ public class ContentViewModel implements Identifiable {
     @ReadOnly
     String id;
     @NotEmpty String name;
+    // Required, because CreateContentUseCase does Long.valueOf(command.contentType()) and the
+    // aggregate has no notion of a content without a type. Without this the form submits happily
+    // and dies one layer down, which is the same shape as the null-list crash below.
+    @NotEmpty
     @Lookup(search = ContentTypeIdOptionsSupplier.class, label = ContentTypeIdLabelSupplier.class)
     String contentType;
     @Lookup(search = LabelIdOptionsSupplier.class, label = LabelIdLabelSupplier.class)
@@ -40,15 +44,37 @@ public class ContentViewModel implements Identifiable {
     final UpdateContentUseCase updateContentUseCase;
 
     public String create(HttpRequest httpRequest) {
-        return createContentUseCase.handle(new CreateContentCommand(name, contentType, labels, values.stream()
-                .map(value -> new ContentValueDto(value.country(), value.language(), value.value()))
-                .toList()));
+        return createContentUseCase.handle(
+                new CreateContentCommand(name, contentType, labelsOrEmpty(), valuesOrEmpty()));
     }
 
     public void save(HttpRequest httpRequest) {
-        updateContentUseCase.handle(new UpdateContentCommand(id, name, contentType, labels, values.stream()
+        updateContentUseCase.handle(
+                new UpdateContentCommand(id, name, contentType, labelsOrEmpty(), valuesOrEmpty()));
+    }
+
+    /**
+     * An untouched collection field arrives null, not empty.
+     *
+     * <p>Mateu hydrates a view model from the state the browser round-trips, and a
+     * {@code @MasterDetail} grid with no rows — or a {@code @Lookup} with nothing picked — sends
+     * null. {@code ActualValueExtractor} returns that null unchanged and {@code ValueWriter} writes
+     * it, so the field is null rather than the empty list the initializer would have left.
+     *
+     * <p>Creating a content without adding a value therefore crashed on {@code values.stream()},
+     * and would have crashed on {@code labels.stream()} in {@code CreateContentUseCase} the moment
+     * that one was fixed. Both are normalised here, at the boundary where UI-shaped data becomes
+     * domain-shaped: nothing below this class should have to know that a collection can arrive
+     * absent, and "the user added no rows" is an empty list, not a missing one.
+     */
+    private List<String> labelsOrEmpty() {
+        return labels != null ? labels : List.of();
+    }
+
+    private List<ContentValueDto> valuesOrEmpty() {
+        return (values != null ? values : List.<ContentValueViewModel>of()).stream()
                 .map(value -> new ContentValueDto(value.country(), value.language(), value.value()))
-                .toList()));
+                .toList();
     }
 
     @Override

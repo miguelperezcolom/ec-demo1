@@ -6,6 +6,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import io.mateu.ecdemo1.iacp.application.out.gitops.CatalogueSource;
 import io.mateu.ecdemo1.iacp.application.out.gitops.DesiredCatalogue;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.AgentManifest;
+import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.ApiMcpManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.BudgetManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.LlmManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.McpManifest;
@@ -35,7 +36,7 @@ import java.util.List;
  * fetch each, rather than walking directories.
  *
  * <p><strong>Any failure throws, and that is the contract the reconciler depends on.</strong> A
- * non-2xx from GitHub, a file that will not parse, a {@code kind} that is not one of the four —
+ * non-2xx from GitHub, a file that will not parse, a {@code kind} that is not one of the seven —
  * each aborts the whole fetch. The reason is deletion: the reconciler removes git-managed entries
  * absent from what this returns, so a fetch that quietly dropped a broken file would read as "that
  * entry was deleted from the repo" and remove it. Better to change nothing and log loudly until the
@@ -75,6 +76,7 @@ public class GitHubCatalogueSource implements CatalogueSource {
     public DesiredCatalogue fetch() {
         var llms = new ArrayList<LlmManifest>();
         var mcps = new ArrayList<McpManifest>();
+        var apiMcps = new ArrayList<ApiMcpManifest>();
         var rags = new ArrayList<RagManifest>();
         var agents = new ArrayList<AgentManifest>();
         var budgets = new ArrayList<BudgetManifest>();
@@ -90,18 +92,22 @@ public class GitHubCatalogueSource implements CatalogueSource {
             switch (kind) {
                 case "llm" -> llms.add(convert(node, LlmManifest.class, file));
                 case "mcp" -> mcps.add(convert(node, McpManifest.class, file));
+                // apimcp and not api-mcp: a kind is a word in a file somebody types,
+                // and one spelling is one fewer thing to get wrong.
+                case "apimcp" -> apiMcps.add(convert(node, ApiMcpManifest.class, file));
                 case "rag" -> rags.add(convert(node, RagManifest.class, file));
                 case "agent" -> agents.add(convert(node, AgentManifest.class, file));
                 case "budget" -> budgets.add(convert(node, BudgetManifest.class, file));
                 case "route" -> routes.add(convert(node, RouteManifest.class, file));
                 default -> throw new IllegalStateException("File '" + file + "' has kind '" + kind
-                        + "', which is not one of llm, mcp, rag, agent, budget, route.");
+                        + "', which is not one of llm, mcp, apimcp, rag, agent, budget, "
+                        + "route.");
             }
         }
-        log.info("GitOps fetched {} llm, {} mcp, {} rag, {} agent, {} budget, {} route from {}/{}",
-                llms.size(), mcps.size(), rags.size(), agents.size(), budgets.size(), routes.size(),
-                repo, path);
-        return new DesiredCatalogue(llms, mcps, rags, agents, budgets, routes);
+        log.info("GitOps fetched {} llm, {} mcp, {} apimcp, {} rag, {} agent, {} budget, {} route "
+                        + "from {}/{}", llms.size(), mcps.size(), apiMcps.size(), rags.size(),
+                agents.size(), budgets.size(), routes.size(), repo, path);
+        return new DesiredCatalogue(llms, mcps, apiMcps, rags, agents, budgets, routes);
     }
 
     /** Every {@code .yaml}/{@code .yml} blob under the configured path, via the git-trees API. */

@@ -1,0 +1,12 @@
+{
+  "name": "ec-demo1-e2e",
+  "private": true,
+  "description": "End-to-end coverage of the four consoles this deployment serves",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.0"
+  }
+}

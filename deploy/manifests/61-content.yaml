@@ -12,6 +12,20 @@ metadata:
   labels: { app: content }
 spec:
   replicas: 1
+  # Recreate, not the default RollingUpdate.
+  #
+  # A rolling update of a one-replica Deployment surges to two pods, and the platform node has no
+  # room for a second copy of this one: Karpenter answers with "no instance type met all
+  # requirements" because a second cx43 would ask the fleet for more vCPU than its limit allows, so
+  # the new pod sits Pending forever while the old one keeps serving. That is the failure the
+  # README warns about, and it reads like a scheduling bug rather than the quota it is.
+  #
+  # Recreate stops the old pod first, so only one is ever scheduled. The cost is a few seconds of
+  # 503 on every deploy of this service, which is the right trade for a demo CRUD and the wrong one
+  # for anything that has to stay up — raise the fleet limit through the Fleet API instead if this
+  # ever needs to be zero-downtime.
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: content }
   template:
@@ -47,7 +61,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: content
-          image: miguelperezcolom/ec-demo1-content:0.12.0
+          image: miguelperezcolom/ec-demo1-content:0.14.1
           env:
             - name: SERVER_PORT
               value: "8104"

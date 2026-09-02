@@ -5,17 +5,29 @@ import io.mateu.ecdemo1.iacp.application.out.gitops.CredentialResolver;
 import io.mateu.ecdemo1.iacp.application.out.gitops.DesiredCatalogue;
 import io.mateu.ecdemo1.iacp.application.out.gitops.GitopsManagedRegistry;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.AgentManifest;
+import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.ApiMcpManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.BudgetManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.LlmManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.McpManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.RagManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.RouteManifest;
 import io.mateu.ecdemo1.iacp.application.out.query.AgentQueryService;
+import io.mateu.ecdemo1.iacp.application.out.query.ApiMcpQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.BudgetQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.LlmQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.McpQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.RagQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.RouteQueryService;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.create.CreateApiMcpCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.create.CreateApiMcpUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.delete.DeleteApiMcpCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.delete.DeleteApiMcpUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.exposetools.ExposeApiToolsCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.exposetools.ExposeApiToolsUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.replacecredential.ReplaceApiMcpCredentialCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.replacecredential.ReplaceApiMcpCredentialUseCase;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.update.UpdateApiMcpCommand;
+import io.mateu.ecdemo1.iacp.application.usecases.apimcp.update.UpdateApiMcpUseCase;
 import io.mateu.ecdemo1.iacp.application.usecases.budget.create.CreateBudgetCommand;
 import io.mateu.ecdemo1.iacp.application.usecases.budget.create.CreateBudgetUseCase;
 import io.mateu.ecdemo1.iacp.application.usecases.budget.delete.DeleteBudgetCommand;
@@ -97,6 +109,7 @@ public class ReconcileCatalogueUseCase {
 
     private static final String LLM = "llm";
     private static final String MCP = "mcp";
+    private static final String API_MCP = "apimcp";
     private static final String RAG = "rag";
     private static final String AGENT = "agent";
     private static final String BUDGET = "budget";
@@ -108,6 +121,7 @@ public class ReconcileCatalogueUseCase {
 
     private final LlmQueryService llmQuery;
     private final McpQueryService mcpQuery;
+    private final ApiMcpQueryService apiMcpQuery;
     private final RagQueryService ragQuery;
     private final AgentQueryService agentQuery;
     private final BudgetQueryService budgetQuery;
@@ -120,6 +134,11 @@ public class ReconcileCatalogueUseCase {
     private final CreateMcpUseCase createMcp;
     private final UpdateMcpUseCase updateMcp;
     private final DeleteMcpUseCase deleteMcp;
+    private final CreateApiMcpUseCase createApiMcp;
+    private final UpdateApiMcpUseCase updateApiMcp;
+    private final DeleteApiMcpUseCase deleteApiMcp;
+    private final ReplaceApiMcpCredentialUseCase replaceApiMcpCredential;
+    private final ExposeApiToolsUseCase exposeApiTools;
     private final CreateRagUseCase createRag;
     private final UpdateRagUseCase updateRag;
     private final DeleteRagUseCase deleteRag;
@@ -155,6 +174,7 @@ public class ReconcileCatalogueUseCase {
 
             desired.llms().forEach(m -> upsertLlm(m, report));
             desired.mcps().forEach(m -> upsertMcp(m, report));
+            desired.apiMcps().forEach(m -> upsertApiMcp(m, report));
             desired.rags().forEach(m -> upsertRag(m, report));
             desired.agents().forEach(m -> upsertAgent(m, report));
             desired.budgets().forEach(m -> upsertBudget(m, report));
@@ -172,6 +192,9 @@ public class ReconcileCatalogueUseCase {
             deleteRemoved(RAG, ids(desired.rags(), RagManifest::id),
                     id -> ragQuery.getById(id).isPresent(),
                     id -> deleteRag.handle(new DeleteRagCommand(List.of(id))), report);
+            deleteRemoved(API_MCP, ids(desired.apiMcps(), ApiMcpManifest::id),
+                    id -> apiMcpQuery.getById(id).isPresent(),
+                    id -> deleteApiMcp.handle(new DeleteApiMcpCommand(List.of(id))), report);
             deleteRemoved(MCP, ids(desired.mcps(), McpManifest::id),
                     id -> mcpQuery.getById(id).isPresent(),
                     id -> deleteMcp.handle(new DeleteMcpCommand(List.of(id))), report);
@@ -238,6 +261,64 @@ public class ReconcileCatalogueUseCase {
                 }
             }
         });
+    }
+
+    /**
+     * An API-backed MCP entry, its credential and its offer.
+     *
+     * <p>Three things and not one, because the aggregate keeps them apart for reasons that survive
+     * into the repo: the credential can only be replaced, never read back, and the offer is
+     * replaced whole rather than merged — an entry that is half of an old import and half of a new
+     * one is the state {@code exposeExactly} exists to prevent.
+     */
+    private void upsertApiMcp(ApiMcpManifest m, Report report) {
+        guardAndRun(API_MCP, m.id(), () -> apiMcpQuery.getById(m.id()).isPresent(), report, exists -> {
+            var name = orId(m.name(), m.id());
+            if (exists) {
+                updateApiMcp.handle(new UpdateApiMcpCommand(m.id(), name, m.apiKind(), m.baseUrl(),
+                        m.specUrl(), m.description(), enabled(m.enabled())));
+            } else {
+                createApiMcp.handle(new CreateApiMcpCommand(m.id(), name, m.apiKind(), m.baseUrl(),
+                        m.specUrl(), m.description()));
+                if (!enabled(m.enabled())) {
+                    updateApiMcp.handle(new UpdateApiMcpCommand(m.id(), name, m.apiKind(),
+                            m.baseUrl(), m.specUrl(), m.description(), false));
+                }
+            }
+            resolveApiCredential(m);
+            exposeTools(m);
+        });
+    }
+
+    private void resolveApiCredential(ApiMcpManifest m) {
+        if (m.credentialEnv() == null || m.credentialEnv().isBlank()) {
+            return;
+        }
+        var secret = credentials.resolve(m.credentialEnv());
+        if (secret == null || secret.isBlank()) {
+            log.warn("API MCP server '{}' names credentialEnv '{}', which resolves to nothing — "
+                    + "leaving its stored credential as it is.", m.id(), m.credentialEnv());
+            return;
+        }
+        replaceApiMcpCredential.handle(new ReplaceApiMcpCredentialCommand(m.id(), secret));
+    }
+
+    /**
+     * A file that does not mention tools leaves the offer alone; one that lists none empties it.
+     *
+     * <p>The asymmetry is deliberate and matches {@code credentialEnv} directly above. Absent is
+     * "I am not saying anything about this", and wiping an offer somebody composed because a base
+     * url was edited in a hurry is not what that file asked for. An explicit empty list IS the repo
+     * saying so, and leaves the entry catalogued and visibly unusable.
+     */
+    private void exposeTools(ApiMcpManifest m) {
+        if (m.tools() == null) {
+            return;
+        }
+        exposeApiTools.handle(new ExposeApiToolsCommand(m.id(), m.tools().stream()
+                .map(t -> new ExposeApiToolsCommand.Tool(t.operation(), t.toolName(),
+                        t.description(), t.requiredRoles()))
+                .toList()));
     }
 
     private void upsertRag(RagManifest m, Report report) {

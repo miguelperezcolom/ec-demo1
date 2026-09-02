@@ -1,6 +1,6 @@
 package io.mateu.ecdemo1.iacp.domain.aggregates.mcp;
 
-import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.Endpoint;
+import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Endpoint;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpTransport;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Enabled;

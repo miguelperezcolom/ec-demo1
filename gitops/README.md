@@ -1,8 +1,9 @@
 # IA control plane — GitOps
 
-The four IA catalogues — agents, models, MCP servers, RAG sources — as YAML in a git repo, with the
-control plane reconciling itself to match on every push. This directory is both the **public schema**
-those files validate against and a **worked example** of the layout a config repo uses.
+The IA catalogues — agents, models, MCP servers, APIs offered as MCP servers, RAG sources, budgets
+and routes — as YAML in a git repo, with the control plane reconciling itself to match on every
+push. This directory is both the **public schema** those files validate against and a **worked
+example** of the layout a config repo uses.
 
 ## How it fits together
 
@@ -11,16 +12,30 @@ config repo (private)                 this deployment
   ia/                                    ia-control-plane
     llms/anthropic.yaml    ── push ──▶     GitHubCatalogueSource  (reads ia/ over the API, with a token)
     mcp/orchestrator.yaml                  ReconcileCatalogueUseCase
-    rag/handbook.yaml       ◀─ webhook ──  /cp-webhooks/github    (HMAC-verified, public on the control host)
+    apimcp/booking-api.yaml ◀─ webhook ──  /cp-webhooks/github    (HMAC-verified, public on the control host)
+    rag/handbook.yaml
     agents/console-agent.yaml
     budgets/daily-per-user.yaml
     routes/support-to-console-agent.yaml
 ```
 
-One entry per file. The `kind` field (`llm` | `mcp` | `rag` | `agent` | `budget` | `route`) says
-which catalogue it is; the schema keys everything else off that. Budgets cap token spend on a
-subject per window; routes pick which agent answers by the caller's context. Both reconcile under
-the same provenance rule as the rest.
+One entry per file. The `kind` field (`llm` | `mcp` | `apimcp` | `rag` | `agent` | `budget` |
+`route`) says which catalogue it is; the schema keys everything else off that. Budgets cap token
+spend on a subject per window; routes pick which agent answers by the caller's context. Both
+reconcile under the same provenance rule as the rest.
+
+**`mcp` and `apimcp` are not two spellings of one thing.** An `mcp` entry is a server somebody else
+runs, and it lists no tools on purpose — the server declares its own, they change without this
+catalogue being told, and a copy here would go stale in silence. An `apimcp` entry is the mirror
+image: nothing else knows what an API offers as tools, because the offer is composed — which
+operations, under which names, described how. There the tool list *is* the entry, which is why it
+is the one kind whose file carries a nested array, and why its own REST/SOAP flavour is spelled
+`apiKind`: `kind` is already taken by the discriminator above.
+
+Two rules keep that array safe to declare. **Omitting `tools` leaves the stored offer alone** — the
+same convention `credentialEnv` follows, so editing a base url in a hurry cannot wipe descriptions
+somebody wrote. **An empty list empties it**, which is the repo saying so on purpose, and leaves the
+entry catalogued and visibly unusable.
 
 ## The rules that matter
 

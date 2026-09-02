@@ -2,7 +2,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 
 import io.mateu.ecdemo1.iacp.application.out.repository.McpRepository;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.Mcp;
-import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.Endpoint;
+import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Endpoint;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpTransport;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Enabled;

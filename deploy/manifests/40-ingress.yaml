@@ -95,3 +95,74 @@ spec:
           - path: /
             pathType: Prefix
             backend: { service: { name: keycloak, port: { number: 8080 } } }
+---
+# The two Redwood consoles. Same gateway, same backends, same Keycloak clients — the only thing
+# that differs is which shell serves the page, and therefore which renderer draws every screen.
+# They get hosts of their own rather than a path, because the shell is chosen by the host and a
+# RemoteMenu names paths relative to whatever host the browser loaded.
+#
+# No DNS record to add: `*.ec1` already covers them, and the certificate is issued by HTTP-01 the
+# first time each name resolves.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rw-console
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    # Same as the demo console's: Mateu drives parts of its UI over SSE, and nginx's default 60s
+    # read timeout with buffering on makes that look frozen rather than broken.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    # Its own certificate, issued by HTTP-01 like the other two. Nothing here uses a wildcard
+    # certificate — the wildcard is in DNS (`*.ec1`), which is why this host resolves without a
+    # new record but still needs a new certificate.
+    - hosts: [rw.ec1.mateu.io]
+      secretName: rw-console-tls
+  rules:
+    - host: rw.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            # The gateway again, not the control shell directly. It is what requires the ai-admin
+            # role on this host; pointing the ingress at the shell would route around the only
+            # place that check exists.
+            backend: { service: { name: gateway, port: { number: 8190 } } }
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rw-control-console
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    # Same as the demo console's: Mateu drives parts of its UI over SSE, and nginx's default 60s
+    # read timeout with buffering on makes that look frozen rather than broken.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    # Its own certificate, issued by HTTP-01 like the other two. Nothing here uses a wildcard
+    # certificate — the wildcard is in DNS (`*.ec1`), which is why this host resolves without a
+    # new record but still needs a new certificate.
+    - hosts: [rw-console.ec1.mateu.io]
+      secretName: rw-control-console-tls
+  rules:
+    - host: rw-console.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            # The gateway again, not the control shell directly. It is what requires the ai-admin
+            # role on this host; pointing the ingress at the shell would route around the only
+            # place that check exists.
+            backend: { service: { name: gateway, port: { number: 8190 } } }

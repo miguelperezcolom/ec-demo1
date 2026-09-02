@@ -1,0 +1,91 @@
+# The demo console rendered by Redwood, beside the Vaadin one rather than instead of it.
+#
+# Same gateway, same backends, same Keycloak client: the ONLY difference is io.mateu:redwood in
+# place of io.mateu:vaadin-lit in its pom, and therefore which renderer draws every screen. A
+# RemoteMenu carries UIDL rather than HTML, so the orchestrator, the forms engine and the demo
+# services render here without knowing a second console exists.
+#
+# Two of them side by side against one cluster is the demonstration; either alone is just an
+# application. It also makes the renderer conformance suite concrete — what Redwood does not
+# cover shows up on real screens instead of in a fixture.
+#
+# The Keycloak URL is compiled into this image, so changing the hostname means rebuilding it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell-redwood
+  namespace: ec-demo1
+  labels: { app: shell-redwood }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: shell-redwood }
+  template:
+    metadata:
+      labels:
+        app: shell-redwood
+        app.kubernetes.io/component: shell
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8102"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: shell-redwood
+          image: miguelperezcolom/ec-demo1-shell-redwood:0.14.1
+          env:
+            - name: SERVER_PORT
+              value: "8102"
+            # The issuer is the public URL, because that is what the `iss` claim says and Spring
+            # checks it. The keys come from the Service, so startup does not wait on the ingress.
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8102 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8102 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8102 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shell-redwood
+  namespace: ec-demo1
+  labels: { app: shell-redwood }
+spec:
+  selector: { app: shell-redwood }
+  ports:
+    - { name: http, port: 8102, targetPort: 8102 }

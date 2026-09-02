@@ -1,0 +1,83 @@
+# The control console rendered by Redwood. See 31-shell-redwood.yaml for why the pair exists.
+#
+# It sits behind the same ai-admin gate as the Vaadin control console: SecurityConfig holds a SET
+# of control hosts, and this one is in it. A console host missing from that set does not fail
+# closed — its /_ia-cp and /_users requests fall through to the catch-all, which permits
+# everything — so the set is the security boundary, not the ingress.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-shell-redwood
+  namespace: ec-demo1
+  labels: { app: control-shell-redwood }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: control-shell-redwood }
+  template:
+    metadata:
+      labels:
+        app: control-shell-redwood
+        app.kubernetes.io/component: control-shell
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8112"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: control-shell-redwood
+          image: miguelperezcolom/ec-demo1-control-shell-redwood:0.14.1
+          env:
+            - name: SERVER_PORT
+              value: "8112"
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8112 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8112 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8112 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-shell-redwood
+  namespace: ec-demo1
+  labels: { app: control-shell-redwood }
+spec:
+  selector: { app: control-shell-redwood }
+  ports:
+    - { name: http, port: 8112, targetPort: 8112 }

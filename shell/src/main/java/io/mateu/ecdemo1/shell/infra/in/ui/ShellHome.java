@@ -76,17 +76,14 @@ public class ShellHome implements WidgetSupplier {
     // renamed in its own pod and not here goes back to flickering, with the shell's version
     // showing first.
 
-    /** Workflow definitions, running processes, step executions, analytics. */
+    /**
+     * Running the platform: Workflow, Forms and Worker, behind one entry.
+     *
+     * <p>They used to sit on the bar beside Booking and Contenidos, which made five equals where
+     * there are really two kinds of thing — see AdminMenu.
+     */
     @Menu
-    RemoteMenu workflow = new RemoteMenu("/_workflow").withLabel("Workflow");
-
-    /** Form definitions, the drag-and-drop editor, and the human tasks waiting to be done. */
-    @Menu
-    RemoteMenu forms = new RemoteMenu("/_forms").withLabel("Forms");
-
-    /** What the test worker was asked to do, and the overrides that answer it by hand. */
-    @Menu
-    RemoteMenu worker = new RemoteMenu("/_worker").withLabel("Worker");
+    AdminMenu admin;
 
     /** Bookings — the CRUD, and the aggregate the booking saga confirms or cancels. */
     @Menu

@@ -1,9 +1,13 @@
-package io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo;
+package io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo;
 
 import java.net.URI;
 
 /**
- * Where a server lives.
+ * An absolute http(s) URL, validated once.
+ *
+ * <p>Shared rather than owned by one aggregate: an MCP server's endpoint, an API's base url and
+ * the location of an OpenAPI document are the same concept with the same invariant, and three
+ * copies of this validation would be three chances to let one of them through.
  *
  * <p>Validated as an absolute http(s) URI at construction rather than when something tries to
  * connect, because the alternative is a catalogue entry that looks fine in a listing and fails

@@ -15,29 +15,37 @@ so a process is changed by a pull request rather than by an API call.
                         ingress-nginx (TLS, Let's Encrypt)
                                  │
                             gateway  ── requires a Keycloak token on every backend path
-      ┌──────────┬──────────┬────┴─────┬──────────┬─────────┬────────┬──────┐
-      │          │          │          │          │         │        │      │
- /_workflow  /_forms   /_worker   /_booking  /_content  /_users    /ai     /**
-      │          │          │          │          │         │        │      │
- orchestrator  forms     worker    booking    content    users   ia-agent  shell
-      │          │          │          │          │         │        │      │
-      │          │          │          │          │         │        │   the only
-      │          │          │          │          │         │        │   page a user
-      │          │          │          │          │         │        │   loads
-      └── PostgreSQL ───────┴──────────┴──────────┴─────────┘        │
-      └── Redpanda (Kafka) ─┴──────────┘                             │
-                            └───────── MCP ───────────────────────────┘
+      ┌──────────┬──────────┬────┴─────┬──────────┬────────┬──────┐
+      │          │          │          │          │        │      │
+ /_workflow  /_forms   /_worker   /_booking  /_content    /ai     /**
+      │          │          │          │          │        │      │
+ orchestrator  forms     worker    booking    content  ia-agent  shell
+      │          │          │          │          │        │      │
+      │          │          │          │          │        │   the only
+      │          │          │          │          │        │   page a user
+      │          │          │          │          │        │   loads
+      └── PostgreSQL ───────┴──────────┴──────────┘        │
+      └── Redpanda (Kafka) ─┴──────────┘                   │
+                            └───────── MCP ────────────────┘
                        (ia-agent calls the tools the engine and booking expose)
 
   https://console.ec1.mateu.io  the control console ── needs the `ai-admin` realm role
                                     │
                               (same gateway)
-                                    │
-                              /_ia-cp    /**
-                                 │        │
-                          ia-control-plane · control-shell
-                                 │
-                            cp-postgres ── its own volume, unlike everything above
+         ┌─────────────┬───────────┴─────┬───────────────────┬─────────────┐
+         │             │                 │                   │             │
+      /_ia-cp       /_users      /_workflow-admin      /_forms-admin      /**
+         │             │                 │                   │             │
+ ia-control-plane    users         orchestrator            forms     control-shell
+         │                        the same two pods that answer
+    cp-postgres                   /_workflow and /_forms above, through
+    its own volume,               a second @UI each
+    unlike everything above
+
+  https://rw.ec1.mateu.io       the same demo console, rendered by Redwood
+  https://rw-console.ec1.mateu.io  the same control console, rendered by Redwood
+                                ── same gateway, same backends, same Keycloak clients: the only
+                                   difference is one line in each shell's pom
 
   https://auth.ec1.mateu.io     Keycloak (realm ec-demo1, clients demo + control-plane)
   https://grafana.ec1.mateu.io  Grafana ── Prometheus · Loki · Tempo
@@ -49,13 +57,17 @@ so a process is changed by a pull request rather than by an API call.
 | | |
 |---|---|
 | `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus, carries the branding |
+| `shell-redwood/` | The same shell with `io.mateu:redwood` in place of `io.mateu:vaadin-lit`, and nothing else changed |
 | `gateway/` | Spring Cloud Gateway — routes the console and enforces the token |
 | `booking/` | Bookings: a CRUD, the MCP tools the agent calls, and the worker side of the booking saga |
 | `content/` | Content, labels and content types — a CRUD and nothing else |
 | `users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
 | `ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
-| `ia-control-plane/` | The four catalogues the agent is configured from: LLMs and their credentials, MCP servers, RAG sources, and the agents that compose them |
+| `ia-control-plane/` | The catalogues the agent is configured from: LLMs and their credentials, MCP servers, APIs offered as MCP servers, RAG sources, and the agents that compose them |
+| `api-mcp/` | Serves the catalogued APIs as MCP servers, one endpoint per entry. Owns no data and no screens |
 | `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `ai-admin` role |
+| `control-shell-redwood/` | The same, rendered by Redwood, on `rw-console.ec1.mateu.io` |
+| `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
 | `grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
 | `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
@@ -68,7 +80,7 @@ four things about this cluster that otherwise cost an afternoon.
 ## Deploy
 
 ```sh
-./deploy/build-images.sh      # the eight images this repo owns → Docker Hub (only when their code changed)
+./deploy/build-images.sh      # the eleven images this repo owns → Docker Hub (only when their code changed)
 ./deploy/deploy.sh            # everything else, idempotent
 ```
 
@@ -85,8 +97,11 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 
 1. **Open the console** at `https://ec1.mateu.io` and log in as `demo` / `demo`. The menu bar is
    assembled from three separate applications; none of their screens is written in the shell.
-2. **Workflow → Definitions.** The three definitions are already there — the orchestrator cloned
-   this repository at startup. Open *Order fulfilment* to see its graph.
+2. **Workflow → Definitions**, on the *control* console at `https://console.ec1.mateu.io`. The
+   three definitions are already there — the orchestrator cloned this repository at startup. Open
+   *Order fulfilment* to see its graph. Definitions live on that console rather than this one
+   because they are configuration; see [The control console](#the-control-console). Same
+   orchestrator pod, reached through a second `@UI` of its own.
 3. **Start a process** and give it a `TEST_CONFIG` variable. Nothing here implements a single
    business step: one test worker answers every task, and this variable is what tells it how.
 
@@ -128,8 +143,8 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 9. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
    (Prometheus). Traces are wired but not yet arriving — see below.
-10. **Then look at the menus that are not the engine.** *Booking*, *Content* and *Users* are three
-    more applications, each serving its own screens from its own pod — the shell states a path and
+10. **Then look at the menus that are not the engine.** *Booking* and *Contenidos* are two more
+    applications, each serving its own screens from its own pod — the shell states a path and
     nothing else about them.
 11. **Ask the chat panel for something.** "Lista las reservas", "crea una reserva para Ana". It has
     no database and no screens: it answers by calling the MCP tools the orchestrator, the forms
@@ -149,6 +164,7 @@ what they are here, not what they were there.
 | `content` | `/_content` | Content, labels and content types. A CRUD over its own database and nothing else |
 | `users` | `/_users` | Users, groups, roles and permissions, plus `GetAuthInfo` over gRPC on 9191 |
 | `ia-agent` | `/ai` | The chat panel's other half. It implements nothing: every answer is an MCP tool call or a refusal |
+| `api-mcp` | — | Not routed by the gateway, on purpose: it calls other people's APIs with stored credentials, and an endpoint here is a way to make it do that. Reachable only from inside the namespace, which is where `ia-agent` is |
 
 **They keep their own UIs.** Nothing about their screens is written in the shell — each declares a
 `@UI` path, `ShellHome` names the same path in a `RemoteMenu`, and the gateway routes it. Adding
@@ -289,18 +305,64 @@ The form it needs, `verify-payment`, is already there.
 ## The control console
 
 A second console, on a host of its own: **`https://console.ec1.mateu.io`**, behind the `ai-admin`
-realm role. Behind it is `ia-control-plane`, which holds the four catalogues the chat agent is
-configured from.
+realm role. Three applications answer on it:
+
+| section | pod | what it is |
+|---|---|---|
+| **IA** | `ia-control-plane` | The four catalogues the chat agent is configured from — below |
+| **Usuarios** | `users` | Users, groups, roles and permissions. Moved here from the demo console: administering access is not part of using the product |
+| **Workflow** · **Forms** | `orchestrator`, `forms` | Workflow definitions and analytics, and the form definitions with their editor. The same two pods that serve the demo console, each through a second `@UI` |
+
+The last row is the one worth reading twice. `orchestrator` and `forms` are not deployed a second
+time; each declares two `@UI`s — `/_workflow` and `/_workflow-admin`, `/_forms` and `/_forms-admin`
+— and the gateway routes the plain pair on the demo host and the `-admin` pair here. Two front
+doors into one pod, and the host is what decides which role is required at each.
+
+That is how the split can exist at all: a `RemoteMenu` mounts the whole menu a pod declares and
+nothing less, so a shell cannot show half of one. The engine had to offer two menus for a
+deployment to be able to put them in two places.
+
+**The routes underneath did not change.** `/workflow/definitions` is still
+`/workflow/definitions` — Mateu builds a menu entry's route from the field name, and the
+administration menus keep the names they were split from. A deep link, or a `[NAVIGATE:]` block the
+chat agent holds, kept working across the move without being told.
+
+**What stayed on the demo console** is the work itself: processes and step executions, form
+executions and the task lists. The line is the same one that moved Usuarios — configuration and
+measurement here, doing the job there.
+
+### The catalogues
+
+`ia-control-plane` holds the four the chat agent is configured from, and one more that is
+catalogued here before anything serves it.
 
 | catalogue | what an entry is |
 |---|---|
 | **LLMs** | A model this deployment may call, and the API key that pays for it |
 | **MCP servers** | A server an agent may be given the tools of. Not the tools — those the server declares at connection time, and a copy here would go stale in silence |
+| **APIs as MCP servers** | An existing API, with a chosen set of its operations named and described as tools. The mirror image of the row above: here the tool list *is* the entry, because nothing else knows it — the offer is composed by an operator rather than declared by a server |
 | **RAG sources** | A vector store, a collection inside it, and the model that embedded it. Searchable — see below |
 | **Agents** | A prompt, one LLM, and the servers and sources it may reach. The only thing a running service is ever handed |
 
-An agent refers to the other three by id and holds nothing of them, so a server's URL changes in
-one place and every agent composed from it follows.
+An agent refers to its LLM, its servers and its sources by id and holds nothing of them, so a
+server's URL changes in one place and every agent composed from it follows.
+
+**Where an API-backed entry becomes a real server.** The catalogue holds the OFFER — which
+operations, under which names, described how — and `api-mcp` holds the TRANSLATION: it reads the
+OpenAPI document with a real parser, builds each tool's input schema from it, and makes the call.
+The split is why the control plane carries no OpenAPI library and is not on the path every tool
+call travels.
+
+An operator then catalogues `http://api-mcp:8113/<entry id>/sse` as an ordinary **MCP server** and
+composes an agent from it. Nothing on the agent's side learns that this entry is different from
+`booking` — which is the point of serving it as MCP rather than teaching the agent a second kind of
+tool.
+
+One thing is deliberately **not** served yet: a tool that declares required roles. The catalogue
+says those are checked where the call is made, and that is `api-mcp` — but the MCP transport hands
+a tool handler no HTTP request, so there is nothing there to read a caller's roles from. Rather
+than offer a narrowed tool with the narrowing silently dropped, `api-mcp` refuses to expose it and
+says so in its log. A tool with an empty role list is served normally.
 
 ### Why a second host and not another menu
 
@@ -313,10 +375,16 @@ is written.
 The realm defines three roles: `user` and `admin` for the demo console, and `ai-admin` for this
 one. It is a role of its own and not the demo's `admin` on purpose — this host reaches the LLM API
 keys and the demo's `admin` never does, so the two are separate grants and neither implies the
-other. That is what lets an AI operator hold `ai-admin` without being able to drive workflows, and
-a platform admin hold `admin` without being able to read a credential. The `demo` user carries all
-three, because a single demo login is meant to reach everything; a real deployment would split
-them. A new public client `control-plane` is in the realm file, with `directAccessGrantsEnabled`
+other. That is what lets a platform admin hold `admin` without being able to read a credential. The
+`demo` user carries all three, because a single demo login is meant to reach everything; a real
+deployment would split them.
+
+**One thing `ai-admin` now grants that it did not**: reading the workflow and form definitions, and
+the engine's analytics, since those moved to this host. It still cannot start, cancel or retry
+anything — processes, steps and the task lists are on the demo console — so the grant is read
+access to configuration, not the ability to drive the engine. If that is the wrong grant for a
+deployment, the fix is a fourth role on the `onControlHost` matcher rather than a fourth host: the
+paths are already separate. A new public client `control-plane` is in the realm file, with `directAccessGrantsEnabled`
 off — unlike the demo client's — because trading a username and password for a token with no
 browser is not a convenience anyone needs on the client that reaches the credentials.
 
@@ -522,6 +590,63 @@ fine on Boot 4 — it speaks JDBC, not HTTP.
 **The id fields are text, not pickers.** An agent's MCP and RAG lists are comma-separated ids, so a
 typo is not refused on save — it becomes a reference the resolver drops with a warning. The preview
 button is what surfaces that.
+
+## The same consoles, rendered twice
+
+Four consoles, two planes, two renderers:
+
+| | Vaadin | Redwood |
+|---|---|---|
+| **the product** | `ec1.mateu.io` | `rw.ec1.mateu.io` |
+| **the platform** | `console.ec1.mateu.io` | `rw-console.ec1.mateu.io` |
+
+`shell-redwood` and `control-shell-redwood` are copies of the two shells with **one line changed**
+in each pom — `io.mateu:redwood` where the original has `io.mateu:vaadin-lit`. Nothing else about
+them is renderer-aware.
+
+That works because a `RemoteMenu` carries **UIDL, not HTML**. The orchestrator, the forms engine
+and the demo services answer with a description of a screen, and whichever renderer the shell
+loaded draws it. So the Redwood consoles render the same backends, through the same gateway
+routes, behind the same Keycloak clients, with no change on any of them. That is the contract this
+deployment exists to show, and it is hard to believe until the two are open side by side against
+one cluster.
+
+**They run beside the Vaadin ones rather than replacing them**, because either alone is just an
+application. And they make Mateu's renderer conformance suite concrete: what Redwood does not
+cover paints a placeholder on a real screen here instead of in a fixture.
+
+**No Keycloak clients of their own.** `@KeycloakSecured` names the Keycloak URL, not the app's own
+host, so the `demo` and `control-plane` clients serve both consoles of their plane — each lists
+both hosts in its redirect URIs. And no DNS to add: the `*.ec1` wildcard already covers them, and
+each certificate is issued by HTTP-01 the first time its name resolves.
+
+**One thing to know before adding a fifth console.** The gateway's backend routes name both hosts
+of their plane (`Host=a,b`) and only the catch-all is per host — that is the whole of the routing
+difference. But `SecurityConfig` holds a **set** of control hosts, and a console host missing from
+that set does not fail closed: its `/_ia-cp` and `/_users` requests fall through to the catch-all
+rule, which permits everything. The set is the security boundary, not the ingress.
+
+## End-to-end coverage
+
+```sh
+cd e2e && npm install && npx playwright install chromium
+npm test
+```
+
+Every screen of every console, on both planes and through both renderers, against the **deployed**
+cluster rather than anything the suite starts itself — only a real deployment has all four
+consoles, the gateway that routes them and the Keycloak that gates them.
+
+The same expectations are asserted four times, and that repetition is the test: a screen that
+renders under Vaadin and not under Redwood is a renderer gap; one that renders on one plane and
+not the other is a routing or authorisation gap. Neither is visible from a single console.
+
+Worth knowing about what it asserts. **Status codes prove nothing here** — Mateu answers a route it
+cannot resolve with a fragment reading `Not found.` and an HTTP 200 — so a screen counts as
+rendered only if it put something on screen and no renderer placeholder on it. And the menu bar is
+read by walking shadow roots by hand rather than with a selector, because the two renderers nest
+their components differently and a selector tuned to one returns nothing on the other, which would
+make a renderer gap look like a passing test.
 
 ## Measuring it
 

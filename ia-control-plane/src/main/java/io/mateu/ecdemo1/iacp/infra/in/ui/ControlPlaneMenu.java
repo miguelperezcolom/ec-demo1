@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui;
 
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.agent.AgentCrudOrchestrator;
+import io.mateu.ecdemo1.iacp.infra.in.ui.pages.apimcp.ApiMcpCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.budget.BudgetCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.llm.LlmCrudOrchestrator;
 import io.mateu.ecdemo1.iacp.infra.in.ui.pages.mcp.McpCrudOrchestrator;
@@ -24,6 +25,14 @@ public class ControlPlaneMenu {
 
     @Menu
     McpCrudOrchestrator mcpServers;
+
+    /**
+     * APIs offered as MCP servers. Beside the catalogue of servers somebody else runs rather than
+     * inside it: an entry here owns its tool list, because the offer is composed on this screen,
+     * and an Mcp deliberately owns none — see the two aggregates.
+     */
+    @Menu
+    ApiMcpCrudOrchestrator apiMcpServers;
 
     @Menu
     RagCrudOrchestrator ragSources;

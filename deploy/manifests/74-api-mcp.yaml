@@ -1,0 +1,91 @@
+# APIs served as MCP servers — one endpoint per catalogued entry, at /{apiMcpId}/sse.
+#
+# It owns no data and no screens. The catalogue is in ia-control-plane, which holds the OFFER
+# (which operations of which API, under which names, described how); this pod holds the
+# TRANSLATION (reading the spec properly, building each tool's schema, making the call). That
+# split is why the control plane is not on the path every tool call travels.
+#
+# NOT routed by the gateway, and the reason is the same one that keeps /internal off it: this pod
+# calls other people's APIs with stored credentials, and an endpoint here is a way to make it do
+# that. It is reachable only from inside the namespace — which is where ia-agent is.
+#
+# How an agent gets these tools: an operator catalogues http://api-mcp:8113/<id>/sse as an
+# ordinary MCP server entry and composes an agent from it. Nothing on the agent's side knows this
+# pod is different from booking.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-mcp
+  namespace: ec-demo1
+  labels: { app: api-mcp }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: api-mcp }
+  template:
+    metadata:
+      labels:
+        app: api-mcp
+        app.kubernetes.io/component: api-mcp
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8113"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: api-mcp
+          image: miguelperezcolom/ec-demo1-api-mcp:0.14.1
+          env:
+            - name: SERVER_PORT
+              value: "8113"
+            # Pod to pod. /internal/api-mcps hands out each API's credential in the clear, and
+            # there is no gateway route to it — see 71-ia-control-plane.yaml.
+            - name: IA_CONTROL_PLANE_URL
+              value: http://ia-control-plane:8110
+            # How late a change made on the console can be. A poll that finds nothing changed
+            # mounts nothing and drops no connected agent's session.
+            - name: CATALOGUE_REFRESH_INTERVAL
+              value: 30s
+          ports:
+            - { name: http, containerPort: 8113 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "512Mi", cpu: "150m" }
+            limits:   { memory: "1Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          # Ready means the catalogue has been read once — not that the control plane is up right
+          # now. Once it has been read, every mounted endpoint is served from what this pod holds,
+          # and taking it out of the Service while the control plane restarts would break tool
+          # calls that would otherwise have worked.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8113 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8113 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-mcp
+  namespace: ec-demo1
+  labels: { app: api-mcp }
+spec:
+  selector: { app: api-mcp }
+  ports:
+    - { name: http, port: 8113, targetPort: 8113 }

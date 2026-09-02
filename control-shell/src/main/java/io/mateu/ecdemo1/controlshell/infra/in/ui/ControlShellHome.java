@@ -65,6 +65,27 @@ public class ControlShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu users = new RemoteMenu("/_users").withLabel("Usuarios");
 
+    /**
+     * Workflow definitions and analytics, served by the orchestrator pod — the same one that
+     * answers Processes and Steps on the demo console, from a second {@code @UI} of its own.
+     *
+     * <p>Here rather than there for the same reason as Usuarios: a definition is configuration, and
+     * analytics measures the engine rather than the business. Neither is part of using the product.
+     * What stays on the demo console is the work itself — the processes in flight and the steps
+     * they took.
+     *
+     * <p>The routes underneath are unchanged: {@code /workflow/definitions} is still
+     * {@code /workflow/definitions}, only reached from {@code /_workflow-admin} instead of
+     * {@code /_workflow}. The engine keeps the field name its menu is built from, so nothing
+     * holding one of those routes had to be told.
+     */
+    @Menu
+    RemoteMenu workflowAdmin = new RemoteMenu("/_workflow-admin").withLabel("Workflow");
+
+    /** The form editor and the form definitions, served by the forms pod's second {@code @UI}. */
+    @Menu
+    RemoteMenu formsAdmin = new RemoteMenu("/_forms-admin").withLabel("Forms");
+
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
         var widgets = new ArrayList<Component>();

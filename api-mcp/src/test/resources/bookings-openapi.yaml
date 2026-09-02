@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: Bookings
+  version: "1.0"
+paths:
+  /bookings/{id}:
+    # Declared on the PATH and not on the operation, which is the shape that used to be missed.
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The booking's id
+        schema: { type: string }
+    get:
+      operationId: getBooking
+      summary: Read one booking
+      parameters:
+        - name: verbose
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200": { description: ok }
+  /bookings:
+    post:
+      operationId: createBooking
+      summary: Create a booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBooking"
+      responses:
+        "201": { description: created }
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+  schemas:
+    NewBooking:
+      type: object
+      required: [leadName]
+      properties:
+        leadName:
+          type: string
+          description: Who the booking is for
+        status:
+          type: string
+          enum: [Pending, Confirmed, Cancelled]
