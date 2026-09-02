@@ -64,6 +64,7 @@ so a process is changed by a pull request rather than by an API call.
 | `users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
 | `ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
 | `ia-control-plane/` | The catalogues the agent is configured from: LLMs and their credentials, MCP servers, APIs offered as MCP servers, RAG sources, and the agents that compose them |
+| `api-mcp/` | Serves the catalogued APIs as MCP servers, one endpoint per entry. Owns no data and no screens |
 | `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `ai-admin` role |
 | `control-shell-redwood/` | The same, rendered by Redwood, on `rw-console.ec1.mateu.io` |
 | `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
@@ -79,7 +80,7 @@ four things about this cluster that otherwise cost an afternoon.
 ## Deploy
 
 ```sh
-./deploy/build-images.sh      # the eight images this repo owns → Docker Hub (only when their code changed)
+./deploy/build-images.sh      # the eleven images this repo owns → Docker Hub (only when their code changed)
 ./deploy/deploy.sh            # everything else, idempotent
 ```
 
@@ -163,6 +164,7 @@ what they are here, not what they were there.
 | `content` | `/_content` | Content, labels and content types. A CRUD over its own database and nothing else |
 | `users` | `/_users` | Users, groups, roles and permissions, plus `GetAuthInfo` over gRPC on 9191 |
 | `ia-agent` | `/ai` | The chat panel's other half. It implements nothing: every answer is an MCP tool call or a refusal |
+| `api-mcp` | — | Not routed by the gateway, on purpose: it calls other people's APIs with stored credentials, and an endpoint here is a way to make it do that. Reachable only from inside the namespace, which is where `ia-agent` is |
 
 **They keep their own UIs.** Nothing about their screens is written in the shell — each declares a
 `@UI` path, `ShellHome` names the same path in a `RemoteMenu`, and the gateway routes it. Adding
@@ -345,11 +347,22 @@ catalogued here before anything serves it.
 An agent refers to its LLM, its servers and its sources by id and holds nothing of them, so a
 server's URL changes in one place and every agent composed from it follows.
 
-**APIs as MCP servers is a catalogue and not yet a server.** An entry can be created, its OpenAPI
-document read, and its operations chosen, named and described; what turns that into a running MCP
-server an agent can be handed is a separate pod that does not exist yet. The catalogue is first on
-purpose — the offer is the part a person has to compose, and the translation is the part that can
-be written against a filled-in catalogue instead of against a guess.
+**Where an API-backed entry becomes a real server.** The catalogue holds the OFFER — which
+operations, under which names, described how — and `api-mcp` holds the TRANSLATION: it reads the
+OpenAPI document with a real parser, builds each tool's input schema from it, and makes the call.
+The split is why the control plane carries no OpenAPI library and is not on the path every tool
+call travels.
+
+An operator then catalogues `http://api-mcp:8113/<entry id>/sse` as an ordinary **MCP server** and
+composes an agent from it. Nothing on the agent's side learns that this entry is different from
+`booking` — which is the point of serving it as MCP rather than teaching the agent a second kind of
+tool.
+
+One thing is deliberately **not** served yet: a tool that declares required roles. The catalogue
+says those are checked where the call is made, and that is `api-mcp` — but the MCP transport hands
+a tool handler no HTTP request, so there is nothing there to read a caller's roles from. Rather
+than offer a narrowed tool with the narrowing silently dropped, `api-mcp` refuses to expose it and
+says so in its log. A tool with an empty role list is served normally.
 
 ### Why a second host and not another menu
 

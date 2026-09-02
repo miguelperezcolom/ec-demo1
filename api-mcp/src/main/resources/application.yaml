@@ -1,0 +1,46 @@
+server:
+  port: ${SERVER_PORT:8113}
+
+spring:
+  application:
+    name: api-mcp
+
+api-mcp:
+  control-plane:
+    # Pod to pod, never through the gateway: /internal/** hands out credentials in the clear and
+    # has no route. Same value the agent is given — see deploy/manifests/63-ia-agent.yaml.
+    url: ${IA_CONTROL_PLANE_URL:http://localhost:8110}
+  refresh:
+    # How late a change an operator makes on the console can be. Every poll that finds nothing
+    # changed mounts nothing and drops no session — see ApiMcpServers.
+    interval: ${CATALOGUE_REFRESH_INTERVAL:30s}
+    initial-delay: ${CATALOGUE_INITIAL_DELAY:2s}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+      group:
+        # The readiness group is readinessState ALONE unless it is said otherwise, so a custom
+        # indicator lands in /actuator/health and not in the probe Kubernetes actually calls —
+        # which would have made this pod ready before it could serve a single endpoint. Naming
+        # `catalogue` here is what makes CatalogueHealthIndicator mean anything.
+        readiness:
+          include: readinessState,catalogue
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+logging:
+  level:
+    # The parser narrates every $ref it follows at INFO, which buries the one line per mounted
+    # endpoint that is worth reading.
+    io.swagger.v3.parser: WARN

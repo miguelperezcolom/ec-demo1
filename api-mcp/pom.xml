@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Boot 3.4.3, like booking and for the same reason: the MCP server SDK this serves with is
+         the one Spring AI 1.0.0 is built against, and that stack does not start on Boot 4. These
+         are separate processes and do not have to match the shells. -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.mateu.ecdemo1</groupId>
+    <artifactId>api-mcp</artifactId>
+    <version>0.1.0</version>
+    <name>ec-demo1 api-mcp</name>
+    <description>Serves the catalogued APIs as MCP servers, one endpoint per entry</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- The SDK Spring AI 1.0.0 resolves. Taken directly rather than through the
+             spring-ai-starter-mcp-server-webmvc starter, which auto-configures exactly ONE server
+             on one fixed endpoint — the opposite of what this service is: a set of endpoints that
+             appears and disappears with the catalogue. -->
+        <mcp.version>0.10.0</mcp.version>
+        <!-- A real OpenAPI parser, and here rather than in ia-control-plane on purpose. Listing
+             operations for a catalogue screen is reading paths.<path>.<method>; CALLING one needs
+             refs, components and schemas resolved, and this is the side that calls. -->
+        <swagger-parser.version>2.1.33</swagger-parser.version>
+        <!-- Ahead of what Boot 3.4.3 manages (1.18.36), which does not run on a JDK 25 javac and
+             fails the build with "TypeTag :: UNKNOWN" rather than anything that names Lombok. -->
+        <lombok.version>1.18.44</lombok.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- The MCP server itself. mcp-spring-webmvc is the SSE transport as a RouterFunction,
+             which is what makes one endpoint per catalogue entry possible: each entry gets its own
+             provider with its own paths, and a delegating RouterFunction picks between them at
+             REQUEST time rather than at startup. -->
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp</artifactId>
+            <version>${mcp.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp-spring-webmvc</artifactId>
+            <version>${mcp.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.swagger.parser.v3</groupId>
+            <artifactId>swagger-parser</artifactId>
+            <version>${swagger-parser.version}</version>
+            <exclusions>
+                <!-- Brings its own slf4j binding otherwise, which fights Boot's. -->
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-simple</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Health probes and the Prometheus endpoint the pod annotation points Prometheus at.
+             Without the registry, /actuator/prometheus does not exist even with actuator on the
+             classpath, and the scrape silently returns 404 forever. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
