@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: apimcp
+id: booking-api
+name: Booking API
+apiKind: REST
+baseUrl: http://booking:8108
+specUrl: http://booking:8108/v3/api-docs
+description: The bookings service's own REST API, offered to agents as tools.
+
+# The tools ARE the entry. An `mcp` entry lists none on purpose — the server declares its own and a
+# copy here would go stale in silence. Here the opposite holds: nothing else knows what this API
+# offers as tools, because the offer is composed. Which operations, under which names, described
+# how, is the decision this file records.
+#
+# Omitting `tools` entirely leaves whatever is stored alone; listing none empties the offer.
+tools:
+  - operation: GET /bookings
+    toolName: list_bookings
+    # This is the field that decides whether the tool is ever called. Written for a model choosing
+    # between tools, not for someone reading the spec — an operationId is not a description.
+    description: >-
+      Lists every booking with its id, lead name, creation date and status. Use it to answer
+      "which bookings exist", to find a booking whose id is unknown, or before changing one.
+
+  - operation: GET /bookings/{id}
+    toolName: get_booking
+    description: >-
+      Reads one booking by its id. Use it when the id is already known; to find one by customer
+      name, list them first.
+
+# A tool that names required roles is NOT served yet. The serving pod cannot see who is calling
+# through the MCP transport, so it refuses to expose it rather than drop the restriction silently —
+# see api-mcp's ApiMcpServers. Left here commented as the shape, not as something that works:
+#
+#  - operation: DELETE /bookings/{id}
+#    toolName: cancel_booking
+#    description: Cancels a booking. Irreversible.
+#    requiredRoles: [booking-admin]

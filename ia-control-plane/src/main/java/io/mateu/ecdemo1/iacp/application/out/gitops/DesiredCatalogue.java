@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.iacp.application.out.gitops;
 
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.AgentManifest;
+import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.ApiMcpManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.BudgetManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.LlmManifest;
 import io.mateu.ecdemo1.iacp.application.out.gitops.manifest.McpManifest;
@@ -14,6 +15,7 @@ import java.util.List;
  * its kinds. This is the desired state the reconciler compares the live catalogues against.
  */
 public record DesiredCatalogue(List<LlmManifest> llms, List<McpManifest> mcps,
-                               List<RagManifest> rags, List<AgentManifest> agents,
-                               List<BudgetManifest> budgets, List<RouteManifest> routes) {
+                               List<ApiMcpManifest> apiMcps, List<RagManifest> rags,
+                               List<AgentManifest> agents, List<BudgetManifest> budgets,
+                               List<RouteManifest> routes) {
 }

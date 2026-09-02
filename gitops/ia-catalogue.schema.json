@@ -2,13 +2,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json",
   "title": "IA control plane catalogue entry",
-  "description": "One agent, model, MCP server or RAG source, as the control plane reads it from GitOps. One entry per file; the 'kind' field says which of the four this is.",
+  "description": "One agent, model, MCP server, API offered as an MCP server, RAG source, budget or route, as the control plane reads it from GitOps. One entry per file; the 'kind' field says which of the seven this is.",
   "type": "object",
-  "required": ["kind", "id"],
+  "required": [
+    "kind",
+    "id"
+  ],
   "properties": {
     "kind": {
       "type": "string",
-      "enum": ["llm", "mcp", "rag", "agent", "budget", "route"],
+      "enum": [
+        "llm",
+        "mcp",
+        "apimcp",
+        "rag",
+        "agent",
+        "budget",
+        "route"
+      ],
       "description": "Which catalogue this entry belongs to."
     },
     "id": {
@@ -22,126 +33,409 @@
       "title": "LLM",
       "description": "A model the agent may call, and how to reach it. The API key is never here — name an env var in credentialEnv instead.",
       "properties": {
-        "kind": { "const": "llm" },
-        "id": { "type": "string" },
-        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "kind": {
+          "const": "llm"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human label. Defaults to the id."
+        },
         "provider": {
           "type": "string",
-          "enum": ["ANTHROPIC", "OPENAI", "OPENAI_COMPATIBLE", "BEDROCK", "VERTEX"],
+          "enum": [
+            "ANTHROPIC",
+            "OPENAI",
+            "OPENAI_COMPATIBLE",
+            "BEDROCK",
+            "VERTEX"
+          ],
           "description": "Who serves the model. Only the API-key-based ones (ANTHROPIC, OPENAI, OPENAI_COMPATIBLE) are callable today."
         },
-        "model": { "type": "string", "description": "The model id the provider expects, e.g. claude-sonnet-4-5." },
-        "baseUrl": { "type": "string", "description": "Override the provider's default endpoint. For OPENAI_COMPATIBLE (Ollama, vLLM, a gateway) this is required." },
-        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
-        "maxTokens": { "type": "integer", "minimum": 1 },
+        "model": {
+          "type": "string",
+          "description": "The model id the provider expects, e.g. claude-sonnet-4-5."
+        },
+        "baseUrl": {
+          "type": "string",
+          "description": "Override the provider's default endpoint. For OPENAI_COMPATIBLE (Ollama, vLLM, a gateway) this is required."
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1
+        },
         "credentialEnv": {
           "type": "string",
           "description": "The name of an environment variable the control plane resolves the API key from at sync time. The secret stays in the deployment; the repo holds only this name."
         },
-        "enabled": { "type": "boolean", "default": true }
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
       },
-      "required": ["kind", "id", "provider", "model"],
+      "required": [
+        "kind",
+        "id",
+        "provider",
+        "model"
+      ],
       "additionalProperties": false
     },
     {
       "title": "MCP server",
       "description": "A server whose tools an agent may be given.",
       "properties": {
-        "kind": { "const": "mcp" },
-        "id": { "type": "string" },
-        "name": { "type": "string", "description": "Human label. Defaults to the id." },
-        "url": { "type": "string", "description": "The server's endpoint, e.g. http://orchestrator:8105/sse." },
+        "kind": {
+          "const": "mcp"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human label. Defaults to the id."
+        },
+        "url": {
+          "type": "string",
+          "description": "The server's endpoint, e.g. http://orchestrator:8105/sse."
+        },
         "transport": {
           "type": "string",
-          "enum": ["SSE", "STREAMABLE_HTTP"],
+          "enum": [
+            "SSE",
+            "STREAMABLE_HTTP"
+          ],
           "description": "How a client reaches it. Every MCP server in this deployment speaks SSE today."
         },
-        "timeoutSeconds": { "type": "integer", "minimum": 1, "default": 60 },
-        "description": { "type": "string", "description": "What the server is for. Read by the model when deciding whether to use its tools." },
-        "enabled": { "type": "boolean", "default": true }
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 60
+        },
+        "description": {
+          "type": "string",
+          "description": "What the server is for. Read by the model when deciding whether to use its tools."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
       },
-      "required": ["kind", "id", "url", "transport"],
+      "required": [
+        "kind",
+        "id",
+        "url",
+        "transport"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "title": "API as an MCP server",
+      "description": "An existing API offered to agents as an MCP server. Unlike an 'mcp' entry — a server somebody else runs, whose tools it declares for itself — the tool list here IS the entry: nothing else knows what an API offers as tools, because the offer is composed. The credential is never here; name an env var in credentialEnv instead.",
+      "properties": {
+        "kind": {
+          "const": "apimcp"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human label. Defaults to the id."
+        },
+        "apiKind": {
+          "type": "string",
+          "enum": [
+            "REST",
+            "SOAP"
+          ],
+          "description": "How the API is described, and therefore how it is read and called. Named apiKind and not kind because 'kind' is already the field that says which catalogue this file belongs to. Only REST is served; a SOAP entry can be catalogued and is refused when its operations are imported."
+        },
+        "baseUrl": {
+          "type": "string",
+          "description": "Where calls go, e.g. https://api.example.com/v1. The spec's own server list is advisory; this is the one that is used."
+        },
+        "specUrl": {
+          "type": "string",
+          "description": "Where the OpenAPI document is fetched from."
+        },
+        "description": {
+          "type": "string",
+          "description": "For whoever reads this catalogue. What a MODEL reads is each tool's own description."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "credentialEnv": {
+          "type": "string",
+          "description": "Name of an environment variable on the control plane holding the API's secret. Never the secret itself."
+        },
+        "tools": {
+          "type": "array",
+          "description": "The offer. OMITTED leaves whatever is stored alone; an empty list exposes nothing, which leaves the entry catalogued and unusable.",
+          "items": {
+            "type": "object",
+            "required": [
+              "operation",
+              "toolName",
+              "description"
+            ],
+            "properties": {
+              "operation": {
+                "type": "string",
+                "description": "The operation as the spec declares it, e.g. 'GET /bookings/{id}'. Not shown to the model."
+              },
+              "toolName": {
+                "type": "string",
+                "description": "What the model calls this tool. Two tools of one API cannot share a name."
+              },
+              "description": {
+                "type": "string",
+                "description": "What the model reads to decide whether to call it. The field that decides whether the tool is ever used — an operationId from the spec is not a description."
+              },
+              "requiredRoles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Empty means anyone the agent is offered to. A tool that names roles is NOT served yet: the serving pod cannot see the caller, and it refuses rather than drop the restriction."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "baseUrl",
+        "specUrl"
+      ],
       "additionalProperties": false
     },
     {
       "title": "RAG source",
       "description": "A vector store an agent may search. 'store' is the backend; the file-level 'kind' is always 'rag'.",
       "properties": {
-        "kind": { "const": "rag" },
-        "id": { "type": "string" },
-        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "kind": {
+          "const": "rag"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human label. Defaults to the id."
+        },
         "store": {
           "type": "string",
-          "enum": ["PGVECTOR", "QDRANT", "ELASTICSEARCH"],
+          "enum": [
+            "PGVECTOR",
+            "QDRANT",
+            "ELASTICSEARCH"
+          ],
           "description": "Which vector store backs this source."
         },
-        "connectionUrl": { "type": "string", "description": "How to reach the store." },
-        "collection": { "type": "string", "description": "The collection/table inside the store this source reads." },
-        "embeddingLlmId": { "type": "string", "description": "The id of an llm entry used to embed queries. Must be an embeddings-capable, OpenAI-shaped model." },
-        "topK": { "type": "integer", "minimum": 1, "default": 5, "description": "How many chunks a search returns." },
-        "description": { "type": "string", "description": "What this source holds. The model reads it as the tool description when deciding whether to search here — a vague one produces a tool it never calls." },
-        "enabled": { "type": "boolean", "default": true }
+        "connectionUrl": {
+          "type": "string",
+          "description": "How to reach the store."
+        },
+        "collection": {
+          "type": "string",
+          "description": "The collection/table inside the store this source reads."
+        },
+        "embeddingLlmId": {
+          "type": "string",
+          "description": "The id of an llm entry used to embed queries. Must be an embeddings-capable, OpenAI-shaped model."
+        },
+        "topK": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "How many chunks a search returns."
+        },
+        "description": {
+          "type": "string",
+          "description": "What this source holds. The model reads it as the tool description when deciding whether to search here — a vague one produces a tool it never calls."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
       },
-      "required": ["kind", "id", "store", "connectionUrl", "collection", "embeddingLlmId"],
+      "required": [
+        "kind",
+        "id",
+        "store",
+        "connectionUrl",
+        "collection",
+        "embeddingLlmId"
+      ],
       "additionalProperties": false
     },
     {
       "title": "Agent",
       "description": "A prompt, one model, and the servers and sources it may reach. The only thing a running service is handed.",
       "properties": {
-        "kind": { "const": "agent" },
-        "id": { "type": "string" },
-        "name": { "type": "string", "description": "Human label. Defaults to the id." },
-        "systemPrompt": { "type": "string", "description": "The system prompt. Use a YAML block scalar (|) for multi-line." },
-        "llm": { "type": "string", "description": "The id of the llm entry this agent uses." },
-        "mcp": { "type": "array", "items": { "type": "string" }, "description": "Ids of mcp entries whose tools this agent may call." },
-        "rag": { "type": "array", "items": { "type": "string" }, "description": "Ids of rag entries this agent may search." },
-        "description": { "type": "string" },
-        "enabled": { "type": "boolean", "default": true }
+        "kind": {
+          "const": "agent"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human label. Defaults to the id."
+        },
+        "systemPrompt": {
+          "type": "string",
+          "description": "The system prompt. Use a YAML block scalar (|) for multi-line."
+        },
+        "llm": {
+          "type": "string",
+          "description": "The id of the llm entry this agent uses."
+        },
+        "mcp": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of mcp entries whose tools this agent may call."
+        },
+        "rag": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of rag entries this agent may search."
+        },
+        "description": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
       },
-      "required": ["kind", "id", "llm"],
+      "required": [
+        "kind",
+        "id",
+        "llm"
+      ],
       "additionalProperties": false
     },
     {
       "title": "Budget",
       "description": "A token spend cap on a subject per window. Opt-in: nothing is capped until a budget names it.",
       "properties": {
-        "kind": { "const": "budget" },
-        "id": { "type": "string" },
-        "name": { "type": "string", "description": "Human label. Defaults to the id." },
+        "kind": {
+          "const": "budget"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human label. Defaults to the id."
+        },
         "scope": {
           "type": "string",
-          "enum": ["AGENT", "LLM", "USER", "TENANT"],
+          "enum": [
+            "AGENT",
+            "LLM",
+            "USER",
+            "TENANT"
+          ],
           "description": "What the cap follows — one agent, model, user or tenant."
         },
-        "subject": { "type": "string", "description": "The id of the agent / model / user / tenant this caps." },
+        "subject": {
+          "type": "string",
+          "description": "The id of the agent / model / user / tenant this caps."
+        },
         "period": {
           "type": "string",
-          "enum": ["DAY", "MONTH"],
+          "enum": [
+            "DAY",
+            "MONTH"
+          ],
           "description": "The window the limit applies over. Resets at midnight (DAY) or the 1st (MONTH), UTC."
         },
-        "limitTokens": { "type": "integer", "minimum": 1, "description": "The most tokens the subject may spend in a window." },
-        "enabled": { "type": "boolean", "default": true }
+        "limitTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The most tokens the subject may spend in a window."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
       },
-      "required": ["kind", "id", "scope", "subject", "period", "limitTokens"],
+      "required": [
+        "kind",
+        "id",
+        "scope",
+        "subject",
+        "period",
+        "limitTokens"
+      ],
       "additionalProperties": false
     },
     {
       "title": "Route",
       "description": "A rule that picks which agent answers, by the caller's context. First match by priority wins.",
       "properties": {
-        "kind": { "const": "route" },
-        "id": { "type": "string" },
-        "name": { "type": "string", "description": "Human label. Defaults to the id." },
-        "priority": { "type": "integer", "description": "Lower is tried first. A specific rule needs a lower number than the catch-all it beats. Defaults to 100." },
-        "role": { "type": "string", "description": "A realm role the caller must have. Omit for any." },
-        "tenant": { "type": "string", "description": "A tenant the caller must belong to. Omit for any." },
-        "locale": { "type": "string", "description": "A UI locale the request must carry, e.g. es. Omit for any." },
-        "routePrefix": { "type": "string", "description": "A prefix the current UI route must start with. Omit for any." },
-        "targetAgent": { "type": "string", "description": "The id of the agent that answers when this rule matches." },
-        "enabled": { "type": "boolean", "default": true }
+        "kind": {
+          "const": "route"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human label. Defaults to the id."
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Lower is tried first. A specific rule needs a lower number than the catch-all it beats. Defaults to 100."
+        },
+        "role": {
+          "type": "string",
+          "description": "A realm role the caller must have. Omit for any."
+        },
+        "tenant": {
+          "type": "string",
+          "description": "A tenant the caller must belong to. Omit for any."
+        },
+        "locale": {
+          "type": "string",
+          "description": "A UI locale the request must carry, e.g. es. Omit for any."
+        },
+        "routePrefix": {
+          "type": "string",
+          "description": "A prefix the current UI route must start with. Omit for any."
+        },
+        "targetAgent": {
+          "type": "string",
+          "description": "The id of the agent that answers when this rule matches."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
       },
-      "required": ["kind", "id", "targetAgent"],
+      "required": [
+        "kind",
+        "id",
+        "targetAgent"
+      ],
       "additionalProperties": false
     }
   ]
