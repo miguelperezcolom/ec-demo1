@@ -10,10 +10,18 @@ spring:
       routes:
         # The workflow-graph web component is served from an absolute path, so it needs a route
         # of its own or the definition viewer renders an empty box. Public — see SecurityConfig.
+        # The engine's own static assets — workflow-graph.js among them, which is what draws a
+        # definition's graph and a process's.
+        #
+        # All FOUR consoles, not just the demo ones. This route named only the demo host until the
+        # definitions screen moved to the control console, and then the graph silently stopped
+        # drawing there: the element was on the page, its script 404'd, and a custom element whose
+        # definition never arrives renders as nothing at all. Any screen that moves between planes
+        # has to bring the assets it loads with it, and this is the one that did not.
         - id: eventconductor-assets
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/eventconductor/**
 
         # Git webhooks. These are NOT under /_workflow and /_forms — those prefixes are the
