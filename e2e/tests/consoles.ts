@@ -32,13 +32,18 @@ const host = (envVar: string, fallback: string) => process.env[envVar] ?? fallba
 
 /** The data plane: what a person uses to get work done. */
 const dataScreens = [
-    { menu: 'Workflow', entry: 'Processes', route: '/workflow/processes' },
-    { menu: 'Workflow', entry: 'Steps', route: '/workflow/steps' },
-    { menu: 'Forms', entry: 'Executions', route: '/forms/executions' },
-    { menu: 'Forms', entry: 'Tasks', route: '/forms/tasks' },
-    { menu: 'Forms', entry: 'Tasks v 2', route: '/forms/tasksV2' },
-    { menu: 'Worker', entry: 'Received tasks', route: '/worker/receivedTasks' },
-    { menu: 'Worker', entry: 'Task overrides', route: '/worker/taskOverrides' },
+    // Workflow, Forms and Worker hang under Admin here — they are how the platform is driven,
+    // where Booking and Contenidos are the product. The ROUTES are untouched by that grouping;
+    // only where the entry sits in the bar changed.
+    //
+    // Steps and Tasks v 2 are gone from this plane on purpose: a step execution is diagnosis of
+    // the engine, and two task lists side by side is a question the person using it cannot answer.
+    // Both still resolve as routes, and WorkflowMenu/FormsMenu still carry them for embedders.
+    { menu: 'Admin', entry: 'Processes', route: '/workflow/processes' },
+    { menu: 'Admin', entry: 'Executions', route: '/forms/executions' },
+    { menu: 'Admin', entry: 'Tasks', route: '/forms/tasks' },
+    { menu: 'Admin', entry: 'Received tasks', route: '/worker/receivedTasks' },
+    { menu: 'Admin', entry: 'Task overrides', route: '/worker/taskOverrides' },
     { menu: 'Booking', entry: 'Bookings', route: '/booking/bookings' },
     { menu: 'Contenidos', entry: 'Contents', route: '/content/contents' },
     { menu: 'Contenidos', entry: 'Labels', route: '/content/labels' },
@@ -66,13 +71,13 @@ export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
         host: host('CONSOLE_HOST', 'ec1.mateu.io'),
-        menus: ['Workflow', 'Forms', 'Worker', 'Booking', 'Contenidos'],
+        menus: ['Admin', 'Booking', 'Contenidos'],
         screens: dataScreens,
     },
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
-        menus: ['Workflow', 'Forms', 'Worker', 'Booking', 'Contenidos'],
+        menus: ['Admin', 'Booking', 'Contenidos'],
         screens: dataScreens,
     },
     {

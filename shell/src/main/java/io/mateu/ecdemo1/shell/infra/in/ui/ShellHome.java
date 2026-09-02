@@ -77,29 +77,13 @@ public class ShellHome implements WidgetSupplier {
     // showing first.
 
     /**
-     * Running processes and their step executions.
+     * Running the platform: Workflow, Forms and Worker, behind one entry.
      *
-     * <p>Not definitions and not analytics: those are the orchestrator's other {@code @UI},
-     * {@code /_workflow-admin}, mounted by the control console behind {@code ai-admin}. Same pod,
-     * two front doors — see ControlShellHome. This one is the work; that one is how the engine is
-     * configured and how it has been behaving.
+     * <p>They used to sit on the bar beside Booking and Contenidos, which made five equals where
+     * there are really two kinds of thing — see AdminMenu.
      */
     @Menu
-    RemoteMenu workflow = new RemoteMenu("/_workflow").withLabel("Workflow");
-
-    /**
-     * Form executions and the human tasks waiting to be done.
-     *
-     * <p>The form definitions and the drag-and-drop editor moved to the control console the same
-     * way, on {@code /_forms-admin}. Designing a form and answering one are done by different
-     * people.
-     */
-    @Menu
-    RemoteMenu forms = new RemoteMenu("/_forms").withLabel("Forms");
-
-    /** What the test worker was asked to do, and the overrides that answer it by hand. */
-    @Menu
-    RemoteMenu worker = new RemoteMenu("/_worker").withLabel("Worker");
+    AdminMenu admin;
 
     /** Bookings — the CRUD, and the aggregate the booking saga confirms or cancels. */
     @Menu
