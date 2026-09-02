@@ -62,6 +62,9 @@ const controlScreens = [
     { menu: 'IA', entry: 'Agents', route: '/ia/agents' },
     { menu: 'IA', entry: 'Llms', route: '/ia/llms' },
     { menu: 'IA', entry: 'Mcp servers', route: '/ia/mcpServers' },
+    // Beside the servers somebody else runs, not inside them: this catalogue owns its tool list
+    // and that one deliberately owns none. Two screens because they are two aggregates.
+    { menu: 'IA', entry: 'Api mcp servers', route: '/ia/apiMcpServers' },
     { menu: 'IA', entry: 'Rag sources', route: '/ia/ragSources' },
     { menu: 'IA', entry: 'Budgets', route: '/ia/budgets' },
     { menu: 'IA', entry: 'Routes', route: '/ia/routes' },

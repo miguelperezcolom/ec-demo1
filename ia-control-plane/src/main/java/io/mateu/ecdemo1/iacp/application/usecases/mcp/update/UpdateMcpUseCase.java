@@ -1,7 +1,7 @@
 package io.mateu.ecdemo1.iacp.application.usecases.mcp.update;
 
 import io.mateu.ecdemo1.iacp.application.out.repository.McpRepository;
-import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.Endpoint;
+import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Endpoint;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Enabled;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Name;

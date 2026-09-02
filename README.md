@@ -63,7 +63,7 @@ so a process is changed by a pull request rather than by an API call.
 | `content/` | Content, labels and content types — a CRUD and nothing else |
 | `users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
 | `ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
-| `ia-control-plane/` | The four catalogues the agent is configured from: LLMs and their credentials, MCP servers, RAG sources, and the agents that compose them |
+| `ia-control-plane/` | The catalogues the agent is configured from: LLMs and their credentials, MCP servers, APIs offered as MCP servers, RAG sources, and the agents that compose them |
 | `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `ai-admin` role |
 | `control-shell-redwood/` | The same, rendered by Redwood, on `rw-console.ec1.mateu.io` |
 | `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
@@ -331,17 +331,25 @@ measurement here, doing the job there.
 
 ### The catalogues
 
-`ia-control-plane` holds the four the chat agent is configured from.
+`ia-control-plane` holds the four the chat agent is configured from, and one more that is
+catalogued here before anything serves it.
 
 | catalogue | what an entry is |
 |---|---|
 | **LLMs** | A model this deployment may call, and the API key that pays for it |
 | **MCP servers** | A server an agent may be given the tools of. Not the tools — those the server declares at connection time, and a copy here would go stale in silence |
+| **APIs as MCP servers** | An existing API, with a chosen set of its operations named and described as tools. The mirror image of the row above: here the tool list *is* the entry, because nothing else knows it — the offer is composed by an operator rather than declared by a server |
 | **RAG sources** | A vector store, a collection inside it, and the model that embedded it. Searchable — see below |
 | **Agents** | A prompt, one LLM, and the servers and sources it may reach. The only thing a running service is ever handed |
 
-An agent refers to the other three by id and holds nothing of them, so a server's URL changes in
-one place and every agent composed from it follows.
+An agent refers to its LLM, its servers and its sources by id and holds nothing of them, so a
+server's URL changes in one place and every agent composed from it follows.
+
+**APIs as MCP servers is a catalogue and not yet a server.** An entry can be created, its OpenAPI
+document read, and its operations chosen, named and described; what turns that into a running MCP
+server an agent can be handed is a separate pod that does not exist yet. The catalogue is first on
+purpose — the offer is the part a person has to compose, and the translation is the part that can
+be written against a filled-in catalogue instead of against a guess.
 
 ### Why a second host and not another menu
 
