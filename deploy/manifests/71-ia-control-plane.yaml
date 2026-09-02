@@ -116,11 +116,12 @@ spec:
             # README. The webhook secret and read token come from the cp-gitops Secret, which
             # deploy.sh creates (empty is fine: disabled needs neither).
             - name: GITOPS_ENABLED
-              value: "false"
+              value: "true"
             - name: GITOPS_REPO
-              value: ""
+              value: "miguelperezcolom/ec-ia-config"
+            # master, como el resto de repositorios de este proyecto — no main.
             - name: GITOPS_BRANCH
-              value: main
+              value: master
             - name: GITOPS_PATH
               value: ia
             - name: GITOPS_POLL_ENABLED
