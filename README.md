@@ -143,9 +143,10 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 9. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
    and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
    (Prometheus). Traces are wired but not yet arriving — see below.
-10. **Then look at the menus that are not the engine.** *Booking* and *Contenidos* are two more
-    applications, each serving its own screens from its own pod — the shell states a path and
-    nothing else about them.
+10. **Then look at the menu that is not the engine.** *Booking* is another application serving its
+    own screens from its own pod — the shell states a path and nothing else about it. The content
+    service is another, still deployed and still serving `/content/**`, but no longer on the bar:
+    a route can outlive the menu entry that used to point at it.
 11. **Ask the chat panel for something.** "Lista las reservas", "crea una reserva para Ana". It has
     no database and no screens: it answers by calling the MCP tools the orchestrator, the forms
     engine and the booking service advertise, and it is told to report a tool failure rather than

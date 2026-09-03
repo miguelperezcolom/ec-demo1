@@ -6,8 +6,8 @@ import io.mateu.uidl.data.RemoteMenu;
 /**
  * Running the platform, gathered behind one entry so the menu bar can say what this console is for.
  *
- * <p>What is left beside it — Booking and Contenidos — is the product: the things somebody uses to
- * get their job done. Workflow, Forms and Worker are how the platform underneath is driven, and on
+ * <p>What is left beside it — Booking — is the product: the thing somebody uses to get their job
+ * done. Workflow, Forms and Worker are how the platform underneath is driven, and on
  * a bar that shows all five at the same level the difference is invisible.
  *
  * <p>Note this is the DATA plane's admin, and it is not the control console. The line there is
