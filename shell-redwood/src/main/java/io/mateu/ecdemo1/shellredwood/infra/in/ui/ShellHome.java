@@ -97,8 +97,8 @@ public class ShellHome implements WidgetSupplier {
     /**
      * Running the platform: Workflow, Forms and Worker, behind one entry.
      *
-     * <p>They used to sit on the bar beside Booking and Contenidos, which made five equals where
-     * there are really two kinds of thing — see AdminMenu.
+     * <p>They used to sit on the bar beside Booking, which made four equals where there are
+     * really two kinds of thing — see AdminMenu.
      */
     @Menu
     AdminMenu admin;
@@ -107,9 +107,9 @@ public class ShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu booking = new RemoteMenu("/_booking").withLabel("Booking");
 
-    /** Content, labels and content types. The one whose label the field name did not predict. */
-    @Menu
-    RemoteMenu content = new RemoteMenu("/_content").withLabel("Contenidos");
+    // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
+    // /content/contents and the rest still resolve for a deep link or an embedder — what went is
+    // the menu entry, not the screens.
 
     // Users, groups, roles and permissions moved to the control console: administering access is a
     // control-plane concern, not part of using the product. It is served by the same users pod,

@@ -33,7 +33,7 @@ const host = (envVar: string, fallback: string) => process.env[envVar] ?? fallba
 /** The data plane: what a person uses to get work done. */
 const dataScreens = [
     // Workflow, Forms and Worker hang under Admin here — they are how the platform is driven,
-    // where Booking and Contenidos are the product. The ROUTES are untouched by that grouping;
+    // where Booking is the product. The ROUTES are untouched by that grouping;
     // only where the entry sits in the bar changed.
     //
     // Steps and Tasks v 2 are gone from this plane on purpose: a step execution is diagnosis of
@@ -45,9 +45,6 @@ const dataScreens = [
     { menu: 'Admin', entry: 'Received tasks', route: '/worker/receivedTasks' },
     { menu: 'Admin', entry: 'Task overrides', route: '/worker/taskOverrides' },
     { menu: 'Booking', entry: 'Bookings', route: '/booking/bookings' },
-    { menu: 'Contenidos', entry: 'Contents', route: '/content/contents' },
-    { menu: 'Contenidos', entry: 'Labels', route: '/content/labels' },
-    { menu: 'Contenidos', entry: 'Content types', route: '/content/contentTypes' },
 ]
 
 /**
@@ -74,13 +71,13 @@ export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
         host: host('CONSOLE_HOST', 'ec1.mateu.io'),
-        menus: ['Admin', 'Booking', 'Contenidos'],
+        menus: ['Admin', 'Booking'],
         screens: dataScreens,
     },
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
-        menus: ['Admin', 'Booking', 'Contenidos'],
+        menus: ['Admin', 'Booking'],
         screens: dataScreens,
     },
     {
