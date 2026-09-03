@@ -33,7 +33,23 @@ for app in $APPS; do
   echo "── building $app ──"
   # Built outside the image on purpose: the Dockerfiles copy target/*.jar, so Maven's cache works
   # and a code change does not re-resolve the whole dependency tree.
-  ( cd "$app" && mvn -B -ntp -DskipTests package )
+  #
+  # `clean` is not paranoia, and it is the expensive half of that trade for a reason.
+  #
+  # Mateu's annotation processor writes the bootstrap page's controller into
+  # target/generated-sources, and Maven does NOT re-run it when the only thing that changed is
+  # `mateu.version`: the module's own .java files are untouched, so javac skips the round and the
+  # PREVIOUS Mateu's generated controller survives into the jar. An image built that way carries a
+  # new frontend bundle behind an old bootstrap.
+  #
+  # That is not hypothetical. It shipped: a fix released in alpha.308 was still missing from a
+  # console running alpha.309, and the symptoms were a body with the browser's default 8px margin,
+  # an app sitting that far down its viewport, the chat panel's input bar hanging off the bottom
+  # edge, and menus that did not resolve. Every build was green throughout, and so was the obvious
+  # check — "all eight modules compile" is true and says nothing whatever about whether the
+  # processor ran again. What says it is a clean build of the same pom producing a different
+  # generated controller.
+  ( cd "$app" && mvn -B -ntp -DskipTests clean package )
   docker buildx build --platform linux/amd64 \
     -t "$REGISTRY/ec-demo1-$app:$TAG" --push "$app"
 done
