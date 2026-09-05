@@ -6,9 +6,12 @@ import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
+import io.mateu.uidl.annotations.PageTemplate;
 import io.mateu.uidl.annotations.PageTitle;
+import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
+import io.mateu.uidl.annotations.WelcomeBanner;
 import io.mateu.uidl.data.Anchor;
 import io.mateu.uidl.data.HorizontalLayout;
 import io.mateu.uidl.data.MicroFrontend;
@@ -55,6 +58,16 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 // Edge-to-edge: the pages behind these menus are listings and workflow graphs, and capping the
 // content at the default ~900px container squeezes them into cards for lack of horizontal room.
 @Style(StyleConstants.FULL_WIDTH)
+// This is a home, so it declares the landing template: Mateu tags the wire pageType as "landing"
+// and the renderer lays the page out as one. The welcome banner is what LANDING is for — Mateu
+// turns it into a HeroSection at the top of the content: an image, a title and a subtitle above
+// the menus. The image is a Redwood illustration served from src/main/resources/static like the
+// logo, so it arrives through the gateway's catch-all with no route and no token of its own.
+@PageTemplate(PageType.LANDING)
+@WelcomeBanner(
+        title = "EventConductor demo",
+        subtitle = "Reservas y workflows, en una sola plataforma.",
+        image = "/images/redwood-header-texture.png")
 // The chat panel. Mateu's client POSTs the prompt here and reads the answer as a stream; the
 // gateway routes /ai/** to the agent pod and requires a token on it, which this client sends.
 // The agent itself knows nothing about these menus: it reaches the orchestrator, the forms engine
