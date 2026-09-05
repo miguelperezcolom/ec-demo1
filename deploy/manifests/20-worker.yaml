@@ -19,6 +19,11 @@ metadata:
   labels: { app: worker }
 spec:
   replicas: 1
+  # Recreate, not the default RollingUpdate: replicas is 1 and the cx43 nodepool runs near-full,
+  # so a rolling update's surge pod cannot schedule and the rollout stalls with the old pod still
+  # serving. Recreate terminates the old pod first — a few seconds of downtime, no surge.
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: worker }
   template:
