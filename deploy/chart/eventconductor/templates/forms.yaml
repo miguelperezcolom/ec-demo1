@@ -8,6 +8,13 @@ metadata:
     app.kubernetes.io/component: forms
 spec:
   replicas: {{ .Values.forms.replicas }}
+  # Recreate, not the default RollingUpdate: replicas is 1 and the cx43 nodepool runs near-full,
+  # so a rolling update's surge pod cannot schedule (Pending, "Insufficient memory") and the
+  # rollout stalls with the old pod still serving. Recreate terminates the old pod first — a few
+  # seconds of downtime, no surge. It used to live only as a live `kubectl patch`; baking it in
+  # keeps it through a fresh `helm install` too.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
