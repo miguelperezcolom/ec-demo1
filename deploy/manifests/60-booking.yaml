@@ -61,7 +61,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: booking
-          image: miguelperezcolom/ec-demo1-booking:0.14.1
+          image: miguelperezcolom/ec-demo1-booking:0.14.7
           env:
             - name: SERVER_PORT
               value: "8108"
