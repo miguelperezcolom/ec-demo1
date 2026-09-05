@@ -5,9 +5,12 @@ import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
+import io.mateu.uidl.annotations.PageTemplate;
 import io.mateu.uidl.annotations.PageTitle;
+import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
+import io.mateu.uidl.annotations.WelcomeBanner;
 import io.mateu.uidl.data.Anchor;
 import io.mateu.uidl.data.HorizontalLayout;
 import io.mateu.uidl.data.Popover;
@@ -43,6 +46,16 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 // The catalogues are listings with long ids and long URLs in them; the default ~900px container
 // wraps those into unreadable columns.
 @Style(StyleConstants.FULL_WIDTH)
+// This is a home, so it declares the landing template: Mateu tags the wire pageType as "landing"
+// and the renderer lays the page out as one. The welcome banner is what LANDING is for — Mateu
+// turns it into a HeroSection at the top of the content: an image, a title and a subtitle above
+// the menus. The image is a Redwood illustration served from src/main/resources/static like the
+// logo, so it arrives through the gateway's catch-all with no route and no token of its own.
+@PageTemplate(PageType.LANDING)
+@WelcomeBanner(
+        title = "Plano de control",
+        subtitle = "IA, usuarios, workflows y formularios de la plataforma.",
+        image = "/images/redwood-header-texture.png")
 public class ControlShellHome implements WidgetSupplier {
 
     // Both entries name their label. Without one Mateu labels a RemoteMenu from the field name
