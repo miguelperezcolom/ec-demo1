@@ -40,7 +40,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: api-mcp
-          image: miguelperezcolom/ec-demo1-api-mcp:0.14.1
+          image: miguelperezcolom/ec-demo1-api-mcp:0.14.7
           env:
             - name: SERVER_PORT
               value: "8113"
