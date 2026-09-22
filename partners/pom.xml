@@ -15,10 +15,10 @@
     </parent>
 
     <groupId>io.mateu.ecdemo1</groupId>
-    <artifactId>booking</artifactId>
+    <artifactId>partners</artifactId>
     <version>0.1.0</version>
-    <name>ec-demo1 booking</name>
-    <description>Bookings: a CRUD UI, MCP tools for the agent, and the worker side of the booking saga</description>
+    <name>ec-demo1 partners</name>
+    <description>The master of trading partners (agencies, tour operators, companies) the CRS-PMS integration PoC projects to the PMS</description>
 
     <properties>
         <java.version>21</java.version>

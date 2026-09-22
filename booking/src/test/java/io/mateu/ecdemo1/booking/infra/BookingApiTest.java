@@ -53,7 +53,12 @@ class BookingApiTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Container
-    static RedpandaContainer redpanda = new RedpandaContainer("docker.redpanda.com/redpandadata/redpanda:v24.1.7");
+    // Data on a tmpfs: Redpanda refuses writes once the disk it sits on has less free space than its
+    // threshold, and a developer machine with a nearly full disk then fails every test after the
+    // first with "BrokerNotAvailable". In memory it is also faster, and a test broker holds nothing
+    // worth keeping.
+    static RedpandaContainer redpanda = new RedpandaContainer("docker.redpanda.com/redpandadata/redpanda:v24.1.7")
+            .withTmpFs(java.util.Map.of("/var/lib/redpanda/data", "rw"));
 
     @DynamicPropertySource
     static void kafka(DynamicPropertyRegistry registry) {
