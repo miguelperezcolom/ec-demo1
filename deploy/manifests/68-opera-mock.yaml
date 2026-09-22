@@ -37,7 +37,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: opera-mock
-          image: miguelperezcolom/ec-demo1-opera-mock:0.15.0
+          image: miguelperezcolom/ec-demo1-opera-mock:0.15.1
           env:
             - name: SERVER_PORT
               value: "8124"
