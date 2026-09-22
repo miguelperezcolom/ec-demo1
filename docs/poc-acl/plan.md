@@ -41,12 +41,27 @@ auditoría (`audit-service`).
 - **Interlocutores en un maestro aparte (`partners`)**, que simula el maestro de interlocutores del
   lado ERP. La reserva de `booking` solo lleva el **código** del interlocutor. El proceso #3 lee
   **directamente del maestro**, que es la alternativa de **R38**.
-- **Motor:** EventConductor, el que ya corre en el clúster. La suspensión por causa es un paso
-  `WAIT_FOR_MESSAGE` correlacionado por la clave de la causa; la reanuda un `MessageReceived`.
+- **Motor:** EventConductor, el que ya corre en el clúster. La suspensión es un paso
+  `WAIT_FOR_MESSAGE` y la reanuda un `MessageReceived` (detalle más abajo).
 - **Orden de aplicación:** guarda de secuencia *compare-and-set* contra un **UDF** de la reserva en
   Opera (R18, R28). La versión la da `booking`.
 - **El LLM nunca está en el camino del dato.** Solo propone mapeados; nada entra en vigor sin
   aprobación humana.
+- **No se escribe nada en el tenant de Opera** (decisión del 2026-09-22). El conector se construye
+  contra **`opera-mock`**, un doble de OHIP que implementa las mismas rutas y formatos de las
+  Property APIs que usamos: token OAuth, catálogo, perfiles, reservas con UDF y cancelación. Cambiar
+  al tenant real es cambiar la URL y las credenciales. Validar contra el tenant (R18, R19,
+  revalidación de `rsv`) queda como paso posterior a la PoC.
+- **La suspensión por causa, sin ciclos en el grafo.** El motor no admite ciclos, así que «volver a
+  Preparar» se hace así:
+  1. `Preparar` devuelve las carencias y `mapping-service` registra cada una como causa, con los
+     procesos que esperan detrás.
+  2. El proceso espera en un único `WAIT_FOR_MESSAGE` correlacionado por su propia clave.
+  3. Cuando un proceso se queda sin causas abiertas, `mapping-service` le envía el mensaje.
+  4. El proceso reanudado **relanza una instancia nueva**, que vuelve a leer la reserva.
+
+  Encaja con «una instancia por evento» del HLA: una instancia de más es inofensiva. Un rechazo
+  determinista de Opera usa el mismo camino, como una causa más.
 
 ## Piezas
 
@@ -68,6 +83,7 @@ ia-agent ── MCP de booking, partners, mapping-service, communication-service
 | `crs-integration-service` | Nuevo | ACL del lado CRS: inbox con deduplicación, relectura, traducción al modelo canónico, router evento → proceso, worker «anotar en el CRS» | No | No |
 | `mapping-service` | Nuevo | Diccionario de equivalencias y de identificadores (perfiles de interlocutor), worker `Preparar`, causas, aprobación, señal de reanudación, petición de propuesta al agente | Sí | Sí |
 | `pms-integration-service` | Nuevo | **El conector.** ACL contra OHIP Property APIs: auth, catálogo, perfiles, reserva, cobros, cancelación, clasificación de errores | No | No |
+| `opera-mock` | Nuevo (doble) | Simula OHIP Property APIs con estado en memoria y una UI de solo lectura para ver qué ha «llegado a Opera» | Sí | No |
 | `communication-service` | Nuevo | Envío de notificaciones: plantillas, destinatarios, canal email por el relay `postfix`, histórico | Sí | Sí |
 | `ec-definitions` | Cambia | Definiciones `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor` | — | — |
 | `ia-control-plane` | Configuración | Alta de los MCP nuevos y del agente de mapeado | — | — |
@@ -161,7 +177,7 @@ no tienen operativa propia que enseñar.
   | 4xx determinista | Causa y suspensión |
   | Conflicto (la reserva ya existe) | Se lee y se actualiza |
 
-- **Pruebas** con un doble de OHIP en WireMock, grabado a partir de respuestas reales del tenant.
+- **Pruebas** contra `opera-mock`, que reproduce las rutas y formatos de las especificaciones públicas de OHIP (`oracle/hospitality-api-docs`). No hay respuestas reales del tenant: no se le escribe nada.
 
 ### `communication-service`
 
@@ -180,7 +196,9 @@ no tienen operativa propia que enseñar.
 
 - **`proyectar-reserva`**
   1. Preparar (`mapping-service`).
-  2. Si hay carencias: aviso y `WAIT_FOR_MESSAGE` por cada causa; al reanudar, **vuelta a Preparar**.
+  2. Si hay carencias: aviso y un `WAIT_FOR_MESSAGE` correlacionado por la clave del proceso. Al
+     reanudarse, **relanza una instancia nueva** que vuelve a leer la reserva (el grafo no admite
+     ciclos).
   3. Si no las hay: asegurar el perfil del huésped → grabar la reserva → anotar en el CRS.
 - **`proyectar-cancelacion`**: esperar a que la reserva esté proyectada → preparar el motivo →
   cancelar en Opera → anotar en el CRS.
@@ -195,12 +213,12 @@ Una rama y un PR por hito.
 
 | Hito | Contenido | Hecho cuando |
 | :--- | :-------- | :----------- |
-| H1 | `booking` ampliado, con versión, eventos y outbox; `shared` alineado | Crear, modificar y cancelar publican su evento con la versión correcta |
+| H1 ✅ | `booking` ampliado, con versión, eventos y outbox; `shared` alineado (PR #21) | Crear, modificar y cancelar publican su evento con la versión correcta |
 | H2 | `integration-model`, `partners`, `crs-integration-service` con inbox, relectura y router | Un cambio en `booking` arranca un proceso con la reserva canónica |
 | H3 | `mapping-service` con el diccionario, `Preparar`, causas y reanudación; UI y MCP | Una reserva con un código sin mapear se suspende y se reanuda al aprobarlo |
-| H4 | `pms-integration-service` contra el doble de OHIP; definiciones #1 y #2 | Punta a punta en local, con la guarda de secuencia |
-| H5 | **Tenant real de Opera** | Reserva creada, modificada y cancelada en Opera; R18, R19, R28 y la revalidación de `rsv` contestadas |
-| H6 | Proceso #3 contra el tenant | Una reserva que referencia un interlocutor nuevo espera y se proyecta tras sincronizarlo |
+| H4 | `opera-mock`, `pms-integration-service` contra él; definiciones #1 y #2 | Punta a punta en local, con la guarda de secuencia |
+| H5 | Tenant real de Opera: **aplazado**, no se escriben datos en Opera | Queda como paso posterior; se documenta qué faltaría validar |
+| H6 | Proceso #3 contra el doble | Una reserva que referencia un interlocutor nuevo espera y se proyecta tras sincronizarlo |
 | H7 | `communication-service` y avisos | Cada tipo de aviso llega por email |
 | H8 | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
 | H9 | Despliegue en el clúster, e2e y conclusiones | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
@@ -211,8 +229,8 @@ Una rama y un PR por hito.
    client id / secret y enterprise **RIUE**. El 2026-09-22 se comprobó que el token OAuth
    (`client_credentials`) funciona; es de cadena **RIUC** (`scope C:RIUC`). **Falta el código de
    hotel**: las Property APIs exigen `x-hotelid` y con `RIUC` / `RIUE` responden 403. También falta
-   saber qué APIs tiene activadas la app `Riu_Hotel_Cliente_OHIP`. Bloquea H5; hasta entonces se
-   trabaja contra el doble. Las credenciales no van en el repo: van a `deploy/.secrets/` y de ahí a un
+   saber qué APIs tiene activadas la app `Riu_Hotel_Cliente_OHIP`. Solo hace falta para la
+   validación posterior contra el tenant real: la PoC se completa contra `opera-mock`. Las credenciales no van en el repo: van a `deploy/.secrets/` y de ahí a un
    Secret. **Rotar el client secret al cerrar la PoC.**
 2. **Configuración del hotel de pruebas:**
    - Qué catálogos tiene y si se pueden leer por API.
@@ -223,5 +241,6 @@ Una rama y un PR por hito.
 
 - El código de los hitos, en PRs.
 - [`cost-log.md`](cost-log.md), con el coste del conector OHIP separado del resto.
-- **Conclusiones**: las incógnitas del HLA que la PoC cierra (R18, R19, R28, R38, revalidación con
-  `rsv`) y los problemas nuevos que haya sacado a la luz, como entrada para el DT.
+- **Conclusiones**: las incógnitas del HLA que la PoC cierra (R28, R38, la suspensión por causa sobre
+  el motor), las que solo puede cerrar el tenant real (R18, R19, revalidación con `rsv`) y los
+  problemas nuevos que haya sacado a la luz, como entrada para el DT.
