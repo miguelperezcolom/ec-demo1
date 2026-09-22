@@ -26,7 +26,7 @@ se pidió un token OAuth.
 Líneas sin blancos. Además: manifiestos y rutas de despliegue (H9), catálogo de MCP y agente de
 mapeado en `ec-ia-config`, menús remotos en los shells.
 
-El escenario local (`e2e/poc-acl-local`) pasa completo contra el orquestador 2.16.5: interlocutores
+El escenario local (`e2e/poc-acl-local`) pasa completo contra el orquestador real, en 2.16.5 y en 2.18.0 (la versión desplegada): interlocutores
 que esperan su mapeado, una reserva que espera seis causas compartidas y se proyecta con códigos
 traducidos, tarifas fijas por noche, régimen como paquete, perfil del interlocutor, ventana de
 folio del interlocutor y versión en el UDF; modificación en orden sin duplicar el depósito; 503

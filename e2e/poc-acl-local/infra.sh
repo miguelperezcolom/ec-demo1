@@ -28,5 +28,5 @@ docker run -d --name poc-orch --network host \
   -e WORKFLOW_GITIMPORT_REPOSITORIES_0_BRANCH=${EC_DEFINITIONS_BRANCH:-master} \
   -e WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY=definitions/workflows \
   -e XDG_CONFIG_HOME=/tmp \
-  miguelperezcolom/orchestrator-standalone-app:${ORCH_VERSION:-2.16.5} >/dev/null
+  miguelperezcolom/orchestrator-standalone-app:${ORCH_VERSION:-2.18.0} >/dev/null
 echo "infra up"
