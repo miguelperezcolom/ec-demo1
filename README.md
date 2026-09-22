@@ -147,7 +147,8 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
     own screens from its own pod — the shell states a path and nothing else about it. The content
     service is another, still deployed and still serving `/content/**`, but no longer on the bar:
     a route can outlive the menu entry that used to point at it.
-11. **Ask the chat panel for something.** "Lista las reservas", "crea una reserva para Ana". It has
+11. **Ask the chat panel for something.** "Lista las reservas", "crea una reserva para Ana García en
+    el PMI01 del 5 al 8 de octubre, doble con desayuno". It has
     no database and no screens: it answers by calling the MCP tools the orchestrator, the forms
     engine and the booking service advertise, and it is told to report a tool failure rather than
     answer around one. Ask it for something no tool covers and it will say so. It needs an
@@ -161,7 +162,7 @@ what they are here, not what they were there.
 
 | | path | what it is |
 |---|---|---|
-| `booking` | `/_booking` | A booking CRUD, an MCP server, and a worker. The three are one pod on purpose: the tools the agent calls and the saga steps that confirm a booking act on the same aggregate |
+| `booking` | `/_booking` | The CRS the CRS-PMS integration PoC projects from (see `docs/poc-acl/`): bookings with rooms, guests, nightly rates and payments, priced from its own catalog. A CRUD, a REST API (`/bookings`, `/catalog`, OpenAPI at `/v3/api-docs`), an MCP server, and a worker. One pod on purpose: the tools the agent calls, the API the integration reads and the saga steps that confirm a booking act on the same aggregate |
 | `content` | `/_content` | Content, labels and content types. A CRUD over its own database and nothing else |
 | `users` | `/_users` | Users, groups, roles and permissions, plus `GetAuthInfo` over gRPC on 9191 |
 | `ia-agent` | `/ai` | The chat panel's other half. It implements nothing: every answer is an MCP tool call or a refusal |
@@ -180,7 +181,10 @@ is created. They inherit that PostgreSQL's `emptyDir`, so treat what they hold a
 
 **Only `booking` touches Kafka.** It consumes the `booking` topic and replies on `upstream` — one
 consumer group of its own, subscribed to one topic, which is the arrangement the engine's own
-configuration argues for at length. `content` and `users` arrived declaring a binder and three
+configuration argues for at length. It also publishes, through a transactional outbox, what
+happens to its bookings on `crs-bookings` — `booking-created`, `booking-modified`,
+`booking-cancelled`, keyed by booking id and carrying the booking's version, not its data — and the
+request that starts `verify-booking-payment`, so neither leaves unless the booking was saved. `content` and `users` arrived declaring a binder and three
 bindings (`consumeOutbox`, `consumeUpstream`, `consumeWorkerEvent`) and implementing none of them,
 under the engine's own group names — `orchestrator-outbox`, `orchestrator-upstream`,
 `worker-group`. Deployed beside a real engine that would have taken partitions away from the

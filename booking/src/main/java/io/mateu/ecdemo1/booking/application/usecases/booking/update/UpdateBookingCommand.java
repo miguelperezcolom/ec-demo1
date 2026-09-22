@@ -1,4 +1,6 @@
 package io.mateu.ecdemo1.booking.application.usecases.booking.update;
 
-public record UpdateBookingCommand(String id, String name) {
+import io.mateu.ecdemo1.booking.application.usecases.booking.BookingRequest;
+
+public record UpdateBookingCommand(String id, BookingRequest booking) {
 }
