@@ -6,6 +6,9 @@ import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.fluent.OnLoadTrigger;
+import io.mateu.uidl.fluent.Trigger;
+import io.mateu.uidl.fluent.TriggersSupplier;
 import io.mateu.uidl.interfaces.Listing;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
@@ -15,7 +18,7 @@ import org.springframework.stereotype.Service;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Profiles in Opera")
-public class ProfilesPage implements Listing<ProfileRow> {
+public class ProfilesPage implements Listing<ProfileRow>, TriggersSupplier {
 
     final OperaStore store;
 
@@ -32,5 +35,14 @@ public class ProfilesPage implements Listing<ProfileRow> {
                     name.trim(), p.path("externalReferences").path(0).path("id").asText());
         }).toList();
         return new ListingData<>(new Page<>(null, rows.size(), 0, rows.size(), rows));
+    }
+
+    /**
+     * Search as soon as the page loads. A listing that is not navigable does not do it by itself —
+     * it stays on its loading skeleton until someone types in the search box.
+     */
+    @Override
+    public java.util.List<Trigger> triggers(HttpRequest httpRequest) {
+        return java.util.List.of(new OnLoadTrigger("search"));
     }
 }

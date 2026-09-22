@@ -1,6 +1,7 @@
 """End-to-end scenario of the CRS -> PMS integration PoC against the local stack (infra.sh + apps.sh).
 Every step checks what it expects and says what it saw; the first failed check stops the run."""
 import json, time, urllib.request, subprocess, sys
+import functools; print = functools.partial(print, flush=True)  # progress as it happens, not at the end
 
 BOOKING, MAPPING, OPERA = "http://localhost:8108", "http://localhost:8122", "http://localhost:8124"
 

@@ -1,7 +1,5 @@
 package io.mateu.ecdemo1.communication.ui;
 
-import io.mateu.ecdemo1.communication.ui.pages.NotificationsPage;
-import io.mateu.ecdemo1.communication.ui.pages.RecipientsCrud;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.*;
 import org.springframework.stereotype.Service;
@@ -15,8 +13,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class CommunicationHome {
 
+    /** One section, so the shell's RemoteMenu can name it: "Notifications". */
     @Menu
-    NotificationsPage notifications;
-    @Menu
-    RecipientsCrud recipients;
+    CommunicationMenu notifications;
 }

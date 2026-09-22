@@ -9,6 +9,9 @@ import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
 import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.fluent.OnLoadTrigger;
+import io.mateu.uidl.fluent.Trigger;
+import io.mateu.uidl.fluent.TriggersSupplier;
 import io.mateu.uidl.interfaces.Listing;
 import io.mateu.uidl.interfaces.Searchable;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +24,7 @@ import java.util.Comparator;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Reservations in Opera")
-public class ReservationsPage implements Listing<ReservationRow>, Searchable {
+public class ReservationsPage implements Listing<ReservationRow>, Searchable, TriggersSupplier {
 
     final OperaStore store;
 
@@ -59,5 +62,14 @@ public class ReservationsPage implements Listing<ReservationRow>, Searchable {
                 rate.path("roomType").asText(), rate.path("ratePlanCode").asText(),
                 r.path("reservationPackages").path(0).path("packageCode").asText(), version, 0,
                 cancelled ? new Status(StatusType.DANGER, "Cancelled") : new Status(StatusType.SUCCESS, "Reserved"));
+    }
+
+    /**
+     * Search as soon as the page loads. A listing that is not navigable does not do it by itself —
+     * it stays on its loading skeleton until someone types in the search box.
+     */
+    @Override
+    public java.util.List<Trigger> triggers(HttpRequest httpRequest) {
+        return java.util.List.of(new OnLoadTrigger("search"));
     }
 }

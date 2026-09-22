@@ -9,7 +9,7 @@ The whole CRS → Opera path on one machine, against the **real EventConductor o
 for m in booking partners crs-integration-service mapping-service pms-integration-service opera-mock; do
   (cd $m && mvn -q package -DskipTests); done
 
-./e2e/poc-acl-local/infra.sh     # Postgres (a database per service), Redpanda, orchestrator 2.18.0
+./e2e/poc-acl-local/infra.sh     # Postgres (a database per service), Redpanda, mailpit, the orchestrator
 ./e2e/poc-acl-local/apps.sh      # the six services, logs in e2e/poc-acl-local/logs/
 python3 e2e/poc-acl-local/scenario.py
 ```

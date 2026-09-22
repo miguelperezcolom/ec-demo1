@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Local end-to-end infrastructure for the PoC: Postgres (a database per service), Redpanda on tmpfs,
-# and the real EventConductor orchestrator, importing the definitions from the local ec-definitions
+# and the real EventConductor orchestrator (ORCH_VERSION, default the one deploy/values pins), importing the definitions from the local ec-definitions
 # branch. Everything on the host network so the services started with java -jar reach it all on
 # localhost.
 set -euo pipefail
@@ -28,5 +28,5 @@ docker run -d --name poc-orch --network host \
   -e WORKFLOW_GITIMPORT_REPOSITORIES_0_BRANCH=${EC_DEFINITIONS_BRANCH:-master} \
   -e WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY=definitions/workflows \
   -e XDG_CONFIG_HOME=/tmp \
-  miguelperezcolom/orchestrator-standalone-app:2.18.0 >/dev/null
+  miguelperezcolom/orchestrator-standalone-app:${ORCH_VERSION:-2.16.5} >/dev/null
 echo "infra up"

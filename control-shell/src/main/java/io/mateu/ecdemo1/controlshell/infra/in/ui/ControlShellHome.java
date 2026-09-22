@@ -99,6 +99,19 @@ public class ControlShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu formsAdmin = new RemoteMenu("/_forms-admin").withLabel("Forms");
 
+    /**
+     * The CRS-PMS integration's control plane (PoC ACL): the causes blocking processes, the code
+     * mapping with its proposals and approvals — and the button that asks the mapping agent — and
+     * the partners' profiles in the PMS. A control-plane concern like the rest of this console:
+     * approving an equivalence changes what every hotel's reservations become in the PMS.
+     */
+    @Menu
+    RemoteMenu mapping = new RemoteMenu("/_mapping").withLabel("Mapping");
+
+    /** What the integration told people, and who is told what. */
+    @Menu
+    RemoteMenu notifications = new RemoteMenu("/_communication").withLabel("Notifications");
+
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
         var widgets = new ArrayList<Component>();

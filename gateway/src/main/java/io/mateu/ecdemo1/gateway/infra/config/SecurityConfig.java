@@ -129,6 +129,9 @@ public class SecurityConfig {
                         // used to be here too; it moved to the control host, behind ai-admin — see
                         // below — because administering access is a control-plane concern.
                         .pathMatchers("/_booking/**", "/_content/**").authenticated()
+                        // The integration PoC's product-side screens: the partners master and the
+                        // Opera double. Same reason as the two above.
+                        .pathMatchers("/_partners/**", "/_opera-mock/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the
@@ -151,7 +154,10 @@ public class SecurityConfig {
                         // /_workflow/** rule further up matches on any host, and a path it caught
                         // would be decided as `authenticated` before this line was ever reached.
                         .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**",
-                                "/_workflow-admin/**", "/_forms-admin/**")).hasRole("ai-admin")
+                                "/_workflow-admin/**", "/_forms-admin/**",
+                                // The integration's control plane (PoC ACL): approving a mapping
+                                // decides what every hotel's reservations become in the PMS.
+                                "/_mapping/**", "/_communication/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and

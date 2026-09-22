@@ -43,7 +43,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-shell
-          image: miguelperezcolom/ec-demo1-control-shell:0.14.10
+          image: miguelperezcolom/ec-demo1-control-shell:0.15.0
           env:
             - name: SERVER_PORT
               value: "8111"

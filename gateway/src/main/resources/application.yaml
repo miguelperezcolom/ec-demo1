@@ -71,6 +71,20 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_booking/**
 
+        # The CRS-PMS integration PoC (docs/poc-acl): the master of partners, and the double of
+        # Opera's API the integration writes to instead of a real tenant.
+        - id: partners
+          uri: ${PARTNERS_URL:http://partners:8120}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_partners/**
+
+        - id: opera-mock
+          uri: ${OPERA_MOCK_URL:http://opera-mock:8124}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_opera-mock/**
+
         - id: content
           uri: ${CONTENT_URL:http://content:8104}
           predicates:
@@ -131,6 +145,20 @@ spring:
         # plain REST endpoint that authenticates itself by HMAC over the body, exactly like the
         # engine's /workflow/webhooks receiver, so it needs a route of its own and no role. Public
         # is the point: a merge in the config repo has to be able to reach it.
+        # The integration's control plane (PoC ACL): the mapping — causes, dictionary, proposals —
+        # and the notifications. On the control host, behind ai-admin, like the rest of it.
+        - id: mapping
+          uri: ${MAPPING_URL:http://mapping-service:8122}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_mapping/**
+
+        - id: communication
+          uri: ${COMMUNICATION_URL:http://communication-service:8125}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_communication/**
+
         - id: ia-control-plane-webhooks
           uri: ${IA_CONTROL_PLANE_URL:http://ia-control-plane:8110}
           predicates:

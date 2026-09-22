@@ -22,7 +22,7 @@ start crs-integration-service DB_URL=$DB/crs_integration BOOKING_URL=http://loca
 start mapping-service DB_URL=$DB/mapping CRS_INTEGRATION_URL=http://localhost:8121 PMS_INTEGRATION_URL=http://localhost:8123 IA_AGENT_URL=http://localhost:8095 RESEND_AFTER=20s
 start pms-integration-service CRS_INTEGRATION_URL=http://localhost:8121 MAPPING_URL=http://localhost:8122 \
   OPERA_GATEWAY_URL=http://localhost:8124 OPERA_APP_KEY=mock-app-key OPERA_CLIENT_ID=mock-client \
-  OPERA_CLIENT_SECRET=mock-secret OPERA_ENTERPRISE_ID=RIUE OPERA_HOTELS=RIUPMI,RIUCUN RETRY_ALERT_AFTER=30s
+  OPERA_CLIENT_SECRET=mock-secret OPERA_ENTERPRISE_ID=RIUE OPERA_HOTELS=RIUPMI,RIUCUN RETRY_ALERT_AFTER=5s
 start communication-service DB_URL=$DB/communication SMTP_HOST=localhost SMTP_PORT=51025 DEFAULT_RECIPIENT=ops@example.com
 for port in 8124 8108 8120 8121 8122 8123 8125; do
   for i in $(seq 1 60); do curl -s localhost:$port/actuator/health 2>/dev/null | grep -q '"UP"' && break; sleep 2; done

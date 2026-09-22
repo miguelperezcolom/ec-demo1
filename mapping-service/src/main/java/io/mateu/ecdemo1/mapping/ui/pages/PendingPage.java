@@ -37,8 +37,9 @@ public class PendingPage {
     @NotEmpty
     String hotelCode;
 
+    /** Hidden while blank — and null is not blank: it would show the word "null". */
     @Notice
-    String notice;
+    String notice = "";
 
     @Section("CRS codes with no approved equivalent")
     @ReadOnly
@@ -62,7 +63,7 @@ public class PendingPage {
         try {
             pmsCodes = queries.pmsCatalog(hotelCode).stream()
                     .map(c -> new PmsCodeRow(c.type().name(), c.code(), c.description())).toList();
-            notice = pending.isEmpty() ? "Nothing pending for " + hotelCode : null;
+            notice = pending.isEmpty() ? "Nothing pending for " + hotelCode : "";
         } catch (RuntimeException e) {
             pmsCodes = List.of();
             notice = "The PMS catalog could not be read: " + e.getMessage();

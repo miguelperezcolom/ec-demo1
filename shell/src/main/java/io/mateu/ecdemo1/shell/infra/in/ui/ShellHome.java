@@ -102,6 +102,20 @@ public class ShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu booking = new RemoteMenu("/_booking").withLabel("Booking");
 
+    /**
+     * The master of trading partners — tour operators, agencies, companies — that the CRS sells
+     * through and the CRS-PMS integration projects to the PMS (PoC ACL, docs/poc-acl).
+     */
+    @Menu
+    RemoteMenu partners = new RemoteMenu("/_partners").withLabel("Partners");
+
+    /**
+     * What reached "Opera": the double of Opera's API the integration PoC writes to instead of a
+     * real tenant, with its reservations, profiles, the calls it received and faults on demand.
+     */
+    @Menu
+    RemoteMenu opera = new RemoteMenu("/_opera-mock").withLabel("Opera");
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

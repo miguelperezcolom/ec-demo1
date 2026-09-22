@@ -203,6 +203,13 @@ kubectl apply -f deploy/manifests/60-booking.yaml
 kubectl apply -f deploy/manifests/61-content.yaml
 kubectl apply -f deploy/manifests/62-users.yaml
 kubectl apply -f deploy/manifests/63-ia-agent.yaml
+# The CRS-PMS integration PoC (docs/poc-acl).
+kubectl apply -f deploy/manifests/64-partners.yaml
+kubectl apply -f deploy/manifests/65-crs-integration.yaml
+kubectl apply -f deploy/manifests/66-mapping.yaml
+kubectl apply -f deploy/manifests/67-pms-integration.yaml
+kubectl apply -f deploy/manifests/68-opera-mock.yaml
+kubectl apply -f deploy/manifests/69-communication.yaml
 # The control console: its database first, then the service, then its shell.
 kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml
