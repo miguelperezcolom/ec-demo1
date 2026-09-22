@@ -307,6 +307,26 @@ and the MCP tools do not depend on it.
 
 The form it needs, `verify-payment`, is already there.
 
+### The CRS → Opera integration PoC
+
+Six more pods take `booking`'s events down to Opera Cloud through OHIP's Property APIs, as three
+engine definitions (`proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, in
+`ec-definitions`):
+
+| | path | what it is |
+|---|---|---|
+| `partners` | `/_partners` | The master of partners (tour operators, agencies, companies) — the ERP's role — with its own outbox |
+| `crs-integration-service` | — | The CRS-side adapter: inbox, reread, canonical reservation, event → process router |
+| `mapping-service` | `/_mapping` | CRS → Opera code dictionary with approval, the causes a process waits on, MCP tools for the mapping agent |
+| `pms-integration-service` | — | **The connector**: every call to OHIP, with the version guard in a UDF and idempotent writes |
+| `opera-mock` | `/_opera-mock` | An OHIP double with validation, availability and injectable faults. The deployed connector points at it |
+| `communication-service` | `/_communication` | Alerts by email |
+
+**Nothing writes to a real Opera tenant.** Real OHIP credentials, when there are any, go to
+`deploy/.secrets/` and a Secret, never to a values file. The plan, the cost log and the conclusions
+are in [`docs/poc-acl/`](docs/poc-acl/); the path runs end to end on one machine with
+[`e2e/poc-acl-local/`](e2e/poc-acl-local/README.md).
+
 ## The control console
 
 A second console, on a host of its own: **`https://console.ec1.mateu.io`**, behind the `ai-admin`

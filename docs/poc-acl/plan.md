@@ -214,14 +214,14 @@ Una rama y un PR por hito.
 | Hito | Contenido | Hecho cuando |
 | :--- | :-------- | :----------- |
 | H1 ✅ | `booking` ampliado, con versión, eventos y outbox; `shared` alineado (PR #21) | Crear, modificar y cancelar publican su evento con la versión correcta |
-| H2 | `integration-model`, `partners`, `crs-integration-service` con inbox, relectura y router | Un cambio en `booking` arranca un proceso con la reserva canónica |
-| H3 | `mapping-service` con el diccionario, `Preparar`, causas y reanudación; UI y MCP | Una reserva con un código sin mapear se suspende y se reanuda al aprobarlo |
-| H4 | `opera-mock`, `pms-integration-service` contra él; definiciones #1 y #2 | Punta a punta en local, con la guarda de secuencia |
+| H2 ✅ | `integration-model`, `partners`, `crs-integration-service` con inbox, relectura y router | Un cambio en `booking` arranca un proceso con la reserva canónica |
+| H3 ✅ | `mapping-service` con el diccionario, `Preparar`, causas y reanudación; UI y MCP | Una reserva con un código sin mapear se suspende y se reanuda al aprobarlo |
+| H4 ✅ | `opera-mock`, `pms-integration-service` contra él; definiciones #1 y #2 | Punta a punta en local, con la guarda de secuencia |
 | H5 | Tenant real de Opera: **aplazado**, no se escriben datos en Opera | Queda como paso posterior; se documenta qué faltaría validar |
-| H6 | Proceso #3 contra el doble | Una reserva que referencia un interlocutor nuevo espera y se proyecta tras sincronizarlo |
-| H7 | `communication-service` y avisos | Cada tipo de aviso llega por email |
-| H8 | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
-| H9 | Despliegue en el clúster, e2e y conclusiones | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
+| H6 ✅ | Proceso #3 contra el doble | Una reserva que referencia un interlocutor nuevo espera y se proyecta tras sincronizarlo |
+| H7 ✅ | `communication-service` y avisos | Cada tipo de aviso llega por email |
+| H8 ✅ | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
+| H9 🟡 | Despliegue en el clúster, e2e y conclusiones (manifiestos, e2e local y [conclusiones](conclusions.md) hechos; falta desplegar) | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
 
 ## Pendiente de recibir
 

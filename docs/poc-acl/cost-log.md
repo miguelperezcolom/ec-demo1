@@ -16,12 +16,15 @@ Una entrada por sesión de trabajo. **Pieza** permite separar el coste del conec
 | 2026-09-22 | H3 | `mapping-service` | | Diccionario cadena + propiedad versionado con aprobación; correspondencia interlocutor → perfil; causas con procesos en espera, liberación, reenvío de la señal y relanzamiento; workers `prepare-*`, `record-partner-profile`, `resolve-projection`, `relaunch`; REST, MCP para el agente, UI (causas, pendientes, diccionario, perfiles), petición de propuesta a `ia-agent`; 5 tests | Revisión | Sin ciclos en el motor: suspensión como espera única + relanzamiento. Carrera aprobación/registro de la espera cerrada revisando tras registrar. El MCP no ve la identidad del usuario: aprobar por MCP exige nombre y confirmación explícita |
 | 2026-09-22 | H4 | `pms-integration-service` (conector OHIP) | | Estudio de las specs públicas de OHIP (rsv, crm, csh, rmcfg, rtp, rsvcfg, lov); cliente OHIP (token, cabeceras, clasificación de errores); catálogo, perfiles, reserva con guarda de versión en UDF, depósitos, cancelación; lock por reserva; aviso de reintento prolongado | Revisión | Multi-habitación simplificado a una reserva con varias tarifas. OHIP exige `x-hotelid` incluso en perfiles de cadena. `rsv` revalida (códigos, perfil, disponibilidad): los rechazos son causas |
 | 2026-09-22 | H4 | `opera-mock`, definiciones, e2e local | | Doble de OHIP con validación, fallos inyectados y UI; tres definiciones; entorno local con el orquestador real y escenario de 7 pasos | Revisión | **Motor 2.18.0: `LOCK` falla en PostgreSQL** (clave con NUL) → sin LOCK, lock en el conector. **Descripción de definición > 255 caracteres: el motor la salta al importar y el validador no avisa**. `JOIN` tras `CHOICE` se descarta → una espera por punto de suspensión. Spring AI descarta en silencio `@Tool` que devuelven `Object` (afectaba a `getBooking` de H1). Pasos resueltos por nombre en `mapping` (el test no lo cubría). `booking` respondía al motor dentro de la transacción |
+| 2026-09-22 | H6 | Proceso #3 (`proyectar-interlocutor`) | | Definición, perfiles de interlocutor en el conector y en el doble, liberación de las reservas que esperaban | Revisión | Cubierto por el paso 1 del escenario |
+| 2026-09-22 | H7, H8 | `communication-service`, agente de mapeado | | Avisos por email (deduplicación, destinatarios, reintento) con test en GreenMail; catálogo MCP y agente en `ec-ia-config`; petición de propuesta desde la UI | Revisión | Sin clave del LLM en local: probado el cableado, no la propuesta real |
+| 2026-09-22 | H9 | Despliegue, e2e, conclusiones | | Manifiestos, BDs, rutas del gateway, menús remotos; escenario local completo; tests del cliente OHIP y del payload; [conclusiones](conclusions.md) | Revisión | Despliegue en el clúster pendiente de confirmar |
 
 ## Resumen (al cerrar)
 
 | Pieza | Horas | % IA | Notas |
 | :---- | ----: | ---: | :---- |
-| `pms-integration-service` (conector OHIP) | | | |
-| Resto de la integración | | | |
-| CRS simulado (`booking`, `partners`) | | | |
+| `pms-integration-service` (conector OHIP) | | | 985 líneas de producción, 205 de test; el doble `opera-mock` otras 954 |
+| Resto de la integración | | | `mapping-service` 1 861, `crs-integration-service` 706, `communication-service` 622, `integration-model` 246, definiciones 318 |
+| CRS simulado (`booking`, `partners`) | | | `booking` +2 915 / −214, `partners` 857 |
 | Total | | | |
