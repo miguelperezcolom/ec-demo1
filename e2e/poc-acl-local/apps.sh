@@ -7,7 +7,7 @@ L=$(dirname "$0")/logs
 mkdir -p $L
 # By port, not by name: an instance started by hand from another directory does not match a path
 # pattern, survives, holds the port, and the fresh one fails to start behind it.
-for port in 8108 8120 8121 8122 8123 8124; do
+for port in 8108 8120 8121 8122 8123 8124 8125; do
   pid=$(ss -ltnp 2>/dev/null | grep ":$port " | grep -o "pid=[0-9]*" | head -1 | cut -d= -f2)
   [ -n "$pid" ] && kill $pid
 done
@@ -23,7 +23,8 @@ start mapping-service DB_URL=$DB/mapping CRS_INTEGRATION_URL=http://localhost:81
 start pms-integration-service CRS_INTEGRATION_URL=http://localhost:8121 MAPPING_URL=http://localhost:8122 \
   OPERA_GATEWAY_URL=http://localhost:8124 OPERA_APP_KEY=mock-app-key OPERA_CLIENT_ID=mock-client \
   OPERA_CLIENT_SECRET=mock-secret OPERA_ENTERPRISE_ID=RIUE OPERA_HOTELS=RIUPMI,RIUCUN RETRY_ALERT_AFTER=30s
-for port in 8124 8108 8120 8121 8122 8123; do
+start communication-service DB_URL=$DB/communication SMTP_HOST=localhost SMTP_PORT=51025 DEFAULT_RECIPIENT=ops@example.com
+for port in 8124 8108 8120 8121 8122 8123 8125; do
   for i in $(seq 1 60); do curl -s localhost:$port/actuator/health 2>/dev/null | grep -q '"UP"' && break; sleep 2; done
   echo "$port $(curl -s localhost:$port/actuator/health | head -c 30)"
 done

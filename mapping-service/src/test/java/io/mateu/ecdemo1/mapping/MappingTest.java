@@ -223,6 +223,35 @@ class MappingTest {
     @Autowired
     io.mateu.ecdemo1.mapping.causes.Causes causesService;
 
+    @Autowired
+    org.springframework.ai.tool.ToolCallbackProvider mappingTools;
+
+    @Autowired
+    io.mateu.ecdemo1.mapping.mcp.MappingMcpTools tools;
+
+    @Test
+    void theMcpServerOffersEveryToolTheAgentNeeds() {
+        // Spring AI drops a tool it cannot describe — one returning Object — with only a warning at
+        // startup. This is where that would show.
+        assertThat(java.util.Arrays.stream(mappingTools.getToolCallbacks()).map(t -> t.getToolDefinition().name()))
+                .contains("listOpenCauses", "listPendingCodes", "getPmsCatalog", "proposeMappings", "listProposals",
+                        "approveMapping", "rejectMapping", "resolveCause");
+    }
+
+    @Test
+    void theAgentsProposalsWaitForAPersonAndAnApprovalNeedsAName() {
+        var answer = tools.proposeMappings(List.of(
+                new Dictionary.Proposal(CodeType.BOARD, null, "MP", "HALFB", Map.of(), 0.95, "Media pensión is half board"),
+                new Dictionary.Proposal(CodeType.BOARD, null, "TI", "ALLINC", Map.of(), 0.9, "Todo incluido is all inclusive")));
+        assertThat(answer).startsWith("Proposed 2");
+        assertThat(dictionary.resolve("PMI01", CodeType.BOARD, "MP")).isEmpty();
+        var mp = tools.listProposals().stream().filter(p -> p.sourceCode().equals("MP")).findFirst().orElseThrow();
+        assertThat(tools.approveMapping(mp.id(), "agent")).startsWith("Error");
+        assertThat(tools.approveMapping(mp.id(), "Miguel")).startsWith("Approved BOARD MP → HALFB");
+        assertThat(dictionary.resolve("PMI01", CodeType.BOARD, "MP")).isPresent();
+        assertThat(consume("notifications", r -> r.value().contains("PROPOSAL_READY"), 1, 10)).isNotEmpty();
+    }
+
     void waitOn(String processKey, String causeKey) {
         causesService.await(processKey, "proyectar-reserva", "PMI01", "L2",
                 List.of(new Variable("locator", "L2"), new Variable("hotelCode", "PMI01")),

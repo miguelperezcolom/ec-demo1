@@ -4,7 +4,9 @@
 # branch. Everything on the host network so the services started with java -jar reach it all on
 # localhost.
 set -euo pipefail
-docker rm -f poc-pg poc-rp poc-orch >/dev/null 2>&1 || true
+docker rm -f poc-pg poc-rp poc-orch poc-mail >/dev/null 2>&1 || true
+# A catch-all SMTP server with an inbox to look at: http://localhost:58025
+docker run -d --name poc-mail -p 51025:1025 -p 58025:8025 axllent/mailpit >/dev/null
 docker run -d --name poc-pg -e POSTGRES_USER=workflow -e POSTGRES_PASSWORD=workflow -e POSTGRES_DB=workflow \
   --tmpfs /var/lib/postgresql/data -p 56432:5432 postgres:16-alpine >/dev/null
 docker run -d --name poc-rp --tmpfs /var/lib/redpanda/data:uid=101,gid=101,mode=0755 -p 59192:9092 \
@@ -12,7 +14,7 @@ docker run -d --name poc-rp --tmpfs /var/lib/redpanda/data:uid=101,gid=101,mode=
   --kafka-addr 0.0.0.0:9092 --advertise-kafka-addr 127.0.0.1:59192 >/dev/null
 until docker exec poc-pg pg_isready -U workflow >/dev/null 2>&1; do sleep 1; done
 sleep 2
-for db in booking partners crs_integration mapping; do
+for db in booking partners crs_integration mapping communication; do
   docker exec poc-pg psql -U workflow -d workflow -qc "create database $db" >/dev/null
 done
 docker run -d --name poc-orch --network host \

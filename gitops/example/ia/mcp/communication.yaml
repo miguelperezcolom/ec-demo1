@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: mcp
+id: communication
+name: Communication
+url: http://communication-service:8125
+transport: SSE
+description: Las notificaciones de la integración — qué se avisó, a quién, y los destinatarios.

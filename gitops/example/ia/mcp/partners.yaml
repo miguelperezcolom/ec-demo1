@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: mcp
+id: partners
+name: Partners
+url: http://partners:8120
+transport: SSE
+description: El maestro de interlocutores — agencias, turoperadores y empresas, con sus datos de facturación.

@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: mcp
+id: mapping
+name: Mapping (CRS → PMS)
+url: http://mapping-service:8122
+transport: SSE
+timeoutSeconds: 60
+description: El mapeado de códigos de la integración CRS → PMS — causas que bloquean procesos, códigos pendientes, catálogo del PMS, propuestas y aprobaciones.

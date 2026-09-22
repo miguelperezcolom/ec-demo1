@@ -138,5 +138,12 @@ until("both wait: the projection for channel WEB, the cancellation for the proje
 approve("CHANNEL", "WEB", "WEBDIR", attributes={"marketCode": "LEIS"})
 until("projected and then cancelled in Opera", lambda: (lambda x: x and x["reservationStatus"] == "Cancelled")(opera_reservation(web)), timeout=180)
 
+print("8. People were told")
+def mails():
+    return [m["Subject"] for m in call("GET", "http://localhost:58025/api/v1/messages")[1].get("messages", [])]
+until("mail for new causes, a write retried too long and a refusal",
+      lambda: all(any(kind in s for s in mails()) for kind in ["[CAUSE_OPENED]", "[RETRYING_TOO_LONG]", "[PMS_REJECTED]"]), timeout=60)
+print("  ", len(mails()), "mails, e.g.", mails()[:3])
+
 print("\nOK — processes:", sql("select workflow_definition_id||' '||status||' '||count(*) from process_entity group by workflow_definition_id, status order by 1").replace("\n", " | "))
 print("Opera calls:", len(call("GET", OPERA + "/_mock/calls")[1]))

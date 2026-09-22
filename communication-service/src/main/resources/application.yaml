@@ -1,0 +1,72 @@
+server:
+  port: 8125
+
+spring:
+  application:
+    name: ec-demo1-communication
+
+  ai:
+    mcp:
+      server:
+        name: communication
+        version: 1.0.0
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  cloud:
+    function:
+      definition: consumeNotifications
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+      bindings:
+        consumeNotifications-in-0:
+          destination: notifications
+          group: ec-demo1-communication
+
+  # The cluster's send-only relay (deploy/manifests/11-postfix.yaml): plain SMTP inside the
+  # namespace, no auth, no TLS; postfix relays onwards.
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:25}
+    properties:
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/communication}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:6}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+communication:
+  from: ${MAIL_FROM:integration@ec1.mateu.io}
+  default-email: ${DEFAULT_RECIPIENT:integration-admins@example.com}
+  max-attempts: 5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error
