@@ -59,23 +59,14 @@ public class MappingMcpTools implements McpSystemContext {
     }
 
     @Tool(description = "The CRS codes a hotel can emit that have no approved equivalent in the PMS yet")
-    public Object listPendingCodes(@ToolParam(description = "CRS hotel code, e.g. PMI01") String hotelCode) {
-        try {
-            return pending.pendingCodes(hotelCode);
-        } catch (RuntimeException e) {
-            return "Error: " + e.getMessage();
-        }
+    public List<Pending.PendingCode> listPendingCodes(@ToolParam(description = "CRS hotel code, e.g. PMI01") String hotelCode) {
+        return pending.pendingCodes(hotelCode);
     }
 
     @Tool(description = "The PMS's codes for a hotel, to choose equivalents from. Until the hotel itself is "
             + "mapped, only the PMS's hotels are listed")
-    public Object getPmsCatalog(@ToolParam(description = "CRS hotel code, e.g. PMI01") String hotelCode) {
-        try {
-            List<CodeEntry> catalog = pending.pmsCatalog(hotelCode);
-            return catalog;
-        } catch (RuntimeException e) {
-            return "Error: " + e.getMessage();
-        }
+    public List<CodeEntry> getPmsCatalog(@ToolParam(description = "CRS hotel code, e.g. PMI01") String hotelCode) {
+        return pending.pmsCatalog(hotelCode);
     }
 
     @Tool(description = "Register proposed equivalences for a person to review. hotelCode empty means a "
@@ -99,9 +90,9 @@ public class MappingMcpTools implements McpSystemContext {
     }
 
     @Tool(description = "Proposals waiting for a person's decision")
-    public List<Object> listProposals() {
+    public List<ProposalView> listProposals() {
         return entries.findByStatusOrderByCreatedAtDesc(EntryStatus.PROPOSED).stream()
-                .<Object>map(e -> new ProposalView(e.getId(), e.getType().name(), e.scope(), e.getSourceCode(),
+                .map(e -> new ProposalView(e.getId(), e.getType().name(), e.scope(), e.getSourceCode(),
                         e.getTargetCode(), e.getAttributes(), e.getConfidence(), e.getRationale(), e.getProposedBy()))
                 .toList();
     }

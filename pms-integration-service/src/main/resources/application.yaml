@@ -1,0 +1,69 @@
+server:
+  port: 8123
+
+spring:
+  application:
+    name: ec-demo1-pms-integration
+
+  cloud:
+    function:
+      definition: consumeTasks
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          notifications:
+            producer:
+              sync: true
+      bindings:
+        # IN: the engine's tasks for this adapter — the steps whose definition says topic pms.
+        consumeTasks-in-0:
+          destination: pms-integration
+          group: ec-demo1-pms-integration-worker
+        # OUT: replies to the engine, and the alarm when a write keeps failing.
+        upstream:
+          destination: upstream
+        notifications:
+          destination: notifications
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
+# Opera, through OHIP. No defaults for the credentials: they come from the environment (a Secret),
+# never from this file. Pointed at opera-mock in this PoC — nothing is written to a real tenant.
+ohip:
+  url: ${OPERA_GATEWAY_URL}
+  app-key: ${OPERA_APP_KEY}
+  client-id: ${OPERA_CLIENT_ID}
+  client-secret: ${OPERA_CLIENT_SECRET}
+  enterprise-id: ${OPERA_ENTERPRISE_ID}
+  hotels: ${OPERA_HOTELS}
+  external-system-code: ${OPERA_EXTERNAL_SYSTEM:RIUCRS}
+  version-udf: CRS_VERSION
+  pay-at-hotel-method: CA
+  timeout: 30s
+
+pms-integration:
+  crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
+  mapping-url: ${MAPPING_URL:http://localhost:8122}
+  alert-after: ${RETRY_ALERT_AFTER:10m}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

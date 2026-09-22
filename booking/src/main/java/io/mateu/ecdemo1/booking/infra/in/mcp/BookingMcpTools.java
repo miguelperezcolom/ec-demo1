@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.booking.infra.in.mcp;
 
 import io.mateu.ecdemo1.booking.application.out.query.BookingQueryService;
+import io.mateu.ecdemo1.booking.application.out.query.dto.BookingDto;
 import io.mateu.ecdemo1.booking.application.usecases.booking.BookingRequest;
 import io.mateu.ecdemo1.booking.application.usecases.booking.cancel.CancelBookingCommand;
 import io.mateu.ecdemo1.booking.application.usecases.booking.cancel.CancelBookingUseCase;
@@ -83,9 +84,11 @@ public class BookingMcpTools implements McpSystemContext {
 
     @Tool(description = "Read a booking in full: stay, holder, rooms with guests and nightly rates, "
             + "payments, status, version and, if it already reached the PMS, its reservation id there")
-    public Object getBooking(String id) {
+    public BookingDto getBooking(String id) {
         log.info("MCP getBooking {}", id);
-        return bookingQueryService.getById(id).<Object>map(b -> b).orElse("Booking not found: " + id);
+        // Thrown, not returned: a tool returning Object is silently dropped by Spring AI ("returns a
+        // functional type"), and an exception reaches the agent as the tool's error text.
+        return bookingQueryService.getById(id).orElseThrow(() -> new java.util.NoSuchElementException("Booking not found: " + id));
     }
 
     @Tool(description = "Create a booking in a hotel. Returns its id. It starts Pending until payment is verified")

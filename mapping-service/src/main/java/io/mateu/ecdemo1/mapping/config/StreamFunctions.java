@@ -36,7 +36,7 @@ public class StreamFunctions {
             if (!(event instanceof TaskExecutionRequested task)) {
                 return;
             }
-            var handler = tasks.handlers().get(task.stepId());
+            var handler = tasks.handler(task).orElse(null);
             if (handler == null) {
                 log.debug("No handler for step {}", task.stepId());
                 return;

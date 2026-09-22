@@ -248,7 +248,13 @@ class MappingTest {
                 new Variable("definitionId", processKey.substring(0, processKey.indexOf(':'))), new Variable("version", "2")));
         variables.addAll(extra);
         var taskId = UUID.randomUUID().toString();
-        var task = new TaskExecutionRequested(taskId, "P-" + taskId, "d", step, "", variables);
+        var definition = processKey.substring(0, processKey.indexOf(':'));
+        var stepId = switch (step) {
+            case "prepare-reservation", "prepare-cancellation", "prepare-partner" -> "prepare";
+            case "relaunch" -> "relaunch-prepare";
+            default -> step;
+        };
+        var task = new TaskExecutionRequested(taskId, "P-" + taskId, definition, stepId, "", variables);
         send("mapping", task.processId(), objectMapper.writerFor(DomainEvent.class).writeValueAsString(task));
         return consume("upstream", r -> r.value().contains(taskId) && r.value().contains("task-status-changed"), 1, 20)
                 .stream().findFirst().map(r -> json(r.value()))

@@ -6,12 +6,15 @@ import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingStatus;
 import io.mateu.workflow.ddd.DomainEvent;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
+import io.mateu.workflow.dtos.events.integration.TaskStatusChanged;
 import io.mateu.workflow.worker.WorkerReply;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cloud.stream.function.StreamBridge;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -28,6 +31,7 @@ import java.util.function.Consumer;
 public class BookingKafkaConsumerConfig {
 
     final ChangeBookingStatusUseCase changeBookingStatusUseCase;
+    final StreamBridge streamBridge;
 
     @Bean
     public Consumer<DomainEvent> consumeWorkerEvent() {
@@ -45,9 +49,14 @@ public class BookingKafkaConsumerConfig {
         };
     }
 
+    /**
+     * Changes the booking, and only once that has committed answers the engine — still on this
+     * thread, so a reply the broker will not take fails the listener and the task is redelivered.
+     */
     private void changeStatus(TaskExecutionRequested task, BookingStatus status) {
-        changeBookingStatusUseCase.handle(new ChangeBookingStatusCommand(
+        var outcome = changeBookingStatusUseCase.handle(new ChangeBookingStatusCommand(
                 bookingId(task), status, task.taskExecutionId(), task.processId()));
+        WorkerReply.send(streamBridge, new TaskStatusChanged(task.taskExecutionId(), outcome, List.of(), task.processId()));
     }
 
     private String bookingId(TaskExecutionRequested task) {

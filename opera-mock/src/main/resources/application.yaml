@@ -1,0 +1,27 @@
+server:
+  port: 8124
+
+spring:
+  application:
+    name: ec-demo1-opera-mock
+
+# The double's credentials. Fake, and meant to be: they open nothing but this service. The real
+# tenant's never belong in a file, here or anywhere in the repository.
+opera-mock:
+  app-key: ${OPERA_MOCK_APP_KEY:mock-app-key}
+  client-id: ${OPERA_MOCK_CLIENT_ID:mock-client}
+  client-secret: ${OPERA_MOCK_CLIENT_SECRET:mock-secret}
+  enterprise-id: ${OPERA_MOCK_ENTERPRISE_ID:RIUE}
+  token-ttl: ${OPERA_MOCK_TOKEN_TTL:1h}
+  hotels: RIUPMI,RIUCUN
+  capacity-per-room-type: ${OPERA_MOCK_CAPACITY:20}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

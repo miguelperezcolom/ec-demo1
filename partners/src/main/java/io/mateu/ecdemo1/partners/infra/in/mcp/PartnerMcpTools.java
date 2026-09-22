@@ -43,8 +43,9 @@ public class PartnerMcpTools implements McpSystemContext {
     }
 
     @Tool(description = "Read a partner by its code")
-    public Object getPartner(String code) {
-        return repository.findByCode(code).<Object>map(PartnerDto::of).orElse("Partner not found: " + code);
+    public PartnerDto getPartner(String code) {
+        return repository.findByCode(code).map(PartnerDto::of)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Partner not found: " + code));
     }
 
     @Tool(description = "Create a partner. The code is 2 to 30 upper-case letters, digits or dashes and never changes")

@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.mapping.worker;
 
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
+import io.mateu.ecdemo1.integration.model.process.Definitions;
 import io.mateu.ecdemo1.integration.model.process.Outcome;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
 import io.mateu.ecdemo1.mapping.causes.Causes;
@@ -17,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -34,14 +35,27 @@ public class TaskHandlers {
     final PartnerProfileRepository partnerProfiles;
     final Clock clock;
 
-    public Map<String, Function<TaskExecutionRequested, List<Variable>>> handlers() {
-        return Map.of(
-                "prepare-reservation", this::prepareReservation,
-                "prepare-cancellation", this::prepareCancellation,
-                "prepare-partner", this::preparePartner,
-                "record-partner-profile", this::recordPartnerProfile,
-                "resolve-projection", this::resolveProjection,
-                "relaunch", this::relaunch);
+    /**
+     * The handler for a task, by its definition and step: "prepare" is a step of every one of the
+     * integration's processes, and what it prepares depends on which. Empty for a step that is not
+     * the mapping's.
+     */
+    public Optional<Function<TaskExecutionRequested, List<Variable>>> handler(TaskExecutionRequested task) {
+        var step = task.stepId();
+        if (step.startsWith("relaunch")) {
+            return Optional.of(this::relaunch);
+        }
+        return Optional.ofNullable(switch (step) {
+            case "prepare" -> switch (task.workflowDefinitionId()) {
+                case Definitions.PROJECT_RESERVATION -> this::prepareReservation;
+                case Definitions.PROJECT_CANCELLATION -> this::prepareCancellation;
+                case Definitions.PROJECT_PARTNER -> this::preparePartner;
+                default -> null;
+            };
+            case "record-partner-profile" -> this::recordPartnerProfile;
+            case "resolve-projection" -> this::resolveProjection;
+            default -> null;
+        });
     }
 
     List<Variable> prepareReservation(TaskExecutionRequested task) {

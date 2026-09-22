@@ -191,7 +191,7 @@ public class Causes {
     private void announce(CauseRecord cause) {
         outbox.appendNotification(new NotificationRequested(
                 UUID.randomUUID().toString(),
-                NotificationType.CAUSE_OPENED,
+                cause.type == CauseType.PMS_REJECTED ? NotificationType.PMS_REJECTED : NotificationType.CAUSE_OPENED,
                 cause.hotelCode,
                 cause.causeKey,
                 "Processes waiting: " + cause.description,

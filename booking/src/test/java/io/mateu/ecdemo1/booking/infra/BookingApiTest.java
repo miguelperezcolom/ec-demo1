@@ -183,6 +183,24 @@ class BookingApiTest {
         })).isInstanceOf(IllegalStateException.class).hasMessageContaining("changed concurrently");
     }
 
+    @Test
+    void theSagaStepConfirmsTheBookingAndAnswersTheEngine() throws Exception {
+        var id = create(REQUEST);
+        var task = new io.mateu.workflow.dtos.events.integration.TaskExecutionRequested("TE-" + id, "PROC-" + id,
+                "verify-booking-payment", "confirm-booking", "",
+                List.of(new io.mateu.workflow.dtos.Variable("bookingId", id)));
+        try (var producer = new org.apache.kafka.clients.producer.KafkaProducer<String, String>(Map.of(
+                org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers()),
+                new org.apache.kafka.common.serialization.StringSerializer(), new org.apache.kafka.common.serialization.StringSerializer())) {
+            producer.send(new org.apache.kafka.clients.producer.ProducerRecord<>("booking", task.processId(),
+                    objectMapper.writerFor(io.mateu.workflow.ddd.DomainEvent.class).writeValueAsString(task))).get();
+        }
+
+        var replies = consume("upstream", null, 60).stream().filter(r -> r.value().contains("TE-" + id)).toList();
+        assertThat(replies).singleElement().satisfies(r -> assertThat(json(r.value()).get("status").asText()).isEqualTo("COMPLETED"));
+        assertThat(read(id).get("status").asText()).isEqualTo("Confirmed");
+    }
+
     String create(String request) throws Exception {
         var body = mvc.perform(post("/bookings").contentType(MediaType.APPLICATION_JSON).content(command(request)))
                 .andExpect(status().isCreated())
