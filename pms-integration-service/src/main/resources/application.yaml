@@ -34,15 +34,10 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 
-# Opera, through OHIP. No defaults for the credentials: they come from the environment (a Secret),
-# never from this file. Pointed at opera-mock in this PoC — nothing is written to a real tenant.
+# Opera, through OHIP: what is written the same way for every property. How to reach each property
+# — gateway, application key, client, secret, enterprise — is each hotel's integration's, read from
+# integrations-service; nothing about a tenant is configuration here.
 ohip:
-  url: ${OPERA_GATEWAY_URL}
-  app-key: ${OPERA_APP_KEY}
-  client-id: ${OPERA_CLIENT_ID}
-  client-secret: ${OPERA_CLIENT_SECRET}
-  enterprise-id: ${OPERA_ENTERPRISE_ID}
-  hotels: ${OPERA_HOTELS}
   external-system-code: ${OPERA_EXTERNAL_SYSTEM:RIUCRS}
   version-udf: CRS_VERSION
   pay-at-hotel-method: CA
@@ -51,6 +46,7 @@ ohip:
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
   mapping-url: ${MAPPING_URL:http://localhost:8122}
+  integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
   alert-after: ${RETRY_ALERT_AFTER:10m}
 
 management:

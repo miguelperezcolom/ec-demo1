@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: mcp
+id: integrations
+name: Integrations (CRS → PMS)
+url: http://integrations-service:8126
+transport: SSE
+timeoutSeconds: 60
+description: Las integraciones de cada hotel con Opera — en qué puerta está su alta y qué le falta, y las decisiones de una persona sobre ella (aprobar el mapeado, activar, pausar, reanudar, relanzar el backfill).

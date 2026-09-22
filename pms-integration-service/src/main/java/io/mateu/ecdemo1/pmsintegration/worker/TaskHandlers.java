@@ -7,7 +7,10 @@ import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
 import io.mateu.ecdemo1.integration.model.reservation.Reservation;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients.CodeRef;
-import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
+import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
+import io.mateu.ecdemo1.integration.model.integration.IntegrationView;
+import io.mateu.ecdemo1.pmsintegration.connections.Connections;
+import io.mateu.ecdemo1.pmsintegration.ohip.PmsTransientException;
 import io.mateu.ecdemo1.pmsintegration.ohip.OperaProfiles;
 import io.mateu.ecdemo1.pmsintegration.ohip.OperaReservations;
 import io.mateu.ecdemo1.pmsintegration.ohip.PmsRejectedException;
@@ -22,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -42,7 +46,7 @@ public class TaskHandlers {
     final OperaProfiles profiles;
     final OperaReservations reservations;
     final ReservationPayload payload;
-    final OhipProperties ohip;
+    final Connections connections;
     final ReservationLocks locks;
 
     public Map<String, Function<TaskExecutionRequested, List<Variable>>> handlers() {
@@ -211,11 +215,19 @@ public class TaskHandlers {
         return locks.withLock(var(task, ProcessVariables.HOTEL_CODE), var(task, ProcessVariables.LOCATOR), () -> step.apply(task));
     }
 
+    /**
+     * Any property whose connection has been verified: profiles are the chain's, and every hotel of
+     * the chain lives in the same Opera environment (R24). None yet is transient — the partner is
+     * projected once the first integration is past its connectivity check.
+     */
     String anyHotel() {
-        if (ohip.hotels().isEmpty()) {
-            throw new IllegalStateException("No Opera hotel configured (ohip.hotels)");
-        }
-        return ohip.hotels().getFirst();
+        return connections.integrations().stream()
+                .filter(i -> !Set.of(IntegrationStatus.CREATED, IntegrationStatus.CONNECTIVITY_FAILED,
+                        IntegrationStatus.DECOMMISSIONED).contains(i.status()))
+                .map(IntegrationView::pmsHotelCode)
+                .sorted()
+                .findFirst()
+                .orElseThrow(() -> new PmsTransientException("No integration with a verified connection to Opera yet"));
     }
 
     /** The PMS hotel of the reservation, or null having registered that its equivalence is missing. */

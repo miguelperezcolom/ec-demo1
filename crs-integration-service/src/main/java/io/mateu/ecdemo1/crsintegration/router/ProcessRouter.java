@@ -70,6 +70,28 @@ public class ProcessRouter {
                 AuthorizationContext.SYSTEM));
     }
 
+    /**
+     * Starts «Proyectar Reserva» for a reservation nobody changed: the backfill's way in. The
+     * version is left out — the process reads the reservation as it is now — and the origin goes
+     * with it, which is how the preparation knows not to hold it for the activation.
+     */
+    @Transactional
+    public void project(String hotelCode, String locator, String origin) {
+        var definitionId = io.mateu.ecdemo1.integration.model.process.Definitions.PROJECT_RESERVATION;
+        var processKey = definitionId + ":" + hotelCode + "/" + locator + ":" + origin;
+        if (!inbox.firstTime("backfill", processKey)) {
+            return;
+        }
+        var variables = new ArrayList<>(List.of(
+                new Variable(ProcessVariables.DEFINITION_ID, definitionId),
+                new Variable(ProcessVariables.PROCESS_KEY, processKey),
+                new Variable(ProcessVariables.EVENT_ID, origin),
+                new Variable(ProcessVariables.ORIGIN, origin)));
+        reservation(variables, hotelCode, locator);
+        outbox.appendToEngine(new ProcessCreationRequested(definitionId, processKey, variables, null,
+                AuthorizationContext.SYSTEM));
+    }
+
     private static void reservation(List<Variable> variables, String hotelCode, String locator) {
         variables.add(new Variable(ProcessVariables.HOTEL_CODE, hotelCode));
         variables.add(new Variable(ProcessVariables.LOCATOR, locator));

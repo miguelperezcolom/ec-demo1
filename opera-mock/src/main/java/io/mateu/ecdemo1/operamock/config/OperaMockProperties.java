@@ -19,7 +19,7 @@ public record OperaMockProperties(String appKey, String clientId, String clientS
 
     public OperaMockProperties {
         if (tokenTtl == null) tokenTtl = Duration.ofHours(1);
-        if (hotels == null) hotels = List.of("RIUPMI", "RIUCUN");
+        if (hotels == null) hotels = List.of("RIUPMI", "RIUCUN", "RIUNEW");
         if (capacityPerRoomType <= 0) capacityPerRoomType = 20;
     }
 }

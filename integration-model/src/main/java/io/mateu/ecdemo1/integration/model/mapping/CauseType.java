@@ -9,5 +9,7 @@ public enum CauseType {
     /** A cancellation for a reservation that has not reached the PMS yet. */
     NOT_YET_PROJECTED,
     /** The PMS refused the write, and would refuse it again: someone has to look. */
-    PMS_REJECTED
+    PMS_REJECTED,
+    /** The hotel's integration is not active: onboarding, paused, or not there at all. */
+    INTEGRATION_INACTIVE
 }

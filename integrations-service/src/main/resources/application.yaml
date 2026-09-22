@@ -1,0 +1,101 @@
+server:
+  port: 8126
+
+spring:
+  application:
+    name: ec-demo1-integrations
+
+  ai:
+    mcp:
+      server:
+        name: integrations
+        version: 1.0.0
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  cloud:
+    function:
+      definition: consumeTasks
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          outboxUpstream:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          notifications:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+      bindings:
+        # IN: the engine's tasks for the integrations — the steps of «alta-integracion».
+        consumeTasks-in-0:
+          destination: integrations
+          group: ec-demo1-integrations-worker
+        # OUT: replies to the engine; and, through the outbox, the start of an onboarding, the
+        # messages that open its gates, and notifications.
+        upstream:
+          destination: upstream
+        outboxUpstream:
+          destination: upstream
+        notifications:
+          destination: notifications
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/integrations}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:8}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
+# No default for the crypto key: it comes from a Secret. Without it no connection can be stored.
+integrations:
+  crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
+  pms-integration-url: ${PMS_INTEGRATION_URL:http://localhost:8123}
+  mapping-url: ${MAPPING_URL:http://localhost:8122}
+  partners-url: ${PARTNERS_URL:http://localhost:8120}
+  console-url: ${CONSOLE_URL:https://console.ec1.mateu.io}
+  crypto-key: ${INTEGRATIONS_CRYPTO_KEY:}
+  gate-check: ${GATE_CHECK:5s}
+  recheck: ${GATE_RECHECK:30s}
+  backfill-per-tick: ${BACKFILL_PER_TICK:20}
+  backfill-tick: ${BACKFILL_TICK:2s}
+  activation-window-days: ${ACTIVATION_WINDOW_DAYS:30}
+
+springdoc:
+  packages-to-scan: io.mateu.ecdemo1.integrations.rest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

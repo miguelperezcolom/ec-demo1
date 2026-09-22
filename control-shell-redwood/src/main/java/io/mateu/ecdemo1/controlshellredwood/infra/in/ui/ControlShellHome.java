@@ -106,6 +106,14 @@ public class ControlShellHome implements WidgetSupplier {
     RemoteMenu formsAdmin = new RemoteMenu("/_forms-admin").withLabel("Forms");
 
     /**
+     * The hotels' integrations with Opera, served by integrations-service: registering one, its
+     * onboarding gate by gate, and activating, pausing or decommissioning it. First of the
+     * integration's menus, because it is where a hotel's integration starts.
+     */
+    @Menu
+    RemoteMenu integrations = new RemoteMenu("/_integrations").withLabel("Integrations");
+
+    /**
      * The CRS-PMS integration's control plane (PoC ACL): the causes blocking processes, the code
      * mapping with its proposals and approvals — and the button that asks the mapping agent — and
      * the partners' profiles in the PMS. A control-plane concern like the rest of this console:

@@ -41,7 +41,7 @@ public class OperaCatalog {
             new Code("NOPAY", "Payment not received"), new Code("DUPBKG", "Duplicate booking"),
             new Code("RELOC", "Relocated / overbooking"), new Code("OTH", "Other"));
 
-    final Map<String, Property> properties = Map.of(
+    final Map<String, Property> properties = new java.util.concurrent.ConcurrentHashMap<>(Map.of(
             "RIUPMI", new Property("RIUPMI", "Riu Demo Palma", "EUR", List.of(
                     new Code("SGLS", "Single standard"), new Code("STDK", "Standard king"),
                     new Code("STDT", "Standard twin"), new Code("DLXS", "Deluxe sea view"),
@@ -51,7 +51,30 @@ public class OperaCatalog {
                     new Code("STDK", "Standard king"), new Code("STDT", "Standard twin"),
                     new Code("OCVW", "Ocean view king"), new Code("JRST", "Junior suite"),
                     new Code("MSTR", "Master suite")),
-                    RATE_PLANS, PACKAGES, SOURCES, MARKETS, PAYMENTS, CANCELLATIONS));
+                    RATE_PLANS, PACKAGES, SOURCES, MARKETS, PAYMENTS, CANCELLATIONS),
+            // A property that has arrived in Opera and nobody has configured yet: no room types, no
+            // rate plans, nothing to map to. Onboarding it stops at «pendiente de configuración»
+            // (HLA F010, R10) until someone configures it — here, from the Properties screen.
+            "RIUNEW", unconfigured("RIUNEW", "Riu Demo Nuevo", "EUR")));
+
+    static Property unconfigured(String hotelId, String name, String currency) {
+        return new Property(hotelId, name, currency, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of());
+    }
+
+    /** Configures a property the way RIUPMI is — what a hotel's Opera administrator would do by hand. */
+    public Property configure(String hotelId) {
+        var current = property(hotelId).orElseThrow(() -> new java.util.NoSuchElementException("No property " + hotelId));
+        var model = properties.get("RIUPMI");
+        var configured = new Property(hotelId, current.name(), current.currency(), model.roomTypes(), model.ratePlans(),
+                model.packages(), model.sourceCodes(), model.marketCodes(), model.paymentMethods(), model.cancellationCodes());
+        properties.put(hotelId, configured);
+        return configured;
+    }
+
+    public java.util.Collection<Property> all() {
+        return properties.values();
+    }
 
     public Optional<Property> property(String hotelId) {
         return Optional.ofNullable(properties.get(hotelId));

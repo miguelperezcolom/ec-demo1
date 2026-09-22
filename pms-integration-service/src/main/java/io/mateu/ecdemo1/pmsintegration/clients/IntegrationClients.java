@@ -92,7 +92,7 @@ public class IntegrationClients {
                 .baseUrl(baseUrl)
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
-                    converters.add(new MappingJackson2HttpMessageConverter(reader.mapper()));
+                    converters.addFirst(new MappingJackson2HttpMessageConverter(reader.mapper()));
                 })
                 .build();
     }

@@ -155,9 +155,9 @@ public class SecurityConfig {
                         // would be decided as `authenticated` before this line was ever reached.
                         .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**",
                                 "/_workflow-admin/**", "/_forms-admin/**",
-                                // The integration's control plane (PoC ACL): approving a mapping
-                                // decides what every hotel's reservations become in the PMS.
-                                "/_mapping/**", "/_communication/**")).hasRole("ai-admin")
+                                // The integration's control plane (PoC ACL): activating a hotel or
+                                // approving a mapping decides what reaches the PMS.
+                                "/_integrations/**", "/_mapping/**", "/_communication/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and

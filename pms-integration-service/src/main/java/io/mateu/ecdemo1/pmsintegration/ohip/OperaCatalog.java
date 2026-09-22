@@ -3,7 +3,8 @@ package io.mateu.ecdemo1.pmsintegration.ohip;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
-import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
+import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
+import io.mateu.ecdemo1.pmsintegration.connections.Connections;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -19,15 +20,18 @@ import java.util.List;
 public class OperaCatalog {
 
     final OhipClient ohip;
-    final OhipProperties properties;
+    final Connections connections;
 
     /**
-     * The hotels this client may see and, when one is named, that property's codes. A board with no
+     * The Opera properties the integrations name and, when one is named, that property's codes. A board with no
      * package in Opera — room only — is the code NONE.
      */
     public List<CodeEntry> catalog(String hotelId) {
         var entries = new ArrayList<CodeEntry>();
-        properties.hotels().forEach(h -> entries.add(new CodeEntry(CodeType.HOTEL, null, h, "Opera property " + h)));
+        connections.integrations().stream()
+                .filter(i -> i.status() != IntegrationStatus.DECOMMISSIONED)
+                .forEach(i -> entries.add(new CodeEntry(CodeType.HOTEL, null, i.pmsHotelCode(),
+                        "Opera property " + i.pmsHotelCode() + " (CRS " + i.crsHotelCode() + ")")));
         for (var type : List.of("Agent", "Company", "Source")) {
             entries.add(new CodeEntry(CodeType.PARTNER_TYPE, null, type, "Opera profile type " + type));
         }

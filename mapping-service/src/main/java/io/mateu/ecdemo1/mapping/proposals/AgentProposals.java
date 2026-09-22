@@ -34,6 +34,24 @@ public class AgentProposals {
         this.agent = RestClient.builder().baseUrl(properties.iaAgentUrl()).requestFactory(factory).build();
     }
 
+    /**
+     * Asks without waiting for the answer — for the onboarding, which cannot hold a step for the
+     * minutes a proposal takes. It goes as no one in particular: the control plane routes it by the
+     * screen, and the proposal is still only a proposal.
+     */
+    public void requestProposalInBackground(String hotelCode) {
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                var answer = requestProposal(hotelCode, null);
+                org.slf4j.LoggerFactory.getLogger(AgentProposals.class)
+                        .info("Agent's proposal for {}: {}", hotelCode, answer == null ? "" : answer.lines().findFirst().orElse(""));
+            } catch (RuntimeException e) {
+                org.slf4j.LoggerFactory.getLogger(AgentProposals.class)
+                        .warn("The agent did not propose a mapping for {}: {}", hotelCode, e.getMessage());
+            }
+        });
+    }
+
     public String requestProposal(String hotelCode, String authorization) {
         var body = new HashMap<String, Object>();
         body.put("message", """

@@ -1,8 +1,11 @@
 package io.mateu.ecdemo1.pmsintegration.ohip;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.mateu.ecdemo1.integration.model.integration.ConnectivityCheck;
+import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.config.TolerantReader;
+import io.mateu.ecdemo1.pmsintegration.connections.Connections;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -19,15 +22,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The one door to OHIP. It gets and renews the OAuth token, puts on every call the headers OHIP
- * demands — the application key, the bearer, the hotel, a request id — and turns every answer into
- * one of three things the rest of the adapter can act on: a result, a transient failure to retry,
- * or a refusal someone has to look at.
+ * The one door to OHIP. It finds how to reach the property a call is for — each hotel's integration
+ * has its own connection — gets and renews the OAuth token for it, puts on every call the headers
+ * OHIP demands — the application key, the bearer, the hotel, a request id — and turns every answer
+ * into one of three things the rest of the adapter can act on: a result, a transient failure to
+ * retry, or a refusal someone has to look at.
  */
 @Component
 @Slf4j
@@ -39,25 +44,19 @@ public class OhipClient {
     record Token(String value, Instant expiresAt) {
     }
 
+    final Connections connections;
     final OhipProperties properties;
-    final RestClient rest;
+    final TolerantReader reader;
     final Clock clock;
-    final AtomicReference<Token> token = new AtomicReference<>();
+    /** One token per client of one gateway and enterprise: two hotels on the same tenant share it. */
+    final Map<String, Token> tokens = new ConcurrentHashMap<>();
+    final Map<String, RestClient> clients = new ConcurrentHashMap<>();
 
-    public OhipClient(OhipProperties properties, TolerantReader reader, Clock clock) {
+    public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock) {
+        this.connections = connections;
         this.properties = properties;
+        this.reader = reader;
         this.clock = clock;
-        var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(properties.timeout());
-        factory.setReadTimeout(properties.timeout());
-        this.rest = RestClient.builder()
-                .baseUrl(properties.url())
-                .requestFactory(factory)
-                .messageConverters(converters -> {
-                    converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
-                    converters.add(new MappingJackson2HttpMessageConverter(reader.mapper()));
-                })
-                .build();
     }
 
     public Response get(String hotelId, String uri, Object... variables) {
@@ -84,15 +83,51 @@ public class OhipClient {
         return call(HttpMethod.PUT, hotelId, uri, body, variables);
     }
 
-    Response call(HttpMethod method, String hotelId, String uri, Object body, Object... variables) {
+    /**
+     * Tries a connection before anyone relies on it (HLA F010, «Registrar y verificar
+     * conectividad»): a token of its own — never one already held — and a read on the property,
+     * which is what shows the client may see that hotel.
+     */
+    public ConnectivityCheck verify(OhipConnection connection) {
         try {
-            return exchange(method, hotelId, uri, body, variables);
+            var rest = rest(connection);
+            var token = requestToken(rest, connection);
+            var types = rest.get().uri("/rm/config/v1/hotels/{hotelId}/roomTypes", connection.pmsHotelCode())
+                    .header("x-app-key", connection.appKey())
+                    .header("x-hotelid", connection.pmsHotelCode())
+                    .header("x-request-id", UUID.randomUUID().toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.value())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve().body(JsonNode.class);
+            // OHIP groups the room types per hotel: count the types, not the groups.
+            var count = 0;
+            if (types != null) {
+                for (var group : types.path("roomTypes")) {
+                    count += group.path("roomType").size();
+                }
+            }
+            return new ConnectivityCheck(true, "Token granted; property %s readable (%d room types)"
+                    .formatted(connection.pmsHotelCode(), count));
+        } catch (RestClientResponseException e) {
+            return new ConnectivityCheck(false, "OHIP %d: %s".formatted(e.getStatusCode().value(), detail(e)));
+        } catch (PmsTransientException e) {
+            return new ConnectivityCheck(false, e.getMessage());
+        } catch (ResourceAccessException | IllegalArgumentException e) {
+            return new ConnectivityCheck(false, "Unreachable: " + e.getMessage());
+        }
+    }
+
+    Response call(HttpMethod method, String hotelId, String uri, Object body, Object... variables) {
+        var connection = connection(hotelId);
+        var rest = rest(connection);
+        try {
+            return exchange(rest, connection, method, hotelId, uri, body, variables);
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() == 401) {
                 // The token may have been revoked or rotated before its time: one fresh try.
-                token.set(null);
+                tokens.remove(tokenKey(connection));
                 try {
-                    return exchange(method, hotelId, uri, body, variables);
+                    return exchange(rest, connection, method, hotelId, uri, body, variables);
                 } catch (RestClientResponseException again) {
                     throw classify(method, uri, again);
                 }
@@ -103,12 +138,23 @@ public class OhipClient {
         }
     }
 
-    Response exchange(HttpMethod method, String hotelId, String uri, Object body, Object... variables) {
+    /**
+     * The connection of the property. None is transient, not a refusal: it is an integration not
+     * registered yet, and the step is retried until it is — the preparation keeps real traffic of a
+     * hotel with no active integration from getting this far.
+     */
+    OhipConnection connection(String hotelId) {
+        return connections.of(hotelId).orElseThrow(() -> new PmsTransientException(
+                "No integration knows how to reach Opera property " + hotelId));
+    }
+
+    Response exchange(RestClient rest, OhipConnection connection, HttpMethod method, String hotelId, String uri,
+                      Object body, Object... variables) {
         var spec = rest.method(method).uri(uri, variables)
-                .header("x-app-key", properties.appKey())
+                .header("x-app-key", connection.appKey())
                 .header("x-hotelid", hotelId)
                 .header("x-request-id", UUID.randomUUID().toString())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(rest, connection))
                 .accept(MediaType.APPLICATION_JSON);
         if (body != null) {
             spec = spec.contentType(MediaType.APPLICATION_JSON).body(body);
@@ -116,6 +162,24 @@ public class OhipClient {
         var entity = spec.retrieve().toEntity(JsonNode.class);
         var location = entity.getHeaders().getLocation();
         return new Response(entity.getBody(), location == null ? null : location.toString());
+    }
+
+    RestClient rest(OhipConnection connection) {
+        return clients.computeIfAbsent(connection.gatewayUrl(), url -> build(connection));
+    }
+
+    RestClient build(OhipConnection connection) {
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(properties.timeout());
+        factory.setReadTimeout(properties.timeout());
+        return RestClient.builder()
+                .baseUrl(connection.gatewayUrl())
+                .requestFactory(factory)
+                .messageConverters(converters -> {
+                    converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
+                    converters.addFirst(new MappingJackson2HttpMessageConverter(reader.mapper()));
+                })
+                .build();
     }
 
     /**
@@ -150,35 +214,44 @@ public class OhipClient {
         }
     }
 
+    static String tokenKey(OhipConnection c) {
+        return c.gatewayUrl() + "|" + c.enterpriseId() + "|" + c.clientId() + "|" + c.appKey();
+    }
+
     /** A token, renewed a minute before it expires — or at once, if Opera turned the last one down. */
-    String token() {
-        var current = token.get();
+    String token(RestClient rest, OhipConnection connection) {
+        var key = tokenKey(connection);
+        var current = tokens.get(key);
         if (current != null && current.expiresAt().isAfter(clock.instant().plusSeconds(60))) {
             return current.value();
         }
+        var fresh = requestToken(rest, connection);
+        tokens.put(key, fresh);
+        return fresh.value();
+    }
+
+    Token requestToken(RestClient rest, OhipConnection connection) {
         var form = new LinkedMultiValueMap<String, String>();
         form.add("grant_type", "client_credentials");
         form.add("scope", "urn:opc:hgbu:ws:__myscopes__");
         var basic = Base64.getEncoder().encodeToString(
-                (properties.clientId() + ":" + properties.clientSecret()).getBytes(StandardCharsets.UTF_8));
+                (connection.clientId() + ":" + connection.clientSecret()).getBytes(StandardCharsets.UTF_8));
         try {
             var answer = rest.post().uri("/oauth/v1/tokens")
-                    .header("x-app-key", properties.appKey())
-                    .header("enterpriseId", properties.enterpriseId())
+                    .header("x-app-key", connection.appKey())
+                    .header("enterpriseId", connection.enterpriseId())
                     .header(HttpHeaders.AUTHORIZATION, "Basic " + basic)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(form)
                     .retrieve().body(JsonNode.class);
-            var fresh = new Token(answer.path("access_token").asText(),
+            log.info("New OHIP token for {} at {}, valid for {}s", connection.clientId(), connection.gatewayUrl(),
+                    answer.path("expires_in").asLong());
+            return new Token(answer.path("access_token").asText(),
                     clock.instant().plusSeconds(answer.path("expires_in").asLong(3600)));
-            token.set(fresh);
-            log.info("New OHIP token, valid for {}s", answer.path("expires_in").asLong());
-            return fresh.value();
         } catch (RestClientResponseException e) {
             throw new PmsTransientException("OHIP refused the token request: %d %s".formatted(e.getStatusCode().value(), detail(e)), e);
         } catch (ResourceAccessException e) {
             throw new PmsTransientException("OHIP unreachable for a token: " + e.getMessage(), e);
         }
     }
-
 }

@@ -46,12 +46,9 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: shell-redwood
-          # Held at 0.15.0 (Mateu 3.0-alpha.340) while every other Mateu module is on alpha.358: the
-          # Redwood bundle published in alpha.356-358 ships mateuBaseUrl = "http://localhost:9005" (the
-          # demo-vb default) instead of "", so the shell loads itself from localhost and shows "Sin
-          # conexión" with an empty menu bar. alpha.341-355 ship "". Move this to the next image once
-          # a Mateu release fixes the bundle.
-          image: miguelperezcolom/ec-demo1-shell-redwood:0.15.0
+          # Built on Mateu 3.0-alpha.352 while every other Mateu module is on alpha.358: see the note
+          # on mateu.version in this shell's pom.
+          image: miguelperezcolom/ec-demo1-shell-redwood:0.16.0
           env:
             - name: SERVER_PORT
               value: "8102"

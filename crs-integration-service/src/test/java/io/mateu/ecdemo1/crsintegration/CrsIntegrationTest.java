@@ -16,6 +16,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,6 +43,7 @@ import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -95,6 +97,10 @@ class CrsIntegrationTest {
             }
             String body = switch (path) {
                 case "/bookings/LOC1" -> BOOKING;
+                case "/bookings/future" -> exchange.getRequestURI().getQuery().contains("afterArrival")
+                        ? "[]"
+                        : "[" + BOOKING + "," + BOOKING.replace("\"LOC1\"", "\"LOC2\"").replace("2026-10-05", "2026-10-09")
+                                .replace("\"TTOO\"", "\"WEB\"").replace("\"NORDTRAVEL\"", "null") + "]";
                 case "/partners/NORDTRAVEL" -> """
                         {"code":"NORDTRAVEL","type":"TourOperator","name":"Nordic Travel Group AB","billingMode":"NoFront",
                          "active":true,"version":1}""";
@@ -189,6 +195,44 @@ class CrsIntegrationTest {
                 .isEqualTo("COMPLETED"));
         assertThat(writes).anySatisfy(w -> assertThat(w).startsWith("PUT /bookings/LOC1/pms-reference")
                 .contains("OPERA-77"));
+    }
+
+    @Test
+    void aBackfillPagesThroughTheFutureReservationsAndSeesWhatTheyReallyUse() throws Exception {
+        mvc.perform(get("/reservations/PMI01/future?limit=10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].locator").value("LOC1"))
+                .andExpect(jsonPath("$[1].locator").value("LOC2"))
+                .andExpect(jsonPath("$[1].version").value(3));
+
+        var usage = json(mvc.perform(get("/reservations/PMI01/future/usage")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertThat(usage.get("reservations").asInt()).isEqualTo(2);
+        var codes = new java.util.HashMap<String, Integer>();
+        usage.get("codes").forEach(c -> codes.put(c.get("type").asText() + "/" + c.get("code").asText(), c.get("reservations").asInt()));
+        assertThat(codes).containsEntry("ROOM_TYPE/DBL", 2).containsEntry("CHANNEL/TTOO", 1).containsEntry("CHANNEL/WEB", 1)
+                .containsEntry("PAYMENT_METHOD/VISA", 2);
+        assertThat(usage.get("codes").get(0).get("reservations").asInt()).isEqualTo(2);
+        assertThat(usage.get("partners")).singleElement()
+                .satisfies(p -> assertThat(p.get("partnerCode").asText()).isEqualTo("NORDTRAVEL"));
+    }
+
+    @Test
+    void aBackfillProjectsAReservationByTheSamePathOnceEvenIfAskedTwice() throws Exception {
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(post("/projections").contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"hotelCode":"PMI01","locator":"LOC1","origin":"backfill:R1"}"""))
+                    .andExpect(status().isOk());
+        }
+        var starts = consume("upstream", r -> r.value().contains("backfill:R1"), 2, 15);
+        assertThat(starts).singleElement().satisfies(r -> {
+            var start = json(r.value());
+            assertThat(start.get("workflowDefinitionId").asText()).isEqualTo("proyectar-reserva");
+            assertThat(start.get("businessKey").asText()).isEqualTo("proyectar-reserva:PMI01/LOC1:backfill:R1");
+            assertThat(variables(start)).containsEntry("origin", "backfill:R1").containsEntry("locator", "LOC1")
+                    .doesNotContainKey("version");
+        });
     }
 
     @Test

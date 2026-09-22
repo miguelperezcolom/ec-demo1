@@ -14,7 +14,7 @@ docker run -d --name poc-rp --tmpfs /var/lib/redpanda/data:uid=101,gid=101,mode=
   --kafka-addr 0.0.0.0:9092 --advertise-kafka-addr 127.0.0.1:59192 >/dev/null
 until docker exec poc-pg pg_isready -U workflow >/dev/null 2>&1; do sleep 1; done
 sleep 2
-for db in booking partners crs_integration mapping communication; do
+for db in booking partners crs_integration mapping communication integrations; do
   docker exec poc-pg psql -U workflow -d workflow -qc "create database $db" >/dev/null
 done
 docker run -d --name poc-orch --network host \

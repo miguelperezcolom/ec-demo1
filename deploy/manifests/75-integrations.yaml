@@ -1,0 +1,114 @@
+# CRS-PMS integration PoC (docs/poc-acl). The integrations: one per hotel, with its connection to Opera
+# (secret sealed at rest under the key in ec-integrations-crypto) and its life, from onboarding —
+# connectivity, catalogue contrast, mapping, partners, backfill — to activation, pause and
+# decommission; the worker of «alta-integracion», the MCP tools, and the screens at /_integrations
+# on the control console. Its REST API is not routed by the gateway: /integrations/connections hands
+# the connector the secret.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integrations-service
+  namespace: ec-demo1
+  labels: { app: integrations-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: integrations-service }
+  template:
+    metadata:
+      labels:
+        app: integrations-service
+        app.kubernetes.io/component: integrations-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8126"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-redpanda
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for redpanda; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: integrations-service
+          image: miguelperezcolom/ec-demo1-integrations-service:0.16.0
+          env:
+            - name: SERVER_PORT
+              value: "8126"
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/integrations
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "6"
+            - name: CRS_INTEGRATION_URL
+              value: "http://crs-integration-service:8121"
+            - name: PMS_INTEGRATION_URL
+              value: "http://pms-integration-service:8123"
+            - name: MAPPING_URL
+              value: "http://mapping-service:8122"
+            - name: PARTNERS_URL
+              value: "http://partners:8120"
+            - name: INTEGRATIONS_CRYPTO_KEY
+              valueFrom: { secretKeyRef: { name: ec-integrations-crypto, key: INTEGRATIONS_CRYPTO_KEY } }
+            - name: CONSOLE_URL
+              value: "https://console.ec1.mateu.io"
+          ports:
+            - { name: http, containerPort: 8126 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "640Mi", cpu: "100m" }
+            limits:   { memory: "1536Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8126 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8126 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: integrations-service
+  namespace: ec-demo1
+  labels: { app: integrations-service }
+spec:
+  selector: { app: integrations-service }
+  ports:
+    - { name: http, port: 8126, targetPort: 8126 }

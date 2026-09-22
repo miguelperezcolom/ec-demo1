@@ -102,6 +102,9 @@ append_if_missing GITOPS_WEBHOOK_SECRET "$(openssl rand -hex 24)"
 # Regenerating this one would make every stored LLM credential undecryptable — nothing re-wraps
 # them — so it is written once and then left alone, like the PostgreSQL password above.
 append_if_missing CP_CRYPTO_KEY "$(openssl rand -base64 32)"
+# The same rule for the key the integrations' Opera secrets are sealed under: a new one leaves every
+# stored connection unreadable, and each hotel's secret would have to be entered again.
+append_if_missing INTEGRATIONS_CRYPTO_KEY "$(openssl rand -base64 32)"
 
 # shellcheck disable=SC1090
 set -a; . "$SECRETS"; set +a
@@ -141,6 +144,9 @@ kubectl create secret generic ec-cp-postgres -n "$NS" \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic ec-cp-crypto -n "$NS" \
   --from-literal=CP_CRYPTO_KEY="$CP_CRYPTO_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic ec-integrations-crypto -n "$NS" \
+  --from-literal=INTEGRATIONS_CRYPTO_KEY="$INTEGRATIONS_CRYPTO_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # The chat agent's Anthropic key. Not generated — it is bought, not derived — so it is only
@@ -210,6 +216,7 @@ kubectl apply -f deploy/manifests/66-mapping.yaml
 kubectl apply -f deploy/manifests/67-pms-integration.yaml
 kubectl apply -f deploy/manifests/68-opera-mock.yaml
 kubectl apply -f deploy/manifests/69-communication.yaml
+kubectl apply -f deploy/manifests/75-integrations.yaml
 # The control console: its database first, then the service, then its shell.
 kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml

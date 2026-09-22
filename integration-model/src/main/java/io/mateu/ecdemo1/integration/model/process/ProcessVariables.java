@@ -15,6 +15,13 @@ public final class ProcessVariables {
     /** The process's own correlation key: what the wait for its causes is correlated by. */
     public static final String PROCESS_KEY = "processKey";
     public static final String DEFINITION_ID = "definitionId";
+    /**
+     * Who started the process, when it was not a change in the CRS: {@code backfill:<run>} for a
+     * reservation a backfill projects. A backfill runs before the integration is active, so its
+     * processes do not wait for the activation.
+     */
+    public static final String ORIGIN = "origin";
+    public static final String INTEGRATION_ID = "integrationId";
 
     public static final String PREPARE_OUTCOME = "prepareOutcome";
     public static final String PROFILE_OUTCOME = "profileOutcome";

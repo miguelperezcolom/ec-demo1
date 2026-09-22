@@ -63,7 +63,7 @@ spec:
               until pg_isready -q; do echo "waiting for postgres"; sleep 2; done
               # CREATE DATABASE has no IF NOT EXISTS, and the Job is retried on failure, so the
               # existence check is what makes re-running this harmless.
-              for db in booking content users partners crs_integration mapping communication; do
+              for db in booking content users partners crs_integration mapping communication integrations; do
                 if psql -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1; then
                   echo "database $db already exists"
                 else

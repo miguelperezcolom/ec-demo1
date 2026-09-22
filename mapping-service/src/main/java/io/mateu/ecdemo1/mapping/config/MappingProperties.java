@@ -7,13 +7,14 @@ import java.time.Duration;
 /**
  * @param crsIntegrationUrl the CRS adapter, for the reservation, the partner and the CRS catalog
  * @param pmsIntegrationUrl the PMS adapter, for the PMS catalog
+ * @param integrationsUrl   the integrations, for whether a hotel's integration is active
  * @param iaAgentUrl        the agent that proposes mappings
  * @param consoleUrl        where the mapping screens are, for links in notifications
  * @param resendAfter       how long a released process may stay silent before the resume message
  *                          is sent again — it can arrive before the process reached its wait
  */
 @ConfigurationProperties("mapping")
-public record MappingProperties(String crsIntegrationUrl, String pmsIntegrationUrl, String iaAgentUrl, String consoleUrl,
+public record MappingProperties(String crsIntegrationUrl, String pmsIntegrationUrl, String integrationsUrl, String iaAgentUrl, String consoleUrl,
                                 Duration resendAfter) {
 
     public MappingProperties {

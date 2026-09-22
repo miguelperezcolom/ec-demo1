@@ -71,6 +71,7 @@ spring:
 mapping:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
   pms-integration-url: ${PMS_INTEGRATION_URL:http://localhost:8123}
+  integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
   ia-agent-url: ${IA_AGENT_URL:http://localhost:8095}
   console-url: ${CONSOLE_URL:https://console.ec1.mateu.io}
   resend-after: 30s

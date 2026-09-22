@@ -51,6 +51,7 @@ const dataScreens = [
     { menu: 'Opera', entry: 'Profiles', route: '/opera/profiles' },
     { menu: 'Opera', entry: 'Calls', route: '/opera/calls' },
     { menu: 'Opera', entry: 'Faults', route: '/opera/faults' },
+    { menu: 'Opera', entry: 'Properties', route: '/opera/properties' },
 ]
 
 /**
@@ -71,7 +72,8 @@ const controlScreens = [
     { menu: 'IA', entry: 'Rag sources', route: '/ia/ragSources' },
     { menu: 'IA', entry: 'Budgets', route: '/ia/budgets' },
     { menu: 'IA', entry: 'Routes', route: '/ia/routes' },
-    // The integration PoC's operation: mapping and causes, and the alerts it sends.
+    // The integration PoC's operation: the hotels' integrations, mapping and causes, and the alerts.
+    { menu: 'Integrations', entry: 'Integrations', route: '/integrations/integrations' },
     { menu: 'Mapping', entry: 'Causes', route: '/mapping/causes' },
     { menu: 'Mapping', entry: 'Pending', route: '/mapping/pending' },
     { menu: 'Mapping', entry: 'Dictionary', route: '/mapping/dictionary' },
@@ -96,13 +98,13 @@ export const CONSOLES: Console[] = [
     {
         name: 'control · vaadin', plane: 'control', renderer: 'vaadin',
         host: host('CONTROL_HOST', 'console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Mapping', 'Notifications'],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Notifications'],
         screens: controlScreens,
     },
     {
         name: 'control · redwood', plane: 'control', renderer: 'redwood',
         host: host('RW_CONTROL_HOST', 'rw-console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Mapping', 'Notifications'],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Notifications'],
         screens: controlScreens,
     },
 ]

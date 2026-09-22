@@ -42,8 +42,8 @@ public class MappingMcpTools implements McpSystemContext {
                 - Para proponer el mapeado pendiente de un hotel: listPendingCodes(hotel) da los códigos del CRS
                   sin equivalencia; getPmsCatalog(hotel) da los códigos del PMS entre los que elegir. Empareja
                   por significado, no por parecido de nombre, y registra la propuesta con proposeMappings,
-                  indicando confianza (0..1) y el porqué de cada línea. El hotel (tipo HOTEL) se mapea primero:
-                  sin él no hay catálogo de la propiedad.
+                  indicando confianza (0..1) y el porqué de cada línea. El hotel (tipo HOTEL) no se propone: lo
+                  registra su integración al verificar la conexión con Opera, y sin ella no hay catálogo.
                 - Un CHANNEL del CRS es en Opera un sourceCode (targetCode) y un marketCode (atributo marketCode).
                 - Un PARTNER_TYPE es el tipo de perfil de Opera: TRAVEL_AGENT, COMPANY o SOURCE.
                 - Nada de lo que propongas entra en vigor sin que una persona lo apruebe. No apruebes tú: si el

@@ -1,10 +1,9 @@
 # CRS-PMS integration PoC (docs/poc-acl). The Opera end of the integration — the connector the PoC measures.
 # The only piece that knows Opera's API (OHIP). No database: its state is Opera's and the engine's.
 #
-# Pointed at opera-mock, with the double's fake credentials: the PoC writes nothing to a real Opera
-# tenant. Pointing it at one is these five variables, from a Secret — never from this file:
-#   OPERA_GATEWAY_URL, OPERA_APP_KEY, OPERA_CLIENT_ID, OPERA_CLIENT_SECRET, OPERA_ENTERPRISE_ID
-# plus OPERA_HOTELS, the properties the client may see (OHIP cannot list them without a hotel).
+# How to reach each Opera property is not here: it is each hotel's integration's, registered in the
+# console and read from integrations-service. In this PoC they point at opera-mock, with the
+# double's fake credentials — nothing is written to a real Opera tenant.
 #
 # One replica: the read-compare-write of a reservation is serialised in memory, per reservation —
 # the engine's LOCK step would be the place, and in 2.18.0 it does not work on PostgreSQL.
@@ -51,7 +50,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: pms-integration-service
-          image: miguelperezcolom/ec-demo1-pms-integration-service:0.15.1
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.16.0
           env:
             - name: SERVER_PORT
               value: "8123"
@@ -61,18 +60,10 @@ spec:
               value: "http://crs-integration-service:8121"
             - name: MAPPING_URL
               value: "http://mapping-service:8122"
-            - name: OPERA_GATEWAY_URL
-              value: "http://opera-mock:8124"
-            - name: OPERA_APP_KEY
-              value: "mock-app-key"
-            - name: OPERA_CLIENT_ID
-              value: "mock-client"
-            - name: OPERA_CLIENT_SECRET
-              value: "mock-secret"
-            - name: OPERA_ENTERPRISE_ID
-              value: "RIUE"
-            - name: OPERA_HOTELS
-              value: "RIUPMI,RIUCUN"
+            # No Opera connection here: each hotel's integration carries its own, read from
+            # integrations-service. In this PoC they all point at opera-mock.
+            - name: INTEGRATIONS_URL
+              value: "http://integrations-service:8126"
             - name: RETRY_ALERT_AFTER
               value: "10m"
           ports:

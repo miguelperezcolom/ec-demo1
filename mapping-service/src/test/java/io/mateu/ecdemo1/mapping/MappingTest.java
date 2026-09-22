@@ -7,6 +7,9 @@ import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.mapping.dictionary.Dictionary;
 import io.mateu.ecdemo1.mapping.store.CauseRecordRepository;
 import io.mateu.ecdemo1.mapping.store.CauseStatus;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 import io.mateu.ecdemo1.mapping.store.EntryStatus;
 import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
 import io.mateu.ecdemo1.mapping.store.WaiterRepository;
@@ -46,6 +49,8 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * The mapping against a real Postgres and broker, with the CRS adapter played by a small HTTP
@@ -53,6 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * observed the way the engine would see them: replies and messages on upstream.
  */
 @SpringBootTest(properties = {"mapping.resend-after=2s", "mapping.resend-check=1s"})
+@AutoConfigureMockMvc
 @Testcontainers
 class MappingTest {
 
@@ -65,6 +71,8 @@ class MappingTest {
             .withTmpFs(Map.of("/var/lib/redpanda/data", "rw"));
 
     static HttpServer crs;
+    /** What the integrations service answers for PMI01's integration; null for "no integration". */
+    static volatile String integrationStatus = "ACTIVE";
 
     static String reservation(String locator, String partner) {
         return """
@@ -84,6 +92,9 @@ class MappingTest {
             var parts = path.split("/");
             String body = path.startsWith("/reservations/PMI01/")
                     ? reservation(parts[3], parts[3].startsWith("P-") ? "NORDTRAVEL" : null)
+                    : path.equals("/integrations/hotels/PMI01") && integrationStatus != null
+                    ? """
+                      {"id":"I-1","crsHotelCode":"PMI01","pmsHotelCode":"RIUPMI","status":"%s"}""".formatted(integrationStatus)
                     : null;
             if (body == null) {
                 exchange.sendResponseHeaders(404, -1);
@@ -97,6 +108,7 @@ class MappingTest {
         });
         crs.start();
         registry.add("CRS_INTEGRATION_URL", () -> "http://localhost:" + crs.getAddress().getPort());
+        registry.add("INTEGRATIONS_URL", () -> "http://localhost:" + crs.getAddress().getPort());
         registry.add("KAFKA_BROKERS", redpanda::getBootstrapServers);
     }
 
@@ -105,6 +117,8 @@ class MappingTest {
         crs.stop(0);
     }
 
+    @Autowired
+    MockMvc mvc;
     @Autowired
     ObjectMapper objectMapper;
     @Autowired
@@ -268,6 +282,49 @@ class MappingTest {
         dictionary.define(new Dictionary.Proposal(type, hotel, code, target, attributes, null, null), "test");
     }
 
+    @Test
+    void aHotelWhoseIntegrationIsNotActiveHoldsItsReservationsButNotItsBackfill() throws Exception {
+        define(CodeType.HOTEL, null, "PMI01", "OPERA-H1", Map.of());
+        define(CodeType.CHANNEL, null, "WEB", "WEB", Map.of("marketCode", "LEIS"));
+        define(CodeType.ROOM_TYPE, "PMI01", "DBL", "DBLK", Map.of());
+        define(CodeType.RATE_PLAN, null, "BAR", "RACK", Map.of());
+        define(CodeType.BOARD, null, "AD", "BB", Map.of());
+        integrationStatus = "BACKFILLING";
+        try {
+            var live = "proyectar-reserva:PMI01/L7:E7";
+            assertThat(variables(runStep("prepare-reservation", "L7", live))).containsEntry("prepareOutcome", "WAIT");
+            assertThat(causes.findById("INTEGRATION_INACTIVE/PMI01")).get()
+                    .satisfies(c -> assertThat(c.status).isEqualTo(CauseStatus.OPEN));
+
+            var backfill = "proyectar-reserva:PMI01/L8:backfill:R1";
+            assertThat(variables(runStepWith("prepare", backfill,
+                    List.of(new Variable("locator", "L8"), new Variable("origin", "backfill:R1")))))
+                    .containsEntry("prepareOutcome", "OK");
+
+            integrationStatus = "ACTIVE";
+            mvc.perform(post("/causes/resolve-if-open").param("key", "INTEGRATION_INACTIVE/PMI01").param("by", "integration"))
+                    .andExpect(status().isOk());
+            assertThat(waiters.findById(live)).get().extracting(w -> w.status).isEqualTo(WaiterStatus.RELEASED);
+        } finally {
+            integrationStatus = "ACTIVE";
+        }
+    }
+
+    @Test
+    void theBackfillsPrePassListsWhatItsReservationsLackMostBlockingFirst() throws Exception {
+        define(CodeType.ROOM_TYPE, "PMI01", "DBL", "DBLK", Map.of());
+        var gaps = json(mvc.perform(post("/gaps").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"hotelCode":"PMI01","reservations":12,
+                         "codes":[{"type":"ROOM_TYPE","code":"DBL","reservations":12},
+                                  {"type":"BOARD","code":"XX","reservations":3},
+                                  {"type":"ROOM_TYPE","code":"ZZZ","reservations":9}],
+                         "partners":[{"partnerCode":"NOBODY","reservations":5}]}"""))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var listed = new ArrayList<String>();
+        gaps.forEach(g -> listed.add(g.get("kind").asText() + ":" + g.get("code").asText() + ":" + g.get("reservations").asInt()));
+        assertThat(listed).containsExactly("MAPPING:ZZZ:9", "PARTNER:NOBODY:5", "MAPPING:XX:3");
+    }
+
     JsonNode runStep(String step, String locator, String processKey) throws Exception {
         return runStepWith(step, processKey, List.of(new Variable("locator", locator)));
     }
@@ -279,7 +336,7 @@ class MappingTest {
         var taskId = UUID.randomUUID().toString();
         var definition = processKey.substring(0, processKey.indexOf(':'));
         var stepId = switch (step) {
-            case "prepare-reservation", "prepare-cancellation", "prepare-partner" -> "prepare";
+            case "prepare", "prepare-reservation", "prepare-cancellation", "prepare-partner" -> "prepare";
             case "relaunch" -> "relaunch-prepare";
             default -> step;
         };

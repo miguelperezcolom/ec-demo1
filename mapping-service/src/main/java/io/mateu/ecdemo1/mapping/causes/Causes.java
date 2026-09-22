@@ -49,7 +49,7 @@ import java.util.UUID;
 public class Causes {
 
     static final Set<String> RELAUNCH_VARIABLES = Set.of(ProcessVariables.DEFINITION_ID, ProcessVariables.HOTEL_CODE,
-            ProcessVariables.LOCATOR, ProcessVariables.PARTNER_CODE, ProcessVariables.VERSION, ProcessVariables.EVENT_ID);
+            ProcessVariables.LOCATOR, ProcessVariables.PARTNER_CODE, ProcessVariables.VERSION, ProcessVariables.EVENT_ID, ProcessVariables.ORIGIN);
 
     final CauseRecordRepository causes;
     final WaiterRepository waiters;

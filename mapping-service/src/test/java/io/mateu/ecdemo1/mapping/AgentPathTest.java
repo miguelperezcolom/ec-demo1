@@ -35,7 +35,7 @@ class AgentPathTest {
         });
         agent.start();
         try {
-            var proposals = new AgentProposals(new MappingProperties(null, null,
+            var proposals = new AgentProposals(new MappingProperties(null, null, null,
                     "http://localhost:" + agent.getAddress().getPort(), null, Duration.ofSeconds(30)));
 
             var answer = proposals.requestProposal("PMI01", "Bearer the-persons-token");

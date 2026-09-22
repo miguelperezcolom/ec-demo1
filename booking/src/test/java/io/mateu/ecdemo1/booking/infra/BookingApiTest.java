@@ -131,6 +131,21 @@ class BookingApiTest {
     }
 
     @Test
+    void aBackfillReadsAHotelsFutureBookingsInArrivalOrderPageByPageWithoutTheCancelledOnes() throws Exception {
+        var later = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-12-01").replace("2026-10-08", "2026-12-04"));
+        var sooner = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-11-02").replace("2026-10-08", "2026-11-05"));
+        var cancelled = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-11-10").replace("2026-10-08", "2026-11-12"));
+        var past = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-09-01").replace("2026-10-08", "2026-09-03"));
+        mvc.perform(post("/bookings/{id}/cancel", cancelled).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reasonCode\":\"CLI\"}")).andExpect(status().isOk());
+
+        var first = future("hotelCode=CUN01&from=2026-10-01&limit=1");
+        assertThat(first).map(b -> b.get("id").asText()).containsExactly(sooner);
+        var rest = future("hotelCode=CUN01&from=2026-10-01&limit=10&afterArrival=2026-11-02&afterId=" + sooner);
+        assertThat(rest).map(b -> b.get("id").asText()).containsExactly(later).doesNotContain(cancelled, past);
+    }
+
+    @Test
     void nestedPartsAreStoredAsReadableJson() throws Exception {
         var id = create(REQUEST);
 
@@ -206,6 +221,22 @@ class BookingApiTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return json(body).get("id").asText();
+    }
+
+    String createIn(String hotelCode, String request) throws Exception {
+        var body = mvc.perform(post("/bookings").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hotelCode\":\"" + hotelCode + "\",\"booking\":" + request + "}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return json(body).get("id").asText();
+    }
+
+    List<JsonNode> future(String query) throws Exception {
+        var body = mvc.perform(get("/bookings/future?" + query)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var list = new ArrayList<JsonNode>();
+        json(body).forEach(list::add);
+        return list;
     }
 
     static String command(String request) {

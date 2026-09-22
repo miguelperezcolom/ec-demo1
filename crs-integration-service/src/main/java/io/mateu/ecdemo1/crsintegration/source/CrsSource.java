@@ -9,6 +9,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.Map;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -31,7 +33,7 @@ public class CrsSource {
                 .baseUrl(baseUrl)
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
-                    converters.add(new MappingJackson2HttpMessageConverter(reader.mapper()));
+                    converters.addFirst(new MappingJackson2HttpMessageConverter(reader.mapper()));
                 })
                 .build();
     }
@@ -46,6 +48,18 @@ public class CrsSource {
             }
             throw e;
         }
+    }
+
+    /** A page of a hotel's bookings still to arrive, not cancelled, after the given position. */
+    public List<BookingView> future(String hotelCode, LocalDate afterArrival, String afterId, int limit) {
+        var list = booking.get().uri(b -> {
+            b.path("/bookings/future").queryParam("hotelCode", hotelCode).queryParam("limit", limit);
+            if (afterArrival != null) {
+                b.queryParam("afterArrival", afterArrival).queryParam("afterId", afterId);
+            }
+            return b.build();
+        }).retrieve().body(BookingView[].class);
+        return list == null ? List.of() : List.of(list);
     }
 
     public Optional<PartnerView> partner(String code) {

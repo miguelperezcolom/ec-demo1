@@ -20,7 +20,11 @@
         <java.version>21</java.version>
         <!-- Pinned rather than floating: this is the version the reference deployment was built
              and verified against. -->
-        <mateu.version>3.0-alpha.358</mateu.version>
+        <!-- Held at alpha.352 while the other Mateu modules are on 358: the Redwood bundle published in
+             alpha.356-358 ships mateuBaseUrl = "http://localhost:9005" (the demo-vb default) instead of
+             "", so this shell loads itself from localhost and shows "Sin conexión" with an empty menu
+             bar. alpha.341-355 ship "" (352 is the last of them published). Move it back to the others' version once a release fixes it. -->
+        <mateu.version>3.0-alpha.352</mateu.version>
     </properties>
 
     <dependencies>

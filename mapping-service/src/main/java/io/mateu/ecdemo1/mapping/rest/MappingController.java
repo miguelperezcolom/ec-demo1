@@ -6,6 +6,9 @@ import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integration.model.mapping.Translation;
 import io.mateu.ecdemo1.mapping.causes.Causes;
 import io.mateu.ecdemo1.mapping.dictionary.Dictionary;
+import io.mateu.ecdemo1.mapping.dictionary.Gaps;
+import io.mateu.ecdemo1.integration.model.integration.FutureUsage;
+import io.mateu.ecdemo1.integration.model.integration.Gap;
 import io.mateu.ecdemo1.mapping.dictionary.Pending;
 import io.mateu.ecdemo1.mapping.store.CauseRecord;
 import io.mateu.ecdemo1.mapping.store.CauseRecordRepository;
@@ -48,6 +51,8 @@ public class MappingController {
     final CauseRecordRepository causeRecords;
     final WaiterRepository waiters;
     final PartnerProfileRepository partnerProfiles;
+    final Gaps gaps;
+    final io.mateu.ecdemo1.mapping.proposals.AgentProposals agentProposals;
 
     public record ResolveRequest(String hotelCode, List<CodeRef> codes) {
     }
@@ -108,6 +113,38 @@ public class MappingController {
     @Operation(summary = "Resolve a cause, resuming every process that waits only on it")
     public void resolveCause(@RequestParam String key, @RequestParam(defaultValue = "admin") String by) {
         causes.resolve(key, by);
+    }
+
+    @PostMapping("/causes/resolve-if-open")
+    @Operation(summary = "Resolve a cause if it is open; nothing if it is not, or was never opened")
+    public void resolveCauseIfOpen(@RequestParam String key, @RequestParam(defaultValue = "admin") String by) {
+        causes.resolveIfOpen(key, by);
+    }
+
+    @PostMapping("/agent-proposals")
+    @Operation(summary = "Ask the mapping agent to propose the hotel's pending mapping; it answers in the background")
+    public void requestAgentProposal(@RequestParam String hotelCode) {
+        agentProposals.requestProposalInBackground(hotelCode);
+    }
+
+    @PostMapping("/gaps")
+    @Operation(summary = "Of the codes and partners a hotel's future reservations use, what is missing — most blocking first")
+    public List<Gap> gaps(@RequestBody FutureUsage usage) {
+        return gaps.of(usage);
+    }
+
+    @PostMapping("/entries/definitions")
+    @Operation(summary = "Enter an equivalence directly, approved by its author; nothing new if it is already in force")
+    public MappingEntry define(@RequestBody Dictionary.Proposal proposal, @RequestParam String by) {
+        var current = dictionary.resolve(proposal.hotelCode(), proposal.type(), proposal.sourceCode());
+        if (current.isPresent() && current.get().targetCode().equals(proposal.targetCode())) {
+            return entries.findAllByOrderByTypeAscSourceCodeAscEntryVersionDesc().stream()
+                    .filter(e -> e.type == proposal.type() && e.sourceCode.equals(proposal.sourceCode())
+                            && java.util.Objects.equals(e.hotelCode, proposal.hotelCode())
+                            && e.status == io.mateu.ecdemo1.mapping.store.EntryStatus.APPROVED)
+                    .findFirst().orElseThrow();
+        }
+        return dictionary.define(proposal, by);
     }
 
     @GetMapping("/pending")

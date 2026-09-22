@@ -145,8 +145,16 @@ spring:
         # plain REST endpoint that authenticates itself by HMAC over the body, exactly like the
         # engine's /workflow/webhooks receiver, so it needs a route of its own and no role. Public
         # is the point: a merge in the config repo has to be able to reach it.
-        # The integration's control plane (PoC ACL): the mapping — causes, dictionary, proposals —
-        # and the notifications. On the control host, behind ai-admin, like the rest of it.
+        # The integration's control plane (PoC ACL): the hotels' integrations, the mapping — causes,
+        # dictionary, proposals — and the notifications. On the control host, behind ai-admin, like
+        # the rest of it. Only the screens: integrations-service's REST API hands the connector a
+        # secret, and has no route here on purpose.
+        - id: integrations
+          uri: ${INTEGRATIONS_URL:http://integrations-service:8126}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_integrations/**
+
         - id: mapping
           uri: ${MAPPING_URL:http://mapping-service:8122}
           predicates:

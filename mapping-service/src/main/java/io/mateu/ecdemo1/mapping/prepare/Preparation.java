@@ -6,6 +6,7 @@ import io.mateu.ecdemo1.integration.model.partner.Partner;
 import io.mateu.ecdemo1.integration.model.process.Outcome;
 import io.mateu.ecdemo1.integration.model.reservation.Reservation;
 import io.mateu.ecdemo1.mapping.causes.Causes;
+import io.mateu.ecdemo1.mapping.clients.IntegrationClients;
 import io.mateu.ecdemo1.mapping.dictionary.Dictionary;
 import io.mateu.ecdemo1.mapping.store.PartnerProfileRepository;
 import io.mateu.workflow.dtos.Variable;
@@ -30,11 +31,22 @@ public class Preparation {
     final Dictionary dictionary;
     final Causes causes;
     final PartnerProfileRepository partnerProfiles;
+    final IntegrationClients integrations;
 
     public record Code(CodeType type, String code) {
     }
 
-    public record WaitContext(String processKey, String definitionId, String subject, List<Variable> variables) {
+    /**
+     * @param origin who started the process when it was not a change in the CRS — a backfill —
+     *               or null
+     */
+    public record WaitContext(String processKey, String definitionId, String subject, List<Variable> variables,
+                              String origin) {
+
+        /** A backfill projects before the integration is active: that is how the hotel gets ready. */
+        boolean heldByActivation() {
+            return origin == null || !origin.startsWith("backfill");
+        }
     }
 
     @Transactional
@@ -48,7 +60,7 @@ public class Preparation {
             codes.add(new Code(CodeType.BOARD, room.boardCode()));
         });
         r.payments().forEach(p -> codes.add(new Code(CodeType.PAYMENT_METHOD, p.methodCode())));
-        return check(r.hotelCode(), codes, r.partnerCode(), wait);
+        return check(r.hotelCode(), codes, r.partnerCode(), wait, wait.heldByActivation());
     }
 
     @Transactional
@@ -58,7 +70,7 @@ public class Preparation {
         if (r.cancellationReasonCode() != null) {
             codes.add(new Code(CodeType.CANCELLATION_REASON, r.cancellationReasonCode()));
         }
-        return check(r.hotelCode(), codes, null, wait);
+        return check(r.hotelCode(), codes, null, wait, true);
     }
 
     /** Partners are chain-level: their causes carry no hotel. */
@@ -66,13 +78,22 @@ public class Preparation {
     public Outcome partner(Partner p, WaitContext wait) {
         var codes = new LinkedHashSet<Code>();
         codes.add(new Code(CodeType.PARTNER_TYPE, p.type().name()));
-        return check(null, codes, null, wait);
+        return check(null, codes, null, wait, false);
     }
 
-    private Outcome check(String hotelCode, LinkedHashSet<Code> codes, String partnerCode, WaitContext wait) {
+    /**
+     * @param gated whether the hotel's integration has to be active for this to go on. Partners are
+     *              the chain's, and a backfill is what gets an integration ready, so neither is.
+     */
+    private Outcome check(String hotelCode, LinkedHashSet<Code> codes, String partnerCode, WaitContext wait,
+                          boolean gated) {
         var scope = hotelCode == null ? "chain" : hotelCode;
         var missing = new java.util.ArrayList<Cause>();
         var stillMissing = new java.util.ArrayList<Supplier<Boolean>>();
+        if (gated && !flows(hotelCode)) {
+            missing.add(Cause.integrationInactive(hotelCode));
+            stillMissing.add(() -> !flows(hotelCode));
+        }
         for (var code : codes) {
             if (dictionary.resolve(hotelCode, code.type(), code.code()).isEmpty()) {
                 missing.add(Cause.missingMapping(scope, code.type(), code.code()));
@@ -96,5 +117,10 @@ public class Preparation {
             }
         }
         return Outcome.WAIT;
+    }
+
+    /** Whether the hotel's reservations may reach the PMS in real time: an integration, and an active one. */
+    boolean flows(String hotelCode) {
+        return integrations.integration(hotelCode).map(i -> i.status().flows()).orElse(false);
     }
 }

@@ -27,4 +27,9 @@ public record Cause(String key, CauseType type, String description) {
         return new Cause("PMS_REJECTED/" + subject, CauseType.PMS_REJECTED,
                 "The PMS refused %s: %s".formatted(subject, reason));
     }
+
+    public static Cause integrationInactive(String hotelCode) {
+        return new Cause("INTEGRATION_INACTIVE/" + hotelCode, CauseType.INTEGRATION_INACTIVE,
+                "The integration of hotel %s is not active".formatted(hotelCode));
+    }
 }

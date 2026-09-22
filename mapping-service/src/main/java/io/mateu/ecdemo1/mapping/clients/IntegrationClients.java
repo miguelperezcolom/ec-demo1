@@ -1,5 +1,9 @@
 package io.mateu.ecdemo1.mapping.clients;
 
+import io.mateu.ecdemo1.integration.model.integration.IntegrationView;
+import org.springframework.web.client.HttpClientErrorException;
+import java.util.Optional;
+
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
 import io.mateu.ecdemo1.integration.model.partner.Partner;
 import io.mateu.ecdemo1.integration.model.reservation.Reservation;
@@ -21,10 +25,12 @@ public class IntegrationClients {
 
     final RestClient crs;
     final RestClient pms;
+    final RestClient integrations;
 
     public IntegrationClients(MappingProperties properties, TolerantReader reader) {
         this.crs = client(properties.crsIntegrationUrl(), reader);
         this.pms = client(properties.pmsIntegrationUrl(), reader);
+        this.integrations = client(properties.integrationsUrl(), reader);
     }
 
     public Reservation reservation(String hotelCode, String locator) {
@@ -47,12 +53,22 @@ public class IntegrationClients {
                 });
     }
 
+    /** The hotel's integration, or empty if the hotel has none. */
+    public Optional<IntegrationView> integration(String crsHotelCode) {
+        try {
+            return Optional.ofNullable(integrations.get().uri("/integrations/hotels/{hotel}", crsHotelCode)
+                    .retrieve().body(IntegrationView.class));
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        }
+    }
+
     private static RestClient client(String baseUrl, TolerantReader reader) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
-                    converters.add(new MappingJackson2HttpMessageConverter(reader.mapper()));
+                    converters.addFirst(new MappingJackson2HttpMessageConverter(reader.mapper()));
                 })
                 .build();
     }
