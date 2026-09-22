@@ -221,7 +221,8 @@ Una rama y un PR por hito.
 | H6 ✅ | Proceso #3 contra el doble | Una reserva que referencia un interlocutor nuevo espera y se proyecta tras sincronizarlo |
 | H7 ✅ | `communication-service` y avisos | Cada tipo de aviso llega por email |
 | H8 ✅ | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
-| H9 🟡 | Despliegue en el clúster, e2e y conclusiones (manifiestos, e2e local y [conclusiones](conclusions.md) hechos; falta desplegar) | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
+| H9 ✅ | Despliegue en el clúster, e2e y conclusiones (desplegado; [conclusiones](conclusions.md)) | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
+| H10 ✅ | `integrations-service`: la integración de cada hotel (conexión con Opera, secreto cifrado) y su alta por puertas como proceso `alta-integracion`; el tráfico de un hotel sin integración activa espera | El alta de un hotel lleva sus reservas a Opera por backfill y la activación libera lo retenido |
 
 ## Pendiente de recibir
 

@@ -309,9 +309,9 @@ The form it needs, `verify-payment`, is already there.
 
 ### The CRS → Opera integration PoC
 
-Six more pods take `booking`'s events down to Opera Cloud through OHIP's Property APIs, as three
-engine definitions (`proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, in
-`ec-definitions`):
+Seven more pods take `booking`'s events down to Opera Cloud through OHIP's Property APIs, as four
+engine definitions (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`,
+`proyectar-interlocutor`, in `ec-definitions`):
 
 | | path | what it is |
 |---|---|---|
@@ -321,6 +321,7 @@ engine definitions (`proyectar-reserva`, `proyectar-cancelacion`, `proyectar-int
 | `pms-integration-service` | — | **The connector**: every call to OHIP, with the version guard in a UDF and idempotent writes |
 | `opera-mock` | `/_opera-mock` | An OHIP double with validation, availability and injectable faults. The deployed connector points at it |
 | `communication-service` | `/_communication` | Alerts by email |
+| `integrations-service` | `/_integrations` | One integration per hotel: its Opera connection (secret sealed) and its onboarding, gate by gate, to activation. Until then the hotel's reservations wait |
 
 **Nothing writes to a real Opera tenant.** Real OHIP credentials, when there are any, go to
 `deploy/.secrets/` and a Secret, never to a values file. The plan, the cost log and the conclusions

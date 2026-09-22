@@ -54,8 +54,7 @@ En *Booking → Bookings* (plano de datos), el hotel X tiene 100 reservas a futu
 canales (web, call centre, turoperador, OTA), interlocutores, regímenes y algunas con depósito. Es
 el punto de partida: un hotel que ya vende en el CRS y que todavía no está integrado con Opera.
 
-> **Preparación:** script de datos que crea esas 100 reservas en un hotel sin integración
-> (`e2e/poc-acl-demo/seed.py`, pendiente).
+> **Preparación:** `e2e/poc-acl-demo/seed.py` crea esas 100 reservas en un hotel sin integración.
 
 ## 4. Crear la integración del hotel X
 
@@ -141,7 +140,7 @@ una viaja sola a Opera por «Proyectar reserva»: se ve en *Admin → Processes*
 
 ## Preparación de la demo
 
-- [ ] Script de datos: 100 reservas a futuro del hotel X.
+- [x] Script de datos: `python3 e2e/poc-acl-demo/seed.py --hotel CUN01 --count 100` (ensayado en local: las 100 llegan a Opera por el backfill y la activación libera los 225 procesos retenidos sin duplicar nada).
 - [ ] Comprobar que el agente de la consola (`console-agent`, creado a mano en el control plane) tiene
       el MCP de `booking`, y que la clave del LLM responde.
 - [ ] Probar el agente de mapeado de punta a punta en el clúster (nunca se ha probado con el LLM real).

@@ -19,6 +19,7 @@ Una entrada por sesión de trabajo. **Pieza** permite separar el coste del conec
 | 2026-09-22 | H6 | Proceso #3 (`proyectar-interlocutor`) | | Definición, perfiles de interlocutor en el conector y en el doble, liberación de las reservas que esperaban | Revisión | Cubierto por el paso 1 del escenario |
 | 2026-09-22 | H7, H8 | `communication-service`, agente de mapeado | | Avisos por email (deduplicación, destinatarios, reintento) con test en GreenMail; catálogo MCP y agente en `ec-ia-config`; petición de propuesta desde la UI | Revisión | Sin clave del LLM en local: probado el cableado, no la propuesta real |
 | 2026-09-22 | H9 | Despliegue, e2e, conclusiones | | Manifiestos, BDs, rutas del gateway, menús remotos; escenario local completo; tests del cliente OHIP y del payload; [conclusiones](conclusions.md) | Revisión | Despliegue en el clúster pendiente de confirmar |
+| 2026-09-22 | H10 | `integrations-service` y ciclo de vida | | Agregado Integración, secreto cifrado (AES-GCM), proceso `alta-integracion` con puertas, backfill por lotes reanudable, retención del tráfico por causa `INTEGRATION_INACTIVE`, conexión OHIP por hotel en el conector, UI, MCP; 5 tests + escenario local ampliado; ensayo con 100 reservas | Revisión | Un `mvn package` sin `clean` dejó en el jar un `integration-model` antiguo (enum nuevo ilegible). El bundle Redwood de Mateu 356–358 lleva una URL de desarrollo: shells Redwood en 352. Disco al 100% durante el build |
 
 ## Resumen (al cerrar)
 
