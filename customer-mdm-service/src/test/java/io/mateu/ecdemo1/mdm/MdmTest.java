@@ -253,6 +253,14 @@ class MdmTest {
     }
 
     @Test
+    void anotherMdmsCustomerIsIgnored() {
+        // Environments share the org, and each hears every merge: one it knows nothing of is not its business.
+        consolidations.received("C-NOTOURS00001", "003000000000001AAA", "EVENT");
+        assertThat(consolidationRecords.count()).isZero();
+        assertThat(calls).isEmpty();
+    }
+
+    @Test
     void aContactDeletedWithoutAMergeLeavesTheCustomer() throws Exception {
         var id = resolve("L1", person("Ana", "García", "ana@example.com", null, null)).get(0).customerId();
         projection.projectPending();

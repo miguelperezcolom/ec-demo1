@@ -131,8 +131,14 @@ public class ConsolidationEvents implements SmartLifecycle {
             @Override
             public void onNext(FetchResponse response) {
                 for (var event : response.getEventsList()) {
-                    var record = decode(blocking, event.getEvent().getSchemaId(), event.getEvent().getPayload());
-                    consolidations.received(string(record, "AbsorbedMdmId__c"), string(record, "AbsorbedContactId__c"), "EVENT");
+                    try {
+                        var record = decode(blocking, event.getEvent().getSchemaId(), event.getEvent().getPayload());
+                        consolidations.received(string(record, "AbsorbedMdmId__c"), string(record, "AbsorbedContactId__c"), "EVENT");
+                    } catch (RuntimeException e) {
+                        // The event is a hint, and the poll the net: one that cannot be handled now is
+                        // left to the poll, instead of holding every event behind it.
+                        log.warn("Event {} not handled, the poll will find it: {}", event.getEvent().getId(), e.getMessage());
+                    }
                     remember(event.getReplayId());
                 }
                 if (response.getEventsCount() == 0 && !response.getLatestReplayId().isEmpty()) {

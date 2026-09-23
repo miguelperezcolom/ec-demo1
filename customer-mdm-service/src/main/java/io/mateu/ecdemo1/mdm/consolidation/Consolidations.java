@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.mdm.consolidation;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.mateu.ecdemo1.mdm.salesforce.SalesforceClient;
 import io.mateu.ecdemo1.mdm.store.ConsolidationRepository;
+import io.mateu.ecdemo1.mdm.store.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,9 +23,15 @@ public class Consolidations {
     final SalesforceClient salesforce;
     final Survivorship survivorship;
     final ConsolidationRepository consolidations;
+    final CustomerRepository customers;
 
     public void received(String absorbedMdmId, String absorbedContactId, String via) {
         if (absorbedMdmId == null || absorbedMdmId.isBlank()) {
+            return;
+        }
+        if (!customers.existsById(absorbedMdmId)) {
+            // Another MDM's customer: environments can share an org, and each hears every merge.
+            log.debug("{} is not a customer of this MDM; ignored", absorbedMdmId);
             return;
         }
         var known = consolidations.findById(absorbedMdmId);
@@ -50,6 +57,12 @@ public class Consolidations {
             // it becomes this customer — the absorbed one lives on, as that contact.
             salesforce.assignMdmId(masterId, absorbedMdmId);
             survivorship.adopted(absorbedMdmId, absorbedContactId, masterId, master, via);
+            return;
+        }
+        if (!customers.existsById(survivorMdmId)) {
+            // Merged into another environment's customer: this MDM cannot make it an alias of a
+            // customer it does not have. Left as it is, and said.
+            log.warn("{} was merged into {}, which is not a customer of this MDM; not applied", absorbedMdmId, survivorMdmId);
             return;
         }
         survivorship.merged(survivorMdmId, absorbedMdmId, masterId, absorbedContactId, master, via);
