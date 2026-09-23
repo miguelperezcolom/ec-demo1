@@ -456,6 +456,9 @@ public class Integrations {
         i.connectivityCheckedAt = clock.instant();
         if (check.ok()) {
             services.defineHotel(i.crsHotelCode, i.pmsHotelCode, "integration " + i.crsHotelCode);
+            if (properties.partnersOwnedByPms()) {
+                definePartnerTypes("integration " + i.crsHotelCode);
+            }
             if (i.status == IntegrationStatus.CONNECTIVITY_FAILED) {
                 transition(i, IntegrationStatus.CREATED, "Connection verified: " + check.message());
             } else {
@@ -513,11 +516,7 @@ public class Integrations {
     }
 
     String importPartners(Integration i, String by) {
-        // Which ERP type each OPERA profile type is, and back: certain, since the partner came from there.
-        for (var type : List.of(new String[]{"TravelAgent", "Agent"}, new String[]{"TourOperator", "Agent"},
-                new String[]{"Company", "Company"}, new String[]{"OnlineAgency", "Source"})) {
-            services.define(io.mateu.ecdemo1.integration.model.mapping.CodeType.PARTNER_TYPE, null, type[0], type[1], by);
-        }
+        definePartnerTypes(by);
         int created = 0, updated = 0, unchanged = 0;
         var fromOpera = services.pmsPartners(i.pmsHotelCode);
         // A code on more than one profile is nobody in particular: which one a reservation means cannot
@@ -548,6 +547,21 @@ public class Integrations {
         }
         return "Partners imported from Opera %s: %d new, %d updated, %d unchanged%s".formatted(i.pmsHotelCode, created, updated,
                 unchanged, ambiguous.isEmpty() ? "" : "; left out, on more than one Opera profile: " + String.join(", ", ambiguous));
+    }
+
+    /**
+     * Which OPERA profile type each partner type is: certain when the partners come from Opera, so the
+     * integration enters it rather than leaving it pending for a person. Keyed by the integration's
+     * canonical type, which is what preparing a partner resolves.
+     */
+    void definePartnerTypes(String by) {
+        for (var type : java.util.Map.of(
+                io.mateu.ecdemo1.integration.model.partner.PartnerType.TRAVEL_AGENT, "Agent",
+                io.mateu.ecdemo1.integration.model.partner.PartnerType.TOUR_OPERATOR, "Agent",
+                io.mateu.ecdemo1.integration.model.partner.PartnerType.COMPANY, "Company",
+                io.mateu.ecdemo1.integration.model.partner.PartnerType.ONLINE_AGENCY, "Source").entrySet()) {
+            services.define(io.mateu.ecdemo1.integration.model.mapping.CodeType.PARTNER_TYPE, null, type.getKey().name(), type.getValue(), by);
+        }
     }
 
     /** The ERP's details for an imported partner: Opera's name and type, and what the ERP already knew of the rest. */

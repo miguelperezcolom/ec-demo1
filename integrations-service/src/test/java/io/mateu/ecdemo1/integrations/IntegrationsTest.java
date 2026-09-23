@@ -370,7 +370,7 @@ class IntegrationsTest {
 
         // The type equivalences come with the import: certain, since the partners came from Opera.
         assertThat(calls).anyMatch(c -> c.startsWith("POST /entries/definitions") && c.contains("\"PARTNER_TYPE\"")
-                && c.contains("\"sourceCode\":\"TravelAgent\"") && c.contains("\"targetCode\":\"Agent\""));
+                && c.contains("\"sourceCode\":\"TRAVEL_AGENT\"") && c.contains("\"targetCode\":\"Agent\""));
         // New to the ERP: created with Opera's name and type; who pays is the guest until the ERP says otherwise.
         assertThat(calls).anyMatch(c -> c.startsWith("POST /partners ") && c.contains("\"code\":\"05100908\"")
                 && c.contains("\"name\":\"ABREU ONLINE PORTUGAL\"") && c.contains("\"type\":\"TravelAgent\"")
