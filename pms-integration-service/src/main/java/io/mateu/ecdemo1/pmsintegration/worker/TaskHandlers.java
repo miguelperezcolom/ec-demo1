@@ -56,13 +56,16 @@ public class TaskHandlers {
     final ReservationLocks locks;
     final PmsIntegrationProperties settings;
     final OhipProperties ohipProperties;
+    final io.mateu.ecdemo1.pmsintegration.frontoffice.FrontOfficeWriter frontOffice;
 
     public Map<String, Function<TaskExecutionRequested, List<Variable>>> handlers() {
         return Map.of(
                 "ensure-guest-profile", this::ensureGuestProfile,
                 "upsert-reservation", task -> locked(task, this::upsertReservation),
                 "cancel-reservation", task -> locked(task, this::cancelReservation),
-                "ensure-partner-profile", this::ensurePartnerProfile);
+                "ensure-partner-profile", this::ensurePartnerProfile,
+                "write-front-office", task -> locked(task, frontOffice::write),
+                "cancel-front-office", task -> locked(task, frontOffice::cancel));
     }
 
     List<Variable> ensureGuestProfile(TaskExecutionRequested task) {
