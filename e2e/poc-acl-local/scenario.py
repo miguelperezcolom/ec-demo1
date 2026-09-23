@@ -160,7 +160,7 @@ first = refused[0]
 assert call("POST", f"{BOOKING}/bookings/{first}/cancel", {"reasonCode": "CLI"})[0] == 200
 approve("CANCELLATION_REASON", "CLI", "CUSTREQ")
 until("the cancellation reached Opera", lambda: (lambda x: x and x["reservationStatus"] == "Cancelled")(opera_reservation(first)), timeout=120)
-blocked = key.split("/")[2]
+blocked = key.split(":")[2]
 call("POST", MAPPING + "/causes/resolve?key=" + urllib.request.quote(key) + "&by=e2e")
 until(f"{blocked} reached Opera once the cause was resolved", lambda: opera_reservation(blocked), timeout=120)
 
