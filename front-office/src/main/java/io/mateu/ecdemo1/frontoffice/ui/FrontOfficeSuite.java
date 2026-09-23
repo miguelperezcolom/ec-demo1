@@ -1,0 +1,57 @@
+package io.mateu.ecdemo1.frontoffice.ui;
+
+import io.mateu.uidl.annotations.App;
+import io.mateu.uidl.annotations.AppContext;
+import io.mateu.uidl.annotations.Audience;
+import io.mateu.uidl.annotations.Menu;
+import io.mateu.uidl.annotations.Title;
+import io.mateu.uidl.annotations.UI;
+import io.mateu.uidl.data.RouteLink;
+import io.mateu.uidl.interfaces.HomeRouteSupplier;
+
+/**
+ * The Front-Office Suite app shell: top menu with the four operational screens plus the two
+ * application-context selectors — the persona switch ({@code Modo}, which drives every
+ * {@code @Audience} projection because the field is named {@code audience}) and the active hotel.
+ */
+@UI("")
+@Title("Front-Office Suite")
+@App(themeToggle = true) // variante AUTO: menú plano de RouteLinks → TABS (in-app navigation)
+@io.mateu.uidl.annotations.Logo("/images/riu.svg")
+@io.mateu.uidl.annotations.FavIcon("/images/riu.svg")
+public class FrontOfficeSuite implements HomeRouteSupplier {
+
+  // la home es la welcome page (Bienvenida)
+  @Override
+  public String homeRoute() {
+    return "/bienvenida";
+  }
+
+  public enum Modo {
+    Staff,
+    Cliente
+  }
+
+  public enum Hotel {
+    PuntaCana,
+    Bavaro,
+    Aruba
+  }
+
+  // persona projection: naming this @AppContext field "audience" makes its value drive the
+  // @Audience marks — unset → full view; Staff/Cliente → that audience's projection
+  @AppContext(label = "Modo")
+  Modo audience;
+
+  @AppContext(label = "Hotel")
+  Hotel hotel;
+
+  @Menu
+  RouteLink reservas =
+      new RouteLink("/reservas", "Reservas").withIcon("vaadin:calendar-user");
+
+  @Audience("Staff")
+  @Menu
+  RouteLink automatizaciones =
+      new RouteLink("/automatizaciones", "Automatizaciones").withIcon("vaadin:tasks");
+}
