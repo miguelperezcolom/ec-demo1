@@ -15,7 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "customer-mdm-servi
 sys.argv = sys.argv[:1]
 import deploy  # the MDM's own credentials and REST helpers
 
-BOOKING, MDM, OPERA = "http://localhost:8108", "http://localhost:8127", "http://localhost:8124"
+import os
+# Overridable, to run it against a cluster through port-forwards.
+BOOKING = os.environ.get("BOOKING_URL", "http://localhost:8108")
+MDM = os.environ.get("MDM_URL", "http://localhost:8127")
+OPERA = os.environ.get("OPERA_URL", "http://localhost:8124")
 TAG = time.strftime("%H%M%S")
 
 
