@@ -48,7 +48,7 @@ spec:
         - name: shell-redwood
           # Built on Mateu 3.0-alpha.352 while every other Mateu module is on alpha.358: see the note
           # on mateu.version in this shell's pom.
-          image: miguelperezcolom/ec-demo1-shell-redwood:0.16.0
+          image: miguelperezcolom/ec-demo1-shell-redwood:0.16.1
           env:
             - name: SERVER_PORT
               value: "8102"

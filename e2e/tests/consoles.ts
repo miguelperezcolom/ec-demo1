@@ -44,9 +44,9 @@ const dataScreens = [
     { menu: 'Admin', entry: 'Tasks', route: '/forms/tasks' },
     { menu: 'Admin', entry: 'Received tasks', route: '/worker/receivedTasks' },
     { menu: 'Admin', entry: 'Task overrides', route: '/worker/taskOverrides' },
-    { menu: 'Booking', entry: 'Bookings', route: '/booking/bookings' },
+    { menu: 'Call center', entry: 'Bookings', route: '/booking/bookings' },
     // The CRS -> Opera integration PoC (docs/poc-acl): the partners master and the Opera double.
-    { menu: 'Partners', entry: 'Partners', route: '/partners/partners' },
+    { menu: 'ERP', entry: 'Partners', route: '/partners/partners' },
     { menu: 'Opera', entry: 'Reservations', route: '/opera/reservations' },
     { menu: 'Opera', entry: 'Profiles', route: '/opera/profiles' },
     { menu: 'Opera', entry: 'Calls', route: '/opera/calls' },
@@ -73,7 +73,7 @@ const controlScreens = [
     { menu: 'IA', entry: 'Budgets', route: '/ia/budgets' },
     { menu: 'IA', entry: 'Routes', route: '/ia/routes' },
     // The integration PoC's operation: the hotels' integrations, mapping and causes, and the alerts.
-    { menu: 'Integrations', entry: 'Integrations', route: '/integrations/integrations' },
+    { menu: 'Integrations', entry: 'Integrations', route: '/integrations/registry' },
     { menu: 'Mapping', entry: 'Causes', route: '/mapping/causes' },
     { menu: 'Mapping', entry: 'Pending', route: '/mapping/pending' },
     { menu: 'Mapping', entry: 'Dictionary', route: '/mapping/dictionary' },
@@ -86,13 +86,13 @@ export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
         host: host('CONSOLE_HOST', 'ec1.mateu.io'),
-        menus: ['Admin', 'Booking', 'Partners', 'Opera'],
+        menus: ['Admin', 'Call center', 'ERP', 'Opera'],
         screens: dataScreens,
     },
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
-        menus: ['Admin', 'Booking', 'Partners', 'Opera'],
+        menus: ['Admin', 'Call center', 'ERP', 'Opera'],
         screens: dataScreens,
     },
     {

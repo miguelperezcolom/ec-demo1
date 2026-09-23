@@ -115,6 +115,7 @@ public class IntegrationViewModel implements Identifiable {
     @Stereotype(FieldStereotype.grid)
     List<HistoryRow> history;
 
+    /** The integration's own id, kept for the actions; the screens are addressed by the hotel. */
     @ReadOnly
     @HiddenInCreate
     String id;
@@ -140,14 +141,14 @@ public class IntegrationViewModel implements Identifiable {
 
     public String create(HttpRequest httpRequest) {
         return lifecycle.register(new Integrations.Registration(crsHotelCode, operaProperty, name, gatewayUrl, appKey,
-                clientId, clientSecret, enterpriseId), user(httpRequest)).id;
+                clientId, clientSecret, enterpriseId), user(httpRequest)).crsHotelCode;
     }
 
     /** Saving changes the connection — and tries it at once. */
     public String save(HttpRequest httpRequest) {
         lifecycle.changeConnection(id, new Integrations.ConnectionChange(gatewayUrl, appKey, clientId, clientSecret,
                 enterpriseId), user(httpRequest));
-        return id;
+        return crsHotelCode;
     }
 
     @Toolbar
@@ -255,9 +256,10 @@ public class IntegrationViewModel implements Identifiable {
         return value == null ? "Nothing" : value;
     }
 
+    /** The hotel, not the uuid: one integration per hotel, and it reads better in a URL. */
     @Override
     public String id() {
-        return id;
+        return crsHotelCode;
     }
 
     @Override

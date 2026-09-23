@@ -13,6 +13,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class PartnersHome {
 
+    /**
+     * "ERP": the master of partners is the ERP's role in this PoC (HLA R38), and that is what it is
+     * called on the console. The field name stays, because the routes hang from it.
+     */
     @Menu
+    @Label("ERP")
     PartnersMenu partners;
 }

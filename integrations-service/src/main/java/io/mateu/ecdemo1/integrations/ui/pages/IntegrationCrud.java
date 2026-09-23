@@ -47,7 +47,7 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
 
     IntegrationRow row(Integration i) {
         var run = runs.findFirstByIntegrationIdOrderByStartedAtDesc(i.id).orElse(null);
-        return new IntegrationRow(i.id, i.crsHotelCode, i.pmsHotelCode, i.name, status(i.status),
+        return new IntegrationRow(i.crsHotelCode, i.pmsHotelCode, i.name, status(i.status),
                 IntegrationDto.waitingFor(i.gate),
                 run == null ? "" : "%s · %d%s".formatted(run.status, run.dispatched, run.expected == null ? "" : "/" + run.expected));
     }
@@ -71,8 +71,10 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
         return viewModel.load(find(id));
     }
 
-    private Integration find(String id) {
-        return integrations.findById(id).orElseThrow(() -> new NoSuchElementException("No integration " + id));
+    /** By the CRS hotel: it is the row's id, and what the URL of a screen carries. */
+    private Integration find(String crsHotelCode) {
+        return integrations.findByCrsHotelCode(crsHotelCode)
+                .orElseThrow(() -> new NoSuchElementException("No integration for hotel " + crsHotelCode));
     }
 
     @Override
@@ -97,6 +99,6 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
 
     @Override
     public String getIdFieldForRow() {
-        return "id";
+        return "crsHotel";
     }
 }

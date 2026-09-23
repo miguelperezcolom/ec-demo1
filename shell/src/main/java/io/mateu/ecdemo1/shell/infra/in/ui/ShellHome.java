@@ -100,14 +100,14 @@ public class ShellHome implements WidgetSupplier {
 
     /** Bookings — the CRUD, and the aggregate the booking saga confirms or cancels. */
     @Menu
-    RemoteMenu booking = new RemoteMenu("/_booking").withLabel("Booking");
+    RemoteMenu booking = new RemoteMenu("/_booking").withLabel("Call center");
 
     /**
      * The master of trading partners — tour operators, agencies, companies — that the CRS sells
      * through and the CRS-PMS integration projects to the PMS (PoC ACL, docs/poc-acl).
      */
     @Menu
-    RemoteMenu partners = new RemoteMenu("/_partners").withLabel("Partners");
+    RemoteMenu partners = new RemoteMenu("/_partners").withLabel("ERP");
 
     /**
      * What reached "Opera": the double of Opera's API the integration PoC writes to instead of a

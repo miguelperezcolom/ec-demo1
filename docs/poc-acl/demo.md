@@ -32,8 +32,8 @@ pantallas y la consola las federa; cada consola tiene además su versión Redwoo
 
 | Menú | Pantallas | Qué enseñar |
 | :--- | :-------- | :---------- |
-| Booking | Bookings | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario y cobros |
-| Partners | Partners | El maestro de interlocutores: turoperador, agencia, OTA, empresa; *Resync* |
+| Call center | Bookings | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario y cobros |
+| ERP | Partners | El maestro de interlocutores: turoperador, agencia, OTA, empresa; *Resync* |
 | Opera | Reservations, Profiles, Calls, Faults, Properties | El doble de Opera: lo que «ha llegado», cada llamada OHIP, fallos a demanda |
 | Admin | Processes, Executions, Tasks… | Los procesos del motor, con sus pasos |
 
@@ -50,7 +50,7 @@ pantallas y la consola las federa; cada consola tiene además su versión Redwoo
 
 ## 3. Un hotel con 100 reservas
 
-En *Booking → Bookings* (plano de datos), el hotel X tiene 100 reservas a futuro: distintas llegadas,
+En *Call center → Bookings* (plano de datos), el hotel X tiene 100 reservas a futuro: distintas llegadas,
 canales (web, call centre, turoperador, OTA), interlocutores, regímenes y algunas con depósito. Es
 el punto de partida: un hotel que ya vende en el CRS y que todavía no está integrado con Opera.
 
@@ -139,7 +139,7 @@ Y en el CRS (*Booking*), cada reserva sabe dónde ha quedado en Opera (referenci
 Con la integración activa, en el chat de la consola de datos: *«Crea 5 reservas en el hotel X para
 la semana que viene…»*. El agente las crea en el CRS con las herramientas MCP de `booking`, y cada
 una viaja sola a Opera por «Proyectar reserva»: se ve en *Admin → Processes*, en
-*Opera → Reservations* y en la referencia del PMS de cada reserva en *Booking*.
+*Opera → Reservations* y en la referencia del PMS de cada reserva en *Call center*.
 
 ## Preparación de la demo
 
