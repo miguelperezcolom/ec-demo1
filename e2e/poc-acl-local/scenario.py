@@ -76,10 +76,10 @@ _, created = call("POST", BOOKING + "/bookings", {"hotelCode": "PMI01", "booking
     "comments": "Late arrival"}})
 loc = created["id"]; print(f"  booking {loc}")
 call("POST", f"{BOOKING}/bookings/{loc}/payments", {"type": "Deposit", "methodCode": "VISA", "amount": 150})
-expected = {"CHANNEL/TTOO", "ROOM_TYPE/DBL", "RATE_PLAN/TTOO", "BOARD/AD", "PAYMENT_METHOD/VISA"}
+expected = {"CHANNEL:TTOO", "ROOM_TYPE:DBL", "RATE_PLAN:TTOO", "BOARD:AD", "PAYMENT_METHOD:VISA"}
 until("held on the inactive integration and on the hotel's codes, the same causes for every process",
-      lambda: "INTEGRATION_INACTIVE/PMI01" in causes()
-      and {k.split("PMI01/", 1)[1] for k in causes() if k.startswith("MISSING_MAPPING/PMI01")} >= expected)
+      lambda: "INTEGRATION_INACTIVE:PMI01" in causes()
+      and {k.split("PMI01:", 1)[1] for k in causes() if k.startswith("MISSING_MAPPING:PMI01")} >= expected)
 print("  waiting:", {k: v for k, v in causes().items() if "PMI01" in k})
 assert opera_reservation(loc) is None, "nothing may reach Opera before the integration is active"
 
@@ -97,9 +97,9 @@ r = until("the backfill projects the reservation before the activation", lambda:
 until("ready to activate once the window is covered", at("PMI01", "READY_TO_ACTIVATE"), timeout=60)
 i = integration("PMI01")
 print(f"  backfill: {i['backfill']['status']} {i['backfill']['dispatched']} projected; history: {len(i['history'])} entries")
-assert "INTEGRATION_INACTIVE/PMI01" in causes(), "live traffic still waits until a person activates"
+assert "INTEGRATION_INACTIVE:PMI01" in causes(), "live traffic still waits until a person activates"
 assert call("POST", f"{INTEGRATIONS}/integrations/{pmi}/activate?by=e2e")[0] == 200
-until("active, and what waited on the activation resumes", lambda: at("PMI01", "ACTIVE")() and "INTEGRATION_INACTIVE/PMI01" not in causes(), timeout=60)
+until("active, and what waited on the activation resumes", lambda: at("PMI01", "ACTIVE")() and "INTEGRATION_INACTIVE:PMI01" not in causes(), timeout=60)
 assert sql("select status from process_entity where workflow_definition_id='alta-integracion' and business_key like 'alta-integracion:" + pmi + "%'") == "COMPLETED"
 
 print("3b. A property nobody configured in Opera stops its onboarding until it is")
@@ -151,7 +151,7 @@ for i in range(21):
         "arrival": "2026-11-02", "departure": "2026-11-04", "holder": {"firstName": "Guest", "lastName": f"N{i}"},
         "rooms": [{"roomTypeCode": "JSU", "ratePlanCode": "TTOO", "boardCode": "AD", "adults": 2, "childrenAges": [], "guests": []}]}})
     refused.append(c["id"])
-key = until("a PMS_REJECTED cause for the 21st junior suite", lambda: next((k for k in causes() if k.startswith("PMS_REJECTED/")), None), timeout=180)
+key = until("a PMS_REJECTED cause for the 21st junior suite", lambda: next((k for k in causes() if k.startswith("PMS_REJECTED:")), None), timeout=180)
 print("  ", key)
 until("twenty junior suites in Opera", lambda: len([x for x in call("GET", OPERA + "/_mock/reservations")[1] if x["roomStay"]["roomRates"][0]["roomType"] == "JRST"]) == 20, timeout=120)
 
@@ -171,7 +171,7 @@ _, c = call("POST", BOOKING + "/bookings", {"hotelCode": "PMI01", "booking": {"c
 web = c["id"]
 call("POST", f"{BOOKING}/bookings/{web}/cancel", {"reasonCode": "CLI"})
 until("both wait: the projection for channel WEB, the cancellation for the projection",
-      lambda: "MISSING_MAPPING/PMI01/CHANNEL/WEB" in causes() and f"NOT_YET_PROJECTED/PMI01/{web}" in causes(), timeout=120)
+      lambda: "MISSING_MAPPING:PMI01:CHANNEL:WEB" in causes() and f"NOT_YET_PROJECTED:PMI01:{web}" in causes(), timeout=120)
 approve("CHANNEL", "WEB", "WEBDIR", attributes={"marketCode": "LEIS"})
 until("projected and then cancelled in Opera", lambda: (lambda x: x and x["reservationStatus"] == "Cancelled")(opera_reservation(web)), timeout=180)
 

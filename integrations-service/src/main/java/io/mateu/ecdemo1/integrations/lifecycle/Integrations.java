@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
  * gate opens when what it waits for is recorded — by a person, or by looking again — and
  * {@link Gates} sends the message that moves the process on. Nothing flows to the PMS until the
  * integration is {@link IntegrationStatus#ACTIVE}: the preparation of every projection holds a
- * hotel whose integration is not, on the cause {@code INTEGRATION_INACTIVE/<hotel>} that
+ * hotel whose integration is not, on the cause {@code INTEGRATION_INACTIVE:<hotel>} that
  * activating resolves.
  */
 @Service

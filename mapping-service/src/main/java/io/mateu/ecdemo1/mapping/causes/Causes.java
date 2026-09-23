@@ -129,7 +129,7 @@ public class Causes {
     @Transactional
     public void mappingApproved(CodeType type, String hotelCode, String code, String approvedBy) {
         causes.findByTypeAndStatus(CauseType.MISSING_MAPPING, CauseStatus.OPEN).stream()
-                .filter(c -> c.causeKey.endsWith("/" + type + "/" + code))
+                .filter(c -> c.causeKey.endsWith(Cause.SEPARATOR + type + Cause.SEPARATOR + code))
                 .filter(c -> hotelCode == null || c.causeKey.equals(Cause.missingMapping(hotelCode, type, code).key()))
                 .forEach(c -> resolve(c.causeKey, approvedBy));
     }

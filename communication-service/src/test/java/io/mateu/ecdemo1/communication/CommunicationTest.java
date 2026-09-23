@@ -72,10 +72,10 @@ class CommunicationTest {
         palma.active = true;
         recipients.save(palma);
 
-        var cause = request("cause-opened:MISSING_MAPPING/PMI01/BOARD/AD:1", "PMI01");
+        var cause = request("cause-opened:MISSING_MAPPING:PMI01:BOARD:AD:1", "PMI01");
         send(cause);
         send(cause);
-        send(request("cause-opened:MISSING_MAPPING/CUN01/BOARD/AD:1", "CUN01"));
+        send(request("cause-opened:MISSING_MAPPING:CUN01:BOARD:AD:1", "CUN01"));
 
         waitFor(() -> smtp.getReceivedMessages().length >= 3);
         Thread.sleep(2000);

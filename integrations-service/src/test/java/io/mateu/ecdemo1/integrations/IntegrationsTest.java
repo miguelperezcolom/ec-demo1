@@ -266,7 +266,7 @@ class IntegrationsTest {
         assertGateSignalled(id, "integration-activation-requested");
         lifecycle.stepActivate(id);
         assertThat(integrations.findById(id).orElseThrow().status).isEqualTo(IntegrationStatus.ACTIVE);
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE/NEW01"));
+        assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01"));
         mvc.perform(get("/integrations/hotels/NEW01")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE")).andExpect(jsonPath("$.pmsHotelCode").value("RIUNEW"));
 
@@ -275,7 +275,7 @@ class IntegrationsTest {
         assertThat(integrations.findById(id).orElseThrow().status).isEqualTo(IntegrationStatus.PAUSED);
         calls.clear();
         lifecycle.resume(id, "ana");
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE/NEW01"));
+        assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01"));
     }
 
     @Test

@@ -32,7 +32,7 @@ public class IntegrationMcpTools implements McpSystemContext {
                 Integraciones CRS → PMS (Opera), una por hotel:
                 - Cada hotel del CRS tiene una integración con su propiedad de Opera y sus credenciales. Nada de
                   ese hotel llega a Opera en tiempo real hasta que su integración está ACTIVE: mientras tanto sus
-                  reservas esperan en la causa INTEGRATION_INACTIVE/<hotel> y se reanudan al activarla.
+                  reservas esperan en la causa INTEGRATION_INACTIVE:<hotel> y se reanudan al activarla.
                 - El alta avanza por puertas: conectividad, propiedad configurada en Opera, mapeado aprobado por
                   una persona, interlocutores proyectados, huecos del backfill resueltos, backfill cubriendo la
                   ventana de activación, y activación por una persona. getIntegration dice en qué puerta está

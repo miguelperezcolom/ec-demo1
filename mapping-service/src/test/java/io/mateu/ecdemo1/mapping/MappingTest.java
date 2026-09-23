@@ -138,12 +138,12 @@ class MappingTest {
         assertThat(variables(reply)).containsEntry("prepareOutcome", "WAIT");
 
         assertThat(causes.findAll()).extracting(c -> c.causeKey).contains(
-                "MISSING_MAPPING/PMI01/HOTEL/PMI01", "MISSING_MAPPING/PMI01/CHANNEL/WEB",
-                "MISSING_MAPPING/PMI01/ROOM_TYPE/DBL", "MISSING_MAPPING/PMI01/RATE_PLAN/BAR",
-                "MISSING_MAPPING/PMI01/BOARD/AD");
-        var expected = List.of("HOTEL/PMI01", "CHANNEL/WEB", "ROOM_TYPE/DBL", "RATE_PLAN/BAR", "BOARD/AD");
+                "MISSING_MAPPING:PMI01:HOTEL:PMI01", "MISSING_MAPPING:PMI01:CHANNEL:WEB",
+                "MISSING_MAPPING:PMI01:ROOM_TYPE:DBL", "MISSING_MAPPING:PMI01:RATE_PLAN:BAR",
+                "MISSING_MAPPING:PMI01:BOARD:AD");
+        var expected = List.of("HOTEL:PMI01", "CHANNEL:WEB", "ROOM_TYPE:DBL", "RATE_PLAN:BAR", "BOARD:AD");
         assertThat(consume("notifications", r -> r.value().contains("CAUSE_OPENED")
-                && expected.stream().anyMatch(c -> r.value().contains("MISSING_MAPPING/PMI01/" + c)), 6, 10))
+                && expected.stream().anyMatch(c -> r.value().contains("MISSING_MAPPING:PMI01:" + c)), 6, 10))
                 .hasSize(5);
 
         define(CodeType.HOTEL, null, "PMI01", "OPERA-H1", Map.of());
@@ -177,7 +177,7 @@ class MappingTest {
     @Test
     void theResumeMessageIsSentAgainUntilTheProcessAnswers() throws Exception {
         var key = "proyectar-reserva:PMI01/L2:E2";
-        var cause = "MISSING_MAPPING/PMI01/BOARD/ZZ";
+        var cause = "MISSING_MAPPING:PMI01:BOARD:ZZ";
         dictionary.propose(new Dictionary.Proposal(CodeType.BOARD, null, "ZZ", "X", Map.of(), null, null), "t");
         waitOn(key, cause);
         approveProposalFor(CodeType.BOARD, "ZZ");
@@ -210,13 +210,13 @@ class MappingTest {
         }
         var key = "proyectar-reserva:PMI01/P-1:E3";
         assertThat(variables(runStep("prepare-reservation", "P-1", key))).containsEntry("prepareOutcome", "WAIT");
-        assertThat(causes.findById("MISSING_PARTNER/NORDTRAVEL")).get().extracting(c -> c.status).isEqualTo(CauseStatus.OPEN);
+        assertThat(causes.findById("MISSING_PARTNER:NORDTRAVEL")).get().extracting(c -> c.status).isEqualTo(CauseStatus.OPEN);
 
         runStepWith("record-partner-profile", "proyectar-interlocutor:partner/NORDTRAVEL:E9", List.of(
                 new Variable("partnerCode", "NORDTRAVEL"), new Variable("pmsProfileIds", "TA-100"),
                 new Variable("pmsProfileType", "TRAVEL_AGENT"), new Variable("version", "1")));
 
-        assertThat(causes.findById("MISSING_PARTNER/NORDTRAVEL")).get().extracting(c -> c.status).isEqualTo(CauseStatus.RESOLVED);
+        assertThat(causes.findById("MISSING_PARTNER:NORDTRAVEL")).get().extracting(c -> c.status).isEqualTo(CauseStatus.RESOLVED);
         assertThat(waiters.findById(key)).get().extracting(w -> w.status).isEqualTo(WaiterStatus.RELEASED);
     }
 
@@ -293,7 +293,7 @@ class MappingTest {
         try {
             var live = "proyectar-reserva:PMI01/L7:E7";
             assertThat(variables(runStep("prepare-reservation", "L7", live))).containsEntry("prepareOutcome", "WAIT");
-            assertThat(causes.findById("INTEGRATION_INACTIVE/PMI01")).get()
+            assertThat(causes.findById("INTEGRATION_INACTIVE:PMI01")).get()
                     .satisfies(c -> assertThat(c.status).isEqualTo(CauseStatus.OPEN));
 
             var backfill = "proyectar-reserva:PMI01/L8:backfill:R1";
@@ -302,7 +302,7 @@ class MappingTest {
                     .containsEntry("prepareOutcome", "OK");
 
             integrationStatus = "ACTIVE";
-            mvc.perform(post("/causes/resolve-if-open").param("key", "INTEGRATION_INACTIVE/PMI01").param("by", "integration"))
+            mvc.perform(post("/causes/resolve-if-open").param("key", "INTEGRATION_INACTIVE:PMI01").param("by", "integration"))
                     .andExpect(status().isOk());
             assertThat(waiters.findById(live)).get().extracting(w -> w.status).isEqualTo(WaiterStatus.RELEASED);
         } finally {

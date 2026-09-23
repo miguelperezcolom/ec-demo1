@@ -68,7 +68,7 @@ puertas: verifica la conexión con Opera y contrasta los catálogos. En el detal
 puerta está («Waiting for») y el historial de lo que ha ido pasando.
 
 Mientras no esté activa, nada del hotel X llega a Opera en tiempo real: sus reservas esperan en la
-causa `INTEGRATION_INACTIVE/X` (*Mapping → Causes*).
+causa `INTEGRATION_INACTIVE:X` (*Mapping → Causes*).
 
 ## 5. El proceso de alta en marcha
 

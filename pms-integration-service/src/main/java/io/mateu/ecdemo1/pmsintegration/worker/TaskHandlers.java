@@ -202,7 +202,7 @@ public class TaskHandlers {
                     new Variable("pmsProfileType", profileType));
         } catch (PmsRejectedException e) {
             integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID), null,
-                    partner.code(), task.variables(), List.of(Cause.pmsRejected("partner/" + partner.code(), e.getMessage())));
+                    partner.code(), task.variables(), List.of(Cause.pmsRejectedPartner(partner.code(), e.getMessage())));
             return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
         }
     }
@@ -242,7 +242,7 @@ public class TaskHandlers {
 
     List<Variable> rejected(TaskExecutionRequested task, Reservation r, String what, PmsRejectedException e, String outcomeVariable) {
         log.warn("Opera refused the {}: {} ({})", what, e.getMessage(), e.errorCode());
-        await(task, r, List.of(Cause.pmsRejected(r.hotelCode() + "/" + r.locator() + "/" + task.stepId(),
+        await(task, r, List.of(Cause.pmsRejectedReservation(r.hotelCode(), r.locator(), task.stepId(),
                 "%s — %s".formatted(e.getMessage(), e.errorCode()))));
         return outcome(outcomeVariable, Outcome.WAIT);
     }

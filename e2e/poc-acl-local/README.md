@@ -22,7 +22,7 @@ python3 e2e/poc-acl-local/scenario.py
 What `scenario.py` walks through, checking each step:
 
 1. The seeded partners wait for their profile type to be mapped.
-2. A booking of a hotel with no integration is held — on `INTEGRATION_INACTIVE/PMI01` and on its
+2. A booking of a hotel with no integration is held — on `INTEGRATION_INACTIVE:PMI01` and on its
    missing codes, the same causes for every process — and nothing reaches Opera.
 3. The hotel's integration is registered and onboarded gate by gate (`alta-integracion`): the
    connection verified, the catalogues contrasted, the partners projected, the mapping approved,
