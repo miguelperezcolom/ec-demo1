@@ -40,9 +40,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-shell-redwood
-          # Built on Mateu 3.0-alpha.352 while every other Mateu module is on alpha.359 (its Redwood bundle still has the localhost base URL): see the note
-          # on mateu.version in this shell's pom.
-          image: miguelperezcolom/ec-demo1-control-shell-redwood:0.17.0
+          image: miguelperezcolom/ec-demo1-control-shell-redwood:0.19.0
           env:
             - name: SERVER_PORT
               value: "8112"
