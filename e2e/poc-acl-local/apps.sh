@@ -27,7 +27,9 @@ start pms-integration-service CRS_INTEGRATION_URL=http://localhost:8121 MAPPING_
 # A throwaway key for the connection secrets: 32 zero bytes. A real one comes from a Secret.
 start integrations-service DB_URL=$DB/integrations CRS_INTEGRATION_URL=http://localhost:8121 \
   PMS_INTEGRATION_URL=http://localhost:8123 MAPPING_URL=http://localhost:8122 PARTNERS_URL=http://localhost:8120 \
-  INTEGRATIONS_CRYPTO_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= GATE_RECHECK=5s BACKFILL_TICK=1s
+  INTEGRATIONS_CRYPTO_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= GATE_RECHECK=5s BACKFILL_TICK=1s \
+  OPERA_GATEWAY_URL=http://localhost:8124 OPERA_APP_KEY=mock-app-key OPERA_CLIENT_ID=mock-client \
+  OPERA_CLIENT_SECRET=mock-secret OPERA_ENTERPRISE_ID=RIUE
 start communication-service DB_URL=$DB/communication SMTP_HOST=localhost SMTP_PORT=51025 DEFAULT_RECIPIENT=ops@example.com
 for port in 8124 8108 8120 8121 8122 8123 8125 8126; do
   for i in $(seq 1 60); do curl -s localhost:$port/actuator/health 2>/dev/null | grep -q '"UP"' && break; sleep 2; done

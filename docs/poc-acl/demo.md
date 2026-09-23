@@ -58,8 +58,11 @@ el punto de partida: un hotel que ya vende en el CRS y que todavía no está int
 
 ## 4. Crear la integración del hotel X
 
-En *Integrations → Integrations* (plano de control), **New**: hotel del CRS, propiedad de Opera,
-gateway OHIP, app key, client id, secreto y enterprise. Al guardarla arranca el proceso
+En *Integrations → Integrations* (plano de control), **New**: solo hay que elegir dos cosas, y las dos
+se leen de sus catálogos, no se escriben — el **hotel del CRS** sale de `booking` (a través del ACL) y
+la **propiedad de Opera**, de la propia Opera, que lista las de la cadena. Los datos de conexión
+vienen rellenos con los de la cadena (un hotel que necesite otros, los cambia aquí).
+Al guardarla arranca el proceso
 `alta-integracion` (se ve en *Admin → Processes*) y la integración avanza sola por sus primeras
 puertas: verifica la conexión con Opera y contrasta los catálogos. En el detalle se ve en qué
 puerta está («Waiting for») y el historial de lo que ha ido pasando.

@@ -16,10 +16,14 @@ public class ApiConfig implements WebMvcConfigurer {
 
     final OhipGuard guard;
 
-    /** Every Property API the double serves is behind the guard; the token endpoint is not. */
+    /**
+     * Every API the double serves is behind the guard — the Property ones and the enterprise one,
+     * which names the hub instead of a hotel; the token endpoint is not.
+     */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(guard).addPathPatterns("/rsv/**", "/crm/**", "/csh/**", "/rm/**", "/rtp/**", "/lov/**");
+        registry.addInterceptor(guard).addPathPatterns("/rsv/**", "/crm/**", "/csh/**", "/rm/**", "/rtp/**", "/lov/**",
+                "/ent/**");
     }
 
     @RestControllerAdvice(basePackageClasses = ApiConfig.class)

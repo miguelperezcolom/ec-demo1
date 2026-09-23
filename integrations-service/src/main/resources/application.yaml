@@ -68,8 +68,16 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 
-# No default for the crypto key: it comes from a Secret. Without it no connection can be stored.
+# No defaults for the crypto key or the Opera secret: both come from a Secret. Without the key no
+# connection can be stored; the rest of the chain's connection is what a new integration starts from
+# and what lists the tenant's properties.
 integrations:
+  opera:
+    gateway-url: ${OPERA_GATEWAY_URL:}
+    app-key: ${OPERA_APP_KEY:}
+    client-id: ${OPERA_CLIENT_ID:}
+    client-secret: ${OPERA_CLIENT_SECRET:}
+    enterprise-id: ${OPERA_ENTERPRISE_ID:}
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
   pms-integration-url: ${PMS_INTEGRATION_URL:http://localhost:8123}
   mapping-url: ${MAPPING_URL:http://localhost:8122}

@@ -5,6 +5,7 @@ import io.mateu.ecdemo1.integration.model.integration.FutureReservation;
 import io.mateu.ecdemo1.integration.model.integration.FutureUsage;
 import io.mateu.ecdemo1.integration.model.integration.Gap;
 import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
+import io.mateu.ecdemo1.integration.model.integration.PmsProperty;
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integrations.config.IntegrationsProperties;
@@ -45,6 +46,13 @@ public class Services {
 
     public ConnectivityCheck verify(OhipConnection connection) {
         return pms.post().uri("/connections/verify").body(connection).retrieve().body(ConnectivityCheck.class);
+    }
+
+    /** The properties of the chain in Opera, asked with the chain's connection: what to integrate a hotel with. */
+    public List<PmsProperty> operaProperties(OhipConnection connection) {
+        return pms.post().uri("/connections/properties").body(connection).retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
     }
 
     public List<CodeEntry> pmsCatalog(String pmsHotelCode) {
@@ -102,6 +110,13 @@ public class Services {
     }
 
     // ── the CRS adapter ──────────────────────────────────────────────────────
+
+    /** The CRS's hotels, in the integration's terms — what a hotel code on the form may be. */
+    public List<CodeEntry> crsHotels() {
+        var catalog = crs.get().uri("/catalog").retrieve().body(new ParameterizedTypeReference<List<CodeEntry>>() {
+        });
+        return catalog == null ? List.of() : catalog.stream().filter(e -> e.type() == CodeType.HOTEL).toList();
+    }
 
     public FutureUsage futureUsage(String crsHotelCode) {
         return crs.get().uri("/reservations/{hotel}/future/usage", crsHotelCode).retrieve().body(FutureUsage.class);

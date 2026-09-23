@@ -68,6 +68,21 @@ class OperaMockTest {
     }
 
     @Test
+    void theEnterpriseListsTheChainsPropertiesAndSaysWhichAreConfigured() throws Exception {
+        mvc.perform(get("/ent/config/v1/hotels").header("x-app-key", "mock-app-key")
+                .header("Authorization", "Bearer " + token).header("x-hubid", "NOPE"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/ent/config/v1/hotels").header("x-app-key", "mock-app-key")
+                        .header("Authorization", "Bearer " + token).header("x-hubid", "RIUE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hotels[0].hotelId").value("RIUCUN"))
+                .andExpect(jsonPath("$.hotels[0].configured").value(true))
+                .andExpect(jsonPath("$.hotels[1].hotelId").value("RIUNEW"))
+                .andExpect(jsonPath("$.hotels[1].configured").value(false))
+                .andExpect(jsonPath("$.hotels[2].hotelId").value("RIUPMI"));
+    }
+
+    @Test
     void everyCallNeedsAValidTokenAndAHotelThisClientMaySee() throws Exception {
         mvc.perform(get("/rm/config/v1/hotels/RIUPMI/roomTypes").header("x-app-key", "mock-app-key")
                 .header("Authorization", "Bearer nope").header("x-hotelid", "RIUPMI")).andExpect(status().isUnauthorized());

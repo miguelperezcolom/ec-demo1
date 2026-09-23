@@ -77,7 +77,7 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
 
     @Override
     public IntegrationViewModel creationForm(HttpRequest httpRequest) {
-        return viewModel;
+        return viewModel.blank();
     }
 
     @Override

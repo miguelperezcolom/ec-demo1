@@ -4,10 +4,15 @@ import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
 import io.mateu.ecdemo1.integrations.rest.IntegrationDto;
 import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
 import io.mateu.ecdemo1.integrations.store.Integration;
+import io.mateu.ecdemo1.integrations.ui.suppliers.CrsHotelLabel;
+import io.mateu.ecdemo1.integrations.ui.suppliers.CrsHotelOptions;
+import io.mateu.ecdemo1.integrations.ui.suppliers.OperaPropertyLabel;
+import io.mateu.ecdemo1.integrations.ui.suppliers.OperaPropertyOptions;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.EditableOnlyWhenCreating;
 import io.mateu.uidl.annotations.HiddenInCreate;
+import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
@@ -41,15 +46,23 @@ public class IntegrationViewModel implements Identifiable {
     @HiddenInCreate
     Status status = new Status(StatusType.NONE, "New");
 
+    /** The CRS's hotels, from the CRS — not typed. */
     @Section("Hotel")
     @NotEmpty
     @EditableOnlyWhenCreating
+    @Lookup(search = CrsHotelOptions.class, label = CrsHotelLabel.class)
     String crsHotelCode;
+    /** The chain's properties, as Opera lists them for the chain's connection. */
     @NotEmpty
     @EditableOnlyWhenCreating
+    @Lookup(search = OperaPropertyOptions.class, label = OperaPropertyLabel.class)
     String operaProperty;
     String name;
 
+    /**
+     * Filled in from the chain's connection: every property of the chain lives in the same tenant
+     * (R24). Changing it here makes it this hotel's own.
+     */
     @Section("Connection to Opera (OHIP)")
     @NotEmpty
     String gatewayUrl;
@@ -57,7 +70,7 @@ public class IntegrationViewModel implements Identifiable {
     String appKey;
     @NotEmpty
     String clientId;
-    /** Write-only: blank keeps the stored secret. */
+    /** Write-only: blank is the chain's secret when creating, and the stored one when editing. */
     @Stereotype(FieldStereotype.password)
     String clientSecret;
     @NotEmpty
@@ -108,6 +121,22 @@ public class IntegrationViewModel implements Identifiable {
 
     final Integrations lifecycle;
     final BackfillRunRepository runs;
+
+    /** A new integration starts from the chain's connection: the person names the hotel and the property. */
+    public IntegrationViewModel blank() {
+        var chain = lifecycle.chainConnection();
+        status = new Status(StatusType.NONE, "New");
+        crsHotelCode = null;
+        operaProperty = null;
+        name = null;
+        gatewayUrl = chain.gatewayUrl();
+        appKey = chain.appKey();
+        clientId = chain.clientId();
+        clientSecret = "";
+        enterpriseId = chain.enterpriseId();
+        id = null;
+        return this;
+    }
 
     public String create(HttpRequest httpRequest) {
         return lifecycle.register(new Integrations.Registration(crsHotelCode, operaProperty, name, gatewayUrl, appKey,

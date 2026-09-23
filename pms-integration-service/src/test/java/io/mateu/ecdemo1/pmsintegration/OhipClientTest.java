@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import io.mateu.ecdemo1.integration.model.integration.IntegrationView;
 import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
+import io.mateu.ecdemo1.integration.model.integration.PmsProperty;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.connections.Connections;
 import io.mateu.ecdemo1.pmsintegration.config.TolerantReader;
@@ -28,6 +29,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** The OHIP door: tokens, headers, and how each kind of answer is sorted. */
 class OhipClientTest {
@@ -123,6 +125,19 @@ class OhipClientTest {
 
         var nowhere = client.verify(new OhipConnection("RIUPMI", "http://localhost:1", "a", "b", "c", "d"));
         assertThat(nowhere.ok()).isFalse();
+    }
+
+    @Test
+    void theChainsPropertiesAreAskedOfTheEnterpriseNotOfAHotel() {
+        answers.add(new Answer(200, """
+                {"hotels":[{"hotelId":"RIUPMI","hotelName":"Riu Demo Palma","currencyCode":"EUR"},
+                           {"hotelId":"RIUNEW","hotelName":"Riu Demo Nuevo"}]}"""));
+
+        var properties = client.properties(connections.get("RIUPMI"));
+
+        assertThat(properties).extracting(PmsProperty::code, PmsProperty::name)
+                .containsExactly(tuple("RIUPMI", "Riu Demo Palma"), tuple("RIUNEW", "Riu Demo Nuevo"));
+        assertThat(calls).last().asString().contains("/ent/config/v1/hotels").contains("hotel=null");
     }
 
     @Test

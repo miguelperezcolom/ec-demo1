@@ -44,6 +44,15 @@ public class OhipGuard implements HandlerInterceptor {
                 || !store.validToken(authorization.substring(7), clock.instant())) {
             return refuse(request, response, new OperaError(HttpStatus.UNAUTHORIZED, "MOCK-TOKEN", "Invalid or expired token"));
         }
+        // Enterprise-level calls name the hub, not a hotel — the two headers are mutually exclusive.
+        if (request.getRequestURI().startsWith("/ent/")) {
+            var hub = request.getHeader("x-hubid");
+            if (hub == null || !hub.equals(properties.enterpriseId())) {
+                return refuse(request, response, new OperaError(HttpStatus.FORBIDDEN, "OPERAWS-GEN01244",
+                        "User is not authorized to access data for enterprise."));
+            }
+            return true;
+        }
         var hotelHeader = request.getHeader("x-hotelid");
         if (hotelHeader == null || hotelHeader.isBlank()) {
             return refuse(request, response, OperaError.badRequest("OPERAWS-GEN01245",

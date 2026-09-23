@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.integrations.lifecycle;
 
 import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
 import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
+import io.mateu.ecdemo1.integration.model.integration.PmsProperty;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
@@ -69,9 +70,34 @@ public class Integrations {
 
     // ── what a person does ──────────────────────────────────────────────────
 
+    /**
+     * The chain's connection to Opera, from configuration: what a new integration starts from, and
+     * what lists the tenant's properties before any integration exists (HLA R24 — one tenant for
+     * the chain). Its property code is blank: that is what each integration names.
+     */
+    public OhipConnection chainConnection() {
+        var opera = properties.opera();
+        return new OhipConnection(null, opera.gatewayUrl(), opera.appKey(), opera.clientId(), opera.clientSecret(),
+                opera.enterpriseId());
+    }
+
+    /** The properties of the chain in Opera, for whoever is registering an integration. */
+    public List<PmsProperty> operaProperties() {
+        return services.operaProperties(chainConnection());
+    }
+
     /** Registers the integration and starts its onboarding. One per CRS hotel. */
     @Transactional
     public Integration register(Registration r, String by) {
+        var chain = chainConnection();
+        var registration = new Registration(r.crsHotelCode(), r.pmsHotelCode(), r.name(), blankOr(r.gatewayUrl(), chain.gatewayUrl()),
+                blankOr(r.appKey(), chain.appKey()), blankOr(r.clientId(), chain.clientId()),
+                blankOr(r.clientSecret(), chain.clientSecret()), blankOr(r.enterpriseId(), chain.enterpriseId()));
+        return registerFilled(registration, by);
+    }
+
+    @Transactional
+    Integration registerFilled(Registration r, String by) {
         require(r.crsHotelCode(), "the CRS hotel");
         require(r.pmsHotelCode(), "the Opera property");
         require(r.gatewayUrl(), "the OHIP gateway");

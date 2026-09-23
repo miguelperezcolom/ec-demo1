@@ -29,6 +29,19 @@ public class ConfigController {
         return Map.of("defaultText", value);
     }
 
+    /**
+     * The chain's properties. Enterprise-level: it names the hub, not a hotel, which is how a client
+     * learns which properties it may see at all — every other call has to name one already.
+     */
+    @GetMapping("/ent/config/v1/hotels")
+    public Map<String, Object> hotels() {
+        return Map.of("hotels", catalog.all().stream()
+                .sorted(java.util.Comparator.comparing(OperaCatalog.Property::hotelId))
+                .map(p -> Map.of("hotelId", p.hotelId(), "hotelName", p.name(), "currencyCode", p.currency(),
+                        "configured", !p.roomTypes().isEmpty()))
+                .toList());
+    }
+
     @GetMapping("/rm/config/v1/hotels/{hotelId}/roomTypes")
     public Map<String, Object> roomTypes(@PathVariable String hotelId) {
         var p = property(hotelId);

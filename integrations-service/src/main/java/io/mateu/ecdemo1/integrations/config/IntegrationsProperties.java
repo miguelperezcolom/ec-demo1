@@ -14,6 +14,10 @@ import java.time.Duration;
  * @param consoleUrl           where the integrations screens are, for links in notifications
  * @param cryptoKey            AES-256 key, base64, the connection secrets are stored under. From a
  *                             Secret, never from a file; nothing is stored if it is missing
+ * @param opera                the chain's connection to Opera: every property of the chain lives in
+ *                             the same tenant (HLA R24), so a new integration starts from it — the
+ *                             form arrives filled in, and it is what lists the tenant's properties.
+ *                             A hotel that needs another one overrides it on its own integration
  * @param gateCheck            how often the gates of every onboarding are looked at
  * @param recheck              how often a gate that needs a look outside — the property's catalogue, the
  *                             backfill's gaps — is looked at again, besides the "Recheck" action
@@ -25,11 +29,16 @@ import java.time.Duration;
  */
 @ConfigurationProperties("integrations")
 public record IntegrationsProperties(String crsIntegrationUrl, String pmsIntegrationUrl, String mappingUrl,
-                                     String partnersUrl, String consoleUrl, String cryptoKey, Duration gateCheck,
-                                     Duration recheck, int backfillPerTick, Duration backfillTick,
+                                     String partnersUrl, String consoleUrl, String cryptoKey, Opera opera,
+                                     Duration gateCheck, Duration recheck, int backfillPerTick, Duration backfillTick,
                                      int activationWindowDays) {
 
+    /** How to reach the chain's Opera tenant. The secret comes from a Secret, never from a file. */
+    public record Opera(String gatewayUrl, String appKey, String clientId, String clientSecret, String enterpriseId) {
+    }
+
     public IntegrationsProperties {
+        if (opera == null) opera = new Opera(null, null, null, null, null);
         if (consoleUrl == null) consoleUrl = "";
         if (gateCheck == null) gateCheck = Duration.ofSeconds(5);
         if (recheck == null) recheck = Duration.ofSeconds(30);

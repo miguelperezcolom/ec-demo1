@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.pmsintegration.ohip;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.mateu.ecdemo1.integration.model.integration.ConnectivityCheck;
 import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
+import io.mateu.ecdemo1.integration.model.integration.PmsProperty;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.config.TolerantReader;
 import io.mateu.ecdemo1.pmsintegration.connections.Connections;
@@ -21,7 +22,9 @@ import org.springframework.web.client.RestClientResponseException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -115,6 +118,32 @@ public class OhipClient {
         } catch (ResourceAccessException | IllegalArgumentException e) {
             return new ConnectivityCheck(false, "Unreachable: " + e.getMessage());
         }
+    }
+
+    /**
+     * The properties this connection may see, asked of the enterprise — the one call that does not
+     * name a hotel, and how a person picks the property a CRS hotel is integrated with. Empty when
+     * the tenant does not answer it: then the property code is typed by hand.
+     */
+    public List<PmsProperty> properties(OhipConnection connection) {
+        var rest = rest(connection);
+        var token = requestToken(rest, connection);
+        var answer = rest.get().uri("/ent/config/v1/hotels")
+                .header("x-app-key", connection.appKey())
+                .header("x-hubid", connection.enterpriseId())
+                .header("x-request-id", UUID.randomUUID().toString())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.value())
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve().body(JsonNode.class);
+        var properties = new ArrayList<PmsProperty>();
+        if (answer != null) {
+            for (var hotel : answer.path("hotels")) {
+                properties.add(new PmsProperty(hotel.path("hotelId").asText(),
+                        hotel.path("hotelName").asText(hotel.path("hotelId").asText()),
+                        hotel.path("currencyCode").asText(null)));
+            }
+        }
+        return properties;
     }
 
     Response call(HttpMethod method, String hotelId, String uri, Object body, Object... variables) {

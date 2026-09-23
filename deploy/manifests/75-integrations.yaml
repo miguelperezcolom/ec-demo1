@@ -75,6 +75,19 @@ spec:
               value: "http://mapping-service:8122"
             - name: PARTNERS_URL
               value: "http://partners:8120"
+            # The chain's connection to Opera: what a new integration starts from, and what lists the
+            # tenant's properties on the form. Pointed at opera-mock, with the double's fake
+            # credentials; a real tenant's go in a Secret, like every other credential here.
+            - name: OPERA_GATEWAY_URL
+              value: "http://opera-mock:8124"
+            - name: OPERA_APP_KEY
+              value: "mock-app-key"
+            - name: OPERA_CLIENT_ID
+              value: "mock-client"
+            - name: OPERA_CLIENT_SECRET
+              value: "mock-secret"
+            - name: OPERA_ENTERPRISE_ID
+              value: "RIUE"
             - name: INTEGRATIONS_CRYPTO_KEY
               valueFrom: { secretKeyRef: { name: ec-integrations-crypto, key: INTEGRATIONS_CRYPTO_KEY } }
             - name: CONSOLE_URL

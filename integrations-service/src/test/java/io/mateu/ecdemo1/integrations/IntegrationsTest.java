@@ -59,6 +59,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "integrations.crypto-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         // Scheduled work off: the test looks at gates and ticks the backfill itself.
         "integrations.gate-check=1h", "integrations.backfill-tick=1h",
+        // The chain's connection: what a new integration starts from when the form leaves it blank.
+        "integrations.opera.gateway-url=https://ohip.example", "integrations.opera.app-key=chain-app",
+        "integrations.opera.client-id=chain-client", "integrations.opera.client-secret=ch41n",
+        "integrations.opera.enterprise-id=RIUE",
         "integrations.backfill-per-tick=2", "integrations.activation-window-days=10"})
 @AutoConfigureMockMvc
 @Testcontainers
@@ -107,10 +111,17 @@ class IntegrationsTest {
             calls.add(exchange.getRequestMethod() + " " + path + (query == null ? "" : "?" + query)
                     + (request.isBlank() ? "" : " " + request));
             String body = switch (path) {
+                case "/connections/properties" -> """
+                        [{"code":"RIUPMI","name":"Riu Demo Palma","currency":"EUR"},
+                         {"code":"RIUNEW","name":"Riu Demo Nuevo","currency":"EUR"}]""";
                 case "/connections/verify" -> connectionWorks
                         ? "{\"ok\":true,\"message\":\"Token granted\"}"
                         : "{\"ok\":false,\"message\":\"OHIP 401: invalid client\"}";
-                case "/catalog" -> "[" + String.join(",", java.util.stream.IntStream.range(0, roomTypes)
+                // No hotel named: the CRS's catalogue. With one: that Opera property's.
+                case "/catalog" -> query == null ? """
+                        [{"type":"HOTEL","code":"NEW01","description":"Riu Nuevo"},
+                         {"type":"ROOM_TYPE","code":"DBL","description":"Doble"}]"""
+                        : "[" + String.join(",", java.util.stream.IntStream.range(0, roomTypes)
                         .mapToObj(n -> "{\"type\":\"ROOM_TYPE\",\"hotelCode\":\"RIUNEW\",\"code\":\"RT" + n + "\"}").toList())
                         + (roomTypes > 0 ? ",{\"type\":\"RATE_PLAN\",\"hotelCode\":\"RIUNEW\",\"code\":\"RACK\"}" : "") + "]";
                 case "/pending" -> "[" + String.join(",", java.util.stream.IntStream.range(0, pendingCodes)
@@ -148,6 +159,8 @@ class IntegrationsTest {
 
     @Autowired
     Integrations lifecycle;
+    @Autowired
+    io.mateu.ecdemo1.integrations.clients.Services services;
     @Autowired
     Gates gates;
     @Autowired
@@ -313,6 +326,24 @@ class IntegrationsTest {
                 .andExpect(jsonPath("$.clientSecret").value("s3cr3t"))
                 .andExpect(jsonPath("$.gatewayUrl").value("https://ohip.example"));
         mvc.perform(get("/integrations/hotels/NOPE01")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void anIntegrationStartsFromTheChainsConnectionAndOperaListsItsProperties() {
+        assertThat(lifecycle.operaProperties()).extracting(p -> p.code()).containsExactly("RIUPMI", "RIUNEW");
+        assertThat(calls).anyMatch(c -> c.startsWith("POST /connections/properties") && c.contains("\"clientSecret\":\"ch41n\""));
+
+        // The form leaves the connection as it came: only the hotel and the property are named.
+        var id = lifecycle.register(new Integrations.Registration("NEW01", "RIUNEW", "Riu Nuevo", null, null, null,
+                null, null), "ana").id;
+        assertThat(lifecycle.connection(lifecycle.find(id)))
+                .extracting(c -> c.gatewayUrl(), c -> c.clientId(), c -> c.clientSecret(), c -> c.enterpriseId())
+                .containsExactly("https://ohip.example", "chain-client", "ch41n", "RIUE");
+    }
+
+    @Test
+    void theCrsHotelsComeFromTheCrs() {
+        assertThat(services.crsHotels()).extracting(h -> h.code()).containsExactly("NEW01");
     }
 
     @Test

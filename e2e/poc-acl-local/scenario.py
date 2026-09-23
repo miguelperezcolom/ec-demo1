@@ -54,9 +54,9 @@ def at(hotel, status):
     return lambda: (integration(hotel) or {}).get("status") == status
 
 def register(hotel, property_):
-    status, body = call("POST", INTEGRATIONS + "/integrations?by=e2e", {"crsHotelCode": hotel, "pmsHotelCode": property_,
-        "name": "Riu " + hotel, "gatewayUrl": OPERA, "appKey": "mock-app-key", "clientId": "mock-client",
-        "clientSecret": "mock-secret", "enterpriseId": "RIUE"})
+    # Only the hotel and the property: the connection comes from the chain's, as the form does.
+    status, body = call("POST", INTEGRATIONS + "/integrations?by=e2e",
+                        {"crsHotelCode": hotel, "pmsHotelCode": property_, "name": "Riu " + hotel})
     assert status == 201, (status, body)
     return body["id"]
 
