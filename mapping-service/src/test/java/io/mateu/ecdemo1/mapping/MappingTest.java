@@ -50,6 +50,7 @@ import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -280,6 +281,19 @@ class MappingTest {
 
     void define(CodeType type, String hotel, String code, String target, Map<String, String> attributes) {
         dictionary.define(new Dictionary.Proposal(type, hotel, code, target, attributes, null, null), "test");
+    }
+
+    @Test
+    void enteringAnEquivalenceAlreadyInForceFromTheChainChangesNothing() throws Exception {
+        define(CodeType.HOTEL, null, "MRU01", "XMAR", Map.of());
+        var before = entries.count();
+
+        // The integration enters the hotel's own equivalence; the chain's already says the same.
+        mvc.perform(post("/entries/definitions").param("by", "integration MRU01").contentType("application/json")
+                        .content("""
+                                {"type":"HOTEL","hotelCode":"MRU01","sourceCode":"MRU01","targetCode":"XMAR","attributes":{}}"""))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.targetCode").value("XMAR"));
+        assertThat(entries.count()).isEqualTo(before);
     }
 
     @Test

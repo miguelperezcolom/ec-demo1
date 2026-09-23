@@ -160,10 +160,13 @@ public class MappingController {
     public MappingEntry define(@RequestBody Dictionary.Proposal proposal, @RequestParam String by) {
         var current = dictionary.resolve(proposal.hotelCode(), proposal.type(), proposal.sourceCode());
         if (current.isPresent() && current.get().targetCode().equals(proposal.targetCode())) {
+            // In force already — the property's own, or the chain's it inherits: that is the answer, and
+            // nothing new is entered. Looking only at the property's made an inherited one a 404.
             return entries.findAllByOrderByTypeAscSourceCodeAscEntryVersionDesc().stream()
                     .filter(e -> e.type == proposal.type() && e.sourceCode.equals(proposal.sourceCode())
-                            && java.util.Objects.equals(e.hotelCode, proposal.hotelCode())
+                            && (java.util.Objects.equals(e.hotelCode, proposal.hotelCode()) || e.hotelCode == null)
                             && e.status == io.mateu.ecdemo1.mapping.store.EntryStatus.APPROVED)
+                    .sorted(java.util.Comparator.comparing(e -> e.hotelCode == null ? 1 : 0))
                     .findFirst().orElseThrow();
         }
         return dictionary.define(proposal, by);
