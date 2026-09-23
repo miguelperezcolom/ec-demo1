@@ -117,6 +117,7 @@ ia-agent ── MCP de booking, partners, mapping-service, communication-service
 | `communication-service` | Nuevo | Envío de notificaciones: plantillas, destinatarios, canal email por el relay `postfix`, histórico | Sí | Sí |
 | `ec-definitions` | Cambia | Definiciones `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor` | — | — |
 | `ia-control-plane` | Configuración | Alta de los MCP nuevos y del agente de mapeado | — | — |
+| `front-office` | Nuevo (H13) | El front office del hotel (check-in, en casa, check-out, folios), traído de la demo de Mateu; recibe cada reserva que se graba en Opera como estancia por llegar, con el huésped por su código de cliente del MDM | Sí | No |
 | `customer-mdm-service` | Nuevo (H11) | Maestro de clientes: golden record, resolución de identidad, proyección a Salesforce, suscripción a `ClienteConsolidado__e`, supervivencia y propagación del código; metadatos de Salesforce en `salesforce/` | Sí | Sí |
 
 Los adaptadores (`crs-` y `pms-integration-service`) no tienen UI ni MCP, como en el HLA: traducen, y
@@ -271,6 +272,7 @@ Una rama y un PR por hito.
 | H7 ✅ | `communication-service` y avisos | Cada tipo de aviso llega por email |
 | H8 ✅ | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
 | H9 ✅ | Despliegue en el clúster, e2e y conclusiones (desplegado; [conclusiones](conclusions.md)) | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
+| H13 ✅ | El front office del hotel (`front-office`, traído de la demo de Mateu): cada reserva de MRU01 que se graba en Opera se graba también allí como estancia por llegar, y su cancelación la cancela; UI en `front.ec1.mateu.io` tras Keycloak | Una reserva de `ec1` está en XMAR y en el front office en 20 s |
 | H12 ✅ | El conector contra el tenant real (OHIP UAT, propiedad XMAR): diferencias con las specs corregidas en el conector y en el doble; interlocutores importados de Opera al ERP en vez de proyectados; en `ec1`, MRU01 integrado con XMAR | Una reserva de `ec1` llega a XMAR (13 s); falta en el tenant: cajero para depósitos e interfaces para referencias en perfiles |
 | H11 | `customer-mdm-service` con Salesforce (HLA CRM-MDM): identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación. En local contra la org real ✅; desplegado en `ec1` (0.17.x) ✅ | Una fusión hecha en Salesforce llega al perfil de Opera de las reservas del cliente absorbido |
 | H10 ✅ | `integrations-service`: la integración de cada hotel (conexión con Opera, secreto cifrado) y su alta por puertas como proceso `alta-integracion`; el tráfico de un hotel sin integración activa espera | El alta de un hotel lleva sus reservas a Opera por backfill y la activación libera lo retenido |

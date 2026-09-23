@@ -41,11 +41,13 @@
       "baseUrl": "https://ec1.mateu.io",
       "redirectUris": [
         "https://ec1.mateu.io/*",
-        "https://rw.ec1.mateu.io/*"
+        "https://rw.ec1.mateu.io/*",
+        "https://front.ec1.mateu.io/*"
       ],
       "webOrigins": [
         "https://ec1.mateu.io",
-        "https://rw.ec1.mateu.io"
+        "https://rw.ec1.mateu.io",
+        "https://front.ec1.mateu.io"
       ],
       "attributes": {
         "post.logout.redirect.uris": "+",

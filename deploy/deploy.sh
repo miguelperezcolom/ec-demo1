@@ -247,6 +247,7 @@ kubectl apply -f deploy/manifests/68-opera-mock.yaml
 kubectl apply -f deploy/manifests/69-communication.yaml
 kubectl apply -f deploy/manifests/75-integrations.yaml
 kubectl apply -f deploy/manifests/76-customer-mdm.yaml
+kubectl apply -f deploy/manifests/77-front-office.yaml
 # The control console: its database first, then the service, then its shell.
 kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml

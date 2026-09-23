@@ -1,0 +1,96 @@
+# CRS-PMS integration PoC (docs/poc-acl), H13: the hotel's front office, brought from Mateu's demo —
+# check-in, the in-house guests, check-out and folios. The integration writes into it every
+# reservation of MRU01 it writes into Opera (pms-integration-service, write-front-office). Its UI at
+# front.ec1.mateu.io, behind Keycloak; its /api only inside the cluster.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front-office
+  namespace: ec-demo1
+  labels: { app: front-office }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: front-office }
+  template:
+    metadata:
+      labels:
+        app: front-office
+        app.kubernetes.io/component: front-office
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8128"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: cx43
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/component, operator: Exists }
+                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: front-office
+          image: miguelperezcolom/ec-demo1-front-office:0.18.0
+          env:
+            - name: SERVER_PORT
+              value: "8128"
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/front_office
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "6"
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8128 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "640Mi", cpu: "100m" }
+            limits:   { memory: "1536Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8128 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8128 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: front-office
+  namespace: ec-demo1
+  labels: { app: front-office }
+spec:
+  selector: { app: front-office }
+  ports:
+    - { name: http, port: 8128, targetPort: 8128 }

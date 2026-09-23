@@ -16,6 +16,8 @@ import io.mateu.uidl.interfaces.HomeRouteSupplier;
  */
 @UI("")
 @Title("Front-Office Suite")
+// The hotel's staff log in with the chain's Keycloak, as in the consoles (same realm and client).
+@io.mateu.uidl.annotations.KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
 @App(themeToggle = true) // variante AUTO: menú plano de RouteLinks → TABS (in-app navigation)
 @io.mateu.uidl.annotations.Logo("/images/riu.svg")
 @io.mateu.uidl.annotations.FavIcon("/images/riu.svg")

@@ -126,6 +126,25 @@ spring:
             - Host=${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/**
 
+        # ── The hotel's front office, on a host of its own (front.ec1.mateu.io) ────────────
+        #
+        # Its UI logs in with Keycloak, as the demo console does. Its /api is where the integration
+        # writes reservations, from inside the cluster; it is not routed from here — answered with a
+        # 404 before the catch-all can take it.
+        - id: front-office-api-not-public
+          uri: no://op
+          predicates:
+            - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/api/**
+          filters:
+            - SetStatus=404
+
+        - id: front-office
+          uri: ${FRONT_OFFICE_URL:http://front-office:8128}
+          predicates:
+            - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/**
+
         # ── The control console, on a host of its own ────────────────────────────────────
         #
         # A second origin rather than a path under the first, so the two consoles are two

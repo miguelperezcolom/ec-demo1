@@ -51,7 +51,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: pms-integration-service
-          image: miguelperezcolom/ec-demo1-pms-integration-service:0.18.0
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.18.2
           env:
             - name: SERVER_PORT
               value: "8123"
@@ -89,6 +89,11 @@ spec:
             # Partners are Opera's: imported into the ERP, never written to Opera.
             - name: PARTNERS_OWNED_BY_PMS
               value: "true"
+            # The hotel's front office: MRU01's reservations are written into it too (H13).
+            - name: FRONT_OFFICE_URL
+              value: "http://front-office:8128"
+            - name: FRONT_OFFICE_HOTELS
+              value: "MRU01"
           ports:
             - { name: http, containerPort: 8123 }
           securityContext:
