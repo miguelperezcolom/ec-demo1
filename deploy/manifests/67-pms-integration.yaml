@@ -2,8 +2,9 @@
 # The only piece that knows Opera's API (OHIP). No database: its state is Opera's and the engine's.
 #
 # How to reach each Opera property is not here: it is each hotel's integration's, registered in the
-# console and read from integrations-service. In this PoC they point at opera-mock, with the
-# double's fake credentials — nothing is written to a real Opera tenant.
+# console and read from integrations-service. On ec1 they point at OHIP UAT (property XMAR), where
+# only reservations and guest profiles are written; partners are read from Opera, never written.
+# What that tenant takes differently — or has not configured yet — is below (docs/poc-acl, H12).
 #
 # One replica: the read-compare-write of a reservation is serialised in memory, per reservation —
 # the engine's LOCK step would be the place, and in 2.18.0 it does not work on PostgreSQL.
@@ -50,7 +51,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: pms-integration-service
-          image: miguelperezcolom/ec-demo1-pms-integration-service:0.17.0
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.18.0
           env:
             - name: SERVER_PORT
               value: "8123"
@@ -69,6 +70,25 @@ spec:
               value: "http://integrations-service:8126"
             - name: RETRY_ALERT_AFTER
               value: "10m"
+            # OHIP UAT: reservations carry the CRS's locator under Rumbo's external system; the CRS
+            # version goes in a numeric UDF named as OPERA names them.
+            - name: OPERA_EXTERNAL_SYSTEM
+              value: "CRS"
+            - name: OPERA_VERSION_UDF
+              value: "UDFN01"
+            - name: OPERA_PAY_AT_HOTEL_METHOD
+              value: "CASH"
+            # Not configured in the tenant yet: profile references need the external systems as
+            # interfaces of the property, and posting deposits needs a cashier for the integration user.
+            - name: OPERA_PROFILE_REFERENCES
+              value: "false"
+            - name: OPERA_CRM_EXTERNAL_SYSTEM
+              value: ""
+            - name: OPERA_POST_DEPOSITS
+              value: "false"
+            # Partners are Opera's: imported into the ERP, never written to Opera.
+            - name: PARTNERS_OWNED_BY_PMS
+              value: "true"
           ports:
             - { name: http, containerPort: 8123 }
           securityContext:

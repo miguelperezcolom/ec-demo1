@@ -67,6 +67,12 @@ lleve los datos del golden record y no solo su código.
   Encaja con «una instancia por evento» del HLA: una instancia de más es inofensiva. Un rechazo
   determinista de Opera usa el mismo camino, como una causa más.
 
+- **Tenant real de Opera (H12, 23-09-2026).** Se levanta la decisión anterior: en OHIP UAT se
+  escriben **solo reservas y perfiles de huésped** (con sus cancelaciones), primero en **XMAR** (XMU si
+  XMAR no sirviera). Los **interlocutores son de Opera**: se leen y se importan al ERP por su
+  `CorporateId`, nunca se crean en Opera (`PARTNERS_OWNED_BY_PMS`). Lo que el tenant aún no tiene
+  configurado —interfaces para referencias en perfiles, cajero del usuario de integración para
+  depósitos— queda tras interruptores (`OPERA_PROFILE_REFERENCES`, `OPERA_POST_DEPOSITS`).
 - **El maestro de clientes es nuestro; Salesforce limpia (H11, HLA CRM-MDM).** `customer-mdm-service`
   guarda el golden record y resuelve la identidad; Salesforce recibe los clientes como `Contact`
   (upsert por el campo externo `MDM_Id__c`), sus reglas de duplicados proponen y un *steward* fusiona.
@@ -265,6 +271,7 @@ Una rama y un PR por hito.
 | H7 ✅ | `communication-service` y avisos | Cada tipo de aviso llega por email |
 | H8 ✅ | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
 | H9 ✅ | Despliegue en el clúster, e2e y conclusiones (desplegado; [conclusiones](conclusions.md)) | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
+| H12 ✅ | El conector contra el tenant real (OHIP UAT, propiedad XMAR): diferencias con las specs corregidas en el conector y en el doble; interlocutores importados de Opera al ERP en vez de proyectados; en `ec1`, MRU01 integrado con XMAR | Una reserva de `ec1` llega a XMAR (13 s); falta en el tenant: cajero para depósitos e interfaces para referencias en perfiles |
 | H11 | `customer-mdm-service` con Salesforce (HLA CRM-MDM): identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación. En local contra la org real ✅; desplegado en `ec1` (0.17.x) ✅ | Una fusión hecha en Salesforce llega al perfil de Opera de las reservas del cliente absorbido |
 | H10 ✅ | `integrations-service`: la integración de cada hotel (conexión con Opera, secreto cifrado) y su alta por puertas como proceso `alta-integracion`; el tráfico de un hotel sin integración activa espera | El alta de un hotel lleva sus reservas a Opera por backfill y la activación libera lo retenido |
 

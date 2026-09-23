@@ -177,6 +177,20 @@ else
   echo "  The customer MDM runs without cleaning until you add them to $SECRETS and re-run this."
 fi
 
+# The chain's connection to Opera Cloud (OHIP UAT, docs/poc-acl H12): what the integrations start
+# from. Bought, not derived; the integrations need it, so without it they cannot be registered.
+if [ -n "${OPERA_GATEWAY_URL:-}" ] && [ -n "${OPERA_CLIENT_SECRET:-}" ]; then
+  kubectl create secret generic ec-opera -n "$NS" \
+    --from-literal=OPERA_GATEWAY_URL="$OPERA_GATEWAY_URL" \
+    --from-literal=OPERA_APP_KEY="$OPERA_APP_KEY" \
+    --from-literal=OPERA_CLIENT_ID="$OPERA_CLIENT_ID" \
+    --from-literal=OPERA_CLIENT_SECRET="$OPERA_CLIENT_SECRET" \
+    --from-literal=OPERA_ENTERPRISE_ID="$OPERA_ENTERPRISE_ID" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "OPERA_* not set — skipping the ec-opera secret; integrations-service will not start without it."
+fi
+
 # The postfix relay's Gmail App Password. Bought, not derived, like the Anthropic key — so the
 # secret is created only when it is present. Without it postfix starts but Gmail refuses the relay,
 # and any mail Keycloak sends stays queued; nothing else is affected.

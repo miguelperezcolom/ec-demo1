@@ -53,7 +53,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: integrations-service
-          image: miguelperezcolom/ec-demo1-integrations-service:0.17.0
+          image: miguelperezcolom/ec-demo1-integrations-service:0.18.1
           env:
             - name: SERVER_PORT
               value: "8126"
@@ -75,19 +75,21 @@ spec:
               value: "http://mapping-service:8122"
             - name: PARTNERS_URL
               value: "http://partners:8120"
-            # The chain's connection to Opera: what a new integration starts from, and what lists the
-            # tenant's properties on the form. Pointed at opera-mock, with the double's fake
-            # credentials; a real tenant's go in a Secret, like every other credential here.
+            # The chain's connection to Opera: what a new integration starts from. OHIP UAT, from the
+            # ec-opera Secret (deploy.sh, from credentials.env) — never in the repo.
             - name: OPERA_GATEWAY_URL
-              value: "http://opera-mock:8124"
+              valueFrom: { secretKeyRef: { name: ec-opera, key: OPERA_GATEWAY_URL } }
             - name: OPERA_APP_KEY
-              value: "mock-app-key"
+              valueFrom: { secretKeyRef: { name: ec-opera, key: OPERA_APP_KEY } }
             - name: OPERA_CLIENT_ID
-              value: "mock-client"
+              valueFrom: { secretKeyRef: { name: ec-opera, key: OPERA_CLIENT_ID } }
             - name: OPERA_CLIENT_SECRET
-              value: "mock-secret"
+              valueFrom: { secretKeyRef: { name: ec-opera, key: OPERA_CLIENT_SECRET } }
             - name: OPERA_ENTERPRISE_ID
-              value: "RIUE"
+              valueFrom: { secretKeyRef: { name: ec-opera, key: OPERA_ENTERPRISE_ID } }
+            # Partners are Opera's: the onboarding imports them into the ERP.
+            - name: PARTNERS_OWNED_BY_PMS
+              value: "true"
             - name: INTEGRATIONS_CRYPTO_KEY
               valueFrom: { secretKeyRef: { name: ec-integrations-crypto, key: INTEGRATIONS_CRYPTO_KEY } }
             - name: CONSOLE_URL
