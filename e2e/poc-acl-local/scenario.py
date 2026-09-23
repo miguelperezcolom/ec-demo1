@@ -3,7 +3,7 @@ Every step checks what it expects and says what it saw; the first failed check s
 import json, time, urllib.request, subprocess, sys
 import functools; print = functools.partial(print, flush=True)  # progress as it happens, not at the end
 
-BOOKING, MAPPING, OPERA, INTEGRATIONS = "http://localhost:8108", "http://localhost:8122", "http://localhost:8124", "http://localhost:8126"
+BOOKING, MAPPING, OPERA, INTEGRATIONS, MDM = "http://localhost:8108", "http://localhost:8122", "http://localhost:8124", "http://localhost:8126", "http://localhost:8127"
 
 def call(method, url, body=None):
     data = json.dumps(body).encode() if body is not None else None
@@ -181,6 +181,18 @@ def mails():
 until("mail for new causes, a write retried too long, a refusal and onboardings that need someone",
       lambda: all(any(kind in s for s in mails()) for kind in ["[CAUSE_OPENED]", "[RETRYING_TOO_LONG]", "[PMS_REJECTED]", "[INTEGRATION_NEEDS_ATTENTION]"]), timeout=60)
 print("  ", len(mails()), "mails, e.g.", mails()[:3])
+
+print("10. The passengers are customers, and the guest profile knows which")
+def holder_profile(locator):
+    for p in call("GET", OPERA + "/_mock/profiles")[1]:
+        refs = {r.get("idContext"): r.get("id") for r in p.get("externalReferences", [])}
+        if refs.get("RIUCRS") == "HOLDER-" + locator:
+            return refs
+customer = until(f"{loc}'s guest profile in Opera carries its holder's customer code (CRM)",
+                 lambda: (holder_profile(loc) or {}).get("CRM"))
+status, golden = call("GET", f"{MDM}/customers/{customer}")
+assert status == 200 and golden["lastName"] == "García", golden
+print("  ", customer, golden["firstName"], golden["lastName"], golden["status"], "—", len(golden["reservations"]), "reservation(s)")
 
 print("\nOK — processes:", sql("select workflow_definition_id||' '||status||' '||count(*) from process_entity group by workflow_definition_id, status order by 1").replace("\n", " | "))
 print("Opera calls:", len(call("GET", OPERA + "/_mock/calls")[1]))

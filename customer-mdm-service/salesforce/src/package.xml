@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Contact.MDM_Id__c</members>
+        <members>Contact.Nationality__c</members>
+        <members>Contact.Document_Type__c</members>
+        <members>Contact.Document_Number__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>ClienteConsolidado__e</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>Mdm_Announce_Merge</members>
+        <members>Mdm_Keep_Mdm_Id</members>
+        <name>Flow</name>
+    </types>
+    <types>
+        <members>MDM_Integration</members>
+        <name>PermissionSet</name>
+    </types>
+    <types>
+        <members>Contact.MDM_Same_Person</members>
+        <name>MatchingRule</name>
+    </types>
+    <types>
+        <members>Contact.MDM_Possible_Duplicate</members>
+        <name>DuplicateRule</name>
+    </types>
+    <version>67.0</version>
+</Package>

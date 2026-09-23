@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Cliente consolidado</label>
+    <pluralLabel>Clientes consolidados</pluralLabel>
+    <description>A contact with an MDM id left Salesforce — by a merge, or deleted. Salesforce cannot name a merge's survivor before the delete, so the MDM reads it (MasterRecordId, queryAll) when this arrives.</description>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <eventType>HighVolume</eventType>
+    <publishBehavior>PublishAfterCommit</publishBehavior>
+    <fields>
+        <fullName>AbsorbedMdmId__c</fullName>
+        <label>Absorbed MDM id</label>
+        <type>Text</type>
+        <length>64</length>
+        <required>false</required>
+        <isFilteringDisabled>false</isFilteringDisabled>
+        <isNameField>false</isNameField>
+        <isSortingDisabled>false</isSortingDisabled>
+    </fields>
+    <fields>
+        <fullName>AbsorbedContactId__c</fullName>
+        <label>Absorbed contact id</label>
+        <type>Text</type>
+        <length>18</length>
+        <required>false</required>
+        <isFilteringDisabled>false</isFilteringDisabled>
+        <isNameField>false</isNameField>
+        <isSortingDisabled>false</isSortingDisabled>
+    </fields>
+</CustomObject>

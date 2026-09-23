@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.pmsintegration.ohip;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.mateu.ecdemo1.integration.model.partner.Partner;
 import io.mateu.ecdemo1.integration.model.reservation.Person;
@@ -28,11 +29,13 @@ public class OperaProfiles {
     final ObjectMapper objectMapper;
 
     /**
-     * The reservation's holder, as the provisional guest profile Opera needs to take a reservation
-     * (F001). One per reservation: whether the same person already has a profile is resolved later,
-     * at check-in, against the CRM — not here (R11).
+     * The reservation's holder, as the guest profile Opera needs to take a reservation (F001). One
+     * per reservation, as before; what is new is that it arrives already knowing who the customer is
+     * (HLA CRM-MDM, F001): the MDM's customer code travels as the profile's CRM reference, and a merge
+     * in the MDM rewrites it. Without the code — the MDM did not answer — the profile is written all
+     * the same: identity never stops a sale.
      */
-    public Ensured ensureGuest(String hotelId, String locator, Person holder) {
+    public Ensured ensureGuest(String hotelId, String locator, Person holder, String customerId) {
         var profile = objectMapper.createObjectNode();
         var details = profile.putObject("profileDetails");
         details.put("profileType", "Guest");
@@ -48,6 +51,9 @@ public class OperaProfiles {
         if (holder.phone() != null) {
             details.putObject("telephones").putArray("telephoneInfo").addObject().putObject("telephone")
                     .put("phoneNumber", holder.phone()).put("primaryInd", true);
+        }
+        if (customerId != null) {
+            profile.putArray("externalReferences").addObject().put("id", customerId).put("idContext", properties.crmExternalSystem());
         }
         return ensure(hotelId, "HOLDER-" + locator, profile);
     }
@@ -91,7 +97,9 @@ public class OperaProfiles {
     }
 
     Ensured ensure(String hotelId, String externalId, ObjectNode profile) {
-        profile.putArray("externalReferences").addObject().put("id", externalId).put("idContext", properties.externalSystemCode());
+        var references = profile.has("externalReferences") ? (ArrayNode) profile.get("externalReferences")
+                : profile.putArray("externalReferences");
+        references.insertObject(0).put("id", externalId).put("idContext", properties.externalSystemCode());
         var existing = byExternalId(hotelId, externalId);
         if (existing.isPresent()) {
             var id = existing.get().path("profileIdList").path(0).path("id").asText();

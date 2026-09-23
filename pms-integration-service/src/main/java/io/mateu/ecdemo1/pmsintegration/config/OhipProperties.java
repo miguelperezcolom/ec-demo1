@@ -15,14 +15,18 @@ import java.time.Duration;
  *                           — the order guard (HLA R18, R28)
  * @param payAtHotelMethod   the payment method a reservation with no payment is recorded with.
  *                           Opera requires one; the CRS has none for "pays at the desk"
+ * @param crmExternalSystem  the context of the guest profile's reference to its customer in the MDM —
+ *                           the AF's «External Reference ID (Type: CRM)», the CRM_GUID
  */
 @ConfigurationProperties("ohip")
-public record OhipProperties(String externalSystemCode, String versionUdf, String payAtHotelMethod, Duration timeout) {
+public record OhipProperties(String externalSystemCode, String versionUdf, String payAtHotelMethod, Duration timeout,
+                             String crmExternalSystem) {
 
     public OhipProperties {
         if (externalSystemCode == null) externalSystemCode = "RIUCRS";
         if (versionUdf == null) versionUdf = "CRS_VERSION";
         if (payAtHotelMethod == null) payAtHotelMethod = "CA";
         if (timeout == null) timeout = Duration.ofSeconds(30);
+        if (crmExternalSystem == null) crmExternalSystem = "CRM";
     }
 }

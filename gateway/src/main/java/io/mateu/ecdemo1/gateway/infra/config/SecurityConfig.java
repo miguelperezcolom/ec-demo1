@@ -157,7 +157,9 @@ public class SecurityConfig {
                                 "/_workflow-admin/**", "/_forms-admin/**",
                                 // The integration's control plane (PoC ACL): activating a hotel or
                                 // approving a mapping decides what reaches the PMS.
-                                "/_integrations/**", "/_mapping/**", "/_communication/**")).hasRole("ai-admin")
+                                "/_integrations/**", "/_mapping/**", "/_communication/**",
+                                // The customer MDM: golden records are personal data.
+                                "/_mdm/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and

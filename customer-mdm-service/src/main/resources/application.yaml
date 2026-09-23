@@ -1,0 +1,59 @@
+server:
+  port: 8127
+
+spring:
+  application:
+    name: ec-demo1-customer-mdm
+
+  ai:
+    mcp:
+      server:
+        name: customer-mdm
+        version: 1.0.0
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/customer_mdm}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:8}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+# Salesforce is off unless its connection is given: the MDM still resolves identities and serves the
+# sale without it — cleaning just waits (HLA: Salesforce is a worker; if it is down, cleaning queues).
+mdm:
+  salesforce:
+    domain: ${SF_DOMAIN:}
+    client-id: ${SF_CLIENT_ID:}
+    client-secret: ${SF_CLIENT_SECRET:}
+    api-version: ${SF_API_VERSION:v67.0}
+    pubsub-host: ${SF_PUBSUB_HOST:api.pubsub.salesforce.com}
+    pubsub-port: ${SF_PUBSUB_PORT:7443}
+    subscribe: ${SF_SUBSCRIBE:true}
+  crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
+  projection-tick: ${PROJECTION_TICK:5s}
+  poll: ${CONSOLIDATION_POLL:60s}
+  propagation-tick: ${PROPAGATION_TICK:5s}
+
+springdoc:
+  packages-to-scan: io.mateu.ecdemo1.mdm.rest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

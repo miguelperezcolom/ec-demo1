@@ -161,6 +161,12 @@ spring:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_mapping/**
 
+        - id: customer-mdm
+          uri: ${CUSTOMER_MDM_URL:http://customer-mdm-service:8127}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_mdm/**
+
         - id: communication
           uri: ${COMMUNICATION_URL:http://communication-service:8125}
           predicates:

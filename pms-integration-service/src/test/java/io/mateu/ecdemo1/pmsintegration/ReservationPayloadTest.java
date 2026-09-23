@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReservationPayloadTest {
 
     final ReservationPayload payload = new ReservationPayload(new ObjectMapper(),
-            new OhipProperties("RIUCRS", "CRS_VERSION", "CA", Duration.ofSeconds(5)));
+            new OhipProperties("RIUCRS", "CRS_VERSION", "CA", Duration.ofSeconds(5), null));
 
     static final LocalDate IN = LocalDate.of(2026, 10, 9);
 

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fields>
+        <fullName>MDM_Id__c</fullName>
+        <label>MDM Id</label>
+        <description>The customer's golden id in our MDM. Ours, not Salesforce's: a merge never reassigns it.</description>
+        <type>Text</type>
+        <length>64</length>
+        <externalId>true</externalId>
+        <unique>true</unique>
+        <caseSensitive>true</caseSensitive>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Nationality__c</fullName>
+        <label>Nationality</label>
+        <type>Text</type>
+        <length>3</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Document_Type__c</fullName>
+        <label>Document type</label>
+        <type>Text</type>
+        <length>20</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Document_Number__c</fullName>
+        <label>Document number</label>
+        <type>Text</type>
+        <length>40</length>
+        <required>false</required>
+    </fields>
+</CustomObject>

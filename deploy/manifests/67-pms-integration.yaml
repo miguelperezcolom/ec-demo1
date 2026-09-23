@@ -60,6 +60,9 @@ spec:
               value: "http://crs-integration-service:8121"
             - name: MAPPING_URL
               value: "http://mapping-service:8122"
+            # Who a reservation's passengers are (HLA CRM-MDM): asked before writing the guest profile.
+            - name: CUSTOMER_MDM_URL
+              value: "http://customer-mdm-service:8127"
             # No Opera connection here: each hotel's integration carries its own, read from
             # integrations-service. In this PoC they all point at opera-mock.
             - name: INTEGRATIONS_URL

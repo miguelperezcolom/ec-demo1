@@ -1,9 +1,12 @@
 package io.mateu.ecdemo1.pmsintegration.worker;
 
+import io.mateu.ecdemo1.integration.model.customer.IdentityRequest;
+import io.mateu.ecdemo1.integration.model.customer.ResolvedIdentity;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integration.model.process.Outcome;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
+import io.mateu.ecdemo1.integration.model.reservation.Person;
 import io.mateu.ecdemo1.integration.model.reservation.Reservation;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients.CodeRef;
@@ -63,13 +66,47 @@ public class TaskHandlers {
         if (hotel == null) {
             return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
         }
+        var customerId = holderCustomer(r);
         try {
-            var ensured = profiles.ensureGuest(hotel, r.locator(), r.holder());
-            log.info("Guest profile {} {} for {}", ensured.profileId(), ensured.created() ? "created" : "updated", r.locator());
-            return List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
-                    new Variable(ProcessVariables.GUEST_PROFILE_ID, ensured.profileId()));
+            var ensured = profiles.ensureGuest(hotel, r.locator(), r.holder(), customerId);
+            log.info("Guest profile {} {} for {} (customer {})", ensured.profileId(), ensured.created() ? "created" : "updated",
+                    r.locator(), customerId);
+            var variables = new ArrayList<>(List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
+                    new Variable(ProcessVariables.GUEST_PROFILE_ID, ensured.profileId())));
+            if (customerId != null) {
+                variables.add(new Variable(ProcessVariables.CUSTOMER_ID, customerId));
+            }
+            return variables;
         } catch (PmsRejectedException e) {
             return rejected(task, r, "guest profile of " + r.locator(), e, ProcessVariables.PROFILE_OUTCOME);
+        }
+    }
+
+    /**
+     * Who the passengers are, asked of the customer MDM — the holder first, then each room's guests —
+     * and the holder's customer code. The MDM is not a gate (HLA CRM-MDM, «no bloquear la venta»):
+     * if it does not answer, the profile goes without the code, and the next projection of the
+     * reservation stamps it.
+     */
+    String holderCustomer(Reservation r) {
+        var passengers = new ArrayList<Person>();
+        if (r.holder() != null) {
+            passengers.add(r.holder());
+        }
+        r.rooms().forEach(room -> {
+            if (room.guests() != null) {
+                passengers.addAll(room.guests());
+            }
+        });
+        if (passengers.isEmpty()) {
+            return null;
+        }
+        try {
+            var identities = integration.identities(new IdentityRequest(r.hotelCode(), r.locator(), passengers));
+            return identities.stream().filter(i -> i.passenger() == 0).map(ResolvedIdentity::customerId).findFirst().orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("Customer MDM unavailable for {}: the guest profile goes without its customer code ({})", r.locator(), e.getMessage());
+            return null;
         }
     }
 

@@ -42,11 +42,13 @@ ohip:
   version-udf: CRS_VERSION
   pay-at-hotel-method: CA
   timeout: 30s
+  crm-external-system: ${OPERA_CRM_EXTERNAL_SYSTEM:CRM}
 
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
   mapping-url: ${MAPPING_URL:http://localhost:8122}
   integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
+  customer-mdm-url: ${CUSTOMER_MDM_URL:http://localhost:8127}
   alert-after: ${RETRY_ALERT_AFTER:10m}
 
 management:

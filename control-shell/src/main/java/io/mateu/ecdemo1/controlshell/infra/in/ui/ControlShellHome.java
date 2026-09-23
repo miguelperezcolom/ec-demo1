@@ -116,6 +116,14 @@ public class ControlShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu mapping = new RemoteMenu("/_mapping").withLabel("Mapping");
 
+    /**
+     * The customers — golden records — served by customer-mdm-service (HLA CRM-MDM): who each
+     * reservation's passengers are, what Salesforce's cleaning merged, and whether the new codes
+     * reached the PMS. Read-only: stewards merge in Salesforce.
+     */
+    @Menu
+    RemoteMenu customers = new RemoteMenu("/_mdm").withLabel("Customers");
+
     /** What the integration told people, and who is told what. */
     @Menu
     RemoteMenu notifications = new RemoteMenu("/_communication").withLabel("Notifications");

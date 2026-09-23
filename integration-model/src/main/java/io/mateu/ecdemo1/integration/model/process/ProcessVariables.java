@@ -27,6 +27,8 @@ public final class ProcessVariables {
     public static final String PROFILE_OUTCOME = "profileOutcome";
     public static final String WRITE_OUTCOME = "writeOutcome";
     public static final String GUEST_PROFILE_ID = "guestProfileId";
+    /** The holder's customer code in the MDM, stamped on the guest profile; absent when the MDM did not answer. */
+    public static final String CUSTOMER_ID = "customerId";
     public static final String PMS_RESERVATION_ID = "pmsReservationId";
     public static final String PMS_PROFILE_IDS = "pmsProfileIds";
     public static final String CAUSES = "causes";

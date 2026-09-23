@@ -22,11 +22,15 @@ esfuerzo se registra desde el primer día en [`cost-log.md`](cost-log.md), y el 
 | #9 (F009) | **Mapeado de códigos**: diccionario cadena + propiedad, versionado, con aprobación humana y **propuesta por un agente** |
 | F012 (parcial) | Suspensión por **causa** y reanudación en bloque al resolverla |
 | Transversal | **MCP** en cada servicio con operativa, **notificaciones** a las personas |
+| HLA CRM-MDM F001–F005 (H11) | **Maestro de clientes**: resolver la identidad de cada pasajero al proyectar, provisional si no hay certeza, limpieza y fusión en **Salesforce**, supervivencia en el MDM y propagación del código al perfil de Opera |
 
 **Fuera:** todo lo que sube del PMS al CRS (OOO, no-show, salida anticipada, cupo, streaming),
 conciliación, backfill (#10), recap, penalización en el folio, ciclo de vida completo de la
 integración (#8, #13), read model de causas (`integration-query-service`; se usa la vista del motor),
-auditoría (`audit-service`).
+auditoría (`audit-service`). Del HLA de CRM-MDM (H11), fuera: consentimiento y derecho al olvido
+(F006, F007), carga inicial del histórico (F008), gobierno de reglas desde una UI (F009), deshacer una
+fusión (CM-R7), fidelización y el flujo PMS → MDM del AF (F013, F018, F019), y que el perfil de Opera
+lleve los datos del golden record y no solo su código.
 
 ## Decisiones tomadas
 
@@ -63,6 +67,26 @@ auditoría (`audit-service`).
   Encaja con «una instancia por evento» del HLA: una instancia de más es inofensiva. Un rechazo
   determinista de Opera usa el mismo camino, como una causa más.
 
+- **El maestro de clientes es nuestro; Salesforce limpia (H11, HLA CRM-MDM).** `customer-mdm-service`
+  guarda el golden record y resuelve la identidad; Salesforce recibe los clientes como `Contact`
+  (upsert por el campo externo `MDM_Id__c`), sus reglas de duplicados proponen y un *steward* fusiona.
+  La vuelta es un Platform Event propio, `ClienteConsolidado__e`, por la **Pub/Sub API**, con
+  *polling* por `queryAll` como red de seguridad.
+  - **Sin Apex.** La org es *Base Edition*: no admite desplegar Apex. El evento lo publica un **Flow**
+    *before delete*, y ahí `MasterRecordId` aún está vacío: el evento dice qué cliente se fue y el MDM
+    lee el superviviente del contacto borrado (`queryAll`). Otro Flow *before save* impide que una
+    fusión reasigne `MDM_Id__c`. Los Flows se despliegan como borrador en producción: `deploy.py`
+    los activa.
+  - **Match solo con certeza.** Documento, o email con el mismo nombre; el titular que también es
+    huésped de una habitación es el mismo cliente. Lo demás es un provisional nuevo: fundir a dos
+    personas distintas es peor que un duplicado, que es para lo que está la limpieza.
+  - **El código viaja por los raíles existentes.** Una fusión no reescribe la reserva del CRS: el MDM
+    guarda qué pasajero de qué reserva es qué cliente y pide a `crs-integration-service` que la
+    **proyecte de nuevo**. `ensure-guest-profile` vuelve a resolver y escribe en el perfil de Opera la
+    referencia externa `CRM` (el `CRM_GUID` del AF) del superviviente; la reserva, ya en esa versión,
+    no se toca. Desvía del HLA, que re-estampa en el CRS: aquí no hace falta tocar `booking`.
+  - **El MDM no es una puerta.** Si no responde, el perfil se escribe sin código y la venta sigue.
+
 ## Piezas
 
 ```
@@ -87,6 +111,7 @@ ia-agent ── MCP de booking, partners, mapping-service, communication-service
 | `communication-service` | Nuevo | Envío de notificaciones: plantillas, destinatarios, canal email por el relay `postfix`, histórico | Sí | Sí |
 | `ec-definitions` | Cambia | Definiciones `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor` | — | — |
 | `ia-control-plane` | Configuración | Alta de los MCP nuevos y del agente de mapeado | — | — |
+| `customer-mdm-service` | Nuevo (H11) | Maestro de clientes: golden record, resolución de identidad, proyección a Salesforce, suscripción a `ClienteConsolidado__e`, supervivencia y propagación del código; metadatos de Salesforce en `salesforce/` | Sí | Sí |
 
 Los adaptadores (`crs-` y `pms-integration-service`) no tienen UI ni MCP, como en el HLA: traducen, y
 no tienen operativa propia que enseñar.
@@ -192,6 +217,24 @@ no tienen operativa propia que enseñar.
 - La integración decide **qué** se notifica y **a quién**; el canal es cosa de este servicio (HLA,
   «Notificación a las personas»).
 
+### `customer-mdm-service` (H11)
+
+- **Resolver identidad** (`POST /identities/resolve`): el conector la llama en `ensure-guest-profile`
+  con el titular y los huéspedes de cada habitación. Idempotente por reserva y pasajero.
+- **Proyección a Salesforce**: los clientes pendientes van como `Contact`; lo que Salesforce rechaza
+  queda marcado y no se reintenta hasta que el cliente cambia.
+- **Vuelta**: `ClienteConsolidado__e` por Pub/Sub API (gRPC, reanuda por *replay id*) y, cada minuto,
+  `queryAll` de los contactos borrados. Los dos acaban en la misma bandeja, deduplicada por cliente.
+- **Supervivencia**: gana, campo a campo, lo que el *steward* dejó en el contacto superviviente;
+  si no lo hay, lo que el MDM tenía; si tampoco, lo del absorbido. El absorbido queda como alias.
+- **Propagación**: cada reserva de un cliente absorbido se proyecta de nuevo (`POST /projections`
+  con origen `mdm-merge-<cliente>`).
+- **Salesforce** (`salesforce/`): campos en `Contact`, el Platform Event, dos Flows, un Permission Set
+  para el usuario de integración, una regla de coincidencia amplia y una regla de duplicados que
+  **registra** los posibles duplicados sin bloquear. `deploy.py` lo despliega con las credenciales del
+  propio MDM (client credentials), activa los Flows y asigna el Permission Set.
+- UI (golden records, consolidaciones) y MCP de solo consulta.
+
 ### Definiciones de proceso (`ec-definitions`)
 
 - **`proyectar-reserva`**
@@ -222,6 +265,7 @@ Una rama y un PR por hito.
 | H7 ✅ | `communication-service` y avisos | Cada tipo de aviso llega por email |
 | H8 ✅ | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
 | H9 ✅ | Despliegue en el clúster, e2e y conclusiones (desplegado; [conclusiones](conclusions.md)) | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
+| H11 | `customer-mdm-service` con Salesforce (HLA CRM-MDM): identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación. En local contra la org real ✅; despliegue en el clúster pendiente | Una fusión hecha en Salesforce llega al perfil de Opera de las reservas del cliente absorbido |
 | H10 ✅ | `integrations-service`: la integración de cada hotel (conexión con Opera, secreto cifrado) y su alta por puertas como proceso `alta-integracion`; el tráfico de un hotel sin integración activa espera | El alta de un hotel lleva sus reservas a Opera por backfill y la activación libera lo retenido |
 
 ## Pendiente de recibir

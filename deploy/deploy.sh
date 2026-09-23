@@ -162,6 +162,21 @@ else
   echo "  The chat panel will answer with a 401 until you add it to $SECRETS and re-run this."
 fi
 
+# The customer MDM's connection to Salesforce (docs/poc-acl, H11): the org's External Client App,
+# client credentials. Bought, not derived, like the Anthropic key — created only when present. Without
+# it the MDM still resolves identities for the connector; projecting to Salesforce and hearing its
+# merges wait until the secret exists and the pod restarts.
+if [ -n "${SF_CLIENT_ID:-}" ] && [ -n "${SF_CLIENT_SECRET:-}" ] && [ -n "${SF_DOMAIN:-}" ]; then
+  kubectl create secret generic ec-salesforce -n "$NS" \
+    --from-literal=SF_DOMAIN="$SF_DOMAIN" \
+    --from-literal=SF_CLIENT_ID="$SF_CLIENT_ID" \
+    --from-literal=SF_CLIENT_SECRET="$SF_CLIENT_SECRET" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "SF_DOMAIN / SF_CLIENT_ID / SF_CLIENT_SECRET not set — skipping the ec-salesforce secret."
+  echo "  The customer MDM runs without cleaning until you add them to $SECRETS and re-run this."
+fi
+
 # The postfix relay's Gmail App Password. Bought, not derived, like the Anthropic key — so the
 # secret is created only when it is present. Without it postfix starts but Gmail refuses the relay,
 # and any mail Keycloak sends stays queued; nothing else is affected.
@@ -217,6 +232,7 @@ kubectl apply -f deploy/manifests/67-pms-integration.yaml
 kubectl apply -f deploy/manifests/68-opera-mock.yaml
 kubectl apply -f deploy/manifests/69-communication.yaml
 kubectl apply -f deploy/manifests/75-integrations.yaml
+kubectl apply -f deploy/manifests/76-customer-mdm.yaml
 # The control console: its database first, then the service, then its shell.
 kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml

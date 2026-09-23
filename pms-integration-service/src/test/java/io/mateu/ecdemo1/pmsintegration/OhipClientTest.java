@@ -73,7 +73,7 @@ class OhipClientTest {
             public List<IntegrationView> integrations() {
                 return List.of();
             }
-        }, new OhipProperties(null, null, null, Duration.ofSeconds(2)), new TolerantReader(new ObjectMapper()), Clock.systemUTC());
+        }, new OhipProperties(null, null, null, Duration.ofSeconds(2), null), new TolerantReader(new ObjectMapper()), Clock.systemUTC());
     }
 
     @AfterEach

@@ -78,6 +78,8 @@ const controlScreens = [
     { menu: 'Mapping', entry: 'Pending', route: '/mapping/pending' },
     { menu: 'Mapping', entry: 'Dictionary', route: '/mapping/dictionary' },
     { menu: 'Mapping', entry: 'Partner profiles', route: '/mapping/partnerProfiles' },
+    { menu: 'Customers', entry: 'Golden records', route: '/customers/golden' },
+    { menu: 'Customers', entry: 'Consolidations', route: '/customers/consolidations' },
     { menu: 'Notifications', entry: 'History', route: '/notifications/history' },
     { menu: 'Notifications', entry: 'Recipients', route: '/notifications/recipients' },
 ]
@@ -98,13 +100,13 @@ export const CONSOLES: Console[] = [
     {
         name: 'control · vaadin', plane: 'control', renderer: 'vaadin',
         host: host('CONTROL_HOST', 'console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Notifications'],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications'],
         screens: controlScreens,
     },
     {
         name: 'control · redwood', plane: 'control', renderer: 'redwood',
         host: host('RW_CONTROL_HOST', 'rw-console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Notifications'],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications'],
         screens: controlScreens,
     },
 ]

@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.pmsintegration.clients;
 
+import io.mateu.ecdemo1.integration.model.customer.IdentityRequest;
+import io.mateu.ecdemo1.integration.model.customer.ResolvedIdentity;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integration.model.mapping.Translation;
@@ -8,6 +10,7 @@ import io.mateu.ecdemo1.integration.model.reservation.Reservation;
 import io.mateu.ecdemo1.pmsintegration.config.PmsIntegrationProperties;
 import io.mateu.ecdemo1.pmsintegration.config.TolerantReader;
 import io.mateu.workflow.dtos.Variable;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Component;
@@ -44,14 +47,23 @@ public class IntegrationClients {
 
     final RestClient crs;
     final RestClient mapping;
+    final RestClient mdm;
 
     public IntegrationClients(PmsIntegrationProperties properties, TolerantReader reader) {
         this.crs = client(properties.crsIntegrationUrl(), reader);
         this.mapping = client(properties.mappingUrl(), reader);
+        this.mdm = client(properties.customerMdmUrl(), reader);
     }
 
     public Reservation reservation(String hotelCode, String locator) {
         return crs.get().uri("/reservations/{hotel}/{locator}", hotelCode, locator).retrieve().body(Reservation.class);
+    }
+
+    /** Who the passengers are, as the customer MDM resolves them (HLA CRM-MDM, F001). */
+    public List<ResolvedIdentity> identities(IdentityRequest request) {
+        return mdm.post().uri("/identities/resolve").body(request).retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
     }
 
     public Partner partner(String code) {

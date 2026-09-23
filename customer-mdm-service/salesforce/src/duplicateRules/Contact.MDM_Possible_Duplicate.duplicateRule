@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DuplicateRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionOnInsert>Allow</actionOnInsert>
+    <actionOnUpdate>Allow</actionOnUpdate>
+    <alertText>This customer may be someone Salesforce already has. Merging is a steward's decision; the MDM applies it.</alertText>
+    <description>Records every possible duplicate the MDM's customers make as a duplicate record set, for a steward to review. Never blocks: the MDM owns the customer, and a sale never waits for cleaning.</description>
+    <duplicateRuleFilter xsi:nil="true" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+    <duplicateRuleMatchRules>
+        <matchRuleSObjectType>Contact</matchRuleSObjectType>
+        <matchingRule>MDM_Same_Person</matchingRule>
+        <objectMapping xsi:nil="true" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+    </duplicateRuleMatchRules>
+    <isActive>true</isActive>
+    <masterLabel>MDM - Possible duplicate</masterLabel>
+    <operationsOnInsert>Alert</operationsOnInsert>
+    <operationsOnInsert>Report</operationsOnInsert>
+    <operationsOnUpdate>Alert</operationsOnUpdate>
+    <operationsOnUpdate>Report</operationsOnUpdate>
+    <securityOption>BypassSharingRules</securityOption>
+    <sortOrder>2</sortOrder>
+</DuplicateRule>
