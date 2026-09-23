@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -42,13 +43,13 @@ public class ConfigController {
                 .toList());
     }
 
+    /** As a real tenant answers it (checked against OHIP UAT, 2026-09-23): a summary, grouped. */
     @GetMapping("/rm/config/v1/hotels/{hotelId}/roomTypes")
     public Map<String, Object> roomTypes(@PathVariable String hotelId) {
         var p = property(hotelId);
-        return Map.of("roomTypes", List.of(Map.of("hotelId", hotelId, "roomType", p.roomTypes().stream()
+        return Map.of("roomTypesSummary", List.of(Map.of("roomTypeSummary", p.roomTypes().stream()
                 .map(r -> Map.of("roomType", r.code(), "shortDescription", text(r.description()), "roomClass", "ALL",
-                        "pseudo", false)).toList())),
-                "count", p.roomTypes().size(), "hasMore", false);
+                        "pseudo", false, "inactive", false)).toList())));
     }
 
     @GetMapping("/rtp/v1/hotels/{hotelId}/ratePlans")
@@ -58,11 +59,19 @@ public class ConfigController {
                 "primaryDetails", Map.of("description", text(r.description())))).toList());
     }
 
+    /**
+     * As a real tenant answers it: the hotel in the {@code hotelId} query parameter — without it,
+     * 400 «Hotel Code is required» — and the codes nested in a list of short infos.
+     */
     @GetMapping("/rtp/v1/packages")
-    public Map<String, Object> packages(@RequestHeader("x-hotelid") String hotelId) {
+    public Map<String, Object> packages(@RequestParam(required = false) String hotelId) {
+        if (hotelId == null || hotelId.isBlank()) {
+            throw OperaError.badRequest("OPERAWS-PAR10015", "Hotel Code is required");
+        }
         var p = property(hotelId);
-        return Map.of("packages", p.packages().stream().map(r -> Map.of("packageCode", r.code(), "hotelId", hotelId,
-                "primaryDetails", Map.of("description", r.description()))).toList());
+        return Map.of("packageCodesList", Map.of("packageCodes", List.of(Map.of("packageCodeShortInfo",
+                p.packages().stream().map(r -> Map.of("code", r.code(),
+                        "primaryDetails", Map.of("description", r.description()))).toList()))));
     }
 
     @GetMapping("/rsv/config/v1/hotels/{hotelId}/sourceCodes/")

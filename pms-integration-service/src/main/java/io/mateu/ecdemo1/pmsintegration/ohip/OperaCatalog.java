@@ -38,9 +38,13 @@ public class OperaCatalog {
         if (hotelId == null || hotelId.isBlank()) {
             return entries;
         }
-        for (var group : ohip.get(hotelId, "/rm/config/v1/hotels/{h}/roomTypes", hotelId).body().path("roomTypes")) {
-            for (var r : group.path("roomType")) {
-                entries.add(entry(CodeType.ROOM_TYPE, hotelId, r.path("roomType").asText(), text(r.path("shortDescription"))));
+        // As a real tenant answers: a grouped summary. Pseudo room types (posting master and the like)
+        // are not sold, and inactive ones are not either.
+        for (var group : ohip.get(hotelId, "/rm/config/v1/hotels/{h}/roomTypes", hotelId).body().path("roomTypesSummary")) {
+            for (var r : group.path("roomTypeSummary")) {
+                if (!r.path("pseudo").asBoolean(false) && !r.path("inactive").asBoolean(false)) {
+                    entries.add(entry(CodeType.ROOM_TYPE, hotelId, r.path("roomType").asText(), text(r.path("shortDescription"))));
+                }
             }
         }
         for (var r : ohip.get(hotelId, "/rtp/v1/hotels/{h}/ratePlans", hotelId).body().path("ratePlans")) {
@@ -48,8 +52,12 @@ public class OperaCatalog {
                     text(r.path("primaryDetails").path("description"))));
         }
         entries.add(entry(CodeType.BOARD, hotelId, "NONE", "No package: room only"));
-        for (var r : ohip.get(hotelId, "/rtp/v1/packages?hotelIds={h}", hotelId).body().path("packages")) {
-            entries.add(entry(CodeType.BOARD, hotelId, r.path("packageCode").asText(), text(r.path("primaryDetails").path("description"))));
+        // hotelId, not hotelIds: a real tenant answers 400 «Hotel Code is required» to the latter.
+        for (var group : ohip.get(hotelId, "/rtp/v1/packages?hotelId={h}&limit=200", hotelId).body()
+                .path("packageCodesList").path("packageCodes")) {
+            for (var r : group.path("packageCodeShortInfo")) {
+                entries.add(entry(CodeType.BOARD, hotelId, r.path("code").asText(), text(r.path("primaryDetails").path("description"))));
+            }
         }
         for (var r : ohip.get(hotelId, "/rsv/config/v1/hotels/{h}/sourceCodes/", hotelId).body().path("sourceCodes")) {
             entries.add(entry(CodeType.CHANNEL, hotelId, r.path("code").asText(), "Source code: " + text(r.path("description"))));

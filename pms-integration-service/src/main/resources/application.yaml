@@ -39,16 +39,21 @@ spring:
 # integrations-service; nothing about a tenant is configuration here.
 ohip:
   external-system-code: ${OPERA_EXTERNAL_SYSTEM:RIUCRS}
-  version-udf: CRS_VERSION
-  pay-at-hotel-method: CA
+  # OPERA names its UDFs UDFN01…UDFN40: which one carries the CRS version is the tenant's to say.
+  version-udf: ${OPERA_VERSION_UDF:CRS_VERSION}
+  pay-at-hotel-method: ${OPERA_PAY_AT_HOTEL_METHOD:CA}
   timeout: 30s
   crm-external-system: ${OPERA_CRM_EXTERNAL_SYSTEM:CRM}
+  profile-references: ${OPERA_PROFILE_REFERENCES:true}
+  post-deposits: ${OPERA_POST_DEPOSITS:true}
 
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
   mapping-url: ${MAPPING_URL:http://localhost:8122}
   integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
   customer-mdm-url: ${CUSTOMER_MDM_URL:http://localhost:8127}
+  # Opera, not the ERP, as the master of partners: read from it, never written to it.
+  partners-owned-by-pms: ${PARTNERS_OWNED_BY_PMS:false}
   alert-after: ${RETRY_ALERT_AFTER:10m}
 
 management:

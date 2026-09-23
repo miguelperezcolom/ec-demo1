@@ -73,7 +73,7 @@ class OhipClientTest {
             public List<IntegrationView> integrations() {
                 return List.of();
             }
-        }, new OhipProperties(null, null, null, Duration.ofSeconds(2), null), new TolerantReader(new ObjectMapper()), Clock.systemUTC());
+        }, new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null), new TolerantReader(new ObjectMapper()), Clock.systemUTC());
     }
 
     @AfterEach
@@ -113,7 +113,7 @@ class OhipClientTest {
 
     @Test
     void aConnectionIsTriedBeforeAnyoneReliesOnIt() {
-        answers.add(new Answer(200, "{\"roomTypes\":[{\"hotelId\":\"RIUPMI\",\"roomType\":[{},{}]}]}"));
+        answers.add(new Answer(200, "{\"roomTypesSummary\":[{\"roomTypeSummary\":[{},{}]}]}"));
         var ok = client.verify(connections.get("RIUPMI"));
         assertThat(ok.ok()).isTrue();
         assertThat(ok.message()).contains("RIUPMI").contains("2 room types");

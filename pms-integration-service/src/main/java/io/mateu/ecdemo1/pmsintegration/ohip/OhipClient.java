@@ -102,11 +102,11 @@ public class OhipClient {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.value())
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve().body(JsonNode.class);
-            // OHIP groups the room types per hotel: count the types, not the groups.
+            // OHIP groups the room types in a summary: count the types, not the groups.
             var count = 0;
             if (types != null) {
-                for (var group : types.path("roomTypes")) {
-                    count += group.path("roomType").size();
+                for (var group : types.path("roomTypesSummary")) {
+                    count += group.path("roomTypeSummary").size();
                 }
             }
             return new ConnectivityCheck(true, "Token granted; property %s readable (%d room types)"

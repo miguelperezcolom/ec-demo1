@@ -89,7 +89,7 @@ class OperaMockTest {
         mvc.perform(ohip(get("/rm/config/v1/hotels/RIUPMI/roomTypes"), "RIUE"))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$['o:errorCode']").value("OPERAWS-GEN01244"));
         mvc.perform(ohip(get("/rm/config/v1/hotels/RIUPMI/roomTypes"), "RIUPMI"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.roomTypes[0].roomType[0].roomType").value("SGLS"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.roomTypesSummary[0].roomTypeSummary[0].roomType").value("SGLS"));
     }
 
     @Test
@@ -102,7 +102,9 @@ class OperaMockTest {
 
         mvc.perform(ohip(get("/rsv/v1/hotels/RIUPMI/reservations?externalReferenceIds=L1&externalSystemCodes=RIUCRS"), "RIUPMI"))
                 .andExpect(jsonPath("$.reservations.totalResults").value(1))
-                .andExpect(jsonPath("$.reservations.reservation[0].userDefinedFields.numericUDFs[0].value").value(3));
+                // A search answers summaries, as a real tenant: no UDFs — those take a get by id.
+                .andExpect(jsonPath("$.reservations.reservationInfo[0].reservationGuest.id").value(guest))
+                .andExpect(jsonPath("$.reservations.reservationInfo[0].userDefinedFields").doesNotExist());
         mvc.perform(ohip(get("/crm/v1/externalSystems/RIUCRS/profiles/HOLDER-L1"), "RIUPMI")).andExpect(status().isOk());
     }
 
@@ -121,7 +123,10 @@ class OperaMockTest {
         var location = mvc.perform(ohip(post("/rsv/v1/hotels/RIUPMI/reservations"), "RIUPMI").content(reservation(guest, "STDT", "C")))
                 .andReturn().getResponse().getHeader("Location");
         mvc.perform(ohip(post(location + "/cancellations"), "RIUPMI").content("""
-                {"reason":{"code":"CUSTREQ"}}""")).andExpect(status().isOk());
+                {"reason":{"code":"CUSTREQ"}}""")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$['o:errorCode']").value("OPERAWS-RSV11046"));
+        mvc.perform(ohip(post(location + "/cancellations"), "RIUPMI").content("""
+                {"reason":{"code":"CUSTREQ","description":"Customer request"}}""")).andExpect(status().isOk());
         mvc.perform(ohip(put(location), "RIUPMI").content(reservation(guest, "STDT", "C")))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$['o:errorCode']").value("MOCK-CANCELLED"));
     }

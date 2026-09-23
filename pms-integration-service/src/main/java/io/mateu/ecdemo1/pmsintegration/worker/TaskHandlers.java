@@ -3,6 +3,9 @@ package io.mateu.ecdemo1.pmsintegration.worker;
 import io.mateu.ecdemo1.integration.model.customer.IdentityRequest;
 import io.mateu.ecdemo1.integration.model.customer.ResolvedIdentity;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
+import io.mateu.ecdemo1.integration.model.partner.Partner;
+import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
+import io.mateu.ecdemo1.pmsintegration.config.PmsIntegrationProperties;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integration.model.process.Outcome;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
@@ -51,6 +54,8 @@ public class TaskHandlers {
     final ReservationPayload payload;
     final Connections connections;
     final ReservationLocks locks;
+    final PmsIntegrationProperties settings;
+    final OhipProperties ohipProperties;
 
     public Map<String, Function<TaskExecutionRequested, List<Variable>>> handlers() {
         return Map.of(
@@ -68,7 +73,9 @@ public class TaskHandlers {
         }
         var customerId = holderCustomer(r);
         try {
-            var ensured = profiles.ensureGuest(hotel, r.locator(), r.holder(), customerId);
+            var known = ohipProperties.profileReferences() ? null
+                    : reservations.byLocator(hotel, r.locator()).flatMap(OperaReservations::guestProfileId).orElse(null);
+            var ensured = profiles.ensureGuest(hotel, r.locator(), r.holder(), customerId, known);
             log.info("Guest profile {} {} for {} (customer {})", ensured.profileId(), ensured.created() ? "created" : "updated",
                     r.locator(), customerId);
             var variables = new ArrayList<>(List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
@@ -161,7 +168,10 @@ public class TaskHandlers {
                 reservations.update(hotel, reservationId, body);
                 log.info("{} v{} -> v{} updated in {} ({})", r.locator(), written, r.version(), hotel, reservationId);
             }
-            for (var payment : r.payments()) {
+            if (!ohipProperties.postDeposits() && !r.payments().isEmpty()) {
+                log.info("{}: {} payment(s) not posted to the folio — deposits are off for this tenant", r.locator(), r.payments().size());
+            }
+            for (var payment : ohipProperties.postDeposits() ? r.payments() : List.<io.mateu.ecdemo1.integration.model.reservation.Payment>of()) {
                 reservations.ensureDeposit(hotel, reservationId, payment,
                         resolved.target(CodeType.PAYMENT_METHOD, payment.methodCode()), r.currency());
             }
@@ -202,7 +212,8 @@ public class TaskHandlers {
         try {
             var reason = r.cancellationReasonCode() == null ? null
                     : resolved.target(CodeType.CANCELLATION_REASON, r.cancellationReasonCode());
-            reservations.cancel(hotel, reservationId, reason);
+            reservations.cancel(hotel, reservationId, reason, r.cancellationReasonCode() == null
+                    ? "Cancelled in the CRS" : "Cancelled in the CRS (reason " + r.cancellationReasonCode() + ")");
             log.info("{} cancelled in {} ({})", r.locator(), hotel, reservationId);
             return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.DONE.name()),
                     new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
@@ -217,6 +228,9 @@ public class TaskHandlers {
      */
     List<Variable> ensurePartnerProfile(TaskExecutionRequested task) {
         var partner = integration.partner(var(task, ProcessVariables.PARTNER_CODE));
+        if (settings.partnersOwnedByPms()) {
+            return resolvePartnerProfile(task, partner);
+        }
         var resolved = integration.resolve(null, List.of(new CodeRef(CodeType.PARTNER_TYPE, partner.type().name())));
         if (!resolved.missing().isEmpty()) {
             integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID), null,
@@ -242,6 +256,23 @@ public class TaskHandlers {
                     partner.code(), task.variables(), List.of(Cause.pmsRejectedPartner(partner.code(), e.getMessage())));
             return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
         }
+    }
+
+    /**
+     * When Opera owns the partners: nothing is written, the profile is the one the import from Opera
+     * recorded. A partner the ERP has and Opera does not waits for it — someone creates it in Opera
+     * and the next import brings it.
+     */
+    List<Variable> resolvePartnerProfile(TaskExecutionRequested task, Partner partner) {
+        var known = integration.partnerProfile(partner.code());
+        if (known.isPresent()) {
+            return List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.STALE.name()),
+                    new Variable(ProcessVariables.PMS_PROFILE_IDS, known.get().pmsProfileId()),
+                    new Variable("pmsProfileType", known.get().profileType()));
+        }
+        integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID), null,
+                partner.code(), task.variables(), List.of(Cause.missingPartner(partner.code())));
+        return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
     }
 
     /**

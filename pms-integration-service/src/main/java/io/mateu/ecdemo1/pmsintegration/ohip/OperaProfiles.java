@@ -35,7 +35,7 @@ public class OperaProfiles {
      * in the MDM rewrites it. Without the code — the MDM did not answer — the profile is written all
      * the same: identity never stops a sale.
      */
-    public Ensured ensureGuest(String hotelId, String locator, Person holder, String customerId) {
+    public Ensured ensureGuest(String hotelId, String locator, Person holder, String customerId, String knownProfileId) {
         var profile = objectMapper.createObjectNode();
         var details = profile.putObject("profileDetails");
         details.put("profileType", "Guest");
@@ -52,7 +52,16 @@ public class OperaProfiles {
             details.putObject("telephones").putArray("telephoneInfo").addObject().putObject("telephone")
                     .put("phoneNumber", holder.phone()).put("primaryInd", true);
         }
-        if (customerId != null) {
+        if (!properties.profileReferences()) {
+            // Nothing to find it by in Opera but the reservation: the caller passes the profile the
+            // reservation already names, if it exists.
+            if (knownProfileId != null) {
+                ohip.put(hotelId, "/crm/v1/profiles/{id}", profile, knownProfileId);
+                return new Ensured(knownProfileId, false);
+            }
+            return new Ensured(lastSegment(ohip.post(hotelId, "/crm/v1/profiles", profile).location()), true);
+        }
+        if (customerId != null && !properties.crmExternalSystem().isBlank()) {
             profile.putArray("externalReferences").addObject().put("id", customerId).put("idContext", properties.crmExternalSystem());
         }
         return ensure(hotelId, "HOLDER-" + locator, profile);

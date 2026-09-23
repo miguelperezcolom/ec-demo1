@@ -16,11 +16,19 @@ import java.time.Duration;
  * @param payAtHotelMethod   the payment method a reservation with no payment is recorded with.
  *                           Opera requires one; the CRS has none for "pays at the desk"
  * @param crmExternalSystem  the context of the guest profile's reference to its customer in the MDM —
- *                           the AF's «External Reference ID (Type: CRM)», the CRM_GUID
+ *                           the AF's «External Reference ID (Type: CRM)», the CRM_GUID. Blank: not stamped
+ * @param profileReferences  whether guest profiles carry external references at all. A tenant takes
+ *                           them only for external systems configured as interfaces of the property
+ *                           (else 400 OPERAWS-GEN01187); without them, a reservation's guest profile is
+ *                           found through the reservation, by the CRS locator it does carry
+ * @param postDeposits       whether the payments the central office collected are posted to the
+ *                           reservation's folio. Posting needs a cashier, and OPERA takes it from the
+ *                           integration user's configuration (else 400 FOF00094 «Invalid Cashier»);
+ *                           off, they stay in the CRS and the reservation is written without them
  */
 @ConfigurationProperties("ohip")
 public record OhipProperties(String externalSystemCode, String versionUdf, String payAtHotelMethod, Duration timeout,
-                             String crmExternalSystem) {
+                             String crmExternalSystem, Boolean profileReferences, Boolean postDeposits) {
 
     public OhipProperties {
         if (externalSystemCode == null) externalSystemCode = "RIUCRS";
@@ -28,5 +36,7 @@ public record OhipProperties(String externalSystemCode, String versionUdf, Strin
         if (payAtHotelMethod == null) payAtHotelMethod = "CA";
         if (timeout == null) timeout = Duration.ofSeconds(30);
         if (crmExternalSystem == null) crmExternalSystem = "CRM";
+        if (profileReferences == null) profileReferences = true;
+        if (postDeposits == null) postDeposits = true;
     }
 }

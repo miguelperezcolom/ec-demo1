@@ -68,7 +68,18 @@ public class ReservationController {
                         .anyMatch(x -> externalReferenceIds.contains(x.path("id").asText())
                                 && (externalSystemCodes == null || externalSystemCodes.contains(x.path("idContext").asText()))))
                 .toList();
-        return Map.of("reservations", Map.of("reservation", found, "totalResults", found.size(), "count", found.size(),
+        // As a real tenant answers a search: summaries under reservationInfo — ids, status, the
+        // primary guest — and not the whole reservation (no UDFs: those take a get by id).
+        var summaries = found.stream().map(r -> {
+            var s = (ObjectNode) r.deepCopy();
+            s.remove(List.of("userDefinedFields", "reservationGuests"));
+            var guest = r.path("reservationGuests").path(0).path("profileInfo").path("profileIdList").path(0).path("id").asText(null);
+            if (guest != null) {
+                s.putObject("reservationGuest").put("id", guest).put("type", "Profile");
+            }
+            return s;
+        }).toList();
+        return Map.of("reservations", Map.of("reservationInfo", summaries, "totalResults", found.size(), "count", found.size(),
                 "hasMore", false));
     }
 
@@ -85,7 +96,14 @@ public class ReservationController {
         if ("Cancelled".equals(current.path("reservationStatus").asText())) {
             throw OperaError.badRequest("MOCK-CANCELLED", "Reservation %s is cancelled and cannot be updated".formatted(reservationId));
         }
-        var reservation = first(body);
+        // A change takes the reservations as a list, not wrapped like a creation: a real tenant
+        // answers the creation's shape with 400 «Unknown property: reservations -> null -> reservation».
+        var list = body.path("reservations");
+        if (!list.isArray() || list.isEmpty() || !list.get(0).isObject()) {
+            throw OperaError.badRequest("OPERAWS-GEN01242", "Unknown property: reservations -> null -> reservation");
+        }
+        var reservation = (ObjectNode) list.get(0).deepCopy();
+        reservation.remove("reservationIdList");
         validate(hotelId, reservation, reservationId);
         stamp(reservation, hotelId, reservationId, confirmation(current));
         reservation.put("reservationStatus", "Reserved");
@@ -101,6 +119,10 @@ public class ReservationController {
                                       @RequestBody JsonNode body) {
         var current = existing(hotelId, reservationId);
         var reason = body.path("reason").path("code").asText();
+        // As a real tenant: the reason needs its description too.
+        if (body.path("reason").path("description").asText("").isBlank()) {
+            throw OperaError.badRequest("OPERAWS-RSV11046", "Cancellation reason cannot be empty");
+        }
         var property = property(hotelId);
         if (!property.has(property.cancellationCodes(), reason)) {
             throw OperaError.badRequest("MOCK-CXLCODE", "Invalid cancellation code " + reason);
@@ -120,6 +142,12 @@ public class ReservationController {
     public ResponseEntity<Map<String, Object>> deposit(@PathVariable String hotelId, @PathVariable String reservationId,
                                                        @RequestBody ObjectNode body) {
         existing(hotelId, reservationId);
+        // As a real tenant takes it: the posting inside criteria. Anything else at the top level is
+        // refused, as OHIP refuses it («Unknown property»).
+        if (!body.path("criteria").isObject()) {
+            throw OperaError.badRequest("OPERAWS-GEN01242", "Unknown property: " + body.fieldNames().next());
+        }
+        body = (ObjectNode) body.path("criteria");
         var method = body.path("paymentMethod").path("paymentMethod").asText();
         var property = property(hotelId);
         if (!property.has(property.paymentMethods(), method)) {
