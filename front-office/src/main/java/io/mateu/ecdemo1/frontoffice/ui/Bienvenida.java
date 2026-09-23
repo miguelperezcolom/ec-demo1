@@ -74,7 +74,7 @@ public class Bienvenida extends Welcome {
     for (int i = 0; i < 7; i++) {
       var day = today.plusDays(i);
       var ocupadas = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.stays().findAll().stream()
-          .filter(s -> s.status() != io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED)
+          .filter(io.mateu.ecdemo1.frontoffice.domain.stay.Stay::occupies)
           // una estancia ocupa la noche de d si entra ese día o antes y sale después
           .filter(s -> !s.checkIn().isAfter(day) && s.checkOut().isAfter(day))
           .count();
@@ -110,7 +110,8 @@ public class Bienvenida extends Welcome {
               s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
                   && !s.checkIn().isAfter(today);
           case SALIDAS ->
-              s.status() != io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
+              (s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE
+                  || s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED)
                   && s.checkOut().isEqual(today);
           case EN_CASA ->
               s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE;

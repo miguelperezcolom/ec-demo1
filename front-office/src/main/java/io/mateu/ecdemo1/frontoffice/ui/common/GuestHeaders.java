@@ -52,7 +52,7 @@ public final class GuestHeaders {
         .title(guest.name())
         .badges(List.of(Chip.builder().label(guest.tier().name()).color("contrast").build()))
         .subtitle(
-            "Hab " + stay.roomNumber() + " · " + stay.roomType() + " · " + stay.board() + " · "
+            stay.roomLabel() + " · " + stay.roomType() + " · " + stay.board() + " · "
                 + stay.nights() + "N")
         .style("width: 100%;")
         .build();
@@ -76,7 +76,7 @@ public final class GuestHeaders {
         .title(guest.name())
         .badges(badges)
         .subtitle(
-            stay.roomType() + " · Hab " + stay.roomNumber() + " · Sal. "
+            stay.roomType() + " · " + stay.roomLabel() + " · Sal. "
                 + stay.checkOut().format(DAY) + " · " + stay.board())
         .facts(
             List.of(

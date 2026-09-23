@@ -129,6 +129,7 @@ public class ReservaOverview
             case ARRIVING -> GuestHeaders.arrivalHeader(stayId);
             case IN_HOUSE -> GuestHeaders.inHouseHeader(stayId);
             case DEPARTED -> GuestHeaders.departureHeader(stayId);
+            case CANCELLED -> GuestHeaders.arrivalHeader(stayId);
           };
 
 // ── cuerpo: huéspedes + operativa en dos columnas; en el check-in, envuelto en un
@@ -303,7 +304,7 @@ public class ReservaOverview
     return switch (stay.status()) {
       case ARRIVING -> paraLlegada(stay);
       case IN_HOUSE -> paraInHouse(stay);
-      case DEPARTED -> paraSalida(stay);
+      case DEPARTED, CANCELLED -> paraSalida(stay);
     };
   }
 
@@ -1000,7 +1001,7 @@ public class ReservaOverview
           Button.builder().label("Mensaje huésped").actionId("mensajeHuesped").build(),
           Button.builder().label("Registrar petición").actionId("opPeticion").build(),
           Button.builder().label("Nueva incidencia").actionId("opIncidencia").build());
-      case DEPARTED -> List.of();
+      case DEPARTED, CANCELLED -> List.of();
     };
   }
 

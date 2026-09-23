@@ -47,6 +47,29 @@ public record Guest(
         complaints, hotels, lastStaySummary, lastStayComplementaryInfo, preferences);
   }
 
+  /**
+   * A guest the hotel learns of from a reservation, by the customer's code in the chain's MDM: the
+   * cardex starts with who the reservation says it is. No loyalty is known yet.
+   */
+  public static Guest fromReservation(String customerId, String name, String document, String email, String phone) {
+    return new Guest(customerId, name, document, false, email, phone, GuestTier.SILVER, 0, 0, 0, 0, 0, 0,
+        null, null, List.of());
+  }
+
+  /**
+   * What a later reservation says of the guest fills what the cardex lacks; what the desk verified
+   * — a document, contact data taken at check-in — is not overwritten by it.
+   */
+  public Guest withReservationData(String name, String document, String email, String phone) {
+    return new Guest(
+        id, name == null || name.isBlank() ? this.name : name,
+        this.document == null || this.document.isBlank() ? document : this.document, documentVerified,
+        this.email == null || this.email.isBlank() ? email : this.email,
+        this.phone == null || this.phone.isBlank() ? phone : this.phone,
+        tier, loyaltyPoints, stays, nights, yearsAsClient, complaints, hotels, lastStaySummary,
+        lastStayComplementaryInfo, preferences);
+  }
+
   /** Updates the contact data captured at the desk. */
   public Guest updateContact(String email, String phone) {
     return new Guest(

@@ -90,7 +90,8 @@ public class ReservasListing
           stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
               && !stay.checkIn().isAfter(today);
       case SALIDAS_HOY ->
-          stay.status() != io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
+          (stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE
+              || stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED)
               && stay.checkOut().isEqual(today);
       case IN_HOUSE ->
           stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE;
@@ -102,7 +103,7 @@ public class ReservasListing
     return new Reserva(
         stay.id(),
         guest.name(),
-        "Hab " + stay.roomNumber() + " · " + stay.roomType(),
+        stay.roomLabel() + " · " + stay.roomType(),
         stay.nights(),
         estadoLabel(stay),
         guest.tier().name());
@@ -128,6 +129,7 @@ public class ReservasListing
       case ARRIVING -> relativo("Llega", stay.checkIn(), today);
       case IN_HOUSE -> relativo("Sale", stay.checkOut(), today);
       case DEPARTED -> "Salió " + FECHA.format(stay.checkOut());
+      case CANCELLED -> "Cancelada · llegaba " + FECHA.format(stay.checkIn());
     };
   }
 
@@ -183,12 +185,12 @@ public class ReservasListing
       var checkIn = switch (estado) {
         case ARRIVING -> i == 4 ? today.plusDays(1) : today;
         case IN_HOUSE -> today.minusDays(1 + i % 3);
-        case DEPARTED -> today.minusDays(4 + i % 2);
+        case DEPARTED, CANCELLED -> today.minusDays(4 + i % 2);
       };
       var checkOut = switch (estado) {
         case ARRIVING -> checkIn.plusDays(2 + i % 4);
         case IN_HOUSE -> i == 5 ? today : today.plusDays(1 + i % 3);
-        case DEPARTED -> today.minusDays(i % 2);
+        case DEPARTED, CANCELLED -> today.minusDays(i % 2);
       };
       FrontOffice.stays().save(new Stay(
           id, id, String.valueOf(200 + i * 7), tipos.get(i % tipos.size()),

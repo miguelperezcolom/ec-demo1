@@ -47,6 +47,50 @@ public record Stay(
     addOns = addOns == null ? Set.of() : Set.copyOf(addOns);
   }
 
+  /** Where the stay sleeps, for a person: its room, or that it has none yet. */
+  public String roomLabel() {
+    return roomNumber == null || roomNumber.isBlank() ? "Sin asignar" : "Hab " + roomNumber;
+  }
+
+  /** Whether the stay takes a room: expected or in the house — not gone, not cancelled. */
+  public boolean occupies() {
+    return status == StayStatus.ARRIVING || status == StayStatus.IN_HOUSE;
+  }
+
+  /**
+   * A stay for a reservation the CRS made, arriving, with no room yet: the desk assigns it at
+   * check-in. Nothing operational — incidents, add-ons — is known before the guest arrives.
+   */
+  public static Stay fromReservation(String id, String guestId, String roomType, String board, LocalDate checkIn,
+      LocalDate checkOut, int pax, String agency, BigDecimal total, List<Companion> companions) {
+    return new Stay(id, guestId, null, roomType, board, checkIn, checkOut, pax, agency, total,
+        StayStatus.ARRIVING, 0, 0, null, companions, List.of(), Set.of());
+  }
+
+  /**
+   * The reservation changed in the CRS: what it says — dates, room type, board, pax, agency, price —
+   * replaces what the stay had; what happened at the hotel — the room assigned, the check-in, the
+   * incidents, the add-ons, the people registered at the desk — is the hotel's, and stays.
+   */
+  public Stay applyReservation(String guestId, String roomType, String board, LocalDate checkIn,
+      LocalDate checkOut, int pax, String agency, BigDecimal total, List<Companion> reservationCompanions) {
+    var keptCompanions = status == StayStatus.ARRIVING && companions.stream().noneMatch(Companion::documentVerified)
+        ? reservationCompanions : companions;
+    return new Stay(id, guestId, roomNumber, roomType, board, checkIn, checkOut, pax, agency, total, status,
+        wishesGranted, wishesTotal, vipNote, keptCompanions, incidents, addOns);
+  }
+
+  /** The reservation was cancelled: a stay still to arrive is cancelled; one already in the house is not. */
+  public Stay cancel() {
+    if (status == StayStatus.CANCELLED) {
+      return this;
+    }
+    if (status != StayStatus.ARRIVING) {
+      throw new IllegalStateException("A stay " + status + " cannot be cancelled");
+    }
+    return withRoomAndStatus(null, roomType, StayStatus.CANCELLED);
+  }
+
   public long nights() {
     return ChronoUnit.DAYS.between(checkIn, checkOut);
   }
