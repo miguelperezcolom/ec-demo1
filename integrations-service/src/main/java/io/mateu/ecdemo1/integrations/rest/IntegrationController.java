@@ -70,6 +70,12 @@ public class IntegrationController {
         return dto(lifecycle.verifyNow(id, by));
     }
 
+    @PostMapping("/{id}/partners/import")
+    @Operation(summary = "Import the chain's partners from Opera into the ERP, and record which profile each is; nothing is written to Opera")
+    public IntegrationDto importPartners(@PathVariable String id, @RequestParam(defaultValue = "api") String by) {
+        return dto(lifecycle.importPartners(id, by));
+    }
+
     @PostMapping("/{id}/recheck")
     @Operation(summary = "Look again at what the current gate needs: the catalogue, the partners, the gaps")
     public IntegrationDto recheck(@PathVariable String id, @RequestParam(defaultValue = "api") String by) {

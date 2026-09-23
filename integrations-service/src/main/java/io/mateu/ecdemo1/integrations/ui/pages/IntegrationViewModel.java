@@ -164,6 +164,13 @@ public class IntegrationViewModel implements Identifiable {
     }
 
     @Toolbar
+    @Action(confirmationRequired = true, confirmationTitle = "Import the partners from Opera?",
+            confirmationMessage = "The chain's agencies, companies and sources in Opera are created or brought up to date in the ERP. Nothing is written to Opera.")
+    public Object importPartners(HttpRequest httpRequest) {
+        return act(httpRequest, "Partners imported", i -> lifecycle.importPartners(i, user(httpRequest)));
+    }
+
+    @Toolbar
     @Action(confirmationRequired = true, confirmationTitle = "Approve the mapping?",
             confirmationMessage = "The onboarding goes on to the partners and the backfill. Codes the reservations use and still lack will stop the backfill.")
     public Object approveMapping(HttpRequest httpRequest) {

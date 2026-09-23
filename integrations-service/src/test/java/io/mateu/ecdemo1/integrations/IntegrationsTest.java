@@ -130,7 +130,16 @@ class IntegrationsTest {
                 case "/reservations/NEW01/future/usage" -> """
                         {"hotelCode":"NEW01","reservations":5,"codes":[],"partners":[{"partnerCode":"NORDTRAVEL","reservations":2}]}""";
                 case "/reservations/NEW01/future" -> future(query);
-                case "/partner-profiles/NORDTRAVEL" -> nordtravelIsAProfile ? "{}" : null;
+                case "/partner-profiles/NORDTRAVEL" -> nordtravelIsAProfile || !"GET".equals(exchange.getRequestMethod()) ? "{}" : null;
+                // Opera's partners, for an import: one the ERP does not have, one it knows by another name.
+                case "/pms-partners" -> """
+                        [{"code":"05100908","pmsProfileId":"16120675","profileType":"Agent","name":"ABREU ONLINE PORTUGAL"},
+                         {"code":"NORDTRAVEL","pmsProfileId":"16120699","profileType":"Company","name":"Nordtravel AB"},
+                         {"code":"12345678","pmsProfileId":"16120701","profileType":"Agent","name":"PLACEHOLDER A"},
+                         {"code":"12345678","pmsProfileId":"16120702","profileType":"Company","name":"PLACEHOLDER B"}]""";
+                case "/partners/05100908" -> "GET".equals(exchange.getRequestMethod()) ? null : "{}";
+                case "/partners/NORDTRAVEL" -> """
+                        {"code":"NORDTRAVEL","type":"TravelAgent","name":"Nordtravel","taxId":"SE556677","billingMode":"NoFront"}""";
                 default -> "{}";
             };
             if (body == null) {
@@ -350,6 +359,36 @@ class IntegrationsTest {
     void aHotelHasOneIntegration() {
         register();
         assertThatThrownBy(this::register).isInstanceOf(IllegalStateException.class).hasMessageContaining("already has");
+    }
+
+    @Test
+    void partnersAreImportedFromOperaIntoTheErpAndNothingIsWrittenToOpera() {
+        var id = register();
+        calls.clear();
+
+        var i = lifecycle.importPartners(id, "ana");
+
+        // The type equivalences come with the import: certain, since the partners came from Opera.
+        assertThat(calls).anyMatch(c -> c.startsWith("POST /entries/definitions") && c.contains("\"PARTNER_TYPE\"")
+                && c.contains("\"sourceCode\":\"TravelAgent\"") && c.contains("\"targetCode\":\"Agent\""));
+        // New to the ERP: created with Opera's name and type; who pays is the guest until the ERP says otherwise.
+        assertThat(calls).anyMatch(c -> c.startsWith("POST /partners ") && c.contains("\"code\":\"05100908\"")
+                && c.contains("\"name\":\"ABREU ONLINE PORTUGAL\"") && c.contains("\"type\":\"TravelAgent\"")
+                && c.contains("\"billingMode\":\"Front\""));
+        // Known to the ERP: Opera's name and type, and what only the ERP knew kept.
+        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partners/NORDTRAVEL") && c.contains("\"type\":\"Company\"")
+                && c.contains("\"name\":\"Nordtravel AB\"") && c.contains("\"billingMode\":\"NoFront\"")
+                && c.contains("\"taxId\":\"SE556677\""));
+        // The mapping learns which profile each one already is.
+        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partner-profiles/05100908") && c.contains("\"pmsProfileId\":\"16120675\"")
+                && c.contains("\"profileType\":\"Agent\""));
+        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partner-profiles/NORDTRAVEL") && c.contains("\"pmsProfileId\":\"16120699\""));
+        // Nothing asked of the connector but the list: no partner is projected to Opera.
+        assertThat(calls).noneMatch(c -> c.contains("/resync") || c.contains("/crm/"));
+        // A code on two profiles is nobody in particular: left out, and said.
+        assertThat(calls).noneMatch(c -> c.contains("12345678"));
+        assertThat(i.history).anyMatch(h -> h.what().contains("1 new, 1 updated, 0 unchanged")
+                && h.what().contains("left out, on more than one Opera profile: 12345678"));
     }
 
     void assertGateSignalled(String id, String gate) {

@@ -89,6 +89,8 @@ integrations:
   backfill-per-tick: ${BACKFILL_PER_TICK:20}
   backfill-tick: ${BACKFILL_TICK:2s}
   activation-window-days: ${ACTIVATION_WINDOW_DAYS:30}
+  # Opera, not the ERP, as the master of partners: imported from it, never projected to it.
+  partners-owned-by-pms: ${PARTNERS_OWNED_BY_PMS:false}
 
 springdoc:
   packages-to-scan: io.mateu.ecdemo1.integrations.rest

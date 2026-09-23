@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.mateu.ecdemo1.integration.model.partner.Partner;
+import io.mateu.ecdemo1.integration.model.partner.PmsPartner;
 import io.mateu.ecdemo1.integration.model.reservation.Person;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import lombok.RequiredArgsConstructor;
@@ -65,6 +66,46 @@ public class OperaProfiles {
             profile.putArray("externalReferences").addObject().put("id", customerId).put("idContext", properties.crmExternalSystem());
         }
         return ensure(hotelId, "HOLDER-" + locator, profile);
+    }
+
+    /**
+     * The chain's partners as Opera has them — agencies, companies and sources — when Opera is where
+     * partners are kept. Each by its CorporateId, the partner's code in the chain; one without it is
+     * nobody the ERP could know it by, and is left out. A profile belongs to the chain, but OHIP still
+     * wants a hotel on the call.
+     */
+    public java.util.List<PmsPartner> partners(String hotelId) {
+        var found = new java.util.ArrayList<PmsPartner>();
+        for (var type : java.util.List.of("Agent", "Company", "Source")) {
+            var offset = 0;
+            while (true) {
+                // A name wildcard: OHIP refuses a search by type alone («minimum search criteria not met»).
+                var page = ohip.get(hotelId, "/crm/v1/profiles?profileType={t}&profileName={n}&hotelId={h}&limit=200&offset={o}&summaryInfo=true",
+                        type, "%", hotelId, offset).body().path("profileSummaries");
+                for (var info : page.path("profileInfo")) {
+                    String profileId = null;
+                    String corporateId = null;
+                    for (var id : info.path("profileIdList")) {
+                        switch (id.path("type").asText()) {
+                            case "Profile" -> profileId = id.path("id").asText();
+                            case "CorporateId" -> corporateId = id.path("id").asText();
+                            default -> {
+                            }
+                        }
+                    }
+                    if (profileId != null && corporateId != null && !corporateId.isBlank()) {
+                        var profile = info.path("profile");
+                        var name = profile.path("company").path("companyName").asText(profile.path("formerName").path("name").asText(corporateId));
+                        found.add(new PmsPartner(corporateId, profileId, type, name));
+                    }
+                }
+                if (!page.path("hasMore").asBoolean(false) || page.path("profileInfo").isEmpty()) {
+                    break;
+                }
+                offset += page.path("profileInfo").size();
+            }
+        }
+        return found;
     }
 
     /** A partner as the profile Opera routes and bills through: Agent, Company or Source (F004). */

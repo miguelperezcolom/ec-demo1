@@ -31,6 +31,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -311,6 +312,18 @@ public class Integrations {
     public void stepSyncPartners(String id) {
         var i = find(id);
         transition(i, IntegrationStatus.SYNCING_PARTNERS, "Syncing the partners of the hotel's future reservations");
+        if (properties.partnersOwnedByPms()) {
+            // Opera is where partners are kept: bring them into the ERP; what the hotel's reservations
+            // use and Opera does not have waits until someone creates it there.
+            var imported = importPartners(i, "onboarding");
+            var missing = missingPartners(i);
+            i.partnersMissing = missing;
+            i.record(clock.instant(), "onboarding", imported + (missing.isEmpty() ? ". Every partner is a PMS profile"
+                    : ". Not in Opera, to be created there: " + String.join(", ", missing)));
+            i.gate = Definitions.GATE_PARTNERS;
+            integrations.save(i);
+            return;
+        }
         var missing = missingPartners(i);
         missing.forEach(services::resyncPartner);
         i.partnersMissing = missing;
@@ -479,6 +492,82 @@ public class Integrations {
                 transition(i, IntegrationStatus.MAPPING_PENDING, "Catalogues contrasted: " + i.contrastSummary);
             }
         }
+    }
+
+    /**
+     * «Importar interlocutores»: the chain's partners as Opera has them go into the ERP — created, or
+     * their name and type brought up to date — and the mapping learns which profile each already is.
+     * Their codes are Opera's CorporateIds, which is what the chain knows a partner by. Nothing is
+     * written to Opera. Idempotent: an import finding everything in place changes nothing.
+     */
+    @Transactional
+    public Integration importPartners(String id, String by) {
+        var i = find(id);
+        var summary = importPartners(i, by);
+        if (i.status == IntegrationStatus.SYNCING_PARTNERS) {
+            i.partnersMissing = missingPartners(i);
+        }
+        i.record(clock.instant(), by, summary);
+        integrations.save(i);
+        return i;
+    }
+
+    String importPartners(Integration i, String by) {
+        // Which ERP type each OPERA profile type is, and back: certain, since the partner came from there.
+        for (var type : List.of(new String[]{"TravelAgent", "Agent"}, new String[]{"TourOperator", "Agent"},
+                new String[]{"Company", "Company"}, new String[]{"OnlineAgency", "Source"})) {
+            services.define(io.mateu.ecdemo1.integration.model.mapping.CodeType.PARTNER_TYPE, null, type[0], type[1], by);
+        }
+        int created = 0, updated = 0, unchanged = 0;
+        var fromOpera = services.pmsPartners(i.pmsHotelCode);
+        // A code on more than one profile is nobody in particular: which one a reservation means cannot
+        // be told, so none of them is imported, and it is said — it is Opera's data to fix.
+        var ambiguous = fromOpera.stream().collect(Collectors.groupingBy(io.mateu.ecdemo1.integration.model.partner.PmsPartner::code,
+                        Collectors.counting()))
+                .entrySet().stream().filter(e -> e.getValue() > 1).map(Map.Entry::getKey).sorted().toList();
+        for (var p : fromOpera) {
+            if (ambiguous.contains(p.code())) {
+                continue;
+            }
+            var type = switch (p.profileType()) {
+                case "Agent" -> "TravelAgent";
+                case "Company" -> "Company";
+                default -> "OnlineAgency";
+            };
+            var current = services.erpPartner(p.code());
+            if (current.isEmpty()) {
+                services.createPartner(p.code(), details(type, p.name(), null));
+                created++;
+            } else if (!type.equals(current.get().path("type").asText()) || !p.name().equals(current.get().path("name").asText())) {
+                services.updatePartner(p.code(), details(type, p.name(), current.get()));
+                updated++;
+            } else {
+                unchanged++;
+            }
+            services.recordPartnerProfile(p.code(), p.pmsProfileId(), p.profileType());
+        }
+        return "Partners imported from Opera %s: %d new, %d updated, %d unchanged%s".formatted(i.pmsHotelCode, created, updated,
+                unchanged, ambiguous.isEmpty() ? "" : "; left out, on more than one Opera profile: " + String.join(", ", ambiguous));
+    }
+
+    /** The ERP's details for an imported partner: Opera's name and type, and what the ERP already knew of the rest. */
+    static Map<String, Object> details(String type, String name, com.fasterxml.jackson.databind.JsonNode current) {
+        var details = new java.util.HashMap<String, Object>();
+        details.put("type", type);
+        details.put("name", name);
+        // Opera does not say who pays the stay; the guest at the desk until the ERP says otherwise.
+        details.put("billingMode", current == null ? "Front" : current.path("billingMode").asText("Front"));
+        if (current != null) {
+            for (var field : List.of("taxId", "email", "phone")) {
+                if (!current.path(field).isNull() && !current.path(field).isMissingNode()) {
+                    details.put(field, current.path(field).asText());
+                }
+            }
+            if (current.path("address").isObject()) {
+                details.put("address", current.path("address"));
+            }
+        }
+        return details;
     }
 
     /** The partners the hotel's future reservations reference that are not PMS profiles yet. */

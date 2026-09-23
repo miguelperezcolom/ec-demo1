@@ -71,6 +71,25 @@ public class Services {
                 .retrieve().toBodilessEntity();
     }
 
+    /** An equivalence entered directly, approved by whoever enters it; nothing new if it is in force. */
+    public void define(CodeType type, String hotelCode, String sourceCode, String targetCode, String by) {
+        var body = new java.util.HashMap<String, Object>();
+        body.put("type", type);
+        body.put("hotelCode", hotelCode);
+        body.put("sourceCode", sourceCode);
+        body.put("targetCode", targetCode);
+        body.put("attributes", Map.of());
+        mapping.post().uri(b -> b.path("/entries/definitions").queryParam("by", by).build()).body(body)
+                .retrieve().toBodilessEntity();
+    }
+
+    /** Which PMS profile a partner already is, as an import from the PMS found it. */
+    public void recordPartnerProfile(String partnerCode, String pmsProfileId, String profileType) {
+        mapping.put().uri("/partner-profiles/{code}", partnerCode)
+                .body(Map.of("pmsProfileId", pmsProfileId, "profileType", profileType))
+                .retrieve().toBodilessEntity();
+    }
+
     public List<PendingCode> pendingMappings(String crsHotelCode) {
         return mapping.get().uri(b -> b.path("/pending").queryParam("hotelCode", crsHotelCode).build())
                 .retrieve().body(new ParameterizedTypeReference<>() {
@@ -104,9 +123,36 @@ public class Services {
 
     // ── the master of partners ───────────────────────────────────────────────
 
+    /** A partner of the master, as it has it; empty when it has none by that code. */
+    public java.util.Optional<com.fasterxml.jackson.databind.JsonNode> erpPartner(String code) {
+        try {
+            return java.util.Optional.ofNullable(partners.get().uri("/partners/{code}", code).retrieve()
+                    .body(com.fasterxml.jackson.databind.JsonNode.class));
+        } catch (HttpClientErrorException.NotFound e) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    public void createPartner(String code, Map<String, Object> details) {
+        partners.post().uri("/partners").body(Map.of("code", code, "details", details)).retrieve().toBodilessEntity();
+    }
+
+    public void updatePartner(String code, Map<String, Object> details) {
+        partners.put().uri("/partners/{code}", code).body(details).retrieve().toBodilessEntity();
+    }
+
     /** Announces a partner again, unchanged, so that the integration projects it to the PMS. */
     public void resyncPartner(String code) {
         partners.post().uri("/partners/{code}/resync", code).retrieve().toBodilessEntity();
+    }
+
+    // ── the connector ─────────────────────────────────────────────────────────
+
+    /** The chain's partners as Opera has them, read through one of its properties. */
+    public List<io.mateu.ecdemo1.integration.model.partner.PmsPartner> pmsPartners(String pmsHotelCode) {
+        return pms.get().uri(b -> b.path("/pms-partners").queryParam("hotelId", pmsHotelCode).build())
+                .retrieve().body(new ParameterizedTypeReference<>() {
+                });
     }
 
     // ── the CRS adapter ──────────────────────────────────────────────────────

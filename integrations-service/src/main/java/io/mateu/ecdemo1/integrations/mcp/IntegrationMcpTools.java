@@ -60,6 +60,11 @@ public class IntegrationMcpTools implements McpSystemContext {
         return api.recheck(id(hotelCode), "agent");
     }
 
+    @Tool(description = "Import the chain's partners (agencies, companies, sources) from Opera into the ERP, through this hotel's property. Nothing is written to Opera")
+    public IntegrationDto importPartners(@ToolParam(description = "CRS hotel code") String hotelCode) {
+        return api.importPartners(id(hotelCode), "agent");
+    }
+
     @Tool(description = "Approve the hotel's mapping so its onboarding goes on. Only when the user asks for it, with their name")
     public IntegrationDto approveMapping(@ToolParam(description = "CRS hotel code") String hotelCode,
                                          @ToolParam(description = "The name of the person approving") String approvedBy) {

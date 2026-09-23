@@ -47,6 +47,7 @@ public class MappingController {
     final Dictionary dictionary;
     final Pending pending;
     final Causes causes;
+    final java.time.Clock clock;
     final MappingEntryRepository entries;
     final CauseRecordRepository causeRecords;
     final WaiterRepository waiters;
@@ -86,6 +87,27 @@ public class MappingController {
                             ref.type(), ref.code())));
         }
         return new ResolveResult(translations, missing);
+    }
+
+    /** A partner's profile as an import from the PMS found it, when the PMS is where partners are kept. */
+    public record ImportedProfile(String pmsProfileId, String profileType) {
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/partner-profiles/{partnerCode}")
+    @Operation(summary = "Record the PMS profile a partner already is (imported from the PMS); what waited for it resumes")
+    @org.springframework.transaction.annotation.Transactional
+    public PartnerProfile importedProfile(@PathVariable String partnerCode, @RequestBody ImportedProfile imported) {
+        var profile = partnerProfiles.findById(partnerCode).orElseGet(PartnerProfile::new);
+        var unchanged = imported.pmsProfileId().equals(profile.getPmsProfileId()) && imported.profileType().equals(profile.getProfileType());
+        profile.setPartnerCode(partnerCode);
+        profile.setPmsProfileId(imported.pmsProfileId());
+        profile.setProfileType(imported.profileType());
+        if (!unchanged) {
+            profile.setUpdatedAt(clock.instant());
+            partnerProfiles.save(profile);
+        }
+        causes.resolveIfOpen(io.mateu.ecdemo1.integration.model.mapping.Cause.missingPartner(partnerCode).key(), "import from the PMS");
+        return profile;
     }
 
     @GetMapping("/partner-profiles/{partnerCode}")
