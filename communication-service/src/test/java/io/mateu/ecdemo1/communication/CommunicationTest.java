@@ -52,8 +52,28 @@ class CommunicationTest {
     static GreenMailExtension smtp = new GreenMailExtension(new ServerSetup(3025, null, ServerSetup.PROTOCOL_SMTP))
             .withConfiguration(GreenMailConfiguration.aConfig().withDisabledAuthentication());
 
+    /** The chat space's webhook, played by a small server that keeps what it is posted. */
+    static final java.util.List<String> chatPosts = new java.util.concurrent.CopyOnWriteArrayList<>();
+    static final com.sun.net.httpserver.HttpServer chatSpace;
+
+    static {
+        try {
+            chatSpace = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress(0), 0);
+            chatSpace.createContext("/v1/spaces/TEST/messages", exchange -> {
+                chatPosts.add(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                exchange.sendResponseHeaders(200, -1);
+                exchange.close();
+            });
+            chatSpace.start();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
+        registry.add("GOOGLE_CHAT_WEBHOOK", () -> "http://localhost:" + chatSpace.getAddress().getPort()
+                + "/v1/spaces/TEST/messages?key=k&token=t");
         registry.add("KAFKA_BROKERS", redpanda::getBootstrapServers);
         registry.add("SMTP_PORT", () -> 3025);
     }
@@ -95,6 +115,12 @@ class CommunicationTest {
                 java.util.Set.of("admins@example.com", "palma@example.com"), java.util.Set.of("admins@example.com"));
         assertThat(notifications.findAll()).filteredOn(n -> n.type == NotificationType.PMS_REJECTED)
                 .hasSize(2).allMatch(n -> n.status == DeliveryStatus.SENT);
+        // Urgent: posted to the chat space as well, once each, with the link to act on it.
+        waitFor(() -> chatPosts.stream().filter(p -> p.contains("PMS_REJECTED:")).count() >= 2);
+        assertThat(chatPosts).filteredOn(p -> p.contains("Processes waiting PMS_REJECTED:PMI01:X")).singleElement().asString()
+                .contains("PMI01").contains("<https://console/mapping/causes|Open>");
+        assertThat(notifications.findAll()).filteredOn(n -> n.type == NotificationType.PMS_REJECTED)
+                .allMatch(n -> n.chatStatus == DeliveryStatus.SENT);
     }
 
     @Test
@@ -115,6 +141,7 @@ class CommunicationTest {
         Thread.sleep(1500);
         assertThat(notifications.findById(n.notificationId())).get().extracting(x -> x.status).isEqualTo(DeliveryStatus.INBOX_ONLY);
         assertThat(smtp.getReceivedMessages()).noneMatch(m -> subjectOf(m).contains("Processes waiting " + key));
+        assertThat(chatPosts).noneMatch(p -> p.contains(key));
 
         send("notification-resolutions", key, new NotificationResolved(key, "ana", Instant.now()));
         waitFor(() -> inbox.openFor(Set.of("ai-admin")).stream().noneMatch(i -> key.equals(i.subject)));

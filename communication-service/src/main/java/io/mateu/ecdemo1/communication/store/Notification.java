@@ -48,4 +48,12 @@ public class Notification {
     public String lastError;
     public Instant requestedAt;
     public Instant sentAt;
+    /** Urgent notifications also go to the chat space: SENT or FAILED, null if not posted there. */
+    @Enumerated(EnumType.STRING)
+    public DeliveryStatus chatStatus;
+    /** With a default: added to a table that already has rows, a bare NOT NULL column is refused. */
+    @Column(columnDefinition = "integer not null default 0")
+    public int chatAttempts;
+    @Column(length = 1000)
+    public String chatError;
 }

@@ -7,14 +7,20 @@ import java.util.Map;
 
 /**
  * @param inbox who sees what in the inbox, and what is urgent enough to be emailed as well
+ * @param chat  the chat space the urgent notifications are also posted to
  */
 @ConfigurationProperties("communication")
-public record CommunicationProperties(String from, String defaultEmail, int maxAttempts, Inbox inbox) {
+public record CommunicationProperties(String from, String defaultEmail, int maxAttempts, Inbox inbox, Chat chat) {
 
     public CommunicationProperties {
         if (from == null) from = "integration@ec1.mateu.io";
         if (maxAttempts <= 0) maxAttempts = 5;
         if (inbox == null) inbox = new Inbox(null, null, null, null);
+        if (chat == null) chat = new Chat(null);
+    }
+
+    /** @param webhook a Google Chat space's incoming webhook; blank, no chat */
+    public record Chat(String webhook) {
     }
 
     /**

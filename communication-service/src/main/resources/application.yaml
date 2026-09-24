@@ -71,6 +71,9 @@ communication:
     # Everything goes to the inbox; these are also emailed.
     urgent: ${INBOX_URGENT:PMS_REJECTED,RETRYING_TOO_LONG}
     tasks-link: ${INBOX_TASKS_LINK:/forms/tasks}
+  chat:
+    # A Google Chat space's incoming webhook, from a Secret: the urgent notifications are posted there too.
+    webhook: ${GOOGLE_CHAT_WEBHOOK:}
 
 management:
   endpoints:

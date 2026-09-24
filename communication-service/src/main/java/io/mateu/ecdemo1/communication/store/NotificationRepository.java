@@ -11,4 +11,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
     List<Notification> findByStatusAndAttemptsLessThan(DeliveryStatus status, int attempts);
 
     List<Notification> findAllByOrderByRequestedAtDesc();
+
+    List<Notification> findByChatStatusAndChatAttemptsLessThan(DeliveryStatus status, int attempts);
 }

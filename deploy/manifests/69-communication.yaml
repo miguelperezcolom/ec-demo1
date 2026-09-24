@@ -51,7 +51,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: communication-service
-          image: miguelperezcolom/ec-demo1-communication-service:0.21.0
+          image: miguelperezcolom/ec-demo1-communication-service:0.21.2
           env:
             - name: SERVER_PORT
               value: "8125"
@@ -63,6 +63,10 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
             - name: DB_PASSWORD
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            # Urgent notifications also go to a Google Chat space. Its webhook URL carries a key and a
+            # token: from a Secret (ec-googlechat), never from here. Optional: without it, email only.
+            - name: GOOGLE_CHAT_WEBHOOK
+              valueFrom: { secretKeyRef: { name: ec-googlechat, key: GOOGLE_CHAT_WEBHOOK, optional: true } }
             - name: DB_POOL_SIZE
               value: "6"
             - name: SMTP_HOST
