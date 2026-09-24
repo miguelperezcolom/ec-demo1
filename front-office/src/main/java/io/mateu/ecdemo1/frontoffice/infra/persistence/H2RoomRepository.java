@@ -19,8 +19,15 @@ class H2RoomRepository implements RoomRepository {
     this.template = template;
   }
 
+  /**
+   * A stay the integration writes has no room until the desk assigns one: asked for the room of such a
+   * stay, there is none — it used to throw, and the whole reservation screen with it.
+   */
   @Override
   public Optional<Room> findByNumber(String number) {
+    if (number == null || number.isBlank()) {
+      return Optional.empty();
+    }
     return crud.findById(number);
   }
 

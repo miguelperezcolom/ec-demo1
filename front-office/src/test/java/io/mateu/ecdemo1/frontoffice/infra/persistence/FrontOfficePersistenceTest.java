@@ -102,4 +102,10 @@ class FrontOfficePersistenceTest {
     rooms.save(room805.occupy());
     assertEquals(RoomOccupancy.OCCUPIED, rooms.findByNumber("805").orElseThrow().occupancy());
   }
+
+  @org.junit.jupiter.api.Test
+  void aStayWithNoRoomYetHasNoRoomRatherThanAnError() {
+    org.assertj.core.api.Assertions.assertThat(rooms.findByNumber(null)).isEmpty();
+    org.assertj.core.api.Assertions.assertThat(rooms.findByNumber("")).isEmpty();
+  }
 }
