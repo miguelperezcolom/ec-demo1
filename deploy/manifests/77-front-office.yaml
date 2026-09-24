@@ -45,7 +45,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: front-office
-          image: miguelperezcolom/ec-demo1-front-office:0.19.0
+          image: miguelperezcolom/ec-demo1-front-office:0.19.1
           env:
             - name: SERVER_PORT
               value: "8128"

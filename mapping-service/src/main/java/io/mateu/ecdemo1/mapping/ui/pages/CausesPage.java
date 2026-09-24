@@ -1,12 +1,12 @@
 package io.mateu.ecdemo1.mapping.ui.pages;
 
+import io.mateu.ecdemo1.mapping.ui.Paging;
 import io.mateu.ecdemo1.mapping.store.CauseRecord;
 import io.mateu.ecdemo1.mapping.store.CauseRecordRepository;
 import io.mateu.ecdemo1.mapping.store.CauseStatus;
 import io.mateu.ecdemo1.mapping.store.WaiterRepository;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -52,7 +52,7 @@ public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<Caus
                         c.status == CauseStatus.OPEN ? new Status(StatusType.WARNING, "Open")
                                 : new Status(StatusType.SUCCESS, "Resolved")))
                 .toList();
-        return new ListingData<>(new Page<>(request.searchText(), rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     @Override

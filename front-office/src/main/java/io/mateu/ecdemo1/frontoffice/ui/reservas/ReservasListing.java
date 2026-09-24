@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.ui.reservas;
 
+import io.mateu.ecdemo1.frontoffice.ui.Paging;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
 import io.mateu.uidl.annotations.Label;
@@ -76,7 +77,7 @@ public class ReservasListing
             .map(this::row)
             .filter(row -> matches(row, searchText))
             .toList();
-    return ListingData.from(rows);
+    return Paging.page(rows, request);
   }
 
   /** El selector rápido: llegadas de hoy / salidas de hoy / en casa. */

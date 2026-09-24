@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.mapping.ui.pages;
 
+import io.mateu.ecdemo1.mapping.ui.Paging;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.ecdemo1.mapping.store.EntryStatus;
 import io.mateu.ecdemo1.mapping.store.MappingEntry;
@@ -7,7 +8,6 @@ import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.NoFilters;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -41,7 +41,7 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
                 .sorted(Comparator.comparing((MappingEntry e) -> e.status == EntryStatus.PROPOSED ? 0 : e.status == EntryStatus.APPROVED ? 1 : 2)
                         .thenComparing(e -> e.type).thenComparing(e -> e.sourceCode))
                 .map(DictionaryCrud::row).toList();
-        return new ListingData<>(new Page<>(request.searchText(), rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     static EntryRow row(MappingEntry e) {

@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.integrations.ui.pages;
 
+import io.mateu.ecdemo1.integrations.ui.Paging;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
 import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
@@ -9,7 +10,6 @@ import io.mateu.ecdemo1.integrations.rest.IntegrationDto;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.NoFilters;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -42,7 +42,7 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
         var rows = integrations.findAllByOrderByCrsHotelCodeAsc().stream()
                 .filter(i -> (i.crsHotelCode + " " + i.pmsHotelCode + " " + i.name + " " + i.status).toLowerCase().contains(text))
                 .map(this::row).toList();
-        return new ListingData<>(new Page<>(request.searchText(), rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     IntegrationRow row(Integration i) {

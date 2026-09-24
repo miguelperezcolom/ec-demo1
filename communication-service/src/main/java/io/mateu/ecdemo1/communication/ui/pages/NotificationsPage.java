@@ -1,11 +1,11 @@
 package io.mateu.ecdemo1.communication.ui.pages;
 
+import io.mateu.ecdemo1.communication.ui.Paging;
 import io.mateu.ecdemo1.communication.store.DeliveryStatus;
 import io.mateu.ecdemo1.communication.store.Notification;
 import io.mateu.ecdemo1.communication.store.NotificationRepository;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -38,7 +38,7 @@ public class NotificationsPage implements Listing<NotificationRow>, Searchable, 
                 .map(n -> new NotificationRow(n.id, String.valueOf(n.requestedAt), String.valueOf(n.type), n.hotelCode,
                         n.title, n.recipients, status(n)))
                 .toList();
-        return new ListingData<>(new Page<>(request.searchText(), rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     static Status status(Notification n) {

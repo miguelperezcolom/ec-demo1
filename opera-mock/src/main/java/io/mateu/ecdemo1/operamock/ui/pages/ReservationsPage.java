@@ -1,10 +1,10 @@
 package io.mateu.ecdemo1.operamock.ui.pages;
 
+import io.mateu.ecdemo1.operamock.ui.Paging;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.mateu.ecdemo1.operamock.store.OperaStore;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -38,7 +38,7 @@ public class ReservationsPage implements Listing<ReservationRow>, Searchable, Tr
                 .map(r -> new ReservationRow(r.id(), r.hotel(), r.crsLocator(), r.arrival(), r.departure(), r.roomType(),
                         r.ratePlan(), r.packageCode(), r.crsVersion(), store.deposits(r.id()).size(), r.status()))
                 .toList();
-        return new ListingData<>(new Page<>(request.searchText(), rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     static ReservationRow row(JsonNode r) {

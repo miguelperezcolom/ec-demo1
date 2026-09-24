@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.ui.automatizaciones;
 
+import io.mateu.ecdemo1.frontoffice.ui.Paging;
 import io.mateu.ecdemo1.frontoffice.domain.automation.Automation;
 import io.mateu.ecdemo1.frontoffice.domain.automation.ConnectedSystem;
 import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
@@ -84,7 +85,7 @@ public class AutomatizacionesListing
             .map(AutomatizacionesListing::row)
             .filter(row -> matches(row, searchText))
             .toList();
-    return ListingData.from(rows);
+    return Paging.page(rows, request);
   }
 
   private static boolean matchesEstado(Automation automation, Estado estado) {

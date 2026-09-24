@@ -1,11 +1,11 @@
 package io.mateu.ecdemo1.communication.ui.pages;
 
+import io.mateu.ecdemo1.communication.ui.Paging;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.ecdemo1.communication.store.RecipientRepository;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.NoFilters;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class RecipientsCrud extends Crud<RecipientViewModel, RecipientViewModel,
                 .map(r -> new RecipientRow(r.id, r.name, r.email, r.notificationType == null ? "any" : r.notificationType.name(),
                         r.hotelCode == null || r.hotelCode.isBlank() ? "any" : r.hotelCode, r.active))
                 .toList();
-        return new ListingData<>(new Page<>(null, rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     @Override

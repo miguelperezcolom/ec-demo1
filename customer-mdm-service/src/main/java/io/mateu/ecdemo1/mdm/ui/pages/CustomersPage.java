@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.mdm.ui.pages;
 
+import io.mateu.ecdemo1.mdm.ui.Paging;
 import io.mateu.ecdemo1.integration.model.customer.CustomerStatus;
 import io.mateu.ecdemo1.mdm.resolution.IdentityResolution;
 import io.mateu.ecdemo1.mdm.store.Customer;
@@ -7,7 +8,6 @@ import io.mateu.ecdemo1.mdm.store.CustomerRepository;
 import io.mateu.ecdemo1.mdm.store.SourceRepository;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -47,7 +47,7 @@ public class CustomersPage implements Listing<CustomerRow>, Searchable, Navigabl
                         c.documentNumber == null ? "" : c.documentType + " " + c.documentNumber,
                         (int) sources.countByCustomerId(c.id), String.valueOf(c.salesforceState), status(c)))
                 .toList();
-        return new ListingData<>(new Page<>(request.searchText(), rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     static Status status(Customer c) {

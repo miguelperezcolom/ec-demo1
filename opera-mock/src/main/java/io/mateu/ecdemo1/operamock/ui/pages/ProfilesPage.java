@@ -1,9 +1,9 @@
 package io.mateu.ecdemo1.operamock.ui.pages;
 
+import io.mateu.ecdemo1.operamock.ui.Paging;
 import io.mateu.ecdemo1.operamock.store.OperaStore;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.fluent.OnLoadTrigger;
@@ -34,7 +34,7 @@ public class ProfilesPage implements Listing<ProfileRow>, TriggersSupplier {
             return new ProfileRow(p.path("profileIdList").path(0).path("id").asText(), details.path("profileType").asText(),
                     name.trim(), p.path("externalReferences").path(0).path("id").asText());
         }).toList();
-        return new ListingData<>(new Page<>(null, rows.size(), 0, rows.size(), rows));
+        return Paging.page(rows, request);
     }
 
     /**
