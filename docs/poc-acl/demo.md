@@ -201,6 +201,24 @@ La línea base (2026-09-24): MRU01 ↔ XMAR activa con sus reservas; **CUN01 sin
 reservas futuras** retenidas (para el alta en directo contra XMU); interlocutores importados; la
 bandeja con las causas de CUN01; la auditoría vacía.
 
+## Probar la demo de punta a punta
+
+Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en `~/.config/ec-demo1/`):
+
+- `npx playwright test` — **las pantallas**: las cuatro consolas y cada una de sus pantallas (menús,
+  bandeja, auditoría…). No escribe nada; se puede lanzar siempre.
+- `npm run demo` — **la historia de la demo** contra ec1, y al final el reset a la línea base
+  (`E2E_RESET=0` para no resetear). Unos 5 minutos:
+  1. una reserva nueva de MRU01 llega a Opera (XMAR) y al front office (se busca por localizador en su
+     listado);
+  2. el cambio de datos de su titular pasa por Salesforce (Case aprobado) y baja al front office y al
+     perfil de Opera, en su sitio;
+  3. una acción auditable aparece en *Audit*;
+  4. la bandeja muestra lo que espera (las causas de CUN01).
+
+  Deja en XMAR una reserva y un perfil por ejecución (las reglas de la demo); en Salesforce, nada
+  después del reset.
+
 ## Preparación de la demo
 
 - [ ] Decidir la propiedad para el alta en directo (§4) y, si es XMU, sembrar un hotel del CRS con

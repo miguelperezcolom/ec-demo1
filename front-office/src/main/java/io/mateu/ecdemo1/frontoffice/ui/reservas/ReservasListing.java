@@ -114,7 +114,8 @@ public class ReservasListing
     if (searchText == null || searchText.isBlank()) {
       return true;
     }
-    var hay = (row.huesped() + " " + row.habitacion() + " " + row.estado() + " " + row.tier())
+    // The locator too: it is what the desk reads off a voucher or a call.
+    var hay = (row.id() + " " + row.huesped() + " " + row.habitacion() + " " + row.estado() + " " + row.tier())
         .toLowerCase();
     for (var word : searchText.trim().toLowerCase().split("\\s+")) {
       if (!hay.contains(word)) {

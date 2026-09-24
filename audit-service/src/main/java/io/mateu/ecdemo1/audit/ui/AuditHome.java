@@ -1,9 +1,7 @@
 package io.mateu.ecdemo1.audit.ui;
 
-import io.mateu.ecdemo1.audit.ui.pages.AuditPage;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.FavIcon;
-import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTitle;
@@ -23,6 +21,5 @@ import org.springframework.stereotype.Service;
 public class AuditHome {
 
     @Menu
-    @Label("Audited actions")
-    AuditPage actions;
+    AuditMenu audit;
 }

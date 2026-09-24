@@ -45,13 +45,11 @@ const dataScreens = [
     { menu: 'Admin', entry: 'Received tasks', route: '/worker/receivedTasks' },
     { menu: 'Admin', entry: 'Task overrides', route: '/worker/taskOverrides' },
     { menu: 'Call center', entry: 'Bookings', route: '/booking/bookings' },
-    // The CRS -> Opera integration PoC (docs/poc-acl): the partners master and the Opera double.
+    // The CRS -> Opera integration PoC (docs/poc-acl): the partners master. The Opera double is no
+    // longer deployed: the integration writes to the chain's real tenant.
     { menu: 'ERP', entry: 'Partners', route: '/partners/partners' },
-    { menu: 'Opera', entry: 'Reservations', route: '/opera/reservations' },
-    { menu: 'Opera', entry: 'Profiles', route: '/opera/profiles' },
-    { menu: 'Opera', entry: 'Calls', route: '/opera/calls' },
-    { menu: 'Opera', entry: 'Faults', route: '/opera/faults' },
-    { menu: 'Opera', entry: 'Properties', route: '/opera/properties' },
+    // What waits for the signed-in user: notifications and tasks of their roles.
+    { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' },
 ]
 
 /**
@@ -82,31 +80,33 @@ const controlScreens = [
     { menu: 'Customers', entry: 'Consolidations', route: '/customers/consolidations' },
     { menu: 'Notifications', entry: 'History', route: '/notifications/history' },
     { menu: 'Notifications', entry: 'Recipients', route: '/notifications/recipients' },
+    { menu: 'Audit', entry: 'Audited actions', route: '/audit/actions' },
+    { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' },
 ]
 
 export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
         host: host('CONSOLE_HOST', 'ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP', 'Opera'],
+        menus: ['Admin', 'Call center', 'ERP', 'Inbox'],
         screens: dataScreens,
     },
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP', 'Opera'],
+        menus: ['Admin', 'Call center', 'ERP', 'Inbox'],
         screens: dataScreens,
     },
     {
         name: 'control · vaadin', plane: 'control', renderer: 'vaadin',
         host: host('CONTROL_HOST', 'console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications'],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications', 'Audit', 'Inbox'],
         screens: controlScreens,
     },
     {
         name: 'control · redwood', plane: 'control', renderer: 'redwood',
         host: host('RW_CONTROL_HOST', 'rw-console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications'],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications', 'Audit', 'Inbox'],
         screens: controlScreens,
     },
 ]

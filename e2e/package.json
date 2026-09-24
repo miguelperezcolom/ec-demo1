@@ -4,7 +4,8 @@
   "description": "End-to-end coverage of the four consoles this deployment serves",
   "scripts": {
     "test": "playwright test",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "demo": "playwright test --config demo.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0"
