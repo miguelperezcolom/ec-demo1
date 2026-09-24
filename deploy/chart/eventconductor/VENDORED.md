@@ -4,6 +4,24 @@ Copied from [`miguelperezcolom/eventconductor`](https://github.com/miguelperezco
 at chart version **0.1.7** / appVersion 2.1.1, so this repository can deploy itself without a
 checkout of the engine repo beside it.
 
+> **Never upgrade the `ec` release with the upstream chart.** This copy has diverged from
+> `charts/eventconductor` while both still say version 0.1.7 — above all, upstream knows nothing
+> about `postgres.localDisk`. A `helm upgrade ec <engine repo>/charts/eventconductor --reuse-values`
+> renders PostgreSQL on a new PVC, replaces its pod, and the `emptyDir` holding **every** database
+> on it — the engine's, Keycloak's and the demo services' — is gone (it happened on 2026-09-24,
+> Helm revision 52). Upgrade only with this chart and `deploy/values/eventconductor.yaml`, changing
+> the `imageTag`s, and check first that the PostgreSQL Deployment does not change:
+>
+> ```bash
+> helm -n ec-demo1 get manifest ec > /tmp/current.yaml
+> helm template ec deploy/chart/eventconductor -n ec-demo1 -f deploy/values/eventconductor.yaml > /tmp/next.yaml
+> diff /tmp/current.yaml /tmp/next.yaml     # expect only image lines
+> ```
+>
+> If it does happen: re-run `keycloak-db-init` and `demo-db-init` (delete + apply, as `deploy.sh`
+> does), restart the services that use this PostgreSQL, and restore the baseline with
+> `deploy/demo/reset.sh`.
+
 ## The changes
 
 Three. The first two fill gaps that make a real deployment impossible rather than inconvenient;
