@@ -9,9 +9,6 @@ import java.time.Duration;
  * @param mappingUrl        the mapping, for translations, partner profiles and causes
  * @param integrationsUrl   the integrations, for how to reach each Opera property
  * @param customerMdmUrl    the customer MDM, for who the passengers are
- * @param partnersOwnedByPms true when the partners live in Opera and are imported from it into the
- *                          ERP, rather than projected from the ERP to Opera: then the connector never
- *                          writes a partner's profile, it only resolves the one the import recorded
  * @param frontOfficeUrl      the hotel's front office, which every reservation written into the PMS is
  *                            written into too; blank, none
  * @param frontOfficeHotels   the CRS hotels that have that front office
@@ -20,7 +17,7 @@ import java.time.Duration;
  */
 @ConfigurationProperties("pms-integration")
 public record PmsIntegrationProperties(String crsIntegrationUrl, String mappingUrl, String integrationsUrl,
-                                       String customerMdmUrl, boolean partnersOwnedByPms, String frontOfficeUrl,
+                                       String customerMdmUrl, String frontOfficeUrl,
                                        java.util.List<String> frontOfficeHotels, Duration alertAfter) {
 
     public PmsIntegrationProperties {

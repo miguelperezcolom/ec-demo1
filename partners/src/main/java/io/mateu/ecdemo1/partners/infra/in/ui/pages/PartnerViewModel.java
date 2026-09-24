@@ -57,6 +57,10 @@ public class PartnerViewModel implements Identifiable {
     @ReadOnly
     @HiddenInCreate
     Long version;
+    /** Which profile it is in Opera: the integration creates it there only while this is empty. */
+    @ReadOnly
+    @HiddenInCreate
+    String operaProfile;
 
     final PartnerService service;
 
@@ -95,6 +99,8 @@ public class PartnerViewModel implements Identifiable {
         email = d.email();
         phone = d.phone();
         version = partner.getVersion();
+        operaProfile = partner.getPmsProfile() == null ? "Not in Opera yet"
+                : partner.getPmsProfile().profileId() + " · " + partner.getPmsProfile().profileType();
         return this;
     }
 

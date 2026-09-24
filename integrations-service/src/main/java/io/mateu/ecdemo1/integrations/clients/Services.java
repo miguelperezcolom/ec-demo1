@@ -142,6 +142,13 @@ public class Services {
     }
 
     /** Announces a partner again, unchanged, so that the integration projects it to the PMS. */
+    /** Records in the ERP which Opera profile the partner is: the integration does not create it there. */
+    public void recordErpPmsProfile(String code, String pmsProfileId, String profileType) {
+        partners.put().uri("/partners/{code}/pms-profile", code)
+                .body(Map.of("profileId", pmsProfileId, "profileType", profileType))
+                .retrieve().toBodilessEntity();
+    }
+
     public void resyncPartner(String code) {
         partners.post().uri("/partners/{code}/resync", code).retrieve().toBodilessEntity();
     }

@@ -108,6 +108,27 @@ public class OperaProfiles {
         return found;
     }
 
+    /**
+     * The chain's profile whose CorporateId is this partner's code, if Opera has one: the partner is
+     * already there, created by someone else or before the ERP learned it.
+     */
+    public java.util.Optional<String> byCorporateId(String hotelId, String code, String profileType) {
+        var page = ohip.get(hotelId, "/crm/v1/profiles?profileType={t}&corporateIds={c}&hotelId={h}&limit=5&summaryInfo=true",
+                profileType, code, hotelId).body().path("profileSummaries").path("profileInfo");
+        for (var info : page) {
+            String profileId = null;
+            var matches = false;
+            for (var id : info.path("profileIdList")) {
+                if ("Profile".equals(id.path("type").asText())) profileId = id.path("id").asText();
+                if ("CorporateId".equals(id.path("type").asText()) && code.equals(id.path("id").asText())) matches = true;
+            }
+            if (matches && profileId != null) {
+                return java.util.Optional.of(profileId);
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
     /** A partner as the profile Opera routes and bills through: Agent, Company or Source (F004). */
     public Ensured ensurePartner(String hotelId, Partner partner, String profileType) {
         var profile = objectMapper.createObjectNode();
@@ -129,6 +150,12 @@ public class OperaProfiles {
         }
         details.putObject("userDefinedFields").putArray("numericUDFs").addObject()
                 .put("name", properties.versionUdf()).put("value", partner.version());
+        if (!properties.profileReferences()) {
+            // No external references on this tenant's profiles: the partner is known by its CorporateId
+            // — its code in the chain — which is what a later search finds it by.
+            profile.putArray("profileIdList").addObject().put("id", partner.code()).put("type", "CorporateId");
+            return new Ensured(lastSegment(ohip.post(hotelId, "/crm/v1/profiles", profile).location()), true);
+        }
         return ensure(hotelId, "PARTNER-" + partner.code(), profile);
     }
 

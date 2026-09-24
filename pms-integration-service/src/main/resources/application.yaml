@@ -55,8 +55,6 @@ pms-integration:
   mapping-url: ${MAPPING_URL:http://localhost:8122}
   integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
   customer-mdm-url: ${CUSTOMER_MDM_URL:http://localhost:8127}
-  # Opera, not the ERP, as the master of partners: read from it, never written to it.
-  partners-owned-by-pms: ${PARTNERS_OWNED_BY_PMS:false}
   # The hotel's front office: every reservation written into Opera for these CRS hotels, into it too.
   front-office-url: ${FRONT_OFFICE_URL:}
   front-office-hotels: ${FRONT_OFFICE_HOTELS:}

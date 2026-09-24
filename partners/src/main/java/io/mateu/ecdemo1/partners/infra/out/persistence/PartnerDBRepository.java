@@ -7,6 +7,7 @@ import io.mateu.ecdemo1.partners.domain.partner.Partner;
 import io.mateu.ecdemo1.partners.domain.partner.PartnerChanged;
 import io.mateu.ecdemo1.partners.domain.partner.PartnerDetails;
 import io.mateu.ecdemo1.partners.domain.partner.PartnerType;
+import io.mateu.ecdemo1.partners.domain.partner.PmsProfile;
 import io.mateu.ecdemo1.partners.infra.out.outbox.OutboxWriter;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,8 @@ public class PartnerDBRepository implements PartnerRepository {
                 new PartnerDetails(PartnerType.valueOf(e.type), e.name, e.taxId,
                         new Address(e.addressLine, e.city, e.postalCode, e.countryCode),
                         e.email, e.phone, BillingMode.valueOf(e.billingMode)),
-                e.active, e.created, e.updated, e.version);
+                e.active, e.created, e.updated, e.version,
+                e.pmsProfileId == null ? null : new PmsProfile(e.pmsProfileId, e.pmsProfileType));
     }
 
     static void copy(Partner p, PartnerEntity e) {
@@ -94,6 +96,8 @@ public class PartnerDBRepository implements PartnerRepository {
         e.billingMode = d.billingMode().name();
         e.active = p.isActive();
         e.version = p.getVersion();
+        e.pmsProfileId = p.getPmsProfile() == null ? null : p.getPmsProfile().profileId();
+        e.pmsProfileType = p.getPmsProfile() == null ? null : p.getPmsProfile().profileType();
         e.created = p.getCreated();
         e.updated = p.getUpdated();
     }

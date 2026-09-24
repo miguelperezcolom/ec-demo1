@@ -398,7 +398,11 @@ class IntegrationsTest {
         assertThat(calls).anyMatch(c -> c.startsWith("PUT /partners/NORDTRAVEL") && c.contains("\"type\":\"Company\"")
                 && c.contains("\"name\":\"Nordtravel AB\"") && c.contains("\"billingMode\":\"NoFront\"")
                 && c.contains("\"taxId\":\"SE556677\""));
-        // The mapping learns which profile each one already is.
+        // The ERP records which Opera profile each one is, so it is not created there again...
+        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partners/05100908/pms-profile") && c.contains("\"profileId\":\"16120675\"")
+                && c.contains("\"profileType\":\"Agent\""));
+        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partners/NORDTRAVEL/pms-profile") && c.contains("\"profileId\":\"16120699\""));
+        // ...and the mapping learns it too.
         assertThat(calls).anyMatch(c -> c.startsWith("PUT /partner-profiles/05100908") && c.contains("\"pmsProfileId\":\"16120675\"")
                 && c.contains("\"profileType\":\"Agent\""));
         assertThat(calls).anyMatch(c -> c.startsWith("PUT /partner-profiles/NORDTRAVEL") && c.contains("\"pmsProfileId\":\"16120699\""));

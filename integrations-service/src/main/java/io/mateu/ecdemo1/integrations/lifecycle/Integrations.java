@@ -323,18 +323,6 @@ public class Integrations {
     public void stepSyncPartners(String id) {
         var i = find(id);
         transition(i, IntegrationStatus.SYNCING_PARTNERS, "Syncing the partners of the hotel's future reservations");
-        if (properties.partnersOwnedByPms()) {
-            // Opera is where partners are kept: bring them into the ERP; what the hotel's reservations
-            // use and Opera does not have waits until someone creates it there.
-            var imported = importPartners(i, "onboarding");
-            var missing = missingPartners(i);
-            i.partnersMissing = missing;
-            i.record(clock.instant(), "onboarding", imported + (missing.isEmpty() ? ". Every partner is a PMS profile"
-                    : ". Not in Opera, to be created there: " + String.join(", ", missing)));
-            i.gate = Definitions.GATE_PARTNERS;
-            integrations.save(i);
-            return;
-        }
         var missing = missingPartners(i);
         missing.forEach(services::resyncPartner);
         i.partnersMissing = missing;
@@ -467,9 +455,9 @@ public class Integrations {
         i.connectivityCheckedAt = clock.instant();
         if (check.ok()) {
             services.defineHotel(i.crsHotelCode, i.pmsHotelCode, "integration " + i.crsHotelCode);
-            if (properties.partnersOwnedByPms()) {
-                definePartnerTypes("integration " + i.crsHotelCode);
-            }
+            // Which profile type each partner type is in OPERA: the tenant's own types, so entered
+            // rather than left pending for a person — creating a partner's profile needs it.
+            definePartnerTypes("integration " + i.crsHotelCode);
             if (i.status == IntegrationStatus.CONNECTIVITY_FAILED) {
                 transition(i, IntegrationStatus.CREATED, "Connection verified: " + check.message());
             } else {
@@ -509,10 +497,12 @@ public class Integrations {
     }
 
     /**
-     * «Importar interlocutores»: the chain's partners as Opera has them go into the ERP — created, or
-     * their name and type brought up to date — and the mapping learns which profile each already is.
-     * Their codes are Opera's CorporateIds, which is what the chain knows a partner by. Nothing is
-     * written to Opera. Idempotent: an import finding everything in place changes nothing.
+     * «Importar interlocutores» — a seed, not the flow: partners go from the ERP to Opera, projected by
+     * «Proyectar Interlocutor». This brings the chain's partners as Opera already has them into the
+     * ERP — created, or their name and type brought up to date — so that a demo or a first load starts
+     * from what exists. The ERP records which Opera profile each one is, and the mapping learns it, so
+     * none is ever created in Opera again. Their codes are Opera's CorporateIds, which is what the chain
+     * knows a partner by. Nothing is written to Opera. Idempotent.
      */
     @Audited("Import partners")
     @Transactional
@@ -555,6 +545,7 @@ public class Integrations {
             } else {
                 unchanged++;
             }
+            services.recordErpPmsProfile(p.code(), p.pmsProfileId(), p.profileType());
             services.recordPartnerProfile(p.code(), p.pmsProfileId(), p.profileType());
         }
         return "Partners imported from Opera %s: %d new, %d updated, %d unchanged%s".formatted(i.pmsHotelCode, created, updated,

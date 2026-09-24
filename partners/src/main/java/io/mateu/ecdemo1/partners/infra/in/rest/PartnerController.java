@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.partners.infra.in.rest;
 import io.mateu.ecdemo1.partners.application.out.PartnerRepository;
 import io.mateu.ecdemo1.partners.application.usecases.PartnerService;
 import io.mateu.ecdemo1.partners.domain.partner.PartnerDetails;
+import io.mateu.ecdemo1.partners.domain.partner.PmsProfile;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -62,6 +63,12 @@ public class PartnerController {
     @Operation(summary = "Replace a partner's details")
     public void update(@PathVariable String code, @RequestBody PartnerDetails details) {
         service.update(code, details);
+    }
+
+    @PutMapping("/{code}/pms-profile")
+    @Operation(summary = "Record which profile the partner is in the PMS (Opera); announces nothing, projects nothing")
+    public void recordPmsProfile(@PathVariable String code, @RequestBody PmsProfile profile) {
+        service.recordPmsProfile(code, profile);
     }
 
     @PostMapping("/{code}/resync")

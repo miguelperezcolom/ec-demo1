@@ -73,7 +73,7 @@ public final class CrsTranslator {
                         : new Address(p.address().line(), p.address().city(), p.address().postalCode(),
                         p.address().countryCode()),
                 p.email(), p.phone(), "NoFront".equals(p.billingMode()) ? BillingMode.NO_FRONT : BillingMode.FRONT,
-                p.active(), p.version());
+                p.active(), p.version(), p.pmsProfileId(), p.pmsProfileType());
     }
 
     static PartnerType partnerType(String type) {

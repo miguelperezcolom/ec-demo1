@@ -24,9 +24,6 @@ import java.time.Duration;
  * @param backfillPerTick      reservations a backfill projects per tick: the throttle that keeps it
  *                             from drowning the CRS and OHIP (HLA, Volumetría)
  * @param backfillTick         how often a backfill projects its next batch
- * @param partnersOwnedByPms   true when the partners are kept in Opera and imported from it into the
- *                             ERP: the partners gate imports them instead of announcing the ERP's for
- *                             projection
  * @param activationWindowDays how far ahead the backfill has to have reached for the integration to be
  *                             activated (HLA R25, «ventana próxima cubierta»)
  */
@@ -34,7 +31,7 @@ import java.time.Duration;
 public record IntegrationsProperties(String crsIntegrationUrl, String pmsIntegrationUrl, String mappingUrl,
                                      String partnersUrl, String consoleUrl, String cryptoKey, Opera opera,
                                      Duration gateCheck, Duration recheck, int backfillPerTick, Duration backfillTick,
-                                     int activationWindowDays, boolean partnersOwnedByPms) {
+                                     int activationWindowDays) {
 
     /** How to reach the chain's Opera tenant. The secret comes from a Secret, never from a file. */
     public record Opera(String gatewayUrl, String appKey, String clientId, String clientSecret, String enterpriseId) {

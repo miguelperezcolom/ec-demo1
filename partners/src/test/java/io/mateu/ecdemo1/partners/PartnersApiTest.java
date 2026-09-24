@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -81,6 +82,24 @@ class PartnersApiTest {
         assertThat(consume("BOOKIT", 3)).map(r -> json(r.value()))
                 .extracting(e -> e.get("type").asText() + "@" + e.get("version").asLong())
                 .containsExactly("partner-changed@1", "partner-changed@2", "partner-changed@2");
+    }
+
+    @Test
+    void whichProfileAPartnerIsInThePmsIsRecordedWithoutChangingOrAnnouncingIt() throws Exception {
+        mvc.perform(post("/partners").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"code":"05100908","details":{"type":"TravelAgent","name":"ABREU ONLINE PORTUGAL","billingMode":"Front"}}"""))
+                .andExpect(status().isCreated());
+        mvc.perform(get("/partners/05100908")).andExpect(jsonPath("$.pmsProfileId").doesNotExist());
+
+        mvc.perform(put("/partners/05100908/pms-profile").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"profileId":"16120675","profileType":"Agent"}""")).andExpect(status().isOk());
+
+        mvc.perform(get("/partners/05100908"))
+                .andExpect(jsonPath("$.pmsProfileId").value("16120675"))
+                .andExpect(jsonPath("$.pmsProfileType").value("Agent"))
+                .andExpect(jsonPath("$.version").value(1));
+        // One announcement — its creation. Recording the profile is not a change of the partner.
+        assertThat(consume("05100908", 2)).hasSize(1);
     }
 
     @Test

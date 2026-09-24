@@ -90,9 +90,6 @@ spec:
             # offered instead, each read on its own.
             - name: OPERA_PROPERTIES
               value: "XMAR,XMU"
-            # Partners are Opera's: imported into the ERP, never written to Opera.
-            - name: PARTNERS_OWNED_BY_PMS
-              value: "true"
             # The hotel's front office: MRU01's reservations are written into it too (H13).
             - name: FRONT_OFFICE_URL
               value: "http://front-office:8128"

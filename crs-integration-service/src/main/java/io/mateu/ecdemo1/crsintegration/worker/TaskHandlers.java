@@ -24,7 +24,8 @@ public class TaskHandlers {
     final CrsSource crs;
 
     public Map<String, Function<TaskExecutionRequested, List<Variable>>> handlers() {
-        return Map.of("annotate-pms-reference", this::annotatePmsReference);
+        return Map.of("annotate-pms-reference", this::annotatePmsReference,
+                "annotate-partner-profile", this::annotatePartnerProfile);
     }
 
     /** Writes the PMS's reservation id back to the CRS. Writing it twice writes the same thing. */
@@ -33,6 +34,20 @@ public class TaskHandlers {
         var pmsReservationId = variable(task, ProcessVariables.PMS_RESERVATION_ID);
         crs.annotatePmsReference(locator, pmsReservationId);
         log.info("Booking {} is reservation {} in the PMS", locator, pmsReservationId);
+        return List.of();
+    }
+
+    /**
+     * Writes back to the master of partners which profile the partner is in the PMS — the one the
+     * connector created, or found there. Written twice, the same thing.
+     */
+    List<Variable> annotatePartnerProfile(TaskExecutionRequested task) {
+        var code = variable(task, ProcessVariables.PARTNER_CODE);
+        var profileId = variable(task, ProcessVariables.PMS_PROFILE_IDS);
+        var profileType = task.variables().stream().filter(v -> "pmsProfileType".equals(v.name())).map(Variable::value)
+                .findFirst().orElse(null);
+        crs.annotatePartnerProfile(code, profileId, profileType);
+        log.info("Partner {} is profile {} ({}) in the PMS", code, profileId, profileType);
         return List.of();
     }
 

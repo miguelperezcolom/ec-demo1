@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.partners.application.usecases;
 import io.mateu.ecdemo1.partners.application.out.PartnerRepository;
 import io.mateu.ecdemo1.partners.domain.partner.Partner;
 import io.mateu.ecdemo1.partners.domain.partner.PartnerDetails;
+import io.mateu.ecdemo1.partners.domain.partner.PmsProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,14 @@ public class PartnerService {
         } else {
             partner.deactivate(clock.instant());
         }
+        repository.save(partner);
+    }
+
+    /** Records which profile the partner is in the PMS; announces nothing. */
+    @Transactional
+    public void recordPmsProfile(String code, PmsProfile profile) {
+        var partner = locked(code);
+        partner.recordPmsProfile(profile, clock.instant());
         repository.save(partner);
     }
 

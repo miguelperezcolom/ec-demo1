@@ -87,9 +87,6 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-opera, key: OPERA_CLIENT_SECRET } }
             - name: OPERA_ENTERPRISE_ID
               valueFrom: { secretKeyRef: { name: ec-opera, key: OPERA_ENTERPRISE_ID } }
-            # Partners are Opera's: the onboarding imports them into the ERP.
-            - name: PARTNERS_OWNED_BY_PMS
-              value: "true"
             - name: INTEGRATIONS_CRYPTO_KEY
               valueFrom: { secretKeyRef: { name: ec-integrations-crypto, key: INTEGRATIONS_CRYPTO_KEY } }
             - name: CONSOLE_URL

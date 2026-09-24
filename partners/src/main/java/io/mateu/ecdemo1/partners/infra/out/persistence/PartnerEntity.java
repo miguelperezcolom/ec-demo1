@@ -34,6 +34,9 @@ public class PartnerEntity {
     String billingMode;
     boolean active;
     long version;
+    /** Which profile it is in the PMS (Opera), and of which type; null until it is one. */
+    String pmsProfileId;
+    String pmsProfileType;
     Instant created;
     Instant updated;
 }

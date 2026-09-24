@@ -19,15 +19,23 @@ public class Partner extends AggregateRoot {
     private final Instant created;
     private Instant updated;
     private long version;
+    /** Which profile it is in the PMS, once it is one there. Not part of its details: integration data. */
+    private PmsProfile pmsProfile;
 
     public Partner(String code, PartnerDetails details, boolean active, Instant created, Instant updated,
                    long version) {
+        this(code, details, active, created, updated, version, null);
+    }
+
+    public Partner(String code, PartnerDetails details, boolean active, Instant created, Instant updated,
+                   long version, PmsProfile pmsProfile) {
         this.code = code;
         this.details = details;
         this.active = active;
         this.created = created;
         this.updated = updated;
         this.version = version;
+        this.pmsProfile = pmsProfile;
     }
 
     public static Partner create(String code, PartnerDetails details, Instant now) {
@@ -42,6 +50,16 @@ public class Partner extends AggregateRoot {
     public void update(PartnerDetails details, Instant now) {
         this.details = details;
         changed(now);
+    }
+
+    /**
+     * Records which profile the partner is in the PMS — created there by the integration, or found
+     * there already. Not a change of the partner: no new version and nothing announced, or recording
+     * it would project the partner again.
+     */
+    public void recordPmsProfile(PmsProfile profile, Instant now) {
+        this.pmsProfile = profile;
+        this.updated = now;
     }
 
     public void deactivate(Instant now) {

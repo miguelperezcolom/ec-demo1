@@ -226,13 +226,17 @@ public class TaskHandlers {
     }
 
     /**
-     * A partner as a profile of the chain in Opera (F004, R12): once, not per hotel. A version the
-     * profile already carries, or an older one, is not written again.
+     * The partner as a profile in Opera — «Proyectar Interlocutor», from the ERP to Opera. What the ERP
+     * already records as its Opera profile is used as it is: nothing is written. Otherwise Opera is
+     * asked first, by the partner's CorporateId, in case it has it and the ERP does not know; and only
+     * if it does not, the profile is created. Whichever it is, the next step writes it back to the ERP,
+     * so it is never created twice.
      */
     List<Variable> ensurePartnerProfile(TaskExecutionRequested task) {
         var partner = integration.partner(var(task, ProcessVariables.PARTNER_CODE));
-        if (settings.partnersOwnedByPms()) {
-            return resolvePartnerProfile(task, partner);
+        if (partner.pmsProfileId() != null && !partner.pmsProfileId().isBlank()) {
+            log.info("Partner {} is already profile {} in Opera, as the ERP records", partner.code(), partner.pmsProfileId());
+            return profiled(Outcome.STALE, partner.pmsProfileId(), partner.pmsProfileType());
         }
         var resolved = integration.resolve(null, List.of(new CodeRef(CodeType.PARTNER_TYPE, partner.type().name())));
         if (!resolved.missing().isEmpty()) {
@@ -243,17 +247,22 @@ public class TaskHandlers {
         var profileType = resolved.target(CodeType.PARTNER_TYPE, partner.type().name());
         var hotel = anyHotel();
         try {
-            var current = profiles.byExternalId(hotel, "PARTNER-" + partner.code());
-            if (current.isPresent() && profiles.projectedVersion(current.get()) >= partner.version()) {
-                var id = current.get().path("profileIdList").path(0).path("id").asText();
-                return List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.STALE.name()),
-                        new Variable(ProcessVariables.PMS_PROFILE_IDS, id), new Variable("pmsProfileType", profileType));
+            if (!ohipProperties.profileReferences()) {
+                var found = profiles.byCorporateId(hotel, partner.code(), profileType);
+                if (found.isPresent()) {
+                    log.info("Partner {} found in Opera by its CorporateId: profile {}", partner.code(), found.get());
+                    return profiled(Outcome.STALE, found.get(), profileType);
+                }
+            } else {
+                var current = profiles.byExternalId(hotel, "PARTNER-" + partner.code());
+                if (current.isPresent() && profiles.projectedVersion(current.get()) >= partner.version()) {
+                    return profiled(Outcome.STALE, current.get().path("profileIdList").path(0).path("id").asText(), profileType);
+                }
             }
             var ensured = profiles.ensurePartner(hotel, partner, profileType);
-            log.info("Partner {} v{} is profile {} ({})", partner.code(), partner.version(), ensured.profileId(), profileType);
-            return List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
-                    new Variable(ProcessVariables.PMS_PROFILE_IDS, ensured.profileId()),
-                    new Variable("pmsProfileType", profileType));
+            log.info("Partner {} v{} is profile {} ({}){}", partner.code(), partner.version(), ensured.profileId(), profileType,
+                    ensured.created() ? ", created in Opera" : "");
+            return profiled(Outcome.OK, ensured.profileId(), profileType);
         } catch (PmsRejectedException e) {
             integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID), null,
                     partner.code(), task.variables(), List.of(Cause.pmsRejectedPartner(partner.code(), e.getMessage())));
@@ -261,21 +270,10 @@ public class TaskHandlers {
         }
     }
 
-    /**
-     * When Opera owns the partners: nothing is written, the profile is the one the import from Opera
-     * recorded. A partner the ERP has and Opera does not waits for it — someone creates it in Opera
-     * and the next import brings it.
-     */
-    List<Variable> resolvePartnerProfile(TaskExecutionRequested task, Partner partner) {
-        var known = integration.partnerProfile(partner.code());
-        if (known.isPresent()) {
-            return List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.STALE.name()),
-                    new Variable(ProcessVariables.PMS_PROFILE_IDS, known.get().pmsProfileId()),
-                    new Variable("pmsProfileType", known.get().profileType()));
-        }
-        integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID), null,
-                partner.code(), task.variables(), List.of(Cause.missingPartner(partner.code())));
-        return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
+    static List<Variable> profiled(Outcome outcome, String profileId, String profileType) {
+        return List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, outcome.name()),
+                new Variable(ProcessVariables.PMS_PROFILE_IDS, profileId),
+                new Variable("pmsProfileType", profileType == null ? "" : profileType));
     }
 
     /**
