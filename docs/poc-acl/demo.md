@@ -1,149 +1,171 @@
 # PoC ACL — guión de la demo
 
-Borrador. Se completa bloque a bloque.
+Estado a 2026-09-24. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
+**tenant real de Opera** (OHIP UAT, propiedad **XMAR**); ya no hay doble de Opera en el despliegue
+(`opera-mock` queda solo para la batería local de pruebas). Lo marcado *(pendiente)* no está
+construido todavía o espera una decisión.
 
 ## 1. Arquitectura (diagramas del HLA)
 
 Del contexto a lo concreto, y parando en lo que la PoC ha construido de verdad. Los diagramas son
-los del HLA *CRS-PMS Integration - Solution* (sección entre corchetes).
+los del HLA *CRS-PMS Integration - Solution* y *CRM-MDM Integration - Solution*.
 
-| # | Diagrama | Sección del HLA | Qué contar | En la PoC |
-| -: | :------- | :-------------- | :--------- | :-------- |
-| 1 | Context Model AS-IS | Context | De dónde partimos | — |
-| 2 | Context Model TO-BE | Context | Rumbo (CRS) ↔ integración ↔ Opera Cloud por OHIP; el maestro de interlocutores del lado ERP | `booking` hace de Rumbo, `partners` de maestro |
-| 3 | Container Model TO-BE | Containers | Los servicios: ACL del CRS, mapeado, conector PMS, comunicación, motor | Los seis servicios, uno por contenedor |
-| 4 | El modelo mental: dos planos | Arquitectura | Plano de datos (lo que fluye) y plano de control (quién lo gobierna) | Dos consolas: `ec1` y `console.ec1` |
-| 5 | Grabar Reserva — System Model | Procesos | El camino de una reserva de punta a punta | «Proyectar reserva», completo |
-| 6 | Proyectar una reserva (secuencia) | Procesos | Preparar → perfil → grabar con guarda de versión → anotar en el CRS | Igual, contra `opera-mock` |
-| 7 | Un proceso bloqueado espera, no falla | Resiliencia | Causas en vez de errores: una causa, N procesos | `mapping-service`, pantalla Causes |
-| 8 | Mapeado — System Model | Mapeado | Diccionario versionado, aprobación humana, propuesta del agente | Diccionario, Pending y el agente |
-| 9 | Alta de una integración (secuencia) y ciclo de vida (estados) | Alta | Del registro a la activación, por puertas | `integrations-service` |
+| # | Diagrama | Qué contar | En la PoC |
+| -: | :------- | :--------- | :-------- |
+| 1 | Context Model AS-IS | De dónde partimos | — |
+| 2 | Context Model TO-BE | Rumbo (CRS) ↔ integración ↔ Opera Cloud por OHIP; el ERP como maestro de interlocutores; Salesforce como motor de limpieza del cliente | `booking` hace de Rumbo, `partners` de ERP; Opera y Salesforce son los reales |
+| 3 | Container Model TO-BE | Los servicios: ACL del CRS, mapeado, conector PMS, integraciones, MDM, comunicación, auditoría, motor | Un servicio por contenedor, y el front office del hotel |
+| 4 | El modelo mental: dos planos | Plano de datos (lo que fluye) y plano de control (quién lo gobierna) | Dos consolas: `ec1` y `console.ec1` |
+| 5 | Grabar Reserva — System Model | El camino de una reserva de punta a punta | «Proyectar reserva», contra Opera real y el front office |
+| 6 | Proyectar una reserva (secuencia) | Preparar → identidad del cliente (MDM) → perfil → grabar con guarda de versión → front office → anotar en el CRS | Igual |
+| 7 | Un proceso bloqueado espera, no falla | Causas en vez de errores: una causa, N procesos | *Mapping → Causes*, y cada causa en la bandeja de quien la resuelve |
+| 8 | Mapeado — System Model | Diccionario versionado, aprobación humana, propuesta del agente | Diccionario, Pending (por integración) y el agente |
+| 9 | Alta de una integración (secuencia y estados) | Del registro a la activación, por puertas | `integrations-service` y el proceso `alta-integracion` |
+| 10 | Maestro de clientes (HLA CRM-MDM) | Identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación | `customer-mdm-service` + Salesforce |
+| 11 | Auditoría y bandeja | Quién hizo qué (F016); lo que espera a cada persona, con el enlace a la pantalla que lo resuelve | `audit-service`, bandeja en `communication-service` |
 
-Fuera de la PoC, y conviene decirlo: la subida PMS → CRS (OOO, conciliación diaria) y el tenant
-real de Opera.
+Fuera de la PoC, y conviene decirlo: la subida PMS → CRS (OOO, no-show, conciliación diaria), el
+cobro de la penalización y el backfill de cupo.
 
 ## 2. Recorrido por las consolas
 
-Dos consolas, una por plano (diagrama 4), mismo usuario `demo`. Cada servicio trae sus propias
-pantallas y la consola las federa; cada consola tiene además su versión Redwood (`rw.` y
-`rw-console.`), con los mismos backends.
+Dos consolas, una por plano (diagrama 4). Cada servicio trae sus pantallas y la consola las federa;
+cada consola tiene su versión Redwood (`rw.` y `rw-console.`) con los mismos backends. En la barra
+superior de las cuatro, el **aviso de la bandeja** («Inbox (n)»).
 
 **Plano de datos — `https://ec1.mateu.io`**: lo que usa el negocio.
 
-| Menú | Pantallas | Qué enseñar |
-| :--- | :-------- | :---------- |
-| Call center | Bookings | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario y cobros |
-| ERP | Partners | El maestro de interlocutores: turoperador, agencia, OTA, empresa; *Resync* |
-| Opera | Reservations, Profiles, Calls, Faults, Properties | El doble de Opera: lo que «ha llegado», cada llamada OHIP, fallos a demanda |
-| Admin | Processes, Executions, Tasks… | Los procesos del motor, con sus pasos |
+| Menú | Qué enseñar |
+| :--- | :---------- |
+| Call center | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario, cobros y su referencia en Opera |
+| ERP | El maestro de interlocutores; cada uno sabe **qué perfil es en Opera** (*Opera profile*); *Resync* |
+| Inbox | Lo que me espera: avisos y tareas de mis roles, cada uno con su enlace |
+| Admin | Los procesos del motor, con sus pasos |
+
+**Front office del hotel — `https://front.ec1.mateu.io`** (Redwood): recepción. Las reservas de
+MRU01 que llegan a Opera llegan también aquí como estancias; check-in, huéspedes, folios.
 
 **Plano de control — `https://console.ec1.mateu.io`**: lo que gobierna la plataforma.
 
-| Menú | Pantallas | Qué enseñar |
-| :--- | :-------- | :---------- |
-| Integrations | Integrations | Una integración por hotel: su conexión con Opera y en qué puerta del alta está |
-| Mapping | Causes, Pending, Dictionary, Partner profiles | Por qué esperan los procesos; el diccionario y su aprobación |
-| Notifications | History, Recipients | Los avisos que ha mandado la integración y a quién |
-| Workflow | Definitions, Analytics | Las definiciones de los procesos (`alta-integracion`, `proyectar-*`) |
-| IA | Agents, Mcp servers, Routes… | El agente de mapeado y los MCP de cada servicio |
-| Usuarios | — | Quién puede hacer qué |
+| Menú | Qué enseñar |
+| :--- | :---------- |
+| Integrations | Una integración por hotel: su conexión con Opera, en qué puerta del alta está, *Relaunch backfill*, *Import partners* |
+| Mapping | Causes; Pending (se elige la **integración**); Dictionary (aprobar, rechazar, **retirar**); Partners in the PMS |
+| Customers | El maestro de clientes: golden records y consolidaciones que llegan de Salesforce |
+| Notifications | Lo que se ha comunicado y a quién; destinatarios |
+| Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
+| Inbox | La misma bandeja, en la consola de control |
+| Workflow / Forms | Las definiciones de proceso y de formulario |
+| IA | El agente de mapeado y los MCP de cada servicio |
+| Usuarios | Quién puede hacer qué |
 
-## 3. Un hotel con 100 reservas
+Todos los listados paginan.
 
-En *Call center → Bookings* (plano de datos), el hotel X tiene 100 reservas a futuro: distintas llegadas,
-canales (web, call centre, turoperador, OTA), interlocutores, regímenes y algunas con depósito. Es
-el punto de partida: un hotel que ya vende en el CRS y que todavía no está integrado con Opera.
+## 3. El punto de partida
 
-> **Preparación:** `e2e/poc-acl-demo/seed.py` crea esas 100 reservas en un hotel sin integración.
+MRU01 (el hotel del CRS) está integrado con **XMAR** (Opera) y activo: sus reservas viajan a Opera
+en tiempo real. Otro hotel del CRS, sin integración, vende y sus reservas **esperan** en la causa
+`INTEGRATION_INACTIVE:<hotel>`.
 
-## 4. Crear la integración del hotel X
+## 4. Crear una integración
 
-En *Integrations → Integrations* (plano de control), **New**: solo hay que elegir dos cosas, y las dos
-se leen de sus catálogos, no se escriben — el **hotel del CRS** sale de `booking` (a través del ACL) y
-la **propiedad de Opera**, de la propia Opera, que lista las de la cadena. Los datos de conexión
-vienen rellenos con los de la cadena (un hotel que necesite otros, los cambia aquí).
-Al guardarla arranca el proceso
-`alta-integracion` (se ve en *Admin → Processes*) y la integración avanza sola por sus primeras
-puertas: verifica la conexión con Opera y contrasta los catálogos. En el detalle se ve en qué
-puerta está («Waiting for») y el historial de lo que ha ido pasando.
-
-Mientras no esté activa, nada del hotel X llega a Opera en tiempo real: sus reservas esperan en la
-causa `INTEGRATION_INACTIVE:X` (*Mapping → Causes*).
-
-## 5. El proceso de alta en marcha
-
-El proceso `alta-integracion` avanza por sus puertas, y en el detalle de la integración se ve cada
-una (*Waiting for* y el historial), en *Admin → Processes* el proceso con sus pasos, y en
-*Notifications → History* los avisos cuando algo necesita a una persona:
+*Integrations → New*: se eligen dos cosas y las dos se leen, no se escriben — el **hotel del CRS**
+sale del CRS y la **propiedad de Opera**, de Opera (el cliente OHIP no puede listar las de la cadena,
+así que la integración ofrece las configuradas — XMAR y XMU — con el nombre que Opera les da). La
+conexión viene rellena con la de la cadena. Al guardarla arranca `alta-integracion`, que avanza solo
+por sus puertas:
 
 1. **Conectividad** con Opera: token y lectura de la propiedad.
-2. **Contraste de catálogos**: qué tiene configurado la propiedad en Opera frente a lo que el CRS
-   puede emitir.
-3. **Mapeado**: los códigos del hotel sin equivalencia (*Mapping → Pending*, con propuesta del
-   agente) y la aprobación de una persona.
-4. **Interlocutores**: los que usan las reservas pendientes del hotel, proyectados como perfiles en
-   Opera (*Opera → Profiles*).
-5. **Backfill**: pasada previa (lo que esas reservas usan y aún falta), y volcado de las 100
-   reservas de la llegada más próxima a la más lejana (*Opera → Reservations* se va llenando), con la
-   disponibilidad de la propiedad suspendida mientras dura.
-6. **Lista para activar** cuando el volcado cubre la ventana próxima.
+2. **Contraste de catálogos**: lo que la propiedad tiene en Opera frente a lo que emite el CRS.
+3. **Mapeado**: los códigos sin equivalencia, con propuesta del agente, y la aprobación de una
+   persona.
+4. **Interlocutores**: los que usan las reservas futuras del hotel se **exportan del ERP a Opera** —
+   el que el ERP ya sabe qué perfil es no se toca; si no, se busca en Opera por su código
+   (CorporateId) y solo si no está se crea; el ERP anota cuál es.
+5. **Backfill**: pasada previa, y volcado de las reservas futuras de la llegada más próxima a la
+   más lejana, con la disponibilidad suspendida mientras dura.
+6. **Lista para activar** cuando cubre la ventana próxima; activar abre el tráfico en tiempo real.
 
-## 6. Se bloquea: faltan mapeados
+Cada puerta que necesita a alguien deja un aviso **en la bandeja** con el enlace a la integración, y
+se cierra solo cuando la integración la pasa.
 
-El alta no falla: **espera**, y dice por qué. Los códigos del hotel X no tienen equivalencia en
-Opera, así que:
+> *(pendiente de decidir)* **Contra qué propiedad hacer el alta en directo.** Un alta completa
+> escribe en Opera las reservas futuras del hotel. XMU está vacía y es la candidata; XMAR ya tiene
+> MRU01 activo.
 
-- La integración se queda en `MAPPING_PENDING` (*Waiting for: A person to approve the mapping*), con
-  los códigos pendientes en *Mapping → Pending*.
-- Si se aprueba sin completarlo, la **pasada previa del backfill** lo para en `BACKFILL_BLOCKED`, con
-  los huecos que usan de verdad sus reservas **ordenados por cuántas bloquean** (en el detalle de la
-  integración, *Backfill gaps*). No se lanzan cien procesos para que se queden esperando: se
-  arreglan antes unas pocas líneas del diccionario.
-- Los interlocutores cuyo tipo no está mapeado esperan en su causa (*Mapping → Causes*).
-- En *Notifications → History* están los avisos a los responsables.
+## 5. Se bloquea: espera, no falla
 
-## 7. Los mapeados que ha propuesto la IA
+- La integración se queda en `MAPPING_PENDING`; los códigos, en *Mapping → Pending* eligiendo la
+  integración, junto a lo que ofrece Opera.
+- Si se aprueba sin completarlo, la pasada previa del backfill lo para en `BACKFILL_BLOCKED` con los
+  huecos ordenados por cuántas reservas bloquean.
+- Cada causa aparece **en la bandeja** de los roles que la resuelven (por defecto `ai-admin`), con el
+  enlace a su pantalla; al resolverla desaparece de todas las bandejas.
 
-Al llegar a la puerta de mapeado, el alta ha pedido al **agente de mapeado** una propuesta. En el
-plano de control, *Mapping → Dictionary*: las propuestas del agente, cada una con su **confianza** y
-el **porqué**, pendientes de revisión. Nada entra en vigor sin una persona.
+## 6. Los mapeados que propone la IA
 
-## 8. Validarlos desbloquea el alta
+Al llegar a la puerta de mapeado, el alta pide al **agente de mapeado** una propuesta: en
+*Mapping → Dictionary* las propuestas, con su confianza y su porqué. Nada entra en vigor sin una
+persona; aprobar reanuda de golpe todo lo que esperaba. Una equivalencia equivocada se corrige
+aprobando otra versión, y la que nunca debió existir se **retira**. Cada decisión queda en *Audit*.
 
-Se aprueban (o se corrigen) las propuestas. Cuando el hotel ya no tiene códigos pendientes, la
-puerta de mapeado se abre sola y el alta sigue: **se proyectan los interlocutores** que usan sus
-reservas (*Opera → Profiles* los muestra con su tipo de perfil), y las causas que los retenían se
-resuelven (*Mapping → Causes*).
+## 7. El backfill
 
-## 9. El backfill
+*Relaunch backfill* en la integración: proyecta todas las reservas futuras del hotel; las que Opera
+ya tiene en esa versión **no se escriben** (ni la reserva, ni el perfil del huésped), las que no, se
+crean. Probado en XMAR: 3 reservas creadas, 2 intactas, ninguna duplicada al reanudar los procesos
+retenidos.
 
-Pasada previa limpia → volcado de las 100 reservas, **de la llegada más próxima a la más lejana**, a
-un ritmo limitado. *Opera → Reservations* se va llenando, y el detalle de la integración muestra el
-avance (*Backfill*: n de 100, ventana cubierta) y la disponibilidad suspendida mientras dura.
+## 8. Una reserva de punta a punta
 
-## 10. En Opera están los datos
+Una reserva nueva de MRU01 en *Call center* (o por el chat del agente, *«Crea 3 reservas en MRU01…»*):
 
-En el plano de datos, *Opera* (el doble de OHIP: **no se escribe en el tenant real**, y conviene
-decirlo):
+- En Opera (XMAR): la reserva con los códigos traducidos, tarifa fija por noche, el perfil del
+  huésped, el del interlocutor cuando lo hay, y la versión del CRS en el UDF.
+- En el front office: la estancia, con su titular.
+- En el CRS: dónde ha quedado en Opera.
+- En *Customers*: los pasajeros resueltos contra el maestro de clientes.
 
-- *Reservations*: las 100 reservas, con los códigos ya traducidos (tipo de habitación, tarifa,
-  origen y mercado, régimen como paquete), tarifa fija por noche, el perfil del huésped y el del
-  interlocutor, la ventana de folio del interlocutor cuando paga él, y la versión del CRS en el UDF.
-- *Profiles*: huéspedes e interlocutores.
-- *Calls*: cada llamada OHIP que ha hecho el conector, con su respuesta.
+## 9. El cliente se limpia en Salesforce
 
-Y en el CRS (*Booking*), cada reserva sabe dónde ha quedado en Opera (referencia del PMS).
+Los pasajeros de cada reserva se proyectan a Salesforce como contactos. Allí se fusionan los
+duplicados (el golden record); la fusión vuelve al MDM (`ClienteConsolidado__e`), que aplica la
+supervivencia y **propaga el código de cliente al perfil de Opera** de las reservas afectadas.
 
-## 11. La IA crea reservas y viajan al PMS
+## 10. Recepción cambia los datos de un cliente *(en construcción)*
 
-Con la integración activa, en el chat de la consola de datos: *«Crea 5 reservas en el hotel X para
-la semana que viene…»*. El agente las crea en el CRS con las herramientas MCP de `booking`, y cada
-una viaja sola a Opera por «Proyectar reserva»: se ve en *Admin → Processes*, en
-*Opera → Reservations* y en la referencia del PMS de cada reserva en *Call center*.
+En el front office se actualizan los datos de un cliente. El **kárdex** del cliente queda
+**pendiente de aprobación**, y así se ve en la reserva. En Salesforce el cambio se aprueba o se
+rechaza, y la decisión baja al front office (el kárdex pasa a aprobado o rechazado, y en su caso los
+datos) y a Opera (el perfil del huésped).
+
+## 11. Quién hizo qué, y qué me espera
+
+- *Audit*: cada acción que decide algo sobre un hotel — alta, aprobar o retirar un mapeado, activar,
+  pausar, backfill, resolver una causa — hecha o rechazada, por consola, API o agente, con quién,
+  cuándo, parámetros y respuesta. Solo lectura.
+- *Inbox*: los avisos de mis roles y las **tareas del motor de formularios** (una tarea es un aviso
+  más), cada uno con su enlace; se van solos cuando se resuelven.
+- **Urgente** (Opera rechaza una escritura, un reintento que no acaba): además de la bandeja, por
+  email y al **espacio de Google Chat**.
+
+## 12. Casos de negocio propuestos *(pendientes de decidir)*
+
+De los comentarios de negocio, propuestos como H14–H17: check-in en 4 pasos; cliente nuevo en
+recepción → MDM/CRM; penalización de cancelación decidida por Comercial; pago diferido con Gestión
+de Cobros y factura de depósito.
 
 ## Preparación de la demo
 
-- [x] Script de datos: `python3 e2e/poc-acl-demo/seed.py --hotel CUN01 --count 100` (ensayado en local: las 100 llegan a Opera por el backfill y la activación libera los 225 procesos retenidos sin duplicar nada).
-- [ ] Comprobar que el agente de la consola (`console-agent`, creado a mano en el control plane) tiene
-      el MCP de `booking`, y que la clave del LLM responde.
-- [ ] Probar el agente de mapeado de punta a punta en el clúster (nunca se ha probado con el LLM real).
+- [ ] Decidir la propiedad para el alta en directo (§4) y, si es XMU, sembrar un hotel del CRS con
+      reservas futuras (`e2e/poc-acl-demo/seed.py`; cuidado: todo lo sembrado acaba en Opera).
+- [ ] Comprobar el agente de la consola (MCP de `booking`) y el agente de mapeado con el LLM real.
+- [ ] Destinatarios de email reales (hoy el de por defecto es un `example.com` y el correo falla) y
+      qué espacio de Google Chat recibe qué (el segundo espacio está bloqueado por su administrador).
+- [ ] Construir el flujo del §10.
+- [ ] Datos de prueba en XMAR que conviene conocer: reservas 39481284, 39481745, 39481775, 39481943,
+      39481944, 39482155 (y dos canceladas); perfiles de interlocutor 20538292 y 20538322
+      (ECDEMO0001/0002).
+- En Opera, lo que necesita un administrador de OPERA: la interfaz de las referencias externas de
+  perfil (OPERAWS-GEN01187) y un cajero para los depósitos (FOF00094). Sin eso, los perfiles van
+  sin referencia externa y los depósitos no se apuntan al folio.
