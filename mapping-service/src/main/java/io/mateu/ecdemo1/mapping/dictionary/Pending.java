@@ -48,8 +48,18 @@ public class Pending {
      * listed — its property codes hang from the PMS's id for it.
      */
     public List<CodeEntry> pmsCatalog(String hotelCode) {
-        var pmsHotel = dictionary.resolve(hotelCode, CodeType.HOTEL, hotelCode);
-        return clients.pmsCatalog(pmsHotel.map(t -> t.targetCode()).orElse(null));
+        // The integration names its Opera property; the hotel's equivalence, for a hotel without one.
+        var pmsHotel = integratedProperty(hotelCode)
+                .or(() -> dictionary.resolve(hotelCode, CodeType.HOTEL, hotelCode).map(t -> t.targetCode()));
+        return clients.pmsCatalog(pmsHotel.orElse(null));
+    }
+
+    java.util.Optional<String> integratedProperty(String hotelCode) {
+        try {
+            return clients.integration(hotelCode).map(i -> i.pmsHotelCode());
+        } catch (RuntimeException e) {
+            return java.util.Optional.empty();
+        }
     }
 
     static boolean matches(MappingEntry p, CodeEntry e, String hotelCode) {

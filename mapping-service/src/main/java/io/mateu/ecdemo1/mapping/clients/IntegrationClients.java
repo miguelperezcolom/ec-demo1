@@ -53,6 +53,12 @@ public class IntegrationClients {
                 });
     }
 
+    /** Every integration, by CRS hotel. */
+    public List<IntegrationView> integrations() {
+        return integrations.get().uri("/integrations").retrieve().body(new ParameterizedTypeReference<>() {
+        });
+    }
+
     /** The hotel's integration, or empty if the hotel has none. */
     public Optional<IntegrationView> integration(String crsHotelCode) {
         try {
