@@ -260,6 +260,26 @@ class MappingTest {
     }
 
     @Test
+    void anEquivalenceInForceCanBeWithdrawnAndTheCodeHasNoneAgain() throws Exception {
+        var entry = dictionary.define(new Dictionary.Proposal(CodeType.BOARD, "WDR01", "WX", "SA", Map.of(), null, null), "Ana García");
+        assertThat(dictionary.resolve("WDR01", CodeType.BOARD, "WX")).isPresent();
+        jdbc.update("delete from outbox_message where binding = 'audit'");
+
+        var withdrawn = dictionary.withdraw(entry.id, "Luis Pons");
+
+        assertThat(withdrawn.status).isEqualTo(io.mateu.ecdemo1.mapping.store.EntryStatus.WITHDRAWN);
+        assertThat(withdrawn.decidedBy).isEqualTo("Luis Pons");
+        assertThat(dictionary.resolve("WDR01", CodeType.BOARD, "WX")).isEmpty();
+        // Only what is in force can be withdrawn — and the refusal is audited too.
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dictionary.withdraw(entry.id, "Luis Pons"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("WITHDRAWN");
+        var audited = jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class);
+        assertThat(audited).hasSize(2).allMatch(p -> p.contains("\"action\":\"Withdraw mapping\""));
+        assertThat(audited.get(0)).contains("\"succeeded\":true").contains("Luis Pons");
+        assertThat(audited.get(1)).contains("\"succeeded\":false");
+    }
+
+    @Test
     void mappingDecisionsAreAuditedAndARefusalToo() throws Exception {
         jdbc.update("delete from outbox_message where binding = 'audit'");
         var entry = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "AUD01", "AUDX", "XAUD", Map.of(), null, null), "agent");

@@ -126,6 +126,21 @@ public class MappingMcpTools implements McpSystemContext {
         }
     }
 
+    @Tool(description = "Withdraw an equivalence in force, with no replacement: the code has no equivalence again and "
+            + "what needs it waits for a new one. ONLY when the user has explicitly asked for it; withdrawnBy is the "
+            + "user's name. To correct an equivalence, propose the right one instead")
+    public String withdrawMapping(String entryId, String withdrawnBy) {
+        if (withdrawnBy == null || withdrawnBy.isBlank() || "agent".equalsIgnoreCase(withdrawnBy)) {
+            return "Error: a withdrawal needs the name of the person withdrawing it";
+        }
+        try {
+            var entry = dictionary.withdraw(entryId, withdrawnBy);
+            return "Withdrawn %s %s → %s (%s)".formatted(entry.getType(), entry.getSourceCode(), entry.getTargetCode(), entry.scope());
+        } catch (RuntimeException e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
     @Tool(description = "Resolve a cause that is not a missing equivalence — typically a write the PMS refused, "
             + "once someone fixed what it refused. Every process waiting only on it resumes")
     public String resolveCause(String causeKey, String resolvedBy) {

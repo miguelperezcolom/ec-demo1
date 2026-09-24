@@ -26,6 +26,8 @@ public class StaleEnumChecks {
     @Transactional
     public void drop() {
         em.createNativeQuery("alter table if exists cause drop constraint if exists cause_type_check").executeUpdate();
+        // The same for an entry's status, frozen before WITHDRAWN existed.
+        em.createNativeQuery("alter table if exists mapping_entry drop constraint if exists mapping_entry_status_check").executeUpdate();
         log.info("cause.type is checked by its enum, not by a constraint frozen when the table was created");
     }
 }

@@ -105,6 +105,14 @@ public class EntryViewModel implements Identifiable {
         return List.of(new Message("Rejected"), new State(this));
     }
 
+    @Toolbar
+    @Action(confirmationRequired = true, confirmationTitle = "Withdraw this equivalence?",
+            confirmationMessage = "It stops translating the code, and nothing takes its place: what needs the code from now on waits until someone maps it again. What was already written in Opera is not changed. To correct an equivalence, define the right one instead — it replaces this one.")
+    public Object withdraw(HttpRequest httpRequest) {
+        load(dictionary.withdraw(id, user(httpRequest)));
+        return List.of(new Message("Withdrawn: the code has no equivalence again"), new State(this));
+    }
+
     private Dictionary.Proposal proposal() {
         var map = new LinkedHashMap<String, String>();
         if (attributes != null) {

@@ -6,5 +6,7 @@ package io.mateu.ecdemo1.mapping.store;
  * kept, with its author, as the history of that code.
  */
 public enum EntryStatus {
-    PROPOSED, APPROVED, REJECTED, SUPERSEDED
+    PROPOSED, APPROVED, REJECTED, SUPERSEDED,
+    /** Was in force and was taken out of it, with no replacement: the code has no equivalence again. */
+    WITHDRAWN
 }

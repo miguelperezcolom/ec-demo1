@@ -202,6 +202,12 @@ public class MappingController {
         return dictionary.approve(id, by);
     }
 
+    @PostMapping("/entries/{id}/withdraw")
+    @Operation(summary = "Take an equivalence in force out of force, with no replacement: the code has no equivalence again")
+    public MappingEntry withdraw(@PathVariable String id, @RequestParam String by) {
+        return dictionary.withdraw(id, by);
+    }
+
     @PostMapping("/entries/{id}/reject")
     public MappingEntry reject(@PathVariable String id, @RequestParam(defaultValue = "admin") String by) {
         return dictionary.reject(id, by);

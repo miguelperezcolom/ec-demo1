@@ -122,6 +122,27 @@ public class Dictionary {
         return entry;
     }
 
+    /**
+     * Takes an equivalence out of force without putting another in its place — a wrong one that should
+     * never have been approved. The code has no equivalence again, so what needs it from now on waits
+     * for a new one, as for any code nobody has mapped; what was already written stays as it was.
+     * Correcting an equivalence is not this: that is approving a new version, which supersedes it.
+     */
+    @Audited("Withdraw mapping")
+    @Transactional
+    public MappingEntry withdraw(String entryId, String withdrawnBy) {
+        var entry = entries.findById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
+        if (entry.status != EntryStatus.APPROVED) {
+            throw new IllegalStateException("Only an equivalence in force can be withdrawn; this one is " + entry.status);
+        }
+        entry.status = EntryStatus.WITHDRAWN;
+        entry.decidedBy = withdrawnBy;
+        entry.decidedAt = clock.instant();
+        log.info("{} {} → {} withdrawn for {} by {} (v{})", entry.type, entry.sourceCode, entry.targetCode,
+                entry.scope(), withdrawnBy, entry.entryVersion);
+        return entries.save(entry);
+    }
+
     /** A person entering an equivalence directly: proposed and approved by them in one go. */
     @Audited("Define mapping")
     @Transactional

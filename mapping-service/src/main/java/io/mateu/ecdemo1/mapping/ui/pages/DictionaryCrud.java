@@ -55,6 +55,7 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
             case APPROVED -> new Status(StatusType.SUCCESS, "Approved");
             case REJECTED -> new Status(StatusType.DANGER, "Rejected");
             case SUPERSEDED -> new Status(StatusType.NONE, "Superseded");
+            case WITHDRAWN -> new Status(StatusType.NONE, "Withdrawn");
         };
     }
 
