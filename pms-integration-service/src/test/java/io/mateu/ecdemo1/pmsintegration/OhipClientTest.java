@@ -63,7 +63,11 @@ class OhipClientTest {
         var gateway = "http://localhost:" + ohip.getAddress().getPort();
         connections.put("RIUPMI", new OhipConnection("RIUPMI", gateway, "app", "id", "secret", "RIUE"));
         connections.put("RIUCUN", new OhipConnection("RIUCUN", gateway, "app2", "id2", "secret2", "RIUE"));
-        client = new OhipClient(new Connections() {
+        client = clientWith(new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null, null));
+    }
+
+    OhipClient clientWith(OhipProperties properties) {
+        return new OhipClient(new Connections() {
             @Override
             public Optional<OhipConnection> of(String pmsHotelCode) {
                 return Optional.ofNullable(connections.get(pmsHotelCode));
@@ -73,7 +77,7 @@ class OhipClientTest {
             public List<IntegrationView> integrations() {
                 return List.of();
             }
-        }, new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null), new TolerantReader(new ObjectMapper()), Clock.systemUTC());
+        }, properties, new TolerantReader(new ObjectMapper()), Clock.systemUTC());
     }
 
     @AfterEach
@@ -138,6 +142,20 @@ class OhipClientTest {
         assertThat(properties).extracting(PmsProperty::code, PmsProperty::name)
                 .containsExactly(tuple("RIUPMI", "Riu Demo Palma"), tuple("RIUNEW", "Riu Demo Nuevo"));
         assertThat(calls).last().asString().contains("/ent/config/v1/hotels").contains("hotel=null");
+    }
+
+    @Test
+    void knownPropertiesAreReadOneByOneAndThoseItCannotReadAreLeftOut() {
+        var known = clientWith(new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null, List.of("XMAR", "XOTHER")));
+        answers.add(new Answer(200, "{\"hotelConfigInfo\":{\"hotelId\":\"XMAR\",\"hotelName\":\"Piloto Mauricio\"}}"));
+        answers.add(new Answer(403, "{\"title\":\"User is not authorized to access data for resort.\"}"));
+
+        var properties = known.properties(connections.get("RIUPMI"));
+
+        assertThat(properties).extracting(PmsProperty::code, PmsProperty::name)
+                .containsExactly(tuple("XMAR", "Piloto Mauricio"));
+        assertThat(calls).noneMatch(call -> call.contains("/ent/config/v1/hotels hotel="));
+        assertThat(calls).anyMatch(call -> call.contains("/ent/config/v1/hotels/XMAR hotel=XMAR"));
     }
 
     @Test

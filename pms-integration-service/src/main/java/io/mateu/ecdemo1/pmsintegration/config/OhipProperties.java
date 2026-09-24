@@ -25,10 +25,14 @@ import java.time.Duration;
  *                           reservation's folio. Posting needs a cashier, and OPERA takes it from the
  *                           integration user's configuration (else 400 FOF00094 «Invalid Cashier»);
  *                           off, they stay in the CRS and the reservation is written without them
+ * @param knownProperties    the chain's properties, named here rather than listed by the tenant: a
+ *                           client without access to the hub gets 403 asking for the list. Each is read
+ *                           on its own — which a client of the property may do — for its name
  */
 @ConfigurationProperties("ohip")
 public record OhipProperties(String externalSystemCode, String versionUdf, String payAtHotelMethod, Duration timeout,
-                             String crmExternalSystem, Boolean profileReferences, Boolean postDeposits) {
+                             String crmExternalSystem, Boolean profileReferences, Boolean postDeposits,
+                             java.util.List<String> knownProperties) {
 
     public OhipProperties {
         if (externalSystemCode == null) externalSystemCode = "RIUCRS";
@@ -38,5 +42,6 @@ public record OhipProperties(String externalSystemCode, String versionUdf, Strin
         if (crmExternalSystem == null) crmExternalSystem = "CRM";
         if (profileReferences == null) profileReferences = true;
         if (postDeposits == null) postDeposits = true;
+        if (knownProperties == null) knownProperties = java.util.List.of();
     }
 }

@@ -46,6 +46,9 @@ ohip:
   crm-external-system: ${OPERA_CRM_EXTERNAL_SYSTEM:CRM}
   profile-references: ${OPERA_PROFILE_REFERENCES:true}
   post-deposits: ${OPERA_POST_DEPOSITS:true}
+  # The chain's properties, when the tenant does not list them (a client without hub access): each is
+  # read on its own for its name, and one this connection cannot read is not offered.
+  known-properties: ${OPERA_PROPERTIES:}
 
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}

@@ -51,7 +51,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: pms-integration-service
-          image: miguelperezcolom/ec-demo1-pms-integration-service:0.18.2
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.18.3
           env:
             - name: SERVER_PORT
               value: "8123"
@@ -86,6 +86,10 @@ spec:
               value: ""
             - name: OPERA_POST_DEPOSITS
               value: "false"
+            # The client has no access to the hub (403 listing the chain's properties): these are
+            # offered instead, each read on its own. XMU is "DO NOT USE".
+            - name: OPERA_PROPERTIES
+              value: "XMAR"
             # Partners are Opera's: imported into the ERP, never written to Opera.
             - name: PARTNERS_OWNED_BY_PMS
               value: "true"

@@ -128,6 +128,38 @@ public class OhipClient {
     public List<PmsProperty> properties(OhipConnection connection) {
         var rest = rest(connection);
         var token = requestToken(rest, connection);
+        if (!properties.knownProperties().isEmpty()) {
+            return knownProperties(rest, connection, token);
+        }
+        return listedProperties(rest, connection, token);
+    }
+
+    /**
+     * The chain's properties as configured, each read on its own for the name Opera gives it. One this
+     * connection cannot read is left out: an integration with it would not work either.
+     */
+    List<PmsProperty> knownProperties(RestClient rest, OhipConnection connection, Token token) {
+        var known = new ArrayList<PmsProperty>();
+        for (var code : properties.knownProperties()) {
+            try {
+                var info = rest.get().uri("/ent/config/v1/hotels/{h}", code)
+                        .header("x-app-key", connection.appKey())
+                        .header("x-hotelid", code)
+                        .header("x-request-id", UUID.randomUUID().toString())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.value())
+                        .accept(MediaType.APPLICATION_JSON)
+                        .retrieve().body(JsonNode.class);
+                var name = info == null ? code : info.path("hotelConfigInfo").path("hotelName").asText(code);
+                known.add(new PmsProperty(code, name, null));
+            } catch (RestClientResponseException unreadable) {
+                log.warn("Property {} is not readable with this connection ({}): not offered", code, unreadable.getStatusCode());
+            }
+        }
+        return known;
+    }
+
+    /** The properties the enterprise lists: needs access to the hub. */
+    List<PmsProperty> listedProperties(RestClient rest, OhipConnection connection, Token token) {
         var answer = rest.get().uri("/ent/config/v1/hotels")
                 .header("x-app-key", connection.appKey())
                 .header("x-hubid", connection.enterpriseId())
