@@ -178,6 +178,29 @@ De los comentarios de negocio, propuestos como H14–H17: check-in en 4 pasos; c
 recepción → MDM/CRM; penalización de cancelación decidida por Comercial; pago diferido con Gestión
 de Cobros y factura de depósito.
 
+## Resetear la demo
+
+`deploy/demo/reset.sh` devuelve ec1 a la **línea base** (`deploy/demo/snapshot.sh` la guarda, en
+`~/.local/share/ec-demo1/demo-baseline`; unos 4 minutos):
+
+- **Nuestros servicios y el motor**: se restauran sus bases de datos (CRS, ERP, integraciones,
+  mapeado, MDM, front office, comunicación y bandeja, auditoría) y el estado del motor (procesos,
+  pasos, tareas); se paran y arrancan.
+- **Salesforce**: se borran los contactos y Cases que creó la demo (solo los de ec1; el org se
+  comparte con el entorno local) y los contactos de la línea base vuelven a sus datos.
+- **Opera no se toca**: ni se cancela ni se borra nada. Por eso la demo se hace para repetirse encima
+  de lo que dejó escrito:
+  - las reservas de CUN01 son siempre las mismas (localizadores de la línea base): la primera demo
+    las escribe en XMU; después, el backfill las **encuentra ya en Opera** y no escribe nada;
+  - durante la demo solo se modifica **lo que se crea en la demo** (una reserva nueva de MRU01, y el
+    cambio de datos sobre **su** titular), nunca reservas o clientes de la línea base: Opera se
+    quedaría con el cambio y no casaría con el estado reseteado. Cada demo deja en XMAR una reserva y
+    un perfil de huésped.
+
+La línea base (2026-09-24): MRU01 ↔ XMAR activa con sus reservas; **CUN01 sin integración con 21
+reservas futuras** retenidas (para el alta en directo contra XMU); interlocutores importados; la
+bandeja con las causas de CUN01; la auditoría vacía.
+
 ## Preparación de la demo
 
 - [ ] Decidir la propiedad para el alta en directo (§4) y, si es XMU, sembrar un hotel del CRS con
