@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.mapping.dictionary;
 
+import io.mateu.ecdemo1.mapping.audit.Audited;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integration.model.mapping.Translation;
 import io.mateu.ecdemo1.mapping.causes.Causes;
@@ -53,6 +54,7 @@ public class Dictionary {
     }
 
     /** Records a proposal. It translates nothing until someone approves it. */
+    @Audited("Propose mapping")
     @Transactional
     public MappingEntry propose(Proposal proposal, String proposedBy) {
         if (proposal.type() == null || blank(proposal.sourceCode()) || blank(proposal.targetCode())) {
@@ -81,6 +83,7 @@ public class Dictionary {
      * <p>A chain-level approval can affect every property at once, which is why it is a person's
      * decision and why it is recorded with their name.
      */
+    @Audited("Approve mapping")
     @Transactional
     public MappingEntry approve(String entryId, String approvedBy) {
         var entry = entries.findById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
@@ -102,6 +105,7 @@ public class Dictionary {
         return entry;
     }
 
+    @Audited("Reject mapping")
     @Transactional
     public MappingEntry reject(String entryId, String rejectedBy) {
         var entry = entries.findById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
@@ -115,6 +119,7 @@ public class Dictionary {
     }
 
     /** A person entering an equivalence directly: proposed and approved by them in one go. */
+    @Audited("Define mapping")
     @Transactional
     public MappingEntry define(Proposal proposal, String author) {
         return approve(propose(proposal, author).id, author);

@@ -219,14 +219,9 @@ public class IntegrationViewModel implements Identifiable {
         return List.of(new Message(done), new State(this));
     }
 
-    /** The console's user when the gateway passed one; "console" otherwise. */
+    /** The console's user, as their token names them; "console" when there is none. */
     static String user(HttpRequest httpRequest) {
-        try {
-            var name = httpRequest.getHeaderValue("X-User-Name");
-            return name == null || name.isBlank() ? "console" : name;
-        } catch (RuntimeException e) {
-            return "console";
-        }
+        return io.mateu.ecdemo1.integrations.ui.ConsoleUser.of(httpRequest);
     }
 
     public IntegrationViewModel load(Integration i) {

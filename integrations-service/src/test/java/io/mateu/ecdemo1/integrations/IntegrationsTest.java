@@ -356,6 +356,25 @@ class IntegrationsTest {
     }
 
     @Test
+    void whatAPersonDoesIsAuditedCarriedOutOrRefusedWithTheSecretMasked() throws Exception {
+        jdbc.update("delete from outbox_message where binding = 'audit'");
+        var id = register();
+        assertThatThrownBy(() -> lifecycle.pause(id, "luis")).isInstanceOf(IllegalStateException.class);
+
+        var audited = new java.util.ArrayList<io.mateu.ecdemo1.integration.model.audit.AuditedAction>();
+        for (var payload : jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class)) {
+            audited.add(objectMapper.readValue(payload, io.mateu.ecdemo1.integration.model.audit.AuditedAction.class));
+        }
+        assertThat(audited).extracting(a -> a.action(), a -> a.by(), a -> a.hotelCode(), a -> a.succeeded())
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("Register integration", "ana", "NEW01", true),
+                        org.assertj.core.groups.Tuple.tuple("Pause integration", "luis", "NEW01", false));
+        assertThat(audited.get(0).parameters()).contains("\"clientSecret\":\"***\"").doesNotContain("s3cr3t");
+        assertThat(audited.get(0).response()).contains("Registered");
+        assertThat(audited.get(1).response()).contains("Only an active integration can be paused");
+        assertThat(audited.get(1).parameters()).contains(id);
+    }
+
+    @Test
     void aHotelHasOneIntegration() {
         register();
         assertThatThrownBy(this::register).isInstanceOf(IllegalStateException.class).hasMessageContaining("already has");

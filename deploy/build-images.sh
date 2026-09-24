@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 REGISTRY="${REGISTRY:-miguelperezcolom}"
 TAG="${1:-0.8.0}"
 
-APPS="shell shell-redwood gateway booking content users ia-agent ia-control-plane api-mcp control-shell control-shell-redwood partners crs-integration-service mapping-service pms-integration-service opera-mock communication-service integrations-service customer-mdm-service front-office"
+APPS="shell shell-redwood gateway booking content users ia-agent ia-control-plane api-mcp control-shell control-shell-redwood partners crs-integration-service mapping-service pms-integration-service opera-mock communication-service integrations-service customer-mdm-service front-office audit-service"
 
 # grpc-interface first, and installed rather than packaged: it is not an application and gets no
 # image, but `users` compiles against the protobuf stubs generated from its .proto, so it has to

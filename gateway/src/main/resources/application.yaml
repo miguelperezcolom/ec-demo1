@@ -186,6 +186,12 @@ spring:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_mdm/**
 
+        - id: audit
+          uri: ${AUDIT_URL:http://audit-service:8129}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_audit/**
+
         - id: communication
           uri: ${COMMUNICATION_URL:http://communication-service:8125}
           predicates:

@@ -239,6 +239,29 @@ class MappingTest {
     io.mateu.ecdemo1.mapping.causes.Causes causesService;
 
     @Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Test
+    void mappingDecisionsAreAuditedAndARefusalToo() throws Exception {
+        jdbc.update("delete from outbox_message where binding = 'audit'");
+        var entry = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "AUD01", "AUDX", "XAUD", Map.of(), null, null), "agent");
+        dictionary.approve(entry.id, "Ana García");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dictionary.reject(entry.id, "Luis"))
+                .isInstanceOf(IllegalStateException.class);
+
+        var audited = new java.util.ArrayList<io.mateu.ecdemo1.integration.model.audit.AuditedAction>();
+        for (var payload : jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class)) {
+            audited.add(objectMapper.readValue(payload, io.mateu.ecdemo1.integration.model.audit.AuditedAction.class));
+        }
+        assertThat(audited).extracting(a -> a.action(), a -> a.by(), a -> a.hotelCode(), a -> a.succeeded())
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("Propose mapping", "agent", "AUD01", true),
+                        org.assertj.core.groups.Tuple.tuple("Approve mapping", "Ana García", "AUD01", true),
+                        org.assertj.core.groups.Tuple.tuple("Reject mapping", "Luis", "AUD01", false));
+        assertThat(audited.get(1).response()).contains("AUDX → XAUD: APPROVED (v1)");
+        assertThat(audited).extracting(a -> a.service()).containsOnly("mapping");
+    }
+
+    @Autowired
     org.springframework.ai.tool.ToolCallbackProvider mappingTools;
 
     @Autowired

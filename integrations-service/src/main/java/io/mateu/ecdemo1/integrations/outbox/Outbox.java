@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.integrations.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mateu.ecdemo1.integration.model.audit.AuditedAction;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.workflow.ddd.DomainEvent;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class Outbox {
 
     public static final String ENGINE = "outboxUpstream";
     public static final String NOTIFICATIONS = "notifications";
+    public static final String AUDIT = "audit";
 
     final OutboxMessageRepository repository;
     final ObjectMapper objectMapper;
@@ -35,6 +37,12 @@ public class Outbox {
     public void appendNotification(NotificationRequested notification) {
         write(NOTIFICATIONS, notification.dedupKey(), "NotificationRequested",
                 serialise(NotificationRequested.class, notification));
+    }
+
+    /** A person's auditable action, for the audit service (HLA F016). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendAudit(AuditedAction action) {
+        write(AUDIT, action.actionId(), "AuditedAction", serialise(AuditedAction.class, action));
     }
 
     private String serialise(Class<?> as, Object value) {

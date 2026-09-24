@@ -22,12 +22,13 @@ esfuerzo se registra desde el primer día en [`cost-log.md`](cost-log.md), y el 
 | #9 (F009) | **Mapeado de códigos**: diccionario cadena + propiedad, versionado, con aprobación humana y **propuesta por un agente** |
 | F012 (parcial) | Suspensión por **causa** y reanudación en bloque al resolverla |
 | Transversal | **MCP** en cada servicio con operativa, **notificaciones** a las personas |
+| F016 | **Auditoría** (`audit-service`): las acciones declaradas `@Audited` en integraciones y mapeado —hechas o rechazadas, por consola, REST o agente— emiten `AuditedAction` por outbox; el servicio las materializa, inmutables, y la consola las lista con búsqueda libre y filtros por fecha, hotel, usuario, acción, servicio y resultado |
 | HLA CRM-MDM F001–F005 (H11) | **Maestro de clientes**: resolver la identidad de cada pasajero al proyectar, provisional si no hay certeza, limpieza y fusión en **Salesforce**, supervivencia en el MDM y propagación del código al perfil de Opera |
 
 **Fuera:** todo lo que sube del PMS al CRS (OOO, no-show, salida anticipada, cupo, streaming),
 conciliación, backfill (#10), recap, penalización en el folio, ciclo de vida completo de la
-integración (#8, #13), read model de causas (`integration-query-service`; se usa la vista del motor),
-auditoría (`audit-service`). Del HLA de CRM-MDM (H11), fuera: consentimiento y derecho al olvido
+integración (#8, #13), read model de causas (`integration-query-service`; se usa la vista del motor).
+Del HLA de CRM-MDM (H11), fuera: consentimiento y derecho al olvido
 (F006, F007), carga inicial del histórico (F008), gobierno de reglas desde una UI (F009), deshacer una
 fusión (CM-R7), fidelización y el flujo PMS → MDM del AF (F013, F018, F019), y que el perfil de Opera
 lleve los datos del golden record y no solo su código.

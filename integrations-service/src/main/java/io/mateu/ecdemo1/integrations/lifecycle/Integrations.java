@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.integrations.lifecycle;
 
+import io.mateu.ecdemo1.integrations.audit.Audited;
 import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
 import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
 import io.mateu.ecdemo1.integration.model.integration.PmsProperty;
@@ -88,6 +89,7 @@ public class Integrations {
     }
 
     /** Registers the integration and starts its onboarding. One per CRS hotel. */
+    @Audited("Register integration")
     @Transactional
     public Integration register(Registration r, String by) {
         var chain = chainConnection();
@@ -135,6 +137,7 @@ public class Integrations {
      * Changes how to reach the property — a blank secret keeps the one stored — and tries the
      * connection again at once: the usual way out of {@link IntegrationStatus#CONNECTIVITY_FAILED}.
      */
+    @Audited("Change connection")
     @Transactional
     public Integration changeConnection(String id, ConnectionChange c, String by) {
         var i = find(id);
@@ -152,6 +155,7 @@ public class Integrations {
     }
 
     /** Tries the connection again, now. */
+    @Audited("Verify connection")
     @Transactional
     public Integration verifyNow(String id, String by) {
         var i = find(id);
@@ -160,6 +164,7 @@ public class Integrations {
     }
 
     /** Looks again at whatever the current gate needs from outside: the catalogue, the partners, the gaps. */
+    @Audited("Recheck")
     @Transactional
     public Integration recheck(String id, String by) {
         var i = find(id);
@@ -171,6 +176,7 @@ public class Integrations {
      * The mapping gate, opened by hand: a person says the hotel's codes are mapped well enough to go
      * on, some still pending. The backfill's pre-pass insists on the ones the reservations really use.
      */
+    @Audited("Approve mapping")
     @Transactional
     public Integration approveMapping(String id, String by) {
         var i = find(id);
@@ -184,6 +190,7 @@ public class Integrations {
     }
 
     /** The activation gate: a person switches real-time traffic on. */
+    @Audited("Activate integration")
     @Transactional
     public Integration activate(String id, String by) {
         var i = find(id);
@@ -197,6 +204,7 @@ public class Integrations {
     }
 
     /** Real-time traffic of the hotel waits — every process on one cause — until it is resumed. */
+    @Audited("Pause integration")
     @Transactional
     public Integration pause(String id, String by) {
         var i = find(id);
@@ -211,6 +219,7 @@ public class Integrations {
     }
 
     /** Real-time traffic flows again, starting with what waited while the integration was paused. */
+    @Audited("Resume integration")
     @Transactional
     public Integration resume(String id, String by) {
         var i = find(id);
@@ -229,6 +238,7 @@ public class Integrations {
      * migration's rollback strategy (R5), not this. A half-done onboarding stays where it was: its
      * gates never open again.
      */
+    @Audited("Decommission integration")
     @Transactional
     public Integration decommission(String id, String by) {
         var i = find(id);
@@ -246,6 +256,7 @@ public class Integrations {
     }
 
     /** A backfill on demand (F013): after a long stop, or to recover a gap. Real-time traffic goes on meanwhile. */
+    @Audited("Relaunch backfill")
     @Transactional
     public BackfillRun relaunchBackfill(String id, String by) {
         var i = find(id);
@@ -503,6 +514,7 @@ public class Integrations {
      * Their codes are Opera's CorporateIds, which is what the chain knows a partner by. Nothing is
      * written to Opera. Idempotent: an import finding everything in place changes nothing.
      */
+    @Audited("Import partners")
     @Transactional
     public Integration importPartners(String id, String by) {
         var i = find(id);

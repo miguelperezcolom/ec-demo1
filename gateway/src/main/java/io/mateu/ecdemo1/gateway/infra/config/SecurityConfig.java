@@ -159,7 +159,9 @@ public class SecurityConfig {
                                 // approving a mapping decides what reaches the PMS.
                                 "/_integrations/**", "/_mapping/**", "/_communication/**",
                                 // The customer MDM: golden records are personal data.
-                                "/_mdm/**")).hasRole("ai-admin")
+                                "/_mdm/**",
+                                // The audit trail: who did what is personal data too.
+                                "/_audit/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and

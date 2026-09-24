@@ -128,6 +128,10 @@ public class ControlShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu notifications = new RemoteMenu("/_communication").withLabel("Notifications");
 
+    /** Who did what on the control plane: every auditable action, searchable (HLA F016). */
+    @Menu
+    RemoteMenu audit = new RemoteMenu("/_audit").withLabel("Audit");
+
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
         var widgets = new ArrayList<Component>();

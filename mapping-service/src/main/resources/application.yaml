@@ -34,6 +34,11 @@ spring:
               sync: true
               configuration:
                 key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          audit:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
       bindings:
         # IN: the engine's tasks for the mapping — the steps whose definition says topic mapping.
         consumeTasks-in-0:
@@ -47,6 +52,9 @@ spring:
           destination: upstream
         notifications:
           destination: notifications
+        # OUT, through the outbox: every auditable action a person takes here (HLA F016).
+        audit:
+          destination: audit
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/mapping}

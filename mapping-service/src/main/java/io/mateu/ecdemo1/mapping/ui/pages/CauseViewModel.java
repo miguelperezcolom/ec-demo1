@@ -62,7 +62,7 @@ public class CauseViewModel implements Identifiable {
     @Action(confirmationRequired = true, confirmationTitle = "Resolve this cause?",
             confirmationMessage = "Every process waiting only on it resumes and reads its data again.")
     public Object resolve(HttpRequest httpRequest) {
-        causes.resolve(key, "console");
+        causes.resolve(key, EntryViewModel.user(httpRequest));
         return List.of(new Message("Resolved: the processes behind it resume"), new State(this));
     }
 

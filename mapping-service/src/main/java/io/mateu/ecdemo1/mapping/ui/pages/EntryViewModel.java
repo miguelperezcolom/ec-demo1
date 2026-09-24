@@ -113,14 +113,9 @@ public class EntryViewModel implements Identifiable {
         return new Dictionary.Proposal(type, hotelCode, crsCode, pmsCode, map, null, null);
     }
 
-    /** The console's user when the gateway passed one; "console" otherwise. */
+    /** The console's user, as their token names them; "console" when there is none. */
     static String user(HttpRequest httpRequest) {
-        try {
-            var name = httpRequest.getHeaderValue("X-User-Name");
-            return name == null || name.isBlank() ? "console" : name;
-        } catch (RuntimeException e) {
-            return "console";
-        }
+        return io.mateu.ecdemo1.mapping.ui.ConsoleUser.of(httpRequest);
     }
 
     public EntryViewModel load(MappingEntry e) {

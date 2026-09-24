@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.mapping.causes;
 
+import io.mateu.ecdemo1.mapping.audit.Audited;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
 import io.mateu.ecdemo1.integration.model.mapping.CauseType;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
@@ -103,6 +104,7 @@ public class Causes {
     }
 
     /** A person, or something that happened, removed the cause. Every process waiting only on it resumes. */
+    @Audited("Resolve cause")
     @Transactional
     public void resolve(String causeKey, String resolvedBy) {
         var record = causes.findById(causeKey).orElseThrow(() -> new NoSuchElementException("No cause " + causeKey));
@@ -162,6 +164,7 @@ public class Causes {
     }
 
     /** The one way out that is not resolving the causes: a person gives up on the process. */
+    @Audited("Discard process")
     @Transactional
     public void discard(String processKey, String discardedBy) {
         var waiter = waiters.findById(processKey).orElseThrow(() -> new NoSuchElementException("No waiting process " + processKey));
