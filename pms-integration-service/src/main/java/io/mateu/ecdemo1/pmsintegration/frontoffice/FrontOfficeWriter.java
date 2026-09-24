@@ -76,9 +76,26 @@ public class FrontOfficeWriter {
                 && properties.frontOfficeHotels() != null && properties.frontOfficeHotels().contains(crsHotelCode);
     }
 
+
+    /**
+     * A version Opera already held was written into the front office when it was written into Opera.
+     * Only a backfill — which fills the front office with what Opera had before it existed — and a
+     * merge in the MDM — a new customer code for the holder — write it again.
+     */
+    public static boolean alreadyWritten(TaskExecutionRequested task) {
+        var outcome = task.variables().stream().filter(v -> ProcessVariables.WRITE_OUTCOME.equals(v.name()))
+                .map(Variable::value).findFirst().orElse("");
+        var origin = task.variables().stream().filter(v -> ProcessVariables.ORIGIN.equals(v.name()))
+                .map(Variable::value).filter(v -> v != null).findFirst().orElse("");
+        return "STALE".equals(outcome) && !origin.startsWith("backfill") && !origin.startsWith("mdm-merge");
+    }
     public List<Variable> write(TaskExecutionRequested task) {
         var hotelCode = var(task, ProcessVariables.HOTEL_CODE);
         if (!hasFrontOffice(hotelCode)) {
+            return List.of();
+        }
+        if (alreadyWritten(task)) {
+            log.info("{}: Opera already held this version; the front office is not written again", var(task, ProcessVariables.LOCATOR));
             return List.of();
         }
         var r = integration.reservation(hotelCode, var(task, ProcessVariables.LOCATOR));

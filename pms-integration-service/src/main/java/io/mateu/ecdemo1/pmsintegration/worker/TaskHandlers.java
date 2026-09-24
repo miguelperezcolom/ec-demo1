@@ -76,8 +76,25 @@ public class TaskHandlers {
         }
         var customerId = holderCustomer(r);
         try {
+            var existing = reservations.byLocator(hotel, r.locator());
+            if (existing.isPresent() && !rewritesTheGuest(task)
+                    && (reservations.writtenVersion(existing.get()) >= r.version() || OperaReservations.cancelled(existing.get()))) {
+                // Opera already holds this version: the reservation will not be written, and neither is
+                // its guest. A merge in the MDM is the exception — it projects the same version again
+                // precisely to put the new customer code on the profile.
+                var id = OperaReservations.guestProfileId(existing.get());
+                if (id.isPresent()) {
+                    log.info("{} v{}: Opera already holds it; guest profile {} left as it is", r.locator(), r.version(), id.get());
+                    var variables = new ArrayList<>(List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
+                            new Variable(ProcessVariables.GUEST_PROFILE_ID, id.get())));
+                    if (customerId != null) {
+                        variables.add(new Variable(ProcessVariables.CUSTOMER_ID, customerId));
+                    }
+                    return variables;
+                }
+            }
             var known = ohipProperties.profileReferences() ? null
-                    : reservations.byLocator(hotel, r.locator()).flatMap(OperaReservations::guestProfileId).orElse(null);
+                    : existing.flatMap(OperaReservations::guestProfileId).orElse(null);
             var ensured = profiles.ensureGuest(hotel, r.locator(), r.holder(), customerId, known);
             log.info("Guest profile {} {} for {} (customer {})", ensured.profileId(), ensured.created() ? "created" : "updated",
                     r.locator(), customerId);
@@ -327,6 +344,16 @@ public class TaskHandlers {
 
     static List<Variable> outcome(String variable, Outcome outcome) {
         return List.of(new Variable(variable, outcome.name()));
+    }
+
+    /** Whether this projection exists to rewrite the guest: a merge in the customer MDM. */
+    static boolean rewritesTheGuest(TaskExecutionRequested task) {
+        return origin(task).startsWith("mdm-merge");
+    }
+
+    static String origin(TaskExecutionRequested task) {
+        return task.variables().stream().filter(v -> ProcessVariables.ORIGIN.equals(v.name())).map(Variable::value)
+                .filter(v -> v != null).findFirst().orElse("");
     }
 
     static String var(TaskExecutionRequested task, String name) {
