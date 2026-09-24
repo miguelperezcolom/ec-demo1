@@ -87,9 +87,9 @@ spec:
             - name: OPERA_POST_DEPOSITS
               value: "false"
             # The client has no access to the hub (403 listing the chain's properties): these are
-            # offered instead, each read on its own. XMU is "DO NOT USE".
+            # offered instead, each read on its own.
             - name: OPERA_PROPERTIES
-              value: "XMAR"
+              value: "XMAR,XMU"
             # Partners are Opera's: imported into the ERP, never written to Opera.
             - name: PARTNERS_OWNED_BY_PMS
               value: "true"
