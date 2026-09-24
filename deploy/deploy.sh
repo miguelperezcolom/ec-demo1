@@ -243,7 +243,6 @@ kubectl apply -f deploy/manifests/64-partners.yaml
 kubectl apply -f deploy/manifests/65-crs-integration.yaml
 kubectl apply -f deploy/manifests/66-mapping.yaml
 kubectl apply -f deploy/manifests/67-pms-integration.yaml
-kubectl apply -f deploy/manifests/68-opera-mock.yaml
 kubectl apply -f deploy/manifests/69-communication.yaml
 kubectl apply -f deploy/manifests/75-integrations.yaml
 kubectl apply -f deploy/manifests/76-customer-mdm.yaml

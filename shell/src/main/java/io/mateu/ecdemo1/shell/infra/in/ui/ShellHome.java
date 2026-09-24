@@ -109,13 +109,6 @@ public class ShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu partners = new RemoteMenu("/_partners").withLabel("ERP");
 
-    /**
-     * What reached "Opera": the double of Opera's API the integration PoC writes to instead of a
-     * real tenant, with its reservations, profiles, the calls it received and faults on demand.
-     */
-    @Menu
-    RemoteMenu opera = new RemoteMenu("/_opera-mock").withLabel("Opera");
-
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

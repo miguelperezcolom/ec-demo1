@@ -65,7 +65,7 @@ spec:
             - name: CUSTOMER_MDM_URL
               value: "http://customer-mdm-service:8127"
             # No Opera connection here: each hotel's integration carries its own, read from
-            # integrations-service. In this PoC they all point at opera-mock.
+            # integrations-service: the chain's OHIP tenant (the ec-opera Secret).
             - name: INTEGRATIONS_URL
               value: "http://integrations-service:8126"
             - name: RETRY_ALERT_AFTER

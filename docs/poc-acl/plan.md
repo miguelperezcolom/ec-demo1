@@ -57,6 +57,10 @@ lleve los datos del golden record y no solo su código.
   Property APIs que usamos: token OAuth, catálogo, perfiles, reservas con UDF y cancelación. Cambiar
   al tenant real es cambiar la URL y las credenciales. Validar contra el tenant (R18, R19,
   revalidación de `rsv`) queda como paso posterior a la PoC.
+  *Revisada:* desde H12 el conector escribe en el tenant real (XMAR), y el 2026-09-24 `opera-mock`
+  sale del despliegue de ec1 —menús, gateway y manifiesto—. Queda solo como doble de la batería
+  punta a punta local (`e2e/poc-acl-local`), que inyecta fallos y agota cupo, cosas que no se hacen
+  contra el tenant.
 - **La suspensión por causa, sin ciclos en el grafo.** El motor no admite ciclos, así que «volver a
   Preparar» se hace así:
   1. `Preparar` devuelve las carencias y `mapping-service` registra cada una como causa, con los

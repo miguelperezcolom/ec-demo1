@@ -79,12 +79,6 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_partners/**
 
-        - id: opera-mock
-          uri: ${OPERA_MOCK_URL:http://opera-mock:8124}
-          predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
-            - Path=/_opera-mock/**
-
         - id: content
           uri: ${CONTENT_URL:http://content:8104}
           predicates:

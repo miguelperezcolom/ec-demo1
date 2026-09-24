@@ -129,9 +129,9 @@ public class SecurityConfig {
                         // used to be here too; it moved to the control host, behind ai-admin — see
                         // below — because administering access is a control-plane concern.
                         .pathMatchers("/_booking/**", "/_content/**").authenticated()
-                        // The integration PoC's product-side screens: the partners master and the
-                        // Opera double. Same reason as the two above.
-                        .pathMatchers("/_partners/**", "/_opera-mock/**").authenticated()
+                        // The integration PoC's product-side screen: the partners master. Same
+                        // reason as the two above.
+                        .pathMatchers("/_partners/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the

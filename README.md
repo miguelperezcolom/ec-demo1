@@ -319,7 +319,7 @@ engine definitions (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelac
 | `crs-integration-service` | — | The CRS-side adapter: inbox, reread, canonical reservation, event → process router |
 | `mapping-service` | `/_mapping` | CRS → Opera code dictionary with approval, the causes a process waits on, MCP tools for the mapping agent |
 | `pms-integration-service` | — | **The connector**: every call to OHIP, with the version guard in a UDF and idempotent writes |
-| `opera-mock` | `/_opera-mock` | An OHIP double with validation, availability and injectable faults. The deployed connector points at it |
+| `opera-mock` | — | An OHIP double with validation, availability and injectable faults, for the local end-to-end suite only (`e2e/poc-acl-local`). Not deployed: ec1 works against the chain's OHIP tenant |
 | `communication-service` | `/_communication` | Alerts by email |
 | `integrations-service` | `/_integrations` | One integration per hotel: its Opera connection (secret sealed) and its onboarding, gate by gate, to activation. Until then the hotel's reservations wait |
 
