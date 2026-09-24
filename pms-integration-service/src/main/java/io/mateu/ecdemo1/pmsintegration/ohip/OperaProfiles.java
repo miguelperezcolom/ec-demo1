@@ -57,6 +57,7 @@ public class OperaProfiles {
             // Nothing to find it by in Opera but the reservation: the caller passes the profile the
             // reservation already names, if it exists.
             if (knownProfileId != null) {
+                onTheExistingEntries(hotelId, knownProfileId, profile);
                 ohip.put(hotelId, "/crm/v1/profiles/{id}", profile, knownProfileId);
                 return new Ensured(knownProfileId, false);
             }
@@ -173,6 +174,61 @@ public class OperaProfiles {
         return ohip.find(hotelId, "/crm/v1/externalSystems/{ext}/profiles/{id}", properties.externalSystemCode(), externalId);
     }
 
+    /**
+     * An email or a phone sent without the id of the entry it replaces is added next to the old one —
+     * OPERA keeps both, and has no way to delete one. So the profile's current primary email and phone
+     * are read, and the new ones sent on their ids: the entry is changed in place.
+     */
+    void onTheExistingEntries(String hotelId, String profileId, ObjectNode profile) {
+        var details = (ObjectNode) profile.get("profileDetails");
+        if (!details.has("emails") && !details.has("telephones")) {
+            return;
+        }
+        var current = ohip.get(hotelId, "/crm/v1/profiles/{id}?fetchInstructions=Profile&fetchInstructions=Communication",
+                profileId).body().path("profileDetails");
+        if (details.has("emails")) {
+            var existing = primary(current.path("emails").path("emailInfo"), "email");
+            if (existing != null) {
+                var entry = (ObjectNode) details.path("emails").path("emailInfo").get(0);
+                entry.put("id", existing.path("id").asText());
+                entry.put("type", existing.path("type").asText("EMAIL"));
+                ((ObjectNode) entry.path("email")).put("type", existing.path("email").path("type").asText("EMAIL"));
+            }
+        }
+        if (details.has("telephones")) {
+            var existing = primary(current.path("telephones").path("telephoneInfo"), "telephone");
+            if (existing != null) {
+                var entry = (ObjectNode) details.path("telephones").path("telephoneInfo").get(0);
+                entry.put("id", existing.path("id").asText());
+                if (existing.has("type")) {
+                    entry.put("type", existing.path("type").asText());
+                }
+                var phone = (ObjectNode) entry.path("telephone");
+                var was = existing.path("telephone");
+                if (was.has("phoneTechType")) {
+                    phone.put("phoneTechType", was.path("phoneTechType").asText());
+                }
+                if (was.has("phoneUseType")) {
+                    phone.put("phoneUseType", was.path("phoneUseType").asText());
+                }
+            }
+        }
+    }
+
+    /** The entry marked primary, or the first; null if there is none. */
+    static JsonNode primary(JsonNode entries, String inner) {
+        JsonNode first = null;
+        for (var entry : entries) {
+            if (first == null) {
+                first = entry;
+            }
+            if (entry.path(inner).path("primaryInd").asBoolean(false)) {
+                return entry;
+            }
+        }
+        return first;
+    }
+
     Ensured ensure(String hotelId, String externalId, ObjectNode profile) {
         var references = profile.has("externalReferences") ? (ArrayNode) profile.get("externalReferences")
                 : profile.putArray("externalReferences");
@@ -180,6 +236,7 @@ public class OperaProfiles {
         var existing = byExternalId(hotelId, externalId);
         if (existing.isPresent()) {
             var id = existing.get().path("profileIdList").path(0).path("id").asText();
+            onTheExistingEntries(hotelId, id, profile);
             ohip.put(hotelId, "/crm/v1/profiles/{id}", profile, id);
             return new Ensured(id, false);
         }
