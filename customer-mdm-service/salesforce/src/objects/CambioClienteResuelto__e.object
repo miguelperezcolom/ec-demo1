@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Cambio de cliente resuelto</label>
+    <pluralLabel>Cambios de cliente resueltos</pluralLabel>
+    <description>A change request was approved or rejected. When approved, the contact already carries the change; the MDM reads it and projects it to the hotels.</description>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <eventType>HighVolume</eventType>
+    <publishBehavior>PublishAfterCommit</publishBehavior>
+    <fields>
+        <fullName>RequestId__c</fullName>
+        <label>Id de la solicitud (MDM)</label>
+        <type>Text</type>
+        <length>64</length>
+        <required>false</required>
+        <isFilteringDisabled>false</isFilteringDisabled>
+        <isNameField>false</isNameField>
+        <isSortingDisabled>false</isSortingDisabled>
+    </fields>
+    <fields>
+        <fullName>MdmId__c</fullName>
+        <label>Cliente (MDM)</label>
+        <type>Text</type>
+        <length>64</length>
+        <required>false</required>
+        <isFilteringDisabled>false</isFilteringDisabled>
+        <isNameField>false</isNameField>
+        <isSortingDisabled>false</isSortingDisabled>
+    </fields>
+    <fields>
+        <fullName>Estado__c</fullName>
+        <label>Estado</label>
+        <type>Text</type>
+        <length>20</length>
+        <required>false</required>
+        <isFilteringDisabled>false</isFilteringDisabled>
+        <isNameField>false</isNameField>
+        <isSortingDisabled>false</isSortingDisabled>
+    </fields>
+</CustomObject>

@@ -95,7 +95,14 @@ public class TaskHandlers {
             }
             var known = ohipProperties.profileReferences() ? null
                     : existing.flatMap(OperaReservations::guestProfileId).orElse(null);
-            var ensured = profiles.ensureGuest(hotel, r.locator(), r.holder(), customerId, known);
+            // The guest as Salesforce — the master — has them, through the MDM; the reservation's data
+            // for what the MDM does not know, or if it does not answer.
+            var holder = customerId == null ? r.holder() : integration.customer(customerId)
+                    .map(master -> overlay(master, r.holder())).orElse(r.holder());
+            var ensured = profiles.ensureGuest(hotel, r.locator(), holder, customerId, known);
+            if (customerId != null) {
+                integration.xref(customerId, "OPERA", ensured.profileId(), hotel + "/" + r.locator());
+            }
             log.info("Guest profile {} {} for {} (customer {})", ensured.profileId(), ensured.created() ? "created" : "updated",
                     r.locator(), customerId);
             var variables = new ArrayList<>(List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
@@ -346,9 +353,25 @@ public class TaskHandlers {
         return List.of(new Variable(variable, outcome.name()));
     }
 
-    /** Whether this projection exists to rewrite the guest: a merge in the customer MDM. */
+    /** Whether this projection exists to rewrite the guest: a merge or a change of the customer in the MDM. */
     static boolean rewritesTheGuest(TaskExecutionRequested task) {
-        return origin(task).startsWith("mdm-merge");
+        return origin(task).startsWith("mdm-");
+    }
+
+    /** The master's data, and the reservation's where the master has none. */
+    public static Person overlay(Person master, Person reservation) {
+        if (reservation == null) {
+            return master;
+        }
+        return new Person(or(master.firstName(), reservation.firstName()), or(master.lastName(), reservation.lastName()),
+                reservation.type(), reservation.age(), or(master.email(), reservation.email()), or(master.phone(), reservation.phone()),
+                or(master.nationality(), reservation.nationality()),
+                master.birthDate() != null ? master.birthDate() : reservation.birthDate(),
+                or(master.documentType(), reservation.documentType()), or(master.documentNumber(), reservation.documentNumber()));
+    }
+
+    static String or(String value, String otherwise) {
+        return value == null || value.isBlank() ? otherwise : value;
     }
 
     static String origin(TaskExecutionRequested task) {

@@ -121,7 +121,11 @@ public final class Paxes {
       var guest = FrontOffice.stayView(stayId).guest();
       var doc =
           document == null || document.isBlank() ? "MAN-" + guest.id().toUpperCase() : document;
-      FrontOffice.guests().save(guest.verifyIdentity(doc).updateContact(email, phone));
+      // The name too: it used to be dropped for the main guest.
+      var edited = guest.rename(name).verifyIdentity(doc).updateContact(email, phone);
+      FrontOffice.guests().save(edited);
+      // What the chain's master keeps goes to it, to be decided; the cardex shows it pending meanwhile.
+      io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.edited(guest, edited);
       return;
     }
     var stay = FrontOffice.stayView(stayId).stay();

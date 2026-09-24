@@ -98,6 +98,7 @@ def main():
     if not check:
         activate_flows(instance, access)
         assign_permission_sets(instance, access, user_id)
+        case_layout(instance, access)
 
 
 def activate_flows(instance, access):
@@ -112,6 +113,56 @@ def activate_flows(instance, access):
         q = urllib.parse.quote(f"SELECT Id FROM Flow WHERE Definition.DeveloperName = '{f.stem}' AND Status = 'Obsolete'")
         for old in call(instance, access, "GET", f"/tooling/query?q={q}")["records"]:
             call(instance, access, "DELETE", f"/tooling/sobjects/Flow/{old['Id']}")
+
+
+CASE_SECTION = "Cambio de datos de cliente (MDM)"
+# What a steward decides on a customer data change request (a Case the MDM opened): the decision and
+# the proposed data, which can be corrected before approving; where it came from, read only.
+CASE_FIELDS = [("Decision__c", "Edit"), ("Motivo__c", "Edit"), ("Cambios__c", "Readonly"), ("Origen__c", "Readonly"),
+               ("Nombre__c", "Edit"), ("Apellidos__c", "Edit"), ("Email__c", "Edit"), ("Telefono__c", "Edit"),
+               ("Nacionalidad__c", "Edit"), ("FechaNacimiento__c", "Edit"), ("TipoDocumento__c", "Edit"),
+               ("NumeroDocumento__c", "Edit"), ("MdmId__c", "Readonly"), ("MdmRequestId__c", "Readonly")]
+
+
+def without_nulls(value):
+    if isinstance(value, dict):
+        return {k: without_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [without_nulls(v) for v in value]
+    return value
+
+
+def case_layout(instance, access):
+    """The change request's fields on the Case page, in a section of their own; added once."""
+    q = urllib.parse.quote("SELECT Id FROM Layout WHERE TableEnumOrId = 'Case' AND Name = 'Case Layout'")
+    records = call(instance, access, "GET", f"/tooling/query?q={q}")["records"]
+    if not records:
+        print("no Case Layout to add the change request's section to")
+        return
+    layout_id = records[0]["Id"]
+    metadata = call(instance, access, "GET", f"/tooling/sobjects/Layout/{layout_id}")["Metadata"]
+    if any(s.get("label") == CASE_SECTION for s in metadata.get("layoutSections", [])):
+        return
+    half = (len(CASE_FIELDS) + 1) // 2
+    columns = [CASE_FIELDS[:half], CASE_FIELDS[half:]]
+    metadata["layoutSections"].insert(1, {
+        "label": CASE_SECTION, "style": "TwoColumnsTopToBottom", "customLabel": True,
+        "detailHeading": True, "editHeading": True,
+        "layoutColumns": [{"layoutItems": [{"field": f, "behavior": b} for f, b in column]} for column in columns]})
+    # Salesforce does not take back its own metadata as it sent it: without the nulls, and without the
+    # action list and the summary layout, whose enums it serialises in a form it then refuses (the layout
+    # keeps the default actions; Lightning shows its compact layout, not the summary).
+    metadata = without_nulls(metadata)
+    metadata.pop("platformActionList", None)
+    metadata.pop("summaryLayout", None)
+    # and the classic quick actions; and a related list's empty quick action list, which it reads as a
+    # mass action on its object (CaseComment) and refuses.
+    metadata.pop("quickActionList", None)
+    for related in metadata.get("relatedLists", []):
+        if not related.get("quickActions"):
+            related.pop("quickActions", None)
+    call(instance, access, "PATCH", f"/tooling/sobjects/Layout/{layout_id}", {"Metadata": metadata})
+    print("Case Layout: section", CASE_SECTION, "added")
 
 
 if __name__ == "__main__":

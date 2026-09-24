@@ -5,15 +5,33 @@
         <members>Contact.Nationality__c</members>
         <members>Contact.Document_Type__c</members>
         <members>Contact.Document_Number__c</members>
+        <members>Case.MdmRequestId__c</members>
+        <members>Case.MdmId__c</members>
+        <members>Case.Nombre__c</members>
+        <members>Case.Apellidos__c</members>
+        <members>Case.Email__c</members>
+        <members>Case.Telefono__c</members>
+        <members>Case.Nacionalidad__c</members>
+        <members>Case.FechaNacimiento__c</members>
+        <members>Case.TipoDocumento__c</members>
+        <members>Case.NumeroDocumento__c</members>
+        <members>Case.Origen__c</members>
+        <members>Case.Cambios__c</members>
+        <members>Case.Decision__c</members>
+        <members>Case.Motivo__c</members>
         <name>CustomField</name>
     </types>
     <types>
         <members>ClienteConsolidado__e</members>
+        <members>CambioClienteResuelto__e</members>
+        <members>ClienteActualizado__e</members>
         <name>CustomObject</name>
     </types>
     <types>
         <members>Mdm_Announce_Merge</members>
         <members>Mdm_Keep_Mdm_Id</members>
+        <members>Mdm_Apply_Change_Request</members>
+        <members>Mdm_Announce_Contact_Change</members>
         <name>Flow</name>
     </types>
     <types>

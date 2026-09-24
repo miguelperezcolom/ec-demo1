@@ -46,35 +46,54 @@ import java.util.concurrent.TimeUnit;
 public class ConsolidationEvents implements SmartLifecycle {
 
     static final String TOPIC = "/event/ClienteConsolidado__e";
+    static final String DECISIONS = "/event/CambioClienteResuelto__e";
+    static final String CONTACT_CHANGES = "/event/ClienteActualizado__e";
     static final int BATCH = 25;
+
+    /** A topic, where its replay position is kept, and what to do with each of its events. */
+    record Topic(String name, String cursor, java.util.function.Consumer<GenericRecord> handler) {
+    }
 
     final MdmProperties.Salesforce properties;
     final SalesforceClient salesforce;
     final Consolidations consolidations;
     final CursorRepository cursors;
     final Map<String, Schema> schemas = new ConcurrentHashMap<>();
+    final java.util.List<Topic> topics;
+    final java.util.List<Thread> threads = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     volatile boolean running;
     volatile ManagedChannel channel;
-    Thread thread;
 
     public ConsolidationEvents(MdmProperties properties, SalesforceClient salesforce, Consolidations consolidations,
-                               CursorRepository cursors) {
+                               CursorRepository cursors, io.mateu.ecdemo1.mdm.change.SalesforceInbox inbox) {
         this.properties = properties.salesforce();
         this.salesforce = salesforce;
         this.consolidations = consolidations;
         this.cursors = cursors;
+        this.topics = java.util.List.of(
+                // A contact left: merged into another, or deleted.
+                new Topic(TOPIC, Cursor.PUBSUB, record -> consolidations.received(string(record, "AbsorbedMdmId__c"),
+                        string(record, "AbsorbedContactId__c"), "EVENT")),
+                // A change a hotel proposed was decided.
+                new Topic(DECISIONS, "pubsub:CambioClienteResuelto__e", record -> inbox.decided(
+                        string(record, "RequestId__c"), string(record, "Estado__c"), "EVENT")),
+                // A contact's data changed in Salesforce, the master: the projection follows.
+                new Topic(CONTACT_CHANGES, "pubsub:ClienteActualizado__e", record -> inbox.contactChanged(
+                        string(record, "MdmId__c"))));
     }
 
     @Override
     public void start() {
         if (!salesforce.enabled() || !properties.subscribe()) {
-            log.info("Not subscribing to {}: Salesforce is not configured", TOPIC);
+            log.info("Not subscribing to Salesforce's events: Salesforce is not configured");
             return;
         }
         running = true;
         channel = ManagedChannelBuilder.forAddress(properties.pubsubHost(), properties.pubsubPort()).useTransportSecurity().build();
-        thread = Thread.ofVirtual().name("salesforce-pubsub").start(this::loop);
+        for (var topic : topics) {
+            threads.add(Thread.ofVirtual().name("salesforce-pubsub-" + topic.cursor()).start(() -> loop(topic)));
+        }
     }
 
     @Override
@@ -83,9 +102,7 @@ public class ConsolidationEvents implements SmartLifecycle {
         if (channel != null) {
             channel.shutdownNow();
         }
-        if (thread != null) {
-            thread.interrupt();
-        }
+        threads.forEach(Thread::interrupt);
     }
 
     @Override
@@ -93,16 +110,16 @@ public class ConsolidationEvents implements SmartLifecycle {
         return running;
     }
 
-    void loop() {
+    void loop(Topic topic) {
         var backoff = 1_000L;
         while (running) {
             try {
-                subscribeOnce();
+                subscribeOnce(topic);
                 backoff = 1_000L;
             } catch (InterruptedException e) {
                 return;
             } catch (RuntimeException e) {
-                log.warn("Pub/Sub subscription to {} dropped: {}", TOPIC, e.getMessage());
+                log.warn("Pub/Sub subscription to {} dropped: {}", topic.name(), e.getMessage());
             }
             try {
                 Thread.sleep(backoff);
@@ -114,7 +131,7 @@ public class ConsolidationEvents implements SmartLifecycle {
     }
 
     /** One subscription, until the stream ends; then the loop opens the next one. */
-    void subscribeOnce() throws InterruptedException {
+    void subscribeOnce(Topic topic) throws InterruptedException {
         var session = salesforce.session();
         var headers = new Metadata();
         headers.put(Metadata.Key.of("accesstoken", Metadata.ASCII_STRING_MARSHALLER), session.accessToken());
@@ -133,20 +150,20 @@ public class ConsolidationEvents implements SmartLifecycle {
                 for (var event : response.getEventsList()) {
                     try {
                         var record = decode(blocking, event.getEvent().getSchemaId(), event.getEvent().getPayload());
-                        consolidations.received(string(record, "AbsorbedMdmId__c"), string(record, "AbsorbedContactId__c"), "EVENT");
+                        topic.handler().accept(record);
                     } catch (RuntimeException e) {
                         // The event is a hint, and the poll the net: one that cannot be handled now is
                         // left to the poll, instead of holding every event behind it.
                         log.warn("Event {} not handled, the poll will find it: {}", event.getEvent().getId(), e.getMessage());
                     }
-                    remember(event.getReplayId());
+                    remember(topic, event.getReplayId());
                 }
                 if (response.getEventsCount() == 0 && !response.getLatestReplayId().isEmpty()) {
                     // A keepalive: nothing happened up to here, so resuming here loses nothing.
-                    remember(response.getLatestReplayId());
+                    remember(topic, response.getLatestReplayId());
                 }
                 if (response.getPendingNumRequested() == 0) {
-                    requests[0].onNext(FetchRequest.newBuilder().setTopicName(TOPIC).setNumRequested(BATCH).build());
+                    requests[0].onNext(FetchRequest.newBuilder().setTopicName(topic.name()).setNumRequested(BATCH).build());
                 }
             }
 
@@ -162,15 +179,15 @@ public class ConsolidationEvents implements SmartLifecycle {
             }
         };
         requests[0] = async.subscribe(responses);
-        var first = FetchRequest.newBuilder().setTopicName(TOPIC).setNumRequested(BATCH);
-        var replayId = cursors.findById(Cursor.PUBSUB).map(c -> c.replayId).orElse(null);
+        var first = FetchRequest.newBuilder().setTopicName(topic.name()).setNumRequested(BATCH);
+        var replayId = cursors.findById(topic.cursor()).map(c -> c.replayId).orElse(null);
         if (replayId != null) {
             first.setReplayPreset(ReplayPreset.CUSTOM).setReplayId(ByteString.copyFrom(Base64.getDecoder().decode(replayId)));
         } else {
             first.setReplayPreset(ReplayPreset.LATEST);
         }
         requests[0].onNext(first.build());
-        log.info("Subscribed to {} from {}", TOPIC, replayId == null ? "now" : "the last event handled");
+        log.info("Subscribed to {} from {}", topic.name(), replayId == null ? "now" : "the last event handled");
         while (running && !ended.await(1, TimeUnit.SECONDS)) {
             // waiting for the stream to end
         }
@@ -180,7 +197,7 @@ public class ConsolidationEvents implements SmartLifecycle {
             } else if (replayId != null && e.getStatus().getCode() == Status.Code.INVALID_ARGUMENT) {
                 // The replay id is gone from Salesforce: start from now; the poll finds what was missed.
                 log.warn("Replay id no longer valid ({}); resuming from now", e.getStatus().getDescription());
-                cursors.deleteById(Cursor.PUBSUB);
+                cursors.deleteById(topic.cursor());
             }
             throw e;
         }
@@ -196,10 +213,10 @@ public class ConsolidationEvents implements SmartLifecycle {
         }
     }
 
-    void remember(ByteString replayId) {
-        var cursor = cursors.findById(Cursor.PUBSUB).orElseGet(() -> {
+    void remember(Topic topic, ByteString replayId) {
+        var cursor = cursors.findById(topic.cursor()).orElseGet(() -> {
             var fresh = new Cursor();
-            fresh.name = Cursor.PUBSUB;
+            fresh.name = topic.cursor();
             return fresh;
         });
         cursor.replayId = Base64.getEncoder().encodeToString(replayId.toByteArray());

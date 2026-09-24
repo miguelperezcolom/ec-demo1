@@ -113,6 +113,59 @@ public class SalesforceClient {
         }
     }
 
+    /**
+     * The change request as a Case on the contact, for someone to decide in Salesforce: Decisión
+     * Pendiente, the proposed data in its fields. Keyed by the request's id, so sending it twice is
+     * one Case.
+     */
+    public String upsertChangeCase(io.mateu.ecdemo1.mdm.store.ChangeRequest r, String contactId, String subject, String description) {
+        var fields = new LinkedHashMap<String, Object>();
+        fields.put("Subject", subject);
+        fields.put("Description", description);
+        fields.put("ContactId", contactId);
+        fields.put("MdmId__c", r.customerId);
+        fields.put("Nombre__c", r.firstName);
+        fields.put("Apellidos__c", r.lastName == null || r.lastName.isBlank() ? "?" : r.lastName);
+        fields.put("Email__c", r.email);
+        fields.put("Telefono__c", r.phone);
+        fields.put("Nacionalidad__c", r.nationality);
+        fields.put("FechaNacimiento__c", r.birthDate == null ? null : r.birthDate.toString());
+        fields.put("TipoDocumento__c", r.documentType);
+        fields.put("NumeroDocumento__c", r.documentNumber);
+        fields.put("Origen__c", cut(r.origin, 255));
+        fields.put("Cambios__c", cut(r.changes, 255));
+        fields.put("Decision__c", "Pendiente");
+        var answer = call(s -> rest.patch()
+                .uri(s.instanceUrl() + "/services/data/{v}/sobjects/Case/MdmRequestId__c/{id}", properties.apiVersion(), r.id)
+                .header("Authorization", "Bearer " + s.accessToken())
+                .contentType(MediaType.APPLICATION_JSON).body(fields)
+                .retrieve().body(JsonNode.class));
+        return answer == null ? null : answer.path("id").asText(null);
+    }
+
+    /** The decided ones among these change requests: request id → Aprobada or Rechazada. */
+    public java.util.Map<String, String> decisions(java.util.Collection<String> requestIds) {
+        var decided = new java.util.HashMap<String, String>();
+        if (requestIds.isEmpty()) {
+            return decided;
+        }
+        var in = requestIds.stream().map(id -> "'" + literal(id) + "'").collect(java.util.stream.Collectors.joining(","));
+        for (var c : queryAll("SELECT MdmRequestId__c, Decision__c FROM Case WHERE MdmRequestId__c IN (" + in + ")")) {
+            var decision = c.path("Decision__c").asText("");
+            if ("Aprobada".equals(decision) || "Rechazada".equals(decision)) {
+                decided.put(c.path("MdmRequestId__c").asText(), decision);
+            }
+        }
+        return decided;
+    }
+
+    /** The contact that carries this MDM id, as Salesforce has it now. */
+    public Optional<JsonNode> contactByMdmId(String mdmId) {
+        return queryAll(("SELECT Id, IsDeleted, MasterRecordId, MDM_Id__c, FirstName, LastName, Email, Phone, Birthdate, "
+                + "Nationality__c, Document_Type__c, Document_Number__c FROM Contact WHERE MDM_Id__c = '%s' AND IsDeleted = false")
+                .formatted(literal(mdmId))).stream().findFirst();
+    }
+
     public Optional<JsonNode> contact(String contactId) {
         var found = queryAll(("SELECT Id, IsDeleted, MasterRecordId, MDM_Id__c, FirstName, LastName, Email, Phone, Birthdate, "
                 + "Nationality__c, Document_Type__c, Document_Number__c FROM Contact WHERE Id = '%s'").formatted(safe(contactId)));
@@ -129,6 +182,15 @@ public class SalesforceClient {
     }
 
     /** Record ids are fifteen or eighteen letters and digits; anything else is not put in a query. */
+    /** A value inside a SOQL string literal: quotes and backslashes escaped. */
+    static String literal(String value) {
+        return value.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    static String cut(String value, int length) {
+        return value == null || value.length() <= length ? value : value.substring(0, length - 1) + "…";
+    }
+
     static String safe(String id) {
         if (id == null || !id.matches("[A-Za-z0-9]{15,18}")) {
             throw new IllegalArgumentException("Not a Salesforce id: " + id);

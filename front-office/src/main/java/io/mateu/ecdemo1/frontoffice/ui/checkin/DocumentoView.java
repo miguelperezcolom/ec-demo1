@@ -333,7 +333,9 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     public void updateContact(String email, String phone) {
       var guest = guest();
       if (guest != null) {
-        FrontOffice.guests().save(guest.updateContact(email, phone));
+        var edited = guest.updateContact(email, phone);
+        FrontOffice.guests().save(edited);
+        io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.edited(guest, edited);
       }
     }
 
@@ -344,7 +346,9 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
         return;
       }
       var doc = document == null || document.isBlank() ? "MAN-" + guest.id().toUpperCase() : document;
-      FrontOffice.guests().save(guest.verifyIdentity(doc).updateContact(email, phone));
+      var edited = guest.rename(name).verifyIdentity(doc).updateContact(email, phone);
+      FrontOffice.guests().save(edited);
+      io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.edited(guest, edited);
     }
   }
 

@@ -15,7 +15,7 @@ import java.time.Duration;
  */
 @ConfigurationProperties("mdm")
 public record MdmProperties(Salesforce salesforce, String crsIntegrationUrl, Duration projectionTick, Duration poll,
-                            Duration propagationTick) {
+                            Duration propagationTick, String frontOfficeUrl) {
 
     /**
      * Client credentials: the MDM calls Salesforce machine to machine, as the user the org's

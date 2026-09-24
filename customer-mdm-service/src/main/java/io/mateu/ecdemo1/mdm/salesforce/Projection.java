@@ -25,6 +25,7 @@ public class Projection {
     final SalesforceClient salesforce;
     final CustomerRepository customers;
     final TransactionTemplate tx;
+    final io.mateu.ecdemo1.mdm.change.Xrefs xrefs;
     final Clock clock;
 
     @Scheduled(fixedDelayString = "${mdm.projection-tick:5s}")
@@ -53,6 +54,7 @@ public class Projection {
                     }
                     customers.save(c);
                 }));
+                xrefs.record(pending.id, io.mateu.ecdemo1.mdm.store.Xref.Target.SALESFORCE, contactId, null);
                 log.info("{} projected to Salesforce as {}", pending.id, contactId);
             } catch (HttpClientErrorException e) {
                 // Salesforce refused this one: say why on the record, and go on with the rest.

@@ -67,6 +67,11 @@ class MdmTest {
     static final Map<String, String> contacts = new ConcurrentHashMap<>();
     static final Map<String, String> contactByMdmId = new ConcurrentHashMap<>();
     static final AtomicInteger nextContact = new AtomicInteger();
+    /** Salesforce's contacts as a query by MDM id answers them — what the master has now. */
+    static final Map<String, String> contactJsonByMdmId = new ConcurrentHashMap<>();
+    /** The Cases opened for change requests, by request id, and how each one was decided. */
+    static final Map<String, String> cases = new ConcurrentHashMap<>();
+    static final Map<String, String> decisions = new ConcurrentHashMap<>();
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) throws IOException {
@@ -88,6 +93,22 @@ class MdmTest {
                 var id = contactByMdmId.computeIfAbsent(mdmId, k -> "003" + String.format("%015d", nextContact.incrementAndGet()));
                 code = created ? 201 : 200;
                 body = "{\"id\":\"" + id + "\",\"success\":true,\"created\":" + created + "}";
+            } else if (path.startsWith("/services/data/v67.0/sobjects/Case/MdmRequestId__c/")) {
+                var requestId = path.substring(path.lastIndexOf('/') + 1);
+                cases.put(requestId, request);
+                body = "{\"id\":\"500" + String.format("%015d", cases.size()) + "\",\"success\":true}";
+            } else if (path.equals("/api/guests/C/kardex") || path.matches("/api/guests/[^/]+/kardex")) {
+                body = "";
+            } else if (path.equals("/services/data/v67.0/queryAll") && URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8).contains("FROM Case")) {
+                var soql = URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8);
+                var records = decisions.entrySet().stream().filter(e -> soql.contains("'" + e.getKey() + "'"))
+                        .map(e -> "{\"MdmRequestId__c\":\"" + e.getKey() + "\",\"Decision__c\":\"" + e.getValue() + "\"}").toList();
+                body = "{\"done\":true,\"records\":[" + String.join(",", records) + "]}";
+            } else if (path.equals("/services/data/v67.0/queryAll") && URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8).contains("WHERE MDM_Id__c = '")) {
+                var soql = URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8);
+                var mdmId = soql.replaceAll(".*WHERE MDM_Id__c = '([^']+)'.*", "$1");
+                var record = contactJsonByMdmId.get(mdmId);
+                body = "{\"done\":true,\"records\":[" + (record == null ? "" : record) + "]}";
             } else if (path.equals("/services/data/v67.0/queryAll")) {
                 var soql = URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8);
                 var id = soql.replaceAll(".*WHERE Id = '([^']+)'.*", "$1");
@@ -111,6 +132,7 @@ class MdmTest {
         var base = "http://localhost:" + others.getAddress().getPort();
         registry.add("mdm.salesforce.domain", () -> base);
         registry.add("mdm.crs-integration-url", () -> base);
+        registry.add("mdm.front-office-url", () -> base);
     }
 
     @AfterAll
@@ -136,6 +158,128 @@ class MdmTest {
     SourceRepository sources;
     @Autowired
     ConsolidationRepository consolidationRecords;
+    @Autowired
+    io.mateu.ecdemo1.mdm.change.ChangeRequests changeRequests;
+    @Autowired
+    io.mateu.ecdemo1.mdm.change.SalesforceProjection salesforceProjection;
+    @Autowired
+    io.mateu.ecdemo1.mdm.change.HotelPropagation hotelPropagation;
+    @Autowired
+    io.mateu.ecdemo1.mdm.store.HotelUpdateRepository hotelUpdates;
+    @Autowired
+    io.mateu.ecdemo1.mdm.change.SalesforceInbox salesforceInbox;
+
+    @Test
+    void anApprovalArrivingTwiceAtOnceIsProjectedOnce() throws Exception {
+        hotelUpdates.deleteAll();
+        var eva = resolve("L11", person("Eva", "Soler", "eva@example.com", null, null)).get(0).customerId();
+        projection.projectPending();
+        var contactId = contactByMdmId.get(eva);
+        contactJsonByMdmId.put(eva, contactJson(contactId, "Eva", "Soler", "eva@example.com"));
+        var requestId = json.readTree(propose(eva, """
+                {"email":"eva.soler@example.com","origin":"front office MRU01"}""")).path("id").asText();
+        changeRequests.send();
+        var before = customers.findById(eva).orElseThrow().version;
+
+        // Approved: the contact changed and the decision was announced — both events at the same moment.
+        contactJsonByMdmId.put(eva, contactJson(contactId, "Eva", "Soler", "eva.soler@example.com"));
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var contact = Thread.ofVirtual().start(() -> { await(start); salesforceInbox.contactChanged(eva); });
+        var decision = Thread.ofVirtual().start(() -> { await(start); salesforceInbox.decided(requestId, "Aprobada", "EVENT"); });
+        start.countDown();
+        contact.join();
+        decision.join();
+
+        assertThat(customers.findById(eva).orElseThrow().version).isEqualTo(before + 1);
+        assertThat(changeRequests.get(requestId).status).isEqualTo("APPROVED");
+        assertThat(hotelUpdates.findAll()).filteredOn(u -> u.customerId.equals(eva)).hasSize(2)
+                .anyMatch(u -> u.dataChanged).anyMatch(u -> "APPROVED".equals(u.decision));
+    }
+
+    static void await(java.util.concurrent.CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    static String contactJson(String id, String first, String last, String email) {
+        return """
+                {"Id":"%s","MDM_Id__c":"x","FirstName":"%s","LastName":"%s","Email":"%s","Phone":null,"Birthdate":null,
+                 "Nationality__c":"ES","Document_Type__c":null,"Document_Number__c":null}""".formatted(id, first, last, email);
+    }
+
+    String propose(String customerId, String body) throws Exception {
+        return mvc.perform(post("/customers/" + customerId + "/change-requests").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void aChangeProposedByAHotelIsDecidedInSalesforceAndTheDecisionReachesTheHotels() throws Exception {
+        hotelUpdates.deleteAll();
+        var ana = resolve("L9", person("Ana", "García", "ana@example.com", null, null)).get(0).customerId();
+        projection.projectPending();
+        var contactId = contactByMdmId.get(ana);
+        contactJsonByMdmId.put(ana, contactJson(contactId, "Ana", "García", "ana@example.com"));
+
+        // Reception changes her email and her name: a proposal, not yet her data.
+        var answer = json.readTree(propose(ana, """
+                {"name":"Ana María García","email":"ana.maria@example.com","origin":"front office MRU01 · luis"}"""));
+        var requestId = answer.path("id").asText();
+        assertThat(answer.path("status").asText()).isEqualTo("PENDING");
+        assertThat(answer.path("changes").asText()).contains("email ana@example.com → ana.maria@example.com").contains("nombre Ana → Ana María");
+        assertThat(customers.findById(ana).orElseThrow().email).isEqualTo("ana@example.com");
+
+        // Opened in Salesforce as a Case on her contact, waiting for a decision.
+        changeRequests.send();
+        assertThat(cases.get(requestId)).contains("\"ContactId\":\"" + contactId + "\"").contains("\"Decision__c\":\"Pendiente\"")
+                .contains("\"Email__c\":\"ana.maria@example.com\"").contains("\"Nombre__c\":\"Ana María\"");
+
+        // Approved in Salesforce: the flow put it on the contact. The MDM learns it (here, by asking).
+        contactJsonByMdmId.put(ana, contactJson(contactId, "Ana María", "García", "ana.maria@example.com"));
+        decisions.put(requestId, "Aprobada");
+        salesforceInbox.poll();
+        var projected = customers.findById(ana).orElseThrow();
+        assertThat(projected.email).isEqualTo("ana.maria@example.com");
+        assertThat(projected.firstName).isEqualTo("Ana María");
+        assertThat(changeRequests.get(requestId).status).isEqualTo("APPROVED");
+
+        // The hotels learn it: the front office's kardex, with the decision; Opera, by projecting her reservation again.
+        calls.clear();
+        hotelPropagation.propagate();
+        assertThat(calls).anyMatch(c -> c.startsWith("PUT /api/guests/" + ana + "/kardex") && c.contains("\"decision\":\"APPROVED\"")
+                && c.contains("ana.maria@example.com") && c.contains("Ana María García") && c.contains(requestId));
+        assertThat(calls).anyMatch(c -> c.startsWith("POST /projections") && c.contains("\"locator\":\"L9\"")
+                && c.contains("mdm-update-" + ana));
+
+        // A second change, rejected: the contact stays as it was; the front office learns it, Opera is not touched.
+        var rejected = json.readTree(propose(ana, """
+                {"phone":"+34 600 000 000","origin":"front office MRU01 · luis"}""")).path("id").asText();
+        changeRequests.send();
+        decisions.put(rejected, "Rechazada");
+        salesforceInbox.poll();
+        calls.clear();
+        hotelPropagation.propagate();
+        assertThat(calls).anyMatch(c -> c.startsWith("PUT /api/guests/" + ana + "/kardex") && c.contains("\"decision\":\"REJECTED\""));
+        assertThat(calls).noneMatch(c -> c.startsWith("POST /projections"));
+        assertThat(customers.findById(ana).orElseThrow().phone).isNull();
+    }
+
+    @Test
+    void aContactChangedInSalesforceIsProjectedOnceAndItsEchoGoesNoFurther() throws Exception {
+        hotelUpdates.deleteAll();
+        var leo = resolve("L10", person("Leo", "Pons", "leo@example.com", null, null)).get(0).customerId();
+        projection.projectPending();
+        var contactId = contactByMdmId.get(leo);
+        contactJsonByMdmId.put(leo, contactJson(contactId, "Leo", "Pons Vidal", "leo@example.com"));
+
+        assertThat(salesforceProjection.refresh(leo, null, null)).isTrue();
+        assertThat(customers.findById(leo).orElseThrow().lastName).isEqualTo("Pons Vidal");
+        // The same again — an echo, or the event delivered twice — changes nothing and goes nowhere.
+        assertThat(salesforceProjection.refresh(leo, null, null)).isFalse();
+        assertThat(hotelUpdates.findAll()).hasSize(1);
+    }
 
     @BeforeEach
     void clean() {
@@ -145,6 +289,9 @@ class MdmTest {
         calls.clear();
         contacts.clear();
         contactByMdmId.clear();
+        contactJsonByMdmId.clear();
+        cases.clear();
+        decisions.clear();
     }
 
     static Person person(String first, String last, String email, String docType, String doc) {

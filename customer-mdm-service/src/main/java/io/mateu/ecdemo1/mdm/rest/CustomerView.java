@@ -19,11 +19,20 @@ public record CustomerView(String id, String requestedId, CustomerStatus status,
                            String email, String phone, String nationality, LocalDate birthDate, String documentType,
                            String documentNumber, long version, SalesforceState salesforceState,
                            String salesforceContactId, String survivorship, Instant updatedAt, List<String> aliases,
-                           List<String> reservations) {
+                           List<String> reservations, List<String> xrefs, List<String> changeRequests) {
 
     public static CustomerView of(Customer c, String requestedId, List<String> aliases, List<String> reservations) {
+        return of(c, requestedId, aliases, reservations, List.of(), List.of());
+    }
+
+    /**
+     * @param xrefs          where the customer is known: SYSTEM:reference (context)
+     * @param changeRequests the changes hotels proposed: id STATUS — what changes
+     */
+    public static CustomerView of(Customer c, String requestedId, List<String> aliases, List<String> reservations,
+                                  List<String> xrefs, List<String> changeRequests) {
         return new CustomerView(c.id, requestedId, c.status, c.firstName, c.lastName, c.email, c.phone, c.nationality,
                 c.birthDate, c.documentType, c.documentNumber, c.version, c.salesforceState, c.salesforceContactId,
-                c.survivorship, c.updatedAt, aliases, reservations);
+                c.survivorship, c.updatedAt, aliases, reservations, xrefs, changeRequests);
     }
 }

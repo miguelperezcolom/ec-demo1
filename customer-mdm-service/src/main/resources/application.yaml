@@ -41,6 +41,8 @@ mdm:
     pubsub-port: ${SF_PUBSUB_PORT:7443}
     subscribe: ${SF_SUBSCRIBE:true}
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
+  # The hotels' front office: its kardex learns what Salesforce decides about a customer.
+  front-office-url: ${FRONT_OFFICE_URL:}
   projection-tick: ${PROJECTION_TICK:5s}
   poll: ${CONSOLIDATION_POLL:60s}
   propagation-tick: ${PROPAGATION_TICK:5s}

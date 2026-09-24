@@ -132,12 +132,25 @@ Los pasajeros de cada reserva se proyectan a Salesforce como contactos. Allí se
 duplicados (el golden record); la fusión vuelve al MDM (`ClienteConsolidado__e`), que aplica la
 supervivencia y **propaga el código de cliente al perfil de Opera** de las reservas afectadas.
 
-## 10. Recepción cambia los datos de un cliente *(en construcción)*
+## 10. Recepción cambia los datos de un cliente
 
-En el front office se actualizan los datos de un cliente. El **kárdex** del cliente queda
-**pendiente de aprobación**, y así se ve en la reserva. En Salesforce el cambio se aprueba o se
-rechaza, y la decisión baja al front office (el kárdex pasa a aprobado o rechazado, y en su caso los
-datos) y a Opera (el perfil del huésped).
+Dónde vive cada dato: **Salesforce es el maestro** del cliente; el **MDM** está delante (guarda las
+**xref** — contacto de Salesforce, huésped del front office, perfiles de Opera — y una **proyección**
+de los datos de Salesforce); el **front office** y **Opera** reciben esa proyección.
+
+1. En el front office (detalle de la reserva o check-in) se cambian los datos del titular. El kárdex
+   los guarda al momento y la reserva muestra **«Kárdex: Pendiente de aprobación»** con lo que cambia.
+2. El front office lo manda al MDM, que abre en Salesforce un **Case «Cambio de datos de cliente»**
+   sobre el contacto, con los datos propuestos (sección *Cambio de datos de cliente (MDM)*).
+3. En Salesforce se pone **Decisión** en *Aprobada* (se pueden corregir los datos antes) o
+   *Rechazada* (con motivo). Un flow aplica lo aprobado al contacto y anuncia la decisión.
+4. Baja sola: el MDM actualiza su proyección; el front office pasa el kárdex a **Aprobado** (o
+   **Rechazado**, y vuelven los datos del maestro); Opera reescribe el perfil del huésped de las
+   reservas del cliente.
+
+Cualquier cambio hecho a mano en el contacto de Salesforce baja igual. Probado en ec1 con
+C-E572C893A59C (Case 500d100000H0YeFAAV): del Case aprobado al front office y al perfil 20538296 de
+Opera.
 
 ## 11. Quién hizo qué, y qué me espera
 
@@ -162,7 +175,7 @@ de Cobros y factura de depósito.
 - [ ] Comprobar el agente de la consola (MCP de `booking`) y el agente de mapeado con el LLM real.
 - [ ] Destinatarios de email reales (hoy el de por defecto es un `example.com` y el correo falla) y
       qué espacio de Google Chat recibe qué (el segundo espacio está bloqueado por su administrador).
-- [ ] Construir el flujo del §10.
+- [ ] Probar el §10 desde la pantalla del front office (con usuario) y el Case desde la consola de Salesforce.
 - [ ] Datos de prueba en XMAR que conviene conocer: reservas 39481284, 39481745, 39481775, 39481943,
       39481944, 39482155 (y dos canceladas); perfiles de interlocutor 20538292 y 20538322
       (ECDEMO0001/0002).

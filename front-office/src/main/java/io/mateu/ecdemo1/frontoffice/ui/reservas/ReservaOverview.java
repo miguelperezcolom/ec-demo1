@@ -266,6 +266,18 @@ public class ReservaOverview
     contenido.add(
         StatusList.builder().items(items).compact(true).frameless(true)
             .style("width: 100%;").build());
+    // El kárdex del titular frente al maestro de clientes (Salesforce): lo último que cambió
+    // recepción y cómo lo ha decidido.
+    io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.of(guest.id()).ifPresent(change -> contenido.add(
+        Text.builder()
+            .text("Kárdex: " + change.label() + " · " + change.changes())
+            .style("margin: 0; font-size: .85rem; padding: .25rem .5rem; border-radius: 4px; "
+                + switch (change.status()) {
+                  case PENDING -> "background: #fff4e5; color: #8a5300;";
+                  case APPROVED -> "background: #e8f5e9; color: #1b5e20;";
+                  case REJECTED -> "background: #fdecea; color: #8a1c1c;";
+                })
+            .build()));
     return VerticalLayout.builder()
         .style("width: 100%; gap: .5rem;")
         .content(contenido)

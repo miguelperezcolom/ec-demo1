@@ -87,7 +87,7 @@ public class FrontOfficeWriter {
                 .map(Variable::value).findFirst().orElse("");
         var origin = task.variables().stream().filter(v -> ProcessVariables.ORIGIN.equals(v.name()))
                 .map(Variable::value).filter(v -> v != null).findFirst().orElse("");
-        return "STALE".equals(outcome) && !origin.startsWith("backfill") && !origin.startsWith("mdm-merge");
+        return "STALE".equals(outcome) && !origin.startsWith("backfill") && !origin.startsWith("mdm-");
     }
     public List<Variable> write(TaskExecutionRequested task) {
         var hotelCode = var(task, ProcessVariables.HOTEL_CODE);
@@ -110,7 +110,10 @@ public class FrontOfficeWriter {
         var agency = r.partnerCode() == null ? "Directo · " + r.channelCode() : integration.partner(r.partnerCode()).name();
         var holder = r.holder();
         var body = new HashMap<String, Object>();
-        body.put("holder", person(customerOf(task, r), holder));
+        var customerId = customerOf(task, r);
+        var master = customerId == null ? holder : integration.customer(customerId)
+                .map(m -> io.mateu.ecdemo1.pmsintegration.worker.TaskHandlers.overlay(m, holder)).orElse(holder);
+        body.put("holder", person(customerId, master));
         body.put("companions", companions(r));
         body.put("roomType", roomType);
         body.put("board", board);
@@ -122,6 +125,9 @@ public class FrontOfficeWriter {
         var written = frontOffice.put().uri("/api/reservations/{locator}", r.locator()).body(body).retrieve()
                 .body(Map.class);
         log.info("{} written into the front office: stay {}", r.locator(), written == null ? "?" : written.get("status"));
+        if (customerId != null) {
+            integration.xref(customerId, "FRONT_OFFICE", customerId, hotelCode);
+        }
         return List.of();
     }
 

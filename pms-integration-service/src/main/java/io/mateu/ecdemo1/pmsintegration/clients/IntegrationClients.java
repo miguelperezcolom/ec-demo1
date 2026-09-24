@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.pmsintegration.clients;
 
+import io.mateu.ecdemo1.integration.model.reservation.Person;
 import io.mateu.ecdemo1.integration.model.customer.IdentityRequest;
 import io.mateu.ecdemo1.integration.model.customer.ResolvedIdentity;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
@@ -60,6 +61,41 @@ public class IntegrationClients {
     }
 
     /** Who the passengers are, as the customer MDM resolves them (HLA CRM-MDM, F001). */
+    /**
+     * The customer as the MDM projects it from Salesforce, the master: what a guest profile and a
+     * kardex are written with. Empty if the MDM does not answer — the reservation's data then.
+     */
+    public java.util.Optional<Person> customer(String customerId) {
+        try {
+            var c = mdm.get().uri("/customers/{id}", customerId).retrieve().body(com.fasterxml.jackson.databind.JsonNode.class);
+            if (c == null) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new Person(text(c, "firstName"), text(c, "lastName"),
+                    io.mateu.ecdemo1.integration.model.reservation.GuestType.ADULT, null, text(c, "email"), text(c, "phone"),
+                    text(c, "nationality"), text(c, "birthDate") == null ? null : java.time.LocalDate.parse(text(c, "birthDate")),
+                    text(c, "documentType"), text(c, "documentNumber")));
+        } catch (RuntimeException e) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    /** Tells the MDM where the customer is known: an Opera profile, a front office's guest. Best effort. */
+    public void xref(String customerId, String target, String reference, String context) {
+        try {
+            mdm.put().uri("/customers/{id}/xrefs", customerId)
+                    .body(java.util.Map.of("target", target, "reference", reference, "context", context == null ? "" : context))
+                    .retrieve().toBodilessEntity();
+        } catch (RuntimeException e) {
+            // The next projection tells it again.
+        }
+    }
+
+    static String text(com.fasterxml.jackson.databind.JsonNode node, String field) {
+        var value = node.path(field);
+        return value.isMissingNode() || value.isNull() || value.asText().isBlank() ? null : value.asText();
+    }
+
     public List<ResolvedIdentity> identities(IdentityRequest request) {
         return mdm.post().uri("/identities/resolve").body(request).retrieve()
                 .body(new ParameterizedTypeReference<>() {

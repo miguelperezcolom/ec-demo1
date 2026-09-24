@@ -70,6 +70,32 @@ public record Guest(
         lastStayComplementaryInfo, preferences);
   }
 
+  /** The name as the desk corrects it. */
+  public Guest rename(String name) {
+    if (name == null || name.isBlank()) return this;
+    return new Guest(
+        id, name.trim(), document, documentVerified, email, phone, tier, loyaltyPoints, stays, nights,
+        yearsAsClient, complaints, hotels, lastStaySummary, lastStayComplementaryInfo, preferences);
+  }
+
+  /**
+   * The customer's data as the chain's master (Salesforce, through the MDM) has it: it replaces the
+   * cardex's. What only the hotel knows — preferences, stays, whether the document was verified here —
+   * stays.
+   */
+  public Guest withMasterData(String name, String document, String email, String phone) {
+    return new Guest(
+        id, name == null || name.isBlank() ? this.name : name, document, documentVerified, email, phone,
+        tier, loyaltyPoints, stays, nights, yearsAsClient, complaints, hotels, lastStaySummary,
+        lastStayComplementaryInfo, preferences);
+  }
+
+  /** Whether the data the chain's master keeps — name, document, email, phone — differs from another's. */
+  public boolean masterDataDiffers(Guest other) {
+    return !java.util.Objects.equals(name, other.name) || !java.util.Objects.equals(document, other.document)
+        || !java.util.Objects.equals(email, other.email) || !java.util.Objects.equals(phone, other.phone);
+  }
+
   /** Updates the contact data captured at the desk. */
   public Guest updateContact(String email, String phone) {
     return new Guest(

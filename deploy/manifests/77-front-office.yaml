@@ -45,10 +45,15 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: front-office
-          image: miguelperezcolom/ec-demo1-front-office:0.19.1
+          image: miguelperezcolom/ec-demo1-front-office:0.22.0
           env:
             - name: SERVER_PORT
               value: "8128"
+            # The chain's MDM: the desk's changes to a guest go there, to be decided in Salesforce.
+            - name: MDM_URL
+              value: "http://customer-mdm-service:8127"
+            - name: FRONT_OFFICE_HOTEL
+              value: "MRU01"
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/front_office
             - name: DB_USERNAME

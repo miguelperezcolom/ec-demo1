@@ -110,4 +110,5 @@ public class ReservationsApi {
   String conflict(IllegalStateException e) {
     return e.getMessage();
   }
+
 }

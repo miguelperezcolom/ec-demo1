@@ -138,3 +138,14 @@ create table if not exists add_on_catalog_item (
     unit           varchar(50),
     included_label varchar(100)
 );
+
+-- The last change the desk made to each guest's data, until the chain's master decides it.
+create table if not exists guest_kardex (
+    guest_id     varchar(64)  primary key,
+    request_id   varchar(64),
+    status       varchar(20)  not null,
+    changes      varchar(500),
+    requested_at timestamp,
+    decided_at   timestamp,
+    synced       boolean      not null
+);
