@@ -123,6 +123,8 @@ public class SecurityConfig {
                         // HMAC-SHA256 over the body, verified by the engine itself.
                         .pathMatchers("/workflow/webhooks/**", "/forms/webhooks/**").permitAll()
                         .pathMatchers("/_workflow/**", "/_forms/**", "/_worker/**").authenticated()
+                        // The inbox, on every host: what it shows depends on the caller's roles.
+                        .pathMatchers("/_inbox/**").authenticated()
                         // The two demo CRUD services, guarded the same way and for the same
                         // reason: none of them authenticates anything of its own, so this is
                         // the only thing between their screens and whoever types the path. Users

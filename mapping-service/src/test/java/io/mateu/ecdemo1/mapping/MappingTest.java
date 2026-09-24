@@ -242,6 +242,24 @@ class MappingTest {
     org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Test
+    void resolvingACauseAndDecidingTheLastProposalCloseWhatTheyAnnounced() throws Exception {
+        jdbc.update("delete from outbox_message where binding = 'resolutions'");
+        var entry = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "RES01", "RESX", "XRES", Map.of(), null, null), "agent");
+        entries.findByStatusOrderByCreatedAtDesc(io.mateu.ecdemo1.mapping.store.EntryStatus.PROPOSED).stream()
+                .filter(e -> !e.id.equals(entry.id)).forEach(e -> dictionary.reject(e.id, "cleanup"));
+        jdbc.update("delete from outbox_message where binding = 'resolutions'");
+        dictionary.approve(entry.id, "Ana García");
+
+        var subjects = jdbc.queryForList("select message_key from outbox_message where binding = 'resolutions' order by seq", String.class);
+        // The approval resolves the cause of the code, if there was one, and it was the last proposal.
+        assertThat(subjects).contains(io.mateu.ecdemo1.mapping.proposals.ProposalAnnouncer.SUBJECT);
+        var payload = jdbc.queryForObject("select payload from outbox_message where binding = 'resolutions' and message_key = ? order by seq desc limit 1",
+                String.class, io.mateu.ecdemo1.mapping.proposals.ProposalAnnouncer.SUBJECT);
+        assertThat(objectMapper.readValue(payload, io.mateu.ecdemo1.integration.model.notification.NotificationResolved.class).resolvedBy())
+                .isEqualTo("Ana García");
+    }
+
+    @Test
     void mappingDecisionsAreAuditedAndARefusalToo() throws Exception {
         jdbc.update("delete from outbox_message where binding = 'audit'");
         var entry = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "AUD01", "AUDX", "XAUD", Map.of(), null, null), "agent");

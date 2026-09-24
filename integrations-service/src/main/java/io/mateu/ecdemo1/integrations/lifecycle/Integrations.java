@@ -633,6 +633,8 @@ public class Integrations {
         log.info("Integration {} ({}): {} -> {}", i.id, i.crsHotelCode, i.status, to);
         i.status = to;
         i.record(clock.instant(), "onboarding", what);
+        // Whatever the integration was waiting for at its last gate, it is past it: that notification is done.
+        outbox.appendResolution("integration/" + i.crsHotelCode, "onboarding");
         if (to == IntegrationStatus.BACKFILL_BLOCKED) {
             notifyAttention(i, "The backfill of " + i.crsHotelCode + " waits on " + i.gaps.size() + " gap(s)", describeGaps(i)
                     + ". Map the codes or project the partners; the backfill starts once none is left.");

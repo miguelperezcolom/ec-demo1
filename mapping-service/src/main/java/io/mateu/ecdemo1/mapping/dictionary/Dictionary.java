@@ -35,6 +35,7 @@ public class Dictionary {
     final MappingEntryRepository entries;
     final Causes causes;
     final Clock clock;
+    final io.mateu.ecdemo1.mapping.outbox.Outbox outbox;
 
     /**
      * What a CRS code is in the PMS for this hotel: the property's own exception if there is one,
@@ -102,6 +103,7 @@ public class Dictionary {
         log.info("{} {} → {} approved for {} by {} (v{})", entry.type, entry.sourceCode, entry.targetCode,
                 entry.scope(), approvedBy, entry.entryVersion);
         causes.mappingApproved(entry.type, entry.hotelCode, entry.sourceCode, approvedBy);
+        noProposalLeft(approvedBy);
         return entry;
     }
 
@@ -115,7 +117,9 @@ public class Dictionary {
         entry.status = EntryStatus.REJECTED;
         entry.decidedBy = rejectedBy;
         entry.decidedAt = clock.instant();
-        return entries.save(entry);
+        entries.save(entry);
+        noProposalLeft(rejectedBy);
+        return entry;
     }
 
     /** A person entering an equivalence directly: proposed and approved by them in one go. */
@@ -123,6 +127,14 @@ public class Dictionary {
     @Transactional
     public MappingEntry define(Proposal proposal, String author) {
         return approve(propose(proposal, author).id, author);
+    }
+
+    /** The last proposal decided: the notifications asking to review them are done with. */
+    void noProposalLeft(String by) {
+        entries.flush();
+        if (entries.findByStatusOrderByCreatedAtDesc(EntryStatus.PROPOSED).isEmpty()) {
+            outbox.appendResolution(io.mateu.ecdemo1.mapping.proposals.ProposalAnnouncer.SUBJECT, by);
+        }
     }
 
     private static boolean blank(String value) {

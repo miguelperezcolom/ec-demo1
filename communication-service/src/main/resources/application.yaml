@@ -17,7 +17,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeNotifications
+      definition: consumeNotifications;consumeResolutions;consumeHumanTasks
     stream:
       kafka:
         binder:
@@ -26,6 +26,14 @@ spring:
       bindings:
         consumeNotifications-in-0:
           destination: notifications
+          group: ec-demo1-communication
+        # What the notifications asked for is no longer waiting: closes them in every inbox.
+        consumeResolutions-in-0:
+          destination: notification-resolutions
+          group: ec-demo1-communication
+        # The forms engine's human tasks (EventConductor's HumanTaskChanged): one more inbox item.
+        consumeHumanTasks-in-0:
+          destination: ${HUMAN_TASKS_TOPIC:human-tasks}
           group: ec-demo1-communication
 
   # The cluster's send-only relay (deploy/manifests/11-postfix.yaml): plain SMTP inside the
@@ -55,6 +63,14 @@ communication:
   from: ${MAIL_FROM:integration@ec1.mateu.io}
   default-email: ${DEFAULT_RECIPIENT:integration-admins@example.com}
   max-attempts: 5
+  inbox:
+    # The roles whose inbox a notification goes to, unless its type names its own below.
+    default-roles: ${INBOX_DEFAULT_ROLES:ai-admin}
+    # roles:
+    #   CAUSE_OPENED: [mapping-admin]
+    # Everything goes to the inbox; these are also emailed.
+    urgent: ${INBOX_URGENT:PMS_REJECTED,RETRYING_TOO_LONG}
+    tasks-link: ${INBOX_TASKS_LINK:/forms/tasks}
 
 management:
   endpoints:

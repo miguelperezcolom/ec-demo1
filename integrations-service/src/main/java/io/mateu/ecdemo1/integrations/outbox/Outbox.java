@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integration.model.audit.AuditedAction;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
+import io.mateu.ecdemo1.integration.model.notification.NotificationResolved;
 import io.mateu.workflow.ddd.DomainEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,7 @@ public class Outbox {
     public static final String ENGINE = "outboxUpstream";
     public static final String NOTIFICATIONS = "notifications";
     public static final String AUDIT = "audit";
+    public static final String RESOLUTIONS = "resolutions";
 
     final OutboxMessageRepository repository;
     final ObjectMapper objectMapper;
@@ -37,6 +39,13 @@ public class Outbox {
     public void appendNotification(NotificationRequested notification) {
         write(NOTIFICATIONS, notification.dedupKey(), "NotificationRequested",
                 serialise(NotificationRequested.class, notification));
+    }
+
+    /** What the notifications about this subject asked for is no longer waiting: they close in every inbox. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendResolution(String subject, String resolvedBy) {
+        write(RESOLUTIONS, subject, "NotificationResolved",
+                serialise(NotificationResolved.class, new NotificationResolved(subject, resolvedBy, clock.instant())));
     }
 
     /** A person's auditable action, for the audit service (HLA F016). */

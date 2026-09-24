@@ -16,6 +16,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProposalAnnouncer {
 
+    /** What every "proposals to review" notification is about: all of them close when none is left. */
+    public static final String SUBJECT = "mapping-proposals";
+
     final Outbox outbox;
     final MappingProperties properties;
     final Clock clock;
@@ -24,7 +27,7 @@ public class ProposalAnnouncer {
     public void proposalsReady(int count) {
         var now = clock.instant();
         outbox.appendNotification(new NotificationRequested(UUID.randomUUID().toString(),
-                NotificationType.PROPOSAL_READY, null, "mapping",
+                NotificationType.PROPOSAL_READY, null, SUBJECT,
                 "%d mapping proposal(s) to review".formatted(count),
                 "The agent proposed %d equivalence(s). None is in force until someone approves it.".formatted(count),
                 properties.consoleUrl() + "/mapping/proposals",

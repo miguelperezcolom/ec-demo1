@@ -33,6 +33,7 @@ public class Deliveries {
     final JavaMailSender mail;
     final CommunicationProperties properties;
     final Clock clock;
+    final io.mateu.ecdemo1.communication.inbox.Inbox inbox;
 
     @Transactional
     public void accept(NotificationRequested request) {
@@ -51,7 +52,14 @@ public class Deliveries {
         n.dedupKey = request.dedupKey();
         n.requestedAt = request.requestedAt();
         notifications.save(n);
-        deliver(n);
+        // Everything goes to the inbox of the roles that see to it; only what cannot wait is emailed too.
+        inbox.post(request);
+        if (properties.inbox().isUrgent(n.type.name())) {
+            deliver(n);
+        } else {
+            n.status = DeliveryStatus.INBOX_ONLY;
+            notifications.save(n);
+        }
     }
 
     /** Sends a notification again, to whoever should receive it now. */

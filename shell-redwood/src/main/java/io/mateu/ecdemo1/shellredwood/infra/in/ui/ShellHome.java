@@ -135,6 +135,10 @@ public class ShellHome implements WidgetSupplier {
     // control-plane concern, not part of using the product. It is served by the same users pod,
     // now mounted by the control shell behind the ai-admin gate. See ControlShellHome.
 
+    /** What waits for me: the notifications and tasks of my roles, each with where to resolve it. */
+    @Menu
+    RemoteMenu inbox = new RemoteMenu("/_inbox").withLabel("Inbox");
+
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
         var widgets = new ArrayList<Component>();
@@ -151,11 +155,11 @@ public class ShellHome implements WidgetSupplier {
 
         widgets.add(HorizontalLayout.builder()
                 .content(List.of(
-                        // The signed-in user's own pending human tasks, pulled straight from the
-                        // forms engine so the first thing on screen is work waiting for them.
+                        // What waits for the signed-in user — the notifications and the forms engine's
+                        // tasks of their roles — so the first thing on screen is work waiting for them.
                         MicroFrontend.builder()
-                                .baseUrl("/_forms")
-                                .route("/my-tasks")
+                                .baseUrl("/_inbox")
+                                .route("/badge")
                                 .build(),
                         Popover.builder()
                                 .wrapped(Text.builder()

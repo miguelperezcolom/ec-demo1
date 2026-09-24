@@ -12,6 +12,7 @@ import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
 import io.mateu.uidl.annotations.WelcomeBanner;
 import io.mateu.uidl.data.Anchor;
+import io.mateu.uidl.data.MicroFrontend;
 import io.mateu.uidl.data.HorizontalLayout;
 import io.mateu.uidl.data.Popover;
 import io.mateu.uidl.data.RemoteMenu;
@@ -138,6 +139,10 @@ public class ControlShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu audit = new RemoteMenu("/_audit").withLabel("Audit");
 
+    /** What waits for me: the notifications and tasks of my roles, each with where to resolve it. */
+    @Menu
+    RemoteMenu inbox = new RemoteMenu("/_inbox").withLabel("Inbox");
+
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
         var widgets = new ArrayList<Component>();
@@ -152,7 +157,13 @@ public class ControlShellHome implements WidgetSupplier {
                 .decode(authorization.substring("Bearer ".length()).split("\\.")[1])));
 
         widgets.add(HorizontalLayout.builder()
-                .content(List.of(Popover.builder()
+                .content(List.of(
+                        // What waits for the signed-in user: the notifications and tasks of their roles.
+                        MicroFrontend.builder()
+                                .baseUrl("/_inbox")
+                                .route("/badge")
+                                .build(),
+                        Popover.builder()
                         .wrapped(Text.builder()
                                 .text("Hola, " + claims.get("name"))
                                 .style("margin-right: 20px;")

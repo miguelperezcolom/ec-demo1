@@ -46,6 +46,7 @@ public class NotificationsPage implements Listing<NotificationRow>, Searchable, 
             case SENT -> new Status(StatusType.SUCCESS, "Sent");
             case FAILED -> new Status(StatusType.DANGER, "Failed (" + n.attempts + ")");
             case NO_RECIPIENTS -> new Status(StatusType.WARNING, "No recipients");
+            case INBOX_ONLY -> new Status(StatusType.INFO, "Inbox only");
         };
     }
 

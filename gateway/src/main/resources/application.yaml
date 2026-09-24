@@ -56,6 +56,14 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_forms/**
 
+        # A person's inbox — notifications and tasks — in every shell: the data plane's and the
+        # control console's. Filtered by the caller's roles in the service; only signed-in users.
+        - id: inbox
+          uri: ${COMMUNICATION_URL:http://communication-service:8125}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_inbox/**
+
         - id: worker
           uri: ${WORKER_URL:http://worker:8091}
           predicates:

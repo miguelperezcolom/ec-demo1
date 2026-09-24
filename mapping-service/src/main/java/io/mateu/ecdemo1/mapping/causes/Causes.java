@@ -115,6 +115,7 @@ public class Causes {
         record.resolvedAt = clock.instant();
         record.resolvedBy = resolvedBy;
         causes.save(record);
+        outbox.appendResolution(causeKey, resolvedBy);
         var released = 0;
         for (var waiter : waiters.waitingOn(causeKey)) {
             if (links.openCausesOf(waiter.getProcessKey()) == 0) {

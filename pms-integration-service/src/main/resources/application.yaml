@@ -17,6 +17,9 @@ spring:
           notifications:
             producer:
               sync: true
+          notificationResolutions:
+            producer:
+              sync: true
       bindings:
         # IN: the engine's tasks for this adapter — the steps whose definition says topic pms.
         consumeTasks-in-0:
@@ -27,6 +30,8 @@ spring:
           destination: upstream
         notifications:
           destination: notifications
+        notificationResolutions:
+          destination: notification-resolutions
 
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}

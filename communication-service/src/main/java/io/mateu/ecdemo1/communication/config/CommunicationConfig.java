@@ -44,6 +44,33 @@ public class CommunicationConfig {
         };
     }
 
+    /** The notification-resolutions topic: what the notifications asked for is no longer waiting. */
+    @Bean
+    public Consumer<Message<byte[]>> consumeResolutions(io.mateu.ecdemo1.communication.inbox.Inbox inbox, ObjectMapper objectMapper) {
+        var reader = objectMapper.copy().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        return message -> {
+            try {
+                inbox.resolved(reader.readValue(message.getPayload(),
+                        io.mateu.ecdemo1.integration.model.notification.NotificationResolved.class));
+            } catch (IOException e) {
+                log.error("Unreadable resolution, skipped: {}", new String(message.getPayload()), e);
+            }
+        };
+    }
+
+    /** The forms engine's human-tasks topic: a task is one more thing waiting in someone's inbox. */
+    @Bean
+    public Consumer<Message<byte[]>> consumeHumanTasks(io.mateu.ecdemo1.communication.inbox.Inbox inbox, ObjectMapper objectMapper) {
+        var reader = objectMapper.copy().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        return message -> {
+            try {
+                inbox.task(reader.readValue(message.getPayload(), io.mateu.ecdemo1.communication.inbox.HumanTask.class));
+            } catch (IOException e) {
+                log.error("Unreadable human task, skipped: {}", new String(message.getPayload()), e);
+            }
+        };
+    }
+
     @Bean
     ApplicationRunner seedRecipients(RecipientRepository recipients, CommunicationProperties properties) {
         return args -> {

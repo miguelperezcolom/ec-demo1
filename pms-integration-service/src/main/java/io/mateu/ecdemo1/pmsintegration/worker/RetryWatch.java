@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RetryWatch {
 
-    record Failing(Instant since, boolean alerted) {
+    record Failing(Instant since, boolean alerted, String subject) {
     }
 
     final PmsIntegrationProperties properties;
@@ -39,9 +39,9 @@ public class RetryWatch {
     public void failed(TaskExecutionRequested task, String hotelCode, String subject, String reason) {
         var key = task.processId() + "/" + task.stepId();
         var now = clock.instant();
-        var state = failing.merge(key, new Failing(now, false), (old, fresh) -> old);
+        var state = failing.merge(key, new Failing(now, false, subject), (old, fresh) -> old);
         if (!state.alerted() && state.since().plus(properties.alertAfter()).isBefore(now)) {
-            failing.put(key, new Failing(state.since(), true));
+            failing.put(key, new Failing(state.since(), true, subject));
             var sent = streamBridge.send("notifications", new NotificationRequested(UUID.randomUUID().toString(),
                     NotificationType.RETRYING_TOO_LONG, hotelCode, subject,
                     "Writing %s to the PMS keeps failing".formatted(subject),
@@ -53,6 +53,11 @@ public class RetryWatch {
     }
 
     public void succeeded(TaskExecutionRequested task) {
-        failing.remove(task.processId() + "/" + task.stepId());
+        var state = failing.remove(task.processId() + "/" + task.stepId());
+        if (state != null && state.alerted() && state.subject() != null) {
+            // It was alerted as failing; it went through: the alert is done with.
+            streamBridge.send("notificationResolutions", new io.mateu.ecdemo1.integration.model.notification.NotificationResolved(
+                    state.subject(), "retry", clock.instant()));
+        }
     }
 }
