@@ -1,6 +1,6 @@
 # PoC ACL — guión de la demo
 
-Estado a 2026-09-24. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
+Estado a 2026-09-24 (tarde). Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
 **tenant real de Opera** (OHIP UAT, propiedad **XMAR**); ya no hay doble de Opera en el despliegue
 (`opera-mock` queda solo para la batería local de pruebas). Lo marcado *(pendiente)* no está
 construido todavía o espera una decisión.
@@ -146,11 +146,21 @@ de los datos de Salesforce); el **front office** y **Opera** reciben esa proyecc
    *Rechazada* (con motivo). Un flow aplica lo aprobado al contacto y anuncia la decisión.
 4. Baja sola: el MDM actualiza su proyección; el front office pasa el kárdex a **Aprobado** (o
    **Rechazado**, y vuelven los datos del maestro); Opera reescribe el perfil del huésped de las
-   reservas del cliente.
+   reservas del cliente **en su sitio**: el email y el teléfono cambian en la misma entrada, no se
+   añade uno nuevo al lado.
 
-Cualquier cambio hecho a mano en el contacto de Salesforce baja igual. Probado en ec1 con
-C-E572C893A59C (Case 500d100000H0YeFAAV): del Case aprobado al front office y al perfil 20538296 de
-Opera.
+Cualquier cambio hecho a mano en el contacto de Salesforce baja igual. Qué enseñar en cada sitio:
+
+| Dónde | Qué se ve |
+| :---- | :-------- |
+| Front office — la reserva del titular | «Kárdex: Pendiente de aprobación · email … → …», y después Aprobado o Rechazado |
+| Salesforce — el Case sobre el contacto | Los datos propuestos, qué cambia, de dónde viene; *Decisión* |
+| Consola — *Customers* | El cliente con sus xref (Salesforce, front office, perfiles de Opera) y sus solicitudes de cambio |
+| Opera | El perfil del huésped con el dato nuevo, en la misma entrada |
+
+Probado en ec1 con C-E572C893A59C (reserva CU838F): dos cambios aprobados en Salesforce (Cases
+500d100000H0YeFAAV y 500d100000H0dNlAAJ) llegaron al front office y al perfil 20538296 de Opera; el
+segundo cambió el email en su sitio.
 
 ## 11. Quién hizo qué, y qué me espera
 
@@ -175,10 +185,16 @@ de Cobros y factura de depósito.
 - [ ] Comprobar el agente de la consola (MCP de `booking`) y el agente de mapeado con el LLM real.
 - [ ] Destinatarios de email reales (hoy el de por defecto es un `example.com` y el correo falla) y
       qué espacio de Google Chat recibe qué (el segundo espacio está bloqueado por su administrador).
-- [ ] Probar el §10 desde la pantalla del front office (con usuario) y el Case desde la consola de Salesforce.
+- [ ] Probar el §10 desde la pantalla del front office (con usuario) y el Case desde la consola de
+      Salesforce. Ojo: el Case lleva la sección *Cambio de datos de cliente (MDM)*; para poder añadirla
+      se quitaron del layout de Case las acciones y el panel de resumen propios (quedan los de por
+      defecto).
+- [ ] Solo el titular viaja al maestro: los acompañantes no llevan código de cliente en el front office.
 - [ ] Datos de prueba en XMAR que conviene conocer: reservas 39481284, 39481745, 39481775, 39481943,
       39481944, 39482155 (y dos canceladas); perfiles de interlocutor 20538292 y 20538322
-      (ECDEMO0001/0002).
+      (ECDEMO0001/0002); el perfil de huésped 20538296 conserva un email antiguo como secundario, de
+      antes del arreglo (la API de Opera no permite borrarlo). En Salesforce, los dos Cases de prueba
+      y el contacto de C-E572C893A59C con los datos cambiados.
 - En Opera, lo que necesita un administrador de OPERA: la interfaz de las referencias externas de
   perfil (OPERAWS-GEN01187) y un cajero para los depósitos (FOF00094). Sin eso, los perfiles van
   sin referencia externa y los depósitos no se apuntan al folio.
