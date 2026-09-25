@@ -28,11 +28,11 @@ spec:
     metadata:
       labels: { app: postfix }
     spec:
-      # Same pin as every workload here: cx43 is Hetzner amd64, matching the single-arch images and
-      # keeping CFKE's provisioner from placing this on an arm64 node.
+      # Same pin as every workload here: a cx43 in hel1, next to the rest, and amd64 — the images are
+      # single-arch and Hetzner's CAX line is arm64.
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
         topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       containers:
         - name: postfix
           image: boky/postfix:v5.1.0

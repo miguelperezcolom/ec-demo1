@@ -32,6 +32,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -n ingress-nginx --create-namespace \
   --set controller.replicaCount=1 \
   --set controller.nodeSelector."kubernetes\.io/arch"=amd64 \
+  --set controller.nodeSelector."topology\.kubernetes\.io/region"=hel1 \
   --set controller.service.type=LoadBalancer \
   --set controller.resources.requests.cpu=100m \
   --set controller.resources.requests.memory=256Mi \

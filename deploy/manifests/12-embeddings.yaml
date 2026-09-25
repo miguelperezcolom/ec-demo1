@@ -27,11 +27,11 @@ spec:
     metadata:
       labels: { app: embeddings }
     spec:
-      # Same pin as every workload here: cx43 is Hetzner amd64, matching the single-arch images and
-      # keeping CFKE's provisioner from placing this on an arm64 node.
+      # Same pin as every workload here: a cx43 in hel1, next to the rest, and amd64 — the images are
+      # single-arch and Hetzner's CAX line is arm64.
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
         topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       containers:
         - name: tei
           image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
@@ -54,8 +54,8 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: { drop: ["ALL"] }
           resources:
-            # Request modestly — the node reserves by request, and there is only one cx43 node with
-            # everything else on it. The model needs ~900Mi resident, which the 3Gi limit covers;
+            # Request modestly — the node reserves by request, and it shares the node with everything
+            # else. The model needs ~900Mi resident, which the 3Gi limit covers;
             # over-reserving at request time just starves other pods of a scheduling slot.
             requests: { memory: "512Mi", cpu: "250m" }
             limits:   { memory: "3Gi", cpu: "2" }

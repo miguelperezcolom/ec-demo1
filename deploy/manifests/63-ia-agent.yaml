@@ -42,16 +42,8 @@ spec:
         prometheus.io/port: "8095"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
         topology.kubernetes.io/region: hel1
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

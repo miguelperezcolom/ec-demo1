@@ -33,16 +33,8 @@ spec:
         prometheus.io/port: "8110"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
         topology.kubernetes.io/region: hel1
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -60,8 +52,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8110"
-            # cp-postgres, not postgres. The engine's database is on an emptyDir and this one is
-            # not — see 70-cp-postgres.yaml for why that distinction is the whole design.
+            # cp-postgres, not postgres: the control plane keeps its own server — see
+            # 70-cp-postgres.yaml.
             - name: DB_URL
               value: jdbc:postgresql://cp-postgres:5432/controlplane
             - name: DB_USERNAME
