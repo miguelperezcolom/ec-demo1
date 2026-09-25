@@ -32,3 +32,20 @@ after the delete and could name the survivor in the event; a flow cannot, hence 
 Deleting a field that an old flow version still references fails: activate the new version first
 (`deploy.py` does, and deletes obsolete versions), then deploy the removal with a
 `destructiveChangesPost.xml` next to `package.xml`.
+
+## Deduplicating contacts (`dedup.py`)
+
+The org's duplicate rules only propose; `dedup.py` merges what they missed. It groups contacts by
+normalized first and last name. A group is AUTO when its non-empty emails, phones and accounts agree,
+and REVISAR otherwise. The master is the contact with the most fields filled in, and its empty fields
+come from the most recent contact that has them.
+
+```bash
+./dedup.py                                  # read only: backup + dedup-out/dedup_plan.md
+./dedup.py --execute                        # merges the AUTO groups (SOAP merge(), 2 absorbed per call)
+./dedup.py --execute --include "lucia fernandez"   # a REVISAR group treated as AUTO
+./dedup.py --restore dedup-out/dedup_result_<ts>.json   # the absorbed back from the recycle bin
+```
+
+For the demo, `--restore` brings the duplicates back so the merge can be shown again. `reset.sh` does
+not restore them, because they are not ec1's customers. Tests: `python3 -m unittest test_dedup`.
