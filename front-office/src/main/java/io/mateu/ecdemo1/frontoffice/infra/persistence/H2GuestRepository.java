@@ -21,7 +21,7 @@ class H2GuestRepository implements GuestRepository {
 
   @Override
   public Optional<Guest> findById(String id) {
-    return crud.findById(id);
+    return RequestCache.get("guest:" + id, () -> crud.findById(id));
   }
 
   @Override
@@ -31,6 +31,7 @@ class H2GuestRepository implements GuestRepository {
 
   @Override
   public Guest save(Guest guest) {
+    RequestCache.evict("guest:" + guest.id());
     // Ids are application-assigned, so new aggregates must be inserted explicitly.
     return crud.existsById(guest.id()) ? crud.save(guest) : template.insert(guest);
   }

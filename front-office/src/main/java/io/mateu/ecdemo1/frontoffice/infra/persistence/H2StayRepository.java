@@ -22,7 +22,7 @@ class H2StayRepository implements StayRepository {
 
   @Override
   public Optional<Stay> findById(String id) {
-    return crud.findById(id);
+    return RequestCache.get("stay:" + id, () -> crud.findById(id));
   }
 
   @Override
@@ -42,6 +42,7 @@ class H2StayRepository implements StayRepository {
 
   @Override
   public Stay save(Stay stay) {
+    RequestCache.evict("stay:" + stay.id());
     return crud.existsById(stay.id()) ? crud.save(stay) : template.insert(stay);
   }
 }

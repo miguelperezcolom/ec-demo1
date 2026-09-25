@@ -20,16 +20,17 @@ class H2FolioRepository implements FolioRepository {
 
   @Override
   public Optional<Folio> findById(String id) {
-    return crud.findById(id);
+    return RequestCache.get("folio:" + id, () -> crud.findById(id));
   }
 
   @Override
   public Optional<Folio> findByStayId(String stayId) {
-    return crud.findByStayId(stayId);
+    return RequestCache.get("folio-of-stay:" + stayId, () -> crud.findByStayId(stayId));
   }
 
   @Override
   public Folio save(Folio folio) {
+    RequestCache.evict("folio:" + folio.id(), "folio-of-stay:" + folio.stayId());
     return crud.existsById(folio.id()) ? crud.save(folio) : template.insert(folio);
   }
 }
