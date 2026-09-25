@@ -51,7 +51,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: crs-integration-service
-          image: miguelperezcolom/ec-demo1-crs-integration-service:0.23.0
+          image: miguelperezcolom/ec-demo1-crs-integration-service:0.23.1
           env:
             - name: SERVER_PORT
               value: "8121"

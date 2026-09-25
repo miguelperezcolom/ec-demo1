@@ -41,7 +41,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: control-shell-redwood
-          image: miguelperezcolom/ec-demo1-control-shell-redwood:0.21.0
+          image: miguelperezcolom/ec-demo1-control-shell-redwood:0.21.1
           env:
             - name: SERVER_PORT
               value: "8112"

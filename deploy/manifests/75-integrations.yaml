@@ -54,7 +54,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: integrations-service
-          image: miguelperezcolom/ec-demo1-integrations-service:0.21.0
+          image: miguelperezcolom/ec-demo1-integrations-service:0.21.1
           env:
             - name: SERVER_PORT
               value: "8126"
