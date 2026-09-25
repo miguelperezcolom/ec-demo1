@@ -24,6 +24,7 @@ spec:
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: cx43
+        topology.kubernetes.io/region: hel1
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -45,7 +46,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: front-office
-          image: miguelperezcolom/ec-demo1-front-office:0.22.3
+          image: miguelperezcolom/ec-demo1-front-office:0.22.4
           env:
             - name: SERVER_PORT
               value: "8128"

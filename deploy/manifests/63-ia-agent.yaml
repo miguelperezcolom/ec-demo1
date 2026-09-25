@@ -43,6 +43,7 @@ spec:
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: cx43
+        topology.kubernetes.io/region: hel1
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

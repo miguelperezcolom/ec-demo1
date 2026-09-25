@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.frontoffice.ui.reservas;
 
 import io.mateu.ecdemo1.frontoffice.ui.Paging;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
+import io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel.StayRow;
 import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
@@ -64,11 +65,13 @@ public class ReservasListing
   public ListingData<Reserva> search(SearchRequest request, HttpRequest httpRequest) {
     var searchText = request.searchText();
     var filtros = filters(request);
+    // Una consulta (estancia + huésped, sin colecciones); el filtro, el orden y la búsqueda sobre la
+    // fila ya pintada siguen en memoria, que es lo que permite buscar por "Llega mañana".
     var rows =
-        FrontOffice.stays().findAll().stream()
+        FrontOffice.stayReads().rows().stream()
             .filter(s -> matchesVista(s, filtros == null ? null : filtros.vista))
             .sorted(
-                java.util.Comparator.comparing((Stay s) -> s.status().ordinal())
+                java.util.Comparator.comparing((StayRow s) -> s.status().ordinal())
                     .thenComparing(
                         s ->
                             s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
@@ -81,7 +84,7 @@ public class ReservasListing
   }
 
   /** El selector rápido: llegadas de hoy / salidas de hoy / en casa. */
-  private static boolean matchesVista(Stay stay, Vista vista) {
+  private static boolean matchesVista(StayRow stay, Vista vista) {
     if (vista == null) {
       return true;
     }
@@ -99,15 +102,16 @@ public class ReservasListing
     };
   }
 
-  private Reserva row(Stay stay) {
-    var guest = FrontOffice.guests().findById(stay.guestId()).orElseThrow();
+  private Reserva row(StayRow stay) {
+    var habitacion = stay.roomNumber() == null || stay.roomNumber().isBlank()
+        ? "Sin asignar" : "Hab " + stay.roomNumber();
     return new Reserva(
         stay.id(),
-        guest.name(),
-        stay.roomLabel() + " · " + stay.roomType(),
-        stay.nights(),
-        estadoLabel(stay),
-        guest.tier().name());
+        stay.guestName(),
+        habitacion + " · " + stay.roomType(),
+        java.time.temporal.ChronoUnit.DAYS.between(stay.checkIn(), stay.checkOut()),
+        estadoLabel(stay.status(), stay.checkIn(), stay.checkOut()),
+        stay.guestTier());
   }
 
   private boolean matches(Reserva row, String searchText) {
@@ -126,12 +130,17 @@ public class ReservasListing
   }
 
   static String estadoLabel(Stay stay) {
+    return estadoLabel(stay.status(), stay.checkIn(), stay.checkOut());
+  }
+
+  static String estadoLabel(
+      io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus status, LocalDate checkIn, LocalDate checkOut) {
     var today = LocalDate.now();
-    return switch (stay.status()) {
-      case ARRIVING -> relativo("Llega", stay.checkIn(), today);
-      case IN_HOUSE -> relativo("Sale", stay.checkOut(), today);
-      case DEPARTED -> "Salió " + FECHA.format(stay.checkOut());
-      case CANCELLED -> "Cancelada · llegaba " + FECHA.format(stay.checkIn());
+    return switch (status) {
+      case ARRIVING -> relativo("Llega", checkIn, today);
+      case IN_HOUSE -> relativo("Sale", checkOut, today);
+      case DEPARTED -> "Salió " + FECHA.format(checkOut);
+      case CANCELLED -> "Cancelada · llegaba " + FECHA.format(checkIn);
     };
   }
 

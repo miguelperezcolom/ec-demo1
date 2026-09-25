@@ -65,19 +65,17 @@ public class Bienvenida extends Welcome {
 
   private static io.mateu.uidl.data.Chart ocupacionProximosDias() {
     var today = java.time.LocalDate.now();
-    var rooms = Math.max(1,
-        io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.rooms().findAll().size());
+    var reads = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.stayReads();
+    var rooms = Math.max(1, reads.rooms());
     var dias = java.time.format.DateTimeFormatter.ofPattern(
         "EEE d", java.util.Locale.forLanguageTag("es"));
     var labels = new java.util.ArrayList<String>();
     var values = new java.util.ArrayList<Double>();
+    // habitaciones ocupadas cada noche: una consulta para los 7 días, no un findAll por día
+    var noches = reads.occupiedNights(today, 7);
     for (int i = 0; i < 7; i++) {
       var day = today.plusDays(i);
-      var ocupadas = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.stays().findAll().stream()
-          .filter(io.mateu.ecdemo1.frontoffice.domain.stay.Stay::occupies)
-          // una estancia ocupa la noche de d si entra ese día o antes y sale después
-          .filter(s -> !s.checkIn().isAfter(day) && s.checkOut().isAfter(day))
-          .count();
+      var ocupadas = noches.get(i);
       labels.add(dias.format(day));
       values.add(Math.min(100d, Math.round(ocupadas * 1000d / rooms) / 10d));
     }
@@ -102,21 +100,15 @@ public class Bienvenida extends Welcome {
 
   private enum Vista { LLEGADAS, SALIDAS, EN_CASA }
 
+  /** Un contador del día: una consulta de agregados, no un findAll de agregados completos. */
   private static long contar(Vista vista) {
-    var today = java.time.LocalDate.now();
-    return io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.stays().findAll().stream()
-        .filter(s -> switch (vista) {
-          case LLEGADAS ->
-              s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
-                  && !s.checkIn().isAfter(today);
-          case SALIDAS ->
-              (s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE
-                  || s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED)
-                  && s.checkOut().isEqual(today);
-          case EN_CASA ->
-              s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE;
-        })
-        .count();
+    var hoy = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.stayReads()
+        .today(java.time.LocalDate.now());
+    return switch (vista) {
+      case LLEGADAS -> hoy.arrivals();
+      case SALIDAS -> hoy.departures();
+      case EN_CASA -> hoy.inHouse();
+    };
   }
 
   @Override

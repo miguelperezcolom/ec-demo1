@@ -26,6 +26,7 @@ public class FrontOffice {
 
   private final GuestRepository guests;
   private final StayRepository stays;
+  private final io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel stayReads;
   private final FolioRepository folios;
   private final RoomRepository rooms;
   private final AutomationRepository automations;
@@ -36,6 +37,7 @@ public class FrontOffice {
   public FrontOffice(
       GuestRepository guests,
       StayRepository stays,
+      io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel stayReads,
       FolioRepository folios,
       RoomRepository rooms,
       AutomationRepository automations,
@@ -43,6 +45,7 @@ public class FrontOffice {
       AddOnCatalogRepository addOnCatalog) {
     this.guests = guests;
     this.stays = stays;
+    this.stayReads = stayReads;
     this.folios = folios;
     this.rooms = rooms;
     this.automations = automations;
@@ -57,6 +60,11 @@ public class FrontOffice {
 
   public static StayRepository stays() {
     return instance.stays;
+  }
+
+  /** Stays as screens that only look read them: plain queries, no aggregates. */
+  public static io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel stayReads() {
+    return instance.stayReads;
   }
 
   public static FolioRepository folios() {

@@ -207,6 +207,7 @@ orchestrator:
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
     node.kubernetes.io/instance-type: ccx13
+    topology.kubernetes.io/region: hel1
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -263,6 +264,7 @@ forms:
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
     node.kubernetes.io/instance-type: cx43
+    topology.kubernetes.io/region: hel1
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -314,6 +316,7 @@ rules:
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
     node.kubernetes.io/instance-type: cx43
+    topology.kubernetes.io/region: hel1
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:

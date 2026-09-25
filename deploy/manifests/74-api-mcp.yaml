@@ -34,6 +34,7 @@ spec:
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: cx43
+        topology.kubernetes.io/region: hel1
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

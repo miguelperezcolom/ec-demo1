@@ -31,6 +31,7 @@ spec:
       # keeping CFKE's provisioner from placing this on an arm64 node.
       nodeSelector:
         node.kubernetes.io/instance-type: cx43
+        topology.kubernetes.io/region: hel1
       containers:
         - name: tei
           image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
