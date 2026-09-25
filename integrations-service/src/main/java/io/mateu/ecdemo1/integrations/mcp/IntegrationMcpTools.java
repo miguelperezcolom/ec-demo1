@@ -65,8 +65,10 @@ public class IntegrationMcpTools implements McpSystemContext {
         return api.importPartners(id(hotelCode), "agent");
     }
 
-    @Tool(description = "Approve the hotel's mapping so its onboarding goes on. Only when the user asks for it, with their name")
-    public IntegrationDto approveMapping(@ToolParam(description = "CRS hotel code") String hotelCode,
+    // Not "approveMapping": the mapping service's tool has that name — it approves one proposed
+    // equivalence — and an agent that sees both MCP servers refuses to start with two tools of one name.
+    @Tool(description = "Approve the hotel's mapping as a whole so its onboarding goes on, even with codes still unmapped. Not for approving one proposed equivalence (that is the mapping service's approveMapping). Only when the user asks for it, with their name")
+    public IntegrationDto approveIntegrationMapping(@ToolParam(description = "CRS hotel code") String hotelCode,
                                          @ToolParam(description = "The name of the person approving") String approvedBy) {
         return api.approveMapping(id(hotelCode), named(approvedBy));
     }
