@@ -63,10 +63,13 @@ spec:
               value: "http://integrations-service:8126"
             - name: RETRY_ALERT_AFTER
               value: "10m"
-            # OHIP UAT: reservations carry the CRS's locator under Rumbo's external system; the CRS
-            # version goes in a numeric UDF named as OPERA names them.
+            # OHIP UAT: reservations carry the CRS's locator under a context of our own. Not "CRS":
+            # the tenant's real CRS writes its references under it, and ours would mix with theirs.
+            # ECDEMO1 is not one of OPERA's catalogued external systems — a reservation's references
+            # take any context; a profile's would not (see OPERA_PROFILE_REFERENCES). The CRS version
+            # goes in a numeric UDF named as OPERA names them.
             - name: OPERA_EXTERNAL_SYSTEM
-              value: "CRS"
+              value: "ECDEMO1"
             - name: OPERA_VERSION_UDF
               value: "UDFN01"
             - name: OPERA_PAY_AT_HOTEL_METHOD
