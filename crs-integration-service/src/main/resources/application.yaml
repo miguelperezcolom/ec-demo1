@@ -73,6 +73,8 @@ spring:
 crs:
   booking-url: ${BOOKING_URL:http://localhost:8108}
   partners-url: ${PARTNERS_URL:http://localhost:8120}
+  # A reservation of a hotel with no integration starts no process (Integrations).
+  integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
   # Business event → process definition (ec-definitions). A new use case is a line here and a
   # definition there, not code.
   routes:

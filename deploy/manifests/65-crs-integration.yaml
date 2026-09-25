@@ -22,16 +22,8 @@ spec:
         prometheus.io/port: "8121"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
         topology.kubernetes.io/region: hel1
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -51,7 +43,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: crs-integration-service
-          image: miguelperezcolom/ec-demo1-crs-integration-service:0.23.1
+          image: miguelperezcolom/ec-demo1-crs-integration-service:0.24.0
           env:
             - name: SERVER_PORT
               value: "8121"
@@ -69,6 +61,8 @@ spec:
               value: "http://booking:8108"
             - name: PARTNERS_URL
               value: "http://partners:8120"
+            - name: INTEGRATIONS_URL
+              value: "http://integrations-service:8126"
           ports:
             - { name: http, containerPort: 8121 }
           securityContext:

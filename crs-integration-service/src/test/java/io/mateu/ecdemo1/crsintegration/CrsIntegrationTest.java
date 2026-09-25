@@ -97,6 +97,10 @@ class CrsIntegrationTest {
             }
             String body = switch (path) {
                 case "/bookings/LOC1" -> BOOKING;
+                case "/bookings/LOC3" -> BOOKING.replace("\"LOC1\"", "\"LOC3\"").replace("\"PMI01\"", "\"CUN01\"");
+                // PMI01 has an integration; CUN01 has none.
+                case "/integrations/views" -> """
+                        [{"id":"I-1","crsHotelCode":"PMI01","pmsHotelCode":"XMAR","status":"ACTIVE"}]""";
                 case "/bookings/future" -> exchange.getRequestURI().getQuery().contains("afterArrival")
                         ? "[]"
                         : "[" + BOOKING + "," + BOOKING.replace("\"LOC1\"", "\"LOC2\"").replace("2026-10-05", "2026-10-09")
@@ -120,6 +124,7 @@ class CrsIntegrationTest {
         var url = "http://localhost:" + crs.getAddress().getPort();
         registry.add("BOOKING_URL", () -> url);
         registry.add("PARTNERS_URL", () -> url);
+        registry.add("INTEGRATIONS_URL", () -> url);
         registry.add("KAFKA_BROKERS", redpanda::getBootstrapServers);
     }
 
@@ -173,6 +178,16 @@ class CrsIntegrationTest {
         assertThat(consume("upstream", r -> r.value().contains("E-3"), 1, 15))
                 .singleElement().satisfies(r -> assertThat(variables(json(r.value())))
                         .containsEntry("partnerCode", "NORDTRAVEL"));
+    }
+
+    @Test
+    void aReservationOfAHotelWithNoIntegrationStartsNoProcess() throws Exception {
+        send("crs-bookings", "LOC3", """
+                {"type":"booking-created","eventId":"E-5","bookingId":"LOC3","hotelCode":"CUN01","version":1,
+                 "occurredAt":"2026-09-22T10:00:00Z"}""");
+
+        assertThat(consume("integration-events", r -> r.value().contains("E-5"), 1, 15)).singleElement();
+        assertThat(consume("upstream", r -> r.value().contains("E-5"), 1, 6)).isEmpty();
     }
 
     @Test

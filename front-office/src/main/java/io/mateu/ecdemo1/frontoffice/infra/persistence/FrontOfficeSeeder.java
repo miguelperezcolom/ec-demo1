@@ -39,7 +39,11 @@ import org.springframework.stereotype.Component;
  * Populates the H2 database on startup with the front-office sample data: today's arrivals, the
  * in-house guests with their folios, the rooms, the monitored automations and the reference
  * catalogs. Dates are relative to {@code LocalDate.now()} so the check-in/check-out queues are
- * always "today's". Idempotent: skipped when guests already exist (file-backed databases).
+ * always "today's". Idempotent: skipped when the hotel already has rooms (file-backed databases).
+ *
+ * <p>Rooms, not guests: a hotel with its rooms set up and no guest yet is a real state — the one it
+ * is in before the integration has written its first reservation — and it must not be filled with
+ * sample guests the CRS and the PMS know nothing about.
  */
 @Component
 public class FrontOfficeSeeder implements ApplicationRunner {
@@ -73,8 +77,8 @@ public class FrontOfficeSeeder implements ApplicationRunner {
 
   @Override
   public void run(ApplicationArguments args) {
-    if (!guests.findAll().isEmpty()) {
-      log.info("Front-office database already populated — skipping seed");
+    if (!rooms.findAll().isEmpty()) {
+      log.info("Front-office database already set up — skipping seed");
       return;
     }
     LocalDate today = LocalDate.now();

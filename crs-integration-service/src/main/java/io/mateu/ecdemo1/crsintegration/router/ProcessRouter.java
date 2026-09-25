@@ -42,6 +42,7 @@ public class ProcessRouter {
     final Inbox inbox;
     final Outbox outbox;
     final CrsProperties properties;
+    final Integrations integrations;
 
     @Transactional
     public void route(IntegrationEvent event) {
@@ -51,6 +52,11 @@ public class ProcessRouter {
         var definitionId = properties.routes().get(typeOf(event));
         if (definitionId == null) {
             log.info("No process for {} {}", typeOf(event), event.eventId());
+            return;
+        }
+        var hotelCode = hotelOf(event);
+        if (hotelCode != null && !integrations.integrated(hotelCode)) {
+            log.info("No integration for hotel {}: {} {} is not projected", hotelCode, typeOf(event), event.key());
             return;
         }
         var processKey = definitionId + ":" + event.key() + ":" + event.eventId();
@@ -117,6 +123,16 @@ public class ProcessRouter {
     private static void reservation(List<Variable> variables, String hotelCode, String locator) {
         variables.add(new Variable(ProcessVariables.HOTEL_CODE, hotelCode));
         variables.add(new Variable(ProcessVariables.LOCATOR, locator));
+    }
+
+    /** The hotel a reservation event belongs to; null for a chain-wide one, as a partner is. */
+    static String hotelOf(IntegrationEvent event) {
+        return switch (event) {
+            case ReservationCreated e -> e.hotelCode();
+            case ReservationModified e -> e.hotelCode();
+            case ReservationCancelled e -> e.hotelCode();
+            case PartnerChanged e -> null;
+        };
     }
 
     static String typeOf(IntegrationEvent event) {
