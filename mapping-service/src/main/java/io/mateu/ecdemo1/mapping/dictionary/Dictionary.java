@@ -54,17 +54,33 @@ public class Dictionary {
                            Map<String, String> attributes, Double confidence, String rationale) {
     }
 
-    /** Records a proposal. It translates nothing until someone approves it. */
+    /**
+     * Records a proposal. It translates nothing until someone approves it.
+     *
+     * <p>Proposing again what is already waiting — the same code, scope and PMS code — records nothing
+     * new: the waiting proposal is returned, with the latest confidence and rationale. The agent is
+     * asked more than once for the same hotel (the onboarding asks, and so can a person from Pending),
+     * and each answer used to add a copy of every proposal. A different PMS code for the same code is
+     * an alternative, and is recorded.
+     */
     @Audited("Propose mapping")
     @Transactional
     public MappingEntry propose(Proposal proposal, String proposedBy) {
         if (proposal.type() == null || blank(proposal.sourceCode()) || blank(proposal.targetCode())) {
             throw new IllegalArgumentException("A proposal needs a type, a CRS code and a PMS code");
         }
+        var hotelCode = proposal.type() == CodeType.HOTEL || blank(proposal.hotelCode()) ? null : proposal.hotelCode();
+        var waiting = entries.pendingProposal(proposal.type(), hotelCode, proposal.sourceCode(), proposal.targetCode());
+        if (!waiting.isEmpty()) {
+            var same = waiting.getFirst();
+            if (proposal.confidence() != null) same.confidence = proposal.confidence();
+            if (!blank(proposal.rationale())) same.rationale = proposal.rationale();
+            return entries.save(same);
+        }
         var entry = new MappingEntry();
         entry.id = UUID.randomUUID().toString();
         entry.type = proposal.type();
-        entry.hotelCode = proposal.type() == CodeType.HOTEL || blank(proposal.hotelCode()) ? null : proposal.hotelCode();
+        entry.hotelCode = hotelCode;
         entry.sourceCode = proposal.sourceCode();
         entry.targetCode = proposal.targetCode();
         entry.attributes = proposal.attributes();

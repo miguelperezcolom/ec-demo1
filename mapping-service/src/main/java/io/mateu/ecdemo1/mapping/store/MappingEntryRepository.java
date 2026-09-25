@@ -33,6 +33,15 @@ public interface MappingEntryRepository extends JpaRepository<MappingEntry, Stri
             """)
     int lastVersion(@Param("type") CodeType type, @Param("hotel") String hotelCode, @Param("code") String code);
 
+    /** The same equivalence, still waiting for a person: same code, same scope, same PMS code. */
+    @Query("""
+            select e from MappingEntry e
+            where e.type = :type and e.sourceCode = :code and e.targetCode = :target and e.status = 'PROPOSED'
+              and ((:hotel is null and e.hotelCode is null) or e.hotelCode = :hotel)
+            """)
+    List<MappingEntry> pendingProposal(@Param("type") CodeType type, @Param("hotel") String hotelCode,
+                                       @Param("code") String code, @Param("target") String target);
+
     List<MappingEntry> findByStatusOrderByCreatedAtDesc(EntryStatus status);
 
     List<MappingEntry> findAllByOrderByTypeAscSourceCodeAscEntryVersionDesc();

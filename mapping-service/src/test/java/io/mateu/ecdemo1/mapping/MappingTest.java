@@ -188,6 +188,19 @@ class MappingTest {
     }
 
     @Test
+    void proposingAgainWhatIsAlreadyWaitingRecordsNothingNewButAnAlternativeIsRecorded() {
+        var first = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "DUP01", "DUPX", "XDUP", Map.of(), 0.6, "first"), "agent");
+        var again = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "DUP01", "DUPX", "XDUP", Map.of(), 0.9, "second"), "agent");
+        var other = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "DUP01", "DUPX", "YDUP", Map.of(), null, null), "agent");
+
+        assertThat(again.getId()).isEqualTo(first.getId());
+        assertThat(again.confidence).isEqualTo(0.9);
+        assertThat(again.rationale).isEqualTo("second");
+        assertThat(other.getId()).isNotEqualTo(first.getId());
+        assertThat(entries.findAll()).filteredOn(e -> "DUPX".equals(e.sourceCode)).hasSize(2);
+    }
+
+    @Test
     void aPropertyExceptionWinsOverTheChainAndApprovingSupersedesThePreviousVersion() {
         define(CodeType.RATE_PLAN, null, "NRF", "NONREF", Map.of());
         define(CodeType.RATE_PLAN, "CUN01", "NRF", "NRF-MX", Map.of());
