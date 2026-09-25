@@ -102,7 +102,8 @@ public class BookingDBQueryService implements BookingQueryService {
                 booking.getCancellation(),
                 booking.getPmsReference(),
                 booking.getCreated(),
-                booking.getUpdated());
+                booking.getUpdated(),
+                booking.originalAmount());
     }
 
 }

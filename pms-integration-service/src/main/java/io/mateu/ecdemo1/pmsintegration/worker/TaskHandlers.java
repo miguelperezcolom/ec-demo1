@@ -152,15 +152,7 @@ public class TaskHandlers {
      */
     List<Variable> upsertReservation(TaskExecutionRequested task) {
         var r = reservation(task);
-        var codes = new LinkedHashSet<CodeRef>();
-        codes.add(new CodeRef(CodeType.HOTEL, r.hotelCode()));
-        codes.add(new CodeRef(CodeType.CHANNEL, r.channelCode()));
-        r.rooms().forEach(room -> {
-            codes.add(new CodeRef(CodeType.ROOM_TYPE, room.roomTypeCode()));
-            codes.add(new CodeRef(CodeType.RATE_PLAN, room.ratePlanCode()));
-            codes.add(new CodeRef(CodeType.BOARD, room.boardCode()));
-        });
-        r.payments().forEach(p -> codes.add(new CodeRef(CodeType.PAYMENT_METHOD, p.methodCode())));
+        var codes = codesOf(r);
         var resolved = integration.resolve(r.hotelCode(), new ArrayList<>(codes));
         var partner = r.partnerCode() == null ? null : integration.partner(r.partnerCode());
         var partnerProfile = r.partnerCode() == null ? null : integration.partnerProfile(r.partnerCode()).orElse(null);
@@ -210,6 +202,81 @@ public class TaskHandlers {
     }
 
     /**
+     * Each night's base as the amount itself. On a modification OPERA re-rates the night from its own
+     * rate plan and keeps the amount sent only as a share of that base — a 25% fee of the CRS's price
+     * came out as 25% of Opera's. With the base given, the night costs what is sent.
+     */
+    static com.fasterxml.jackson.databind.JsonNode withBaseAmounts(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node instanceof com.fasterxml.jackson.databind.node.ObjectNode object) {
+            var base = object.get("base");
+            if (base instanceof com.fasterxml.jackson.databind.node.ObjectNode b && b.has("amountBeforeTax")) {
+                b.set("baseAmount", b.get("amountBeforeTax"));
+            }
+            object.forEach(TaskHandlers::withBaseAmounts);
+        } else if (node != null && node.isArray()) {
+            node.forEach(TaskHandlers::withBaseAmounts);
+        }
+        return node;
+    }
+
+    /** The codes a reservation is written to Opera with: hotel, channel, each room's, each payment's. */
+    static LinkedHashSet<CodeRef> codesOf(Reservation r) {
+        var codes = new LinkedHashSet<CodeRef>();
+        codes.add(new CodeRef(CodeType.HOTEL, r.hotelCode()));
+        codes.add(new CodeRef(CodeType.CHANNEL, r.channelCode()));
+        r.rooms().forEach(room -> {
+            codes.add(new CodeRef(CodeType.ROOM_TYPE, room.roomTypeCode()));
+            codes.add(new CodeRef(CodeType.RATE_PLAN, room.ratePlanCode()));
+            codes.add(new CodeRef(CodeType.BOARD, room.boardCode()));
+        });
+        r.payments().forEach(p -> codes.add(new CodeRef(CodeType.PAYMENT_METHOD, p.methodCode())));
+        return codes;
+    }
+
+    /**
+     * The reservation as it costs its no-show fee: every night's rate by the same share, the last one
+     * taking the rounding, so that the stay adds up to the fee exactly.
+     */
+    public static Reservation withFee(Reservation r) {
+        var fee = r.cancellationFee();
+        var original = r.originalAmount() == null || r.originalAmount().signum() == 0 ? null : r.originalAmount();
+        if (fee == null || original == null) {
+            return r;
+        }
+        var share = fee.divide(original, 10, java.math.RoundingMode.HALF_UP);
+        var rooms = new ArrayList<io.mateu.ecdemo1.integration.model.reservation.Room>();
+        var written = java.math.BigDecimal.ZERO;
+        io.mateu.ecdemo1.integration.model.reservation.NightlyRate last = null;
+        int lastRoom = -1, lastNight = -1;
+        for (var room : r.rooms()) {
+            var nights = new ArrayList<io.mateu.ecdemo1.integration.model.reservation.NightlyRate>();
+            for (var night : room.nightlyRates()) {
+                var amount = night.amount().multiply(share).setScale(2, java.math.RoundingMode.HALF_UP);
+                written = written.add(amount);
+                nights.add(new io.mateu.ecdemo1.integration.model.reservation.NightlyRate(night.date(), amount));
+            }
+            rooms.add(new io.mateu.ecdemo1.integration.model.reservation.Room(room.line(), room.roomTypeCode(),
+                    room.ratePlanCode(), room.boardCode(), room.adults(), room.childrenAges(), room.guests(), nights));
+            if (!nights.isEmpty()) {
+                lastRoom = rooms.size() - 1;
+                lastNight = nights.size() - 1;
+                last = nights.get(lastNight);
+            }
+        }
+        if (last != null && written.compareTo(fee) != 0) {
+            var room = rooms.get(lastRoom);
+            var nights = new ArrayList<>(room.nightlyRates());
+            nights.set(lastNight, new io.mateu.ecdemo1.integration.model.reservation.NightlyRate(last.date(),
+                    last.amount().add(fee.subtract(written))));
+            rooms.set(lastRoom, new io.mateu.ecdemo1.integration.model.reservation.Room(room.line(), room.roomTypeCode(),
+                    room.ratePlanCode(), room.boardCode(), room.adults(), room.childrenAges(), room.guests(), nights));
+        }
+        return new Reservation(r.hotelCode(), r.locator(), r.version(), r.status(), r.channelCode(), r.partnerCode(),
+                r.externalReference(), r.arrival(), r.departure(), r.currency(), r.holder(), rooms, r.payments(), fee,
+                r.comments(), r.cancellationReasonCode(), r.cancellationFee(), r.originalAmount());
+    }
+
+    /**
      * Cancels in Opera. A reservation Opera does not have yet is not skipped: the cancellation waits
      * for it to be projected, so the PMS keeps the record and a penalty would have a folio (R37).
      */
@@ -237,10 +304,34 @@ public class TaskHandlers {
                     new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
         }
         try {
+            if (r.noShow() && r.cancellationFee() != null) {
+                // A no-show still costs its fee: Opera's reservation says so before it is cancelled — once
+                // cancelled, Opera takes no more changes.
+                var all = new ArrayList<>(codesOf(r));
+                all.add(new CodeRef(CodeType.CANCELLATION_REASON, r.cancellationReasonCode()));
+                var full = integration.resolve(r.hotelCode(), all);
+                if (!full.missing().isEmpty()) {
+                    await(task, r, full.missing());
+                    return outcome(ProcessVariables.WRITE_OUTCOME, Outcome.WAIT);
+                }
+                var partner = r.partnerCode() == null ? null : integration.partner(r.partnerCode());
+                var partnerProfile = r.partnerCode() == null ? null : integration.partnerProfile(r.partnerCode()).orElse(null);
+                var charged = withFee(r);
+                var body = payload.build(charged, full, hotel,
+                        OperaReservations.guestProfileId(existing.get()).orElse(null), partner,
+                        partnerProfile == null ? null : partnerProfile.pmsProfileId(),
+                        partnerProfile == null ? null : partnerProfile.profileType());
+                reservations.update(hotel, reservationId, withBaseAmounts(body));
+                log.info("{}: a no-show — its fee of {} (of {}) written to {} before cancelling", r.locator(),
+                        r.cancellationFee(), r.originalAmount(), reservationId);
+            }
             var reason = r.cancellationReasonCode() == null ? null
                     : resolved.target(CodeType.CANCELLATION_REASON, r.cancellationReasonCode());
             reservations.cancel(hotel, reservationId, reason, r.cancellationReasonCode() == null
-                    ? "Cancelled in the CRS" : "Cancelled in the CRS (reason " + r.cancellationReasonCode() + ")");
+                    ? "Cancelled in the CRS"
+                    : r.noShow() ? "No show: cancelled in the CRS with a fee of %s %s (of %s)".formatted(
+                            r.cancellationFee(), r.currency(), r.originalAmount())
+                    : "Cancelled in the CRS (reason " + r.cancellationReasonCode() + ")");
             log.info("{} cancelled in {} ({})", r.locator(), hotel, reservationId);
             return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.DONE.name()),
                     new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));

@@ -129,7 +129,7 @@ public class ReservaOverview
             case ARRIVING -> GuestHeaders.arrivalHeader(stayId);
             case IN_HOUSE -> GuestHeaders.inHouseHeader(stayId);
             case DEPARTED -> GuestHeaders.departureHeader(stayId);
-            case CANCELLED -> GuestHeaders.arrivalHeader(stayId);
+            case CANCELLED, NO_SHOW -> GuestHeaders.arrivalHeader(stayId);
           };
 
 // ── cuerpo: huéspedes + operativa en dos columnas; en el check-in, envuelto en un
@@ -316,7 +316,7 @@ public class ReservaOverview
     return switch (stay.status()) {
       case ARRIVING -> paraLlegada(stay);
       case IN_HOUSE -> paraInHouse(stay);
-      case DEPARTED, CANCELLED -> paraSalida(stay);
+      case DEPARTED, CANCELLED, NO_SHOW -> paraSalida(stay);
     };
   }
 
@@ -1013,7 +1013,7 @@ public class ReservaOverview
           Button.builder().label("Mensaje huésped").actionId("mensajeHuesped").build(),
           Button.builder().label("Registrar petición").actionId("opPeticion").build(),
           Button.builder().label("Nueva incidencia").actionId("opIncidencia").build());
-      case DEPARTED, CANCELLED -> List.of();
+      case DEPARTED, CANCELLED, NO_SHOW -> List.of();
     };
   }
 
@@ -1092,6 +1092,14 @@ public class ReservaOverview
         var ops = FrontOffice.checkInOps().of(stayId).toggleNoShow(pax);
         FrontOffice.checkInOps().save(stayId, ops);
         var nombre = Paxes.nameOf(stayId, pax);
+        var stay = stay();
+        var todos = java.util.stream.IntStream.rangeClosed(1, stay.pax()).allMatch(ops::isNoShow);
+        if (todos && stay.status() == StayStatus.ARRIVING) {
+          // Nadie de la reserva ha llegado: es un no show de la reserva, y lo decide el CRS
+          // (HLA F006) — la cancela con su cargo, y el resultado vuelve aquí y a Opera.
+          var aviso = io.mateu.ecdemo1.frontoffice.infra.crs.NoShows.report(stayId);
+          yield List.of(this, new Message("No show registrado — " + nombre + ". " + aviso));
+        }
         yield List.of(this, new Message(ops.isNoShow(pax)
             ? "No show registrado — " + nombre
             : "No show revertido — " + nombre));

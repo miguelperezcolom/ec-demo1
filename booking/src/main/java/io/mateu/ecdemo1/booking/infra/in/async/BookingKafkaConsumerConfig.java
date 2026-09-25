@@ -44,6 +44,9 @@ public class BookingKafkaConsumerConfig {
             switch (task.stepId()) {
                 case "confirm-booking" -> changeStatus(task, BookingStatus.Confirmed);
                 case "cancel-booking" -> changeStatus(task, BookingStatus.Cancelled);
+                // «Registrar no-show»: the hotel says the guest did not arrive.
+                case "register-no-show" -> WorkerReply.send(streamBridge, new TaskStatusChanged(task.taskExecutionId(),
+                        changeBookingStatusUseCase.noShow(bookingId(task)), List.of(), task.processId()));
                 default -> log.debug("No handler for step {}", task.stepId());
             }
         };

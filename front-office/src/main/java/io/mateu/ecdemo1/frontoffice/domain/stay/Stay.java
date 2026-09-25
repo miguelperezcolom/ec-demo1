@@ -81,8 +81,24 @@ public record Stay(
   }
 
   /** The reservation was cancelled: a stay still to arrive is cancelled; one already in the house is not. */
+  /**
+   * The guests did not arrive: the CRS cancelled the booking as a no-show, and it costs what it says —
+   * a share of the original price. Once: told again, the same stay.
+   */
+  public Stay noShow(java.math.BigDecimal fee) {
+    if (status == StayStatus.NO_SHOW) {
+      return this;
+    }
+    if (status != StayStatus.ARRIVING && status != StayStatus.CANCELLED) {
+      throw new IllegalStateException("A stay " + status + " cannot be a no-show");
+    }
+    return new Stay(
+        id, guestId, null, roomType, board, checkIn, checkOut, pax, agency, fee == null ? total : fee,
+        StayStatus.NO_SHOW, wishesGranted, wishesTotal, vipNote, companions, incidents, addOns);
+  }
+
   public Stay cancel() {
-    if (status == StayStatus.CANCELLED) {
+    if (status == StayStatus.CANCELLED || status == StayStatus.NO_SHOW) {
       return this;
     }
     if (status != StayStatus.ARRIVING) {

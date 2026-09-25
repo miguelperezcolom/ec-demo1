@@ -92,6 +92,28 @@ public class ProcessRouter {
                 AuthorizationContext.SYSTEM));
     }
 
+    /**
+     * «Registrar no-show» (HLA F006, #5): the hotel says a reservation's guests did not arrive. One
+     * process per reservation — told twice, it is one no-show; the CRS applies its rule, and the result
+     * comes back down to the PMS as the cancellation it is.
+     */
+    public boolean noShow(String hotelCode, String locator, String reportedBy) {
+        var definitionId = io.mateu.ecdemo1.integration.model.process.Definitions.REGISTER_NO_SHOW;
+        var processKey = definitionId + ":" + hotelCode + "/" + locator;
+        if (!inbox.firstTime("no-show", processKey)) {
+            return false;
+        }
+        var variables = new ArrayList<>(List.of(
+                new Variable(ProcessVariables.DEFINITION_ID, definitionId),
+                new Variable(ProcessVariables.PROCESS_KEY, processKey),
+                new Variable("bookingId", locator),
+                new Variable("reportedBy", reportedBy == null ? "front office" : reportedBy)));
+        reservation(variables, hotelCode, locator);
+        outbox.appendToEngine(new ProcessCreationRequested(definitionId, processKey, variables, null,
+                AuthorizationContext.SYSTEM));
+        return true;
+    }
+
     private static void reservation(List<Variable> variables, String hotelCode, String locator) {
         variables.add(new Variable(ProcessVariables.HOTEL_CODE, hotelCode));
         variables.add(new Variable(ProcessVariables.LOCATOR, locator));

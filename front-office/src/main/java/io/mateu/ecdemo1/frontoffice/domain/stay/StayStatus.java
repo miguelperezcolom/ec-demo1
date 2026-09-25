@@ -8,5 +8,7 @@ public enum StayStatus {
   ARRIVING,
   IN_HOUSE,
   DEPARTED,
-  CANCELLED
+  CANCELLED,
+  /** The guests did not arrive: cancelled in the CRS as a no-show, and it still costs its fee. */
+  NO_SHOW
 }

@@ -138,8 +138,15 @@ public class FrontOfficeWriter {
         }
         var locator = var(task, ProcessVariables.LOCATOR);
         try {
-            frontOffice.post().uri("/api/reservations/{locator}/cancellation", locator).retrieve().toBodilessEntity();
-            log.info("{} cancelled in the front office", locator);
+            // Why, and what it still costs: a no-show is a stay the guest owes its fee for.
+            var r = integration.reservation(hotelCode, locator);
+            var body = new HashMap<String, Object>();
+            body.put("noShow", r.noShow());
+            body.put("reasonCode", r.cancellationReasonCode());
+            body.put("total", r.totalAmount());
+            frontOffice.post().uri("/api/reservations/{locator}/cancellation", locator).body(body).retrieve().toBodilessEntity();
+            log.info("{} {} in the front office{}", locator, r.noShow() ? "a no-show" : "cancelled",
+                    r.noShow() ? ", costing " + r.totalAmount() : "");
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
                 log.info("{} was never in the front office: nothing to cancel", locator);

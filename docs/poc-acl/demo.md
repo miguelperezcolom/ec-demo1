@@ -162,6 +162,25 @@ Probado en ec1 con C-E572C893A59C (reserva CU838F): dos cambios aprobados en Sal
 500d100000H0YeFAAV y 500d100000H0dNlAAJ) llegaron al front office y al perfil 20538296 de Opera; el
 segundo cambió el email en su sitio.
 
+## 10 bis. No show: el hotel lo dice y el CRS lo cobra
+
+HLA F006: el no-show se detecta en el hotel, sube al CRS como estado, el CRS aplica su regla y el
+resultado baja por la proyección de siempre.
+
+1. En el front office, en la reserva (que llega hoy), se marca **No show** en cada huésped. Al marcar
+   el último, el front office avisa al CRS: la reserva entera es un no show.
+2. Arranca el proceso **`registrar-no-show`** (*Admin → Processes*): el CRS **cancela la reserva como
+   no show** (motivo `NOS`) y la deja costando el **25 % de su precio original** (configurable,
+   `booking.no-show-fee-percent`). En *Call center* se ve cancelada, con su cargo y el precio original.
+3. La cancelación baja sola (`proyectar-cancelacion`):
+   - **Opera**: primero la reserva pasa a costar el cargo (sus noches, al 25 %) y después se cancela
+     con el motivo **NOSHOW** («No Show»), con el cargo en la descripción. (El estado «No Show» de
+     Opera solo lo pone su Night Audit; por API es una cancelación.)
+   - **Front office**: la estancia pasa a **No show**, costando el cargo.
+
+Hace falta la equivalencia `NOS → NOSHOW` (motivo de cancelación, MRU01), que ya está en la línea
+base. Solo reservas que vienen del CRS: las de demostración del front office se quedan en local.
+
 ## 11. Quién hizo qué, y qué me espera
 
 - *Audit*: cada acción que decide algo sobre un hotel — alta, aprobar o retirar un mapeado, activar,
@@ -197,7 +216,7 @@ de Cobros y factura de depósito.
     quedaría con el cambio y no casaría con el estado reseteado. Cada demo deja en XMAR una reserva y
     un perfil de huésped.
 
-La línea base (2026-09-24): MRU01 ↔ XMAR activa con sus reservas; **CUN01 sin integración con 21
+La línea base (2026-09-25, 06:58Z): MRU01 ↔ XMAR activa (con la equivalencia `NOS → NOSHOW`) con sus reservas; **CUN01 sin integración con 21
 reservas futuras** retenidas (para el alta en directo contra XMU); interlocutores importados; la
 bandeja con las causas de CUN01; la auditoría vacía.
 
@@ -213,8 +232,9 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
      listado);
   2. el cambio de datos de su titular pasa por Salesforce (Case aprobado) y baja al front office y al
      perfil de Opera, en su sitio;
-  3. una acción auditable aparece en *Audit*;
-  4. la bandeja muestra lo que espera (las causas de CUN01).
+  4. un **no show** de esa reserva: el CRS la cancela con su cargo del 25 % y lo que cuesta llega al
+     front office y a Opera (cancelada con NOSHOW, sus noches sumando el cargo);
+  5. una acción auditable aparece en *Audit*, y la bandeja muestra lo que espera (las causas de CUN01).
 
   Deja en XMAR una reserva y un perfil por ejecución (las reglas de la demo); en Salesforce, nada
   después del reset.

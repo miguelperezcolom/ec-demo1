@@ -116,8 +116,36 @@ public class Booking extends AggregateRoot {
         return List.copyOf(payments);
     }
 
+    /** What the booking costs: its price, or — cancelled with a fee, as a no-show — the fee. */
     public BigDecimal totalAmount() {
+        return cancellation != null && cancellation.fee() != null ? cancellation.fee() : terms.total();
+    }
+
+    /** The price as it was booked, whatever a cancellation left of it. */
+    public BigDecimal originalAmount() {
         return terms.total();
+    }
+
+    /** The CRS's cancellation reason for a guest who did not arrive. */
+    public static final String NO_SHOW = "NOS";
+
+    /**
+     * The guest did not arrive: the hotel says so (HLA F006), and the CRS applies its rule — the
+     * booking is cancelled as a no-show and costs a share of its original price. Once: a second
+     * notice of the same no-show changes nothing, and a booking already cancelled is not a no-show.
+     */
+    public void noShow(int feePercent, Instant now) {
+        if (feePercent < 0 || feePercent > 100) {
+            throw new IllegalArgumentException("A no-show fee is a share of the price, 0 to 100: " + feePercent);
+        }
+        if (status == BookingStatus.Cancelled) {
+            return;
+        }
+        var fee = terms.total().multiply(BigDecimal.valueOf(feePercent)).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        status = BookingStatus.Cancelled;
+        cancellation = new Cancellation(NO_SHOW, now, fee, feePercent);
+        bump(now);
+        send(new BookingCancelled(eventId(), id.id(), hotelCode, version, now, NO_SHOW));
     }
 
     public BigDecimal paidAmount() {

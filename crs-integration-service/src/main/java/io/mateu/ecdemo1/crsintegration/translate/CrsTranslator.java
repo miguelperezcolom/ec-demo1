@@ -41,7 +41,9 @@ public final class CrsTranslator {
                 b.rooms().stream().map(CrsTranslator::room).toList(),
                 b.payments() == null ? List.of() : b.payments().stream().map(CrsTranslator::payment).toList(),
                 b.totalAmount(), b.comments(),
-                b.cancellation() != null ? b.cancellation().reasonCode() : null);
+                b.cancellation() != null ? b.cancellation().reasonCode() : null,
+                b.cancellation() != null ? b.cancellation().fee() : null,
+                b.originalAmount() != null ? b.originalAmount() : b.totalAmount());
     }
 
     static ReservationStatus status(String status) {

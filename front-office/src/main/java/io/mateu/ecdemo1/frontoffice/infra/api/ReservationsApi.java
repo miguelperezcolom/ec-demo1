@@ -72,11 +72,16 @@ public class ReservationsApi {
     return new Written(locator, guestId, stay.status().name(), existing.isEmpty());
   }
 
+  /** Why, and what it still costs: a no-show is a stay the guest owes its fee for. */
+  public record Cancellation(Boolean noShow, String reasonCode, BigDecimal total) {}
+
   @PostMapping("/{locator}/cancellation")
   @Transactional
-  public Written cancel(@PathVariable String locator) {
+  public Written cancel(@PathVariable String locator,
+      @org.springframework.web.bind.annotation.RequestBody(required = false) Cancellation cancellation) {
     var stay = stays.findById(locator).orElseThrow(() -> new NoSuchElementException("No stay " + locator));
-    var cancelled = stays.save(stay.cancel());
+    var noShow = cancellation != null && Boolean.TRUE.equals(cancellation.noShow());
+    var cancelled = stays.save(noShow ? stay.noShow(cancellation.total()) : stay.cancel());
     return new Written(locator, cancelled.guestId(), cancelled.status().name(), false);
   }
 

@@ -82,4 +82,27 @@ class ReservationsApiTest {
     mvc.perform(post("/api/reservations/RES3/cancellation")).andExpect(status().isOk());
     assertThat(stays.findById("RES3").orElseThrow().occupies()).isFalse();
   }
+
+  @org.junit.jupiter.api.Test
+  void aNoShowIsCancelledAndCostsItsFee() throws Exception {
+    mvc.perform(put("/api/reservations/RES9").contentType(MediaType.APPLICATION_JSON)
+        .content(reservation("Suite Junior Standard Balcón", "2026-11-13"))).andExpect(status().isOk());
+
+    mvc.perform(post("/api/reservations/RES9/cancellation").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"noShow\":true,\"reasonCode\":\"NOS\",\"total\":180.00}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("NO_SHOW"));
+
+    var stay = stays.findById("RES9").orElseThrow();
+    assertThat(stay.status()).isEqualTo(StayStatus.NO_SHOW);
+    assertThat(stay.total()).isEqualByComparingTo("180.00");
+    // Told again — a retried step — the same no-show.
+    mvc.perform(post("/api/reservations/RES9/cancellation").contentType(MediaType.APPLICATION_JSON)
+        .content("{\"noShow\":true,\"reasonCode\":\"NOS\",\"total\":180.00}")).andExpect(status().isOk());
+    // A cancellation with no body is still a plain one.
+    mvc.perform(put("/api/reservations/RES10").contentType(MediaType.APPLICATION_JSON)
+        .content(reservation("Suite Junior Standard Balcón", "2026-11-13"))).andExpect(status().isOk());
+    mvc.perform(post("/api/reservations/RES10/cancellation")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"));
+  }
 }

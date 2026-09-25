@@ -6,6 +6,8 @@ public final class Definitions {
     public static final String PROJECT_RESERVATION = "proyectar-reserva";
     public static final String PROJECT_CANCELLATION = "proyectar-cancelacion";
     public static final String PROJECT_PARTNER = "proyectar-interlocutor";
+    /** The hotel says a guest did not arrive: the CRS cancels the booking as a no-show, with its fee (HLA F006, #5). */
+    public static final String REGISTER_NO_SHOW = "registrar-no-show";
 
     /** The onboarding of a hotel's integration: gates from registration to activation (F010). */
     public static final String ONBOARD_INTEGRATION = "alta-integracion";

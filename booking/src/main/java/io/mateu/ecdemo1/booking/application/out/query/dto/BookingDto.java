@@ -38,6 +38,8 @@ public record BookingDto(
         Cancellation cancellation,
         PmsReference pmsReference,
         Instant created,
-        Instant updated
+        Instant updated,
+        /** The price as it was booked; totalAmount is what the booking costs now (a no-show's fee). */
+        BigDecimal originalAmount
 ) {
 }

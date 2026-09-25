@@ -32,6 +32,22 @@ public class ChangeBookingStatusUseCase {
     final BookingRepository repository;
     final Clock clock;
 
+    /** The CRS's no-show rule: the share of the original price a guest who does not arrive owes. */
+    @org.springframework.beans.factory.annotation.Value("${booking.no-show-fee-percent:25}")
+    int noShowFeePercent;
+
+    /** The hotel says the guest did not arrive: cancelled as a no-show, with its fee. */
+    @Transactional
+    public TaskStatus noShow(String bookingId) {
+        var booking = repository.findByIdForUpdate(new BookingId(bookingId))
+                .orElseThrow(() -> new NoSuchElementException("Booking not found: " + bookingId));
+        booking.noShow(noShowFeePercent, clock.instant());
+        repository.save(booking);
+        log.info("Booking {} is a no-show: it now costs {} ({}% of {})", bookingId, booking.totalAmount(), noShowFeePercent,
+                booking.originalAmount());
+        return TaskStatus.COMPLETED;
+    }
+
     @Transactional
     public TaskStatus handle(ChangeBookingStatusCommand command) {
         var booking = repository.findByIdForUpdate(new BookingId(command.id()))

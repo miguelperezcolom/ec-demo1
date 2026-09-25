@@ -141,6 +141,7 @@ public class ReservasListing
       case IN_HOUSE -> relativo("Sale", checkOut, today);
       case DEPARTED -> "Salió " + FECHA.format(checkOut);
       case CANCELLED -> "Cancelada · llegaba " + FECHA.format(checkIn);
+      case NO_SHOW -> "No show · llegaba " + FECHA.format(checkIn);
     };
   }
 
@@ -196,12 +197,12 @@ public class ReservasListing
       var checkIn = switch (estado) {
         case ARRIVING -> i == 4 ? today.plusDays(1) : today;
         case IN_HOUSE -> today.minusDays(1 + i % 3);
-        case DEPARTED, CANCELLED -> today.minusDays(4 + i % 2);
+        case DEPARTED, CANCELLED, NO_SHOW -> today.minusDays(4 + i % 2);
       };
       var checkOut = switch (estado) {
         case ARRIVING -> checkIn.plusDays(2 + i % 4);
         case IN_HOUSE -> i == 5 ? today : today.plusDays(1 + i % 3);
-        case DEPARTED, CANCELLED -> today.minusDays(i % 2);
+        case DEPARTED, CANCELLED, NO_SHOW -> today.minusDays(i % 2);
       };
       FrontOffice.stays().save(new Stay(
           id, id, String.valueOf(200 + i * 7), tipos.get(i % tipos.size()),

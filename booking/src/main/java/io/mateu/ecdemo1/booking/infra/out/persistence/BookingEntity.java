@@ -79,6 +79,11 @@ public class BookingEntity {
 
     Instant cancelledAt;
 
+    /** What the cancellation costs (a no-show's fee), and the share of the price it is. */
+    java.math.BigDecimal cancellationFee;
+
+    Integer cancellationFeePercent;
+
     String pmsReservationId;
 
     Instant pmsAnnotatedAt;

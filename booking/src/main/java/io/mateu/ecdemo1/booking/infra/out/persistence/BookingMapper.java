@@ -31,7 +31,8 @@ final class BookingMapper {
                 entity.payments != null ? entity.payments : List.of(),
                 BookingStatus.valueOf(entity.status),
                 entity.cancellationReason != null
-                        ? new Cancellation(entity.cancellationReason, entity.cancelledAt) : null,
+                        ? new Cancellation(entity.cancellationReason, entity.cancelledAt, entity.cancellationFee,
+                        entity.cancellationFeePercent) : null,
                 entity.pmsReservationId != null
                         ? new PmsReference(entity.pmsReservationId, entity.pmsAnnotatedAt) : null,
                 entity.created,
@@ -58,6 +59,8 @@ final class BookingMapper {
         entity.comments = terms.comments();
         entity.cancellationReason = booking.getCancellation() != null ? booking.getCancellation().reasonCode() : null;
         entity.cancelledAt = booking.getCancellation() != null ? booking.getCancellation().cancelledAt() : null;
+        entity.cancellationFee = booking.getCancellation() != null ? booking.getCancellation().fee() : null;
+        entity.cancellationFeePercent = booking.getCancellation() != null ? booking.getCancellation().feePercent() : null;
         entity.pmsReservationId = booking.getPmsReference() != null ? booking.getPmsReference().reservationId() : null;
         entity.pmsAnnotatedAt = booking.getPmsReference() != null ? booking.getPmsReference().annotatedAt() : null;
         entity.created = booking.getCreated();

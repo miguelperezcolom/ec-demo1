@@ -36,6 +36,17 @@ function guestProfileId(node: any): string | undefined {
     return undefined
 }
 
+/** The reservation's nightly rate lines, wherever the response nests them. */
+function roomRates(node: any): any[] {
+    if (!node || typeof node !== 'object') return []
+    if (Array.isArray(node.roomRates)) return node.roomRates
+    for (const value of Object.values(node)) {
+        const found = roomRates(value)
+        if (found.length) return found
+    }
+    return []
+}
+
 /** Everything the page shows, through the shadow roots both renderers use. */
 async function pageText(page: Page): Promise<string> {
     // A page still navigating (a redirect, the shell mounting) has no text yet: the poll asks again.
@@ -120,6 +131,36 @@ test("the holder's change is decided in Salesforce and reaches the front office 
         const profile = await opera.get('XMAR', `/crm/v1/profiles/${profileId}?fetchInstructions=Profile&fetchInstructions=Communication`)
         const emails = profile.profileDetails?.emails?.emailInfo ?? []
         return emails.filter((e: any) => e.email.primaryInd).map((e: any) => e.email.emailAddress).includes(email)
+    })
+})
+
+test("a no-show: the CRS cancels it with its fee, and what it costs reaches the front office and Opera", async () => {
+    const before = await api(API.booking, 'GET', `/bookings/${locator}`)
+    // What the front office does when the last guest of the reservation is marked as a no-show.
+    const reported = await api(API.crs, 'POST', '/no-shows', { hotelCode: 'MRU01', locator, reportedBy: `front office MRU01 (${RUN})` })
+    expect(reported.status).toBe('REPORTED')
+
+    // The CRS: cancelled as a no-show (NOS), costing 25% of its original price.
+    const booking = await until('the CRS never cancelled it as a no-show', async () => {
+        const b = await api(API.booking, 'GET', `/bookings/${locator}`)
+        return b.status === 'Cancelled' && b.cancellation?.reasonCode === 'NOS' ? b : undefined
+    })
+    const fee = Number(booking.cancellation.fee)
+    expect(Number(booking.originalAmount)).toBeCloseTo(Number(before.totalAmount), 2)
+    expect(fee).toBeCloseTo(Number(before.totalAmount) * 0.25, 2)
+    expect(Number(booking.totalAmount)).toBeCloseTo(fee, 2)
+
+    // The front office: the stay is a no-show, and costs the fee.
+    await until('the front office never showed the no-show', async () => {
+        const stay = await api(API.frontOffice, 'GET', `/api/reservations/${locator}`)
+        return stay.status === 'NO_SHOW'
+    })
+    // Opera: cancelled with the No Show reason, its rates brought down to the fee.
+    await until("Opera's reservation never became a cancelled no-show costing the fee", async () => {
+        const reservation = await opera.get('XMAR', `/rsv/v1/hotels/XMAR/reservations/${operaId}`)
+        const text = JSON.stringify(reservation)
+        const nights = roomRates(reservation).reduce((sum: number, r: any) => sum + Number(r.total?.amountBeforeTax ?? 0), 0)
+        return text.includes('"Cancelled"') && text.includes('"code":"NOSHOW"') && Math.abs(nights - fee) < 0.01
     })
 })
 
