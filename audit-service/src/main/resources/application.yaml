@@ -1,0 +1,53 @@
+server:
+  port: 8129
+
+spring:
+  application:
+    name: ec-demo1-audit
+
+  cloud:
+    function:
+      definition: consumeAudit
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+      bindings:
+        # IN: the actions the control-plane services audit, from their outboxes (HLA F016).
+        consumeAudit-in-0:
+          destination: audit
+          group: ec-demo1-audit
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/audit}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:4}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+# The time zone the trail is shown, and filtered by date, in.
+audit:
+  zone: ${AUDIT_ZONE:Europe/Madrid}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

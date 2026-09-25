@@ -1,20 +1,15 @@
 # A second PostgreSQL, for the control plane alone, on a volume that survives its pod.
 #
-# The engine's PostgreSQL is on an `emptyDir` — `postgres.localDisk: true` in
-# deploy/values/eventconductor.yaml — because local NVMe is what decides how fast a WAL commit can
-# fsync, and that number is what this whole deployment exists to measure. The price is that the
-# data dies with the pod, and that is the right trade for an engine schema, a test worker's task
-# log and three demo services' rows.
+# The engine's PostgreSQL was on an `emptyDir` when this was written — local NVMe, to measure how
+# fast a WAL commit can fsync — so its data died with the pod. It is on a volume now too, but the
+# control plane keeps its own server.
 #
-# It is the wrong trade for this one. The control plane holds the catalogue of MCP servers, the
+# The control plane holds the catalogue of MCP servers, the
 # agents composed from it, the encrypted API keys the chat panel spends money with, and — since
 # retrieval — whatever has been ingested into a RAG source that points here. Losing that
 # on a pod restart would make the console worse than the YAML file it replaces — the point of
 # moving configuration into a UI is that it stays put.
 #
-# Flipping the engine's own `localDisk` to false would have solved it in one line and slowed the
-# measured path for everything. A second database, 2Gi, on the same `hcloud-volumes` storage class
-# Redpanda already uses, does not.
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -49,17 +44,13 @@ spec:
       labels:
         app: cp-postgres
         app.kubernetes.io/component: cp-postgres
+      annotations:
+        # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage.
+        karpenter.sh/do-not-disrupt: "true"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 999

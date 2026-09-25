@@ -4,58 +4,39 @@
 #     -f deploy/values/eventconductor.yaml
 #
 # ── The topology, and why ─────────────────────────────────────────────────────
-# Five node groups, each on hardware chosen for what it does. Separation is enforced by pod
-# anti-affinity on `app.kubernetes.io/component`, not by hope: an instance-type selector alone
-# lets Karpenter pack two components onto one node the moment they both fit.
+# One pool of nodes in hel1, which the engine shares with the rest of ec-demo1. The only pins are
+# the region and the architecture: Karpenter picks the machines. Not an instance type either — a
+# pin to cx43 left every pod Pending the day hel1 had none to offer ("no instance type ... had a
+# required offering"), and ec1 was down until it was lifted.
 #
-#   postgres      ccx13   2 vCPU / 8 GB   alone, local NVMe
-#   orchestrator  ccx13   2 vCPU / 8 GB   alone
-#   worker        ccx13   2 vCPU / 8 GB   alone       (deploy/manifests/20-worker.yaml)
-#   platform      cx43    8 vCPU          redpanda, forms, rules, keycloak, shell, gateway, console
-#   observability ccx23   4 vCPU / 16 GB  its own namespace, its own instance type
+# It was five node groups once — postgres, orchestrator and the worker alone on a dedicated-vCPU
+# ccx13 each, kept apart by pod anti-affinity — because this deployment was built to measure the
+# engine's throughput, and a WAL commit's fsync is what caps it. A demo does not need that: it
+# cost four nodes more than the load does, and it went. The tuning below (the outbox relay, the
+# consumer parallelism) is kept, since it costs nothing at low load.
 #
-# One 8-vCPU node for the whole platform group rather than several small ones: they fit together,
-# and the fleet's cpu limit is the binding constraint — 3x2 + 8 + 4, plus a small node for the
-# ingress controller, is 20 of 24.
-#
-# cx43 and not ccx33: this fleet's catalogue has no ccx33 at all. Karpenter answers a request for
-# one with "no instance type met all requirements" and creates nothing, which reads exactly like a
-# quota problem and is not — probe a type with a throwaway pod before designing around it. The
-# shared-vCPU line is the right trade here anyway: nothing in this group blocks on fsync the way
-# PostgreSQL does, which is what the dedicated vCPU is bought for.
-#
-# CCX rather than CX: dedicated vCPU. On the shared-vCPU line an fsync syscall is stalled by
-# noisy-neighbour CPU steal, which is exactly the syscall a WAL commit blocks on — the engine's
-# throughput ceiling is a database durability ceiling before it is anything else.
-#
-# CloudFleet does not allow creating NodePools with kubectl ("must be managed via the Cloudfleet
-# Fleet API"), so the instance type is requested per pod and Karpenter provisions it off the
-# existing unrestricted pool. That pool's own cpu limit is the real budget: this topology asks for
-# 18 vCPU of node, plus whatever the ingress controller sits on.
+# Observability is not in this pool: it keeps its own node, where its volumes are (Loki, Tempo).
 
 ## ── PostgreSQL ───────────────────────────────────────────────────────────────
 postgres:
   image: postgres:16
+  # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage of
+  # everything that talks to it. It still moves if its node goes away for another reason.
+  podAnnotations:
+    karpenter.sh/do-not-disrupt: "true"
   database: workflow
   username: workflow
   existingSecret: ec-postgres
-  # Local NVMe. See the note on this key in the chart's values.yaml — the data does not survive
-  # the pod, which is the trade this deployment is explicitly making.
-  localDisk: true
+  # A volume that follows the pod, not the node's local disk. On an emptyDir the database died
+  # every time Karpenter moved it — the engine's state and Keycloak's with it — which was the
+  # trade for measuring fsync, and is the wrong one for a demo.
+  localDisk: false
+  storage: 10Gi
+  storageClass: hcloud-volumes
   maxConnections: 400
   nodeSelector:
-    node.kubernetes.io/instance-type: ccx13
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              # Exists AND NotIn, deliberately. `NotIn` alone also matches pods that do not carry
-              # the label at all — every DaemonSet on the node — and the rule would then exclude
-              # every node in the cluster and schedule nothing.
-              - { key: app.kubernetes.io/component, operator: Exists }
-              - { key: app.kubernetes.io/component, operator: NotIn, values: [postgres] }
-          topologyKey: kubernetes.io/hostname
+    topology.kubernetes.io/region: hel1
+    kubernetes.io/arch: amd64
   resources:
     requests: { memory: "3Gi", cpu: "1" }
     limits:   { memory: "6Gi" }
@@ -63,6 +44,10 @@ postgres:
 ## ── Redpanda ─────────────────────────────────────────────────────────────────
 redpanda:
   image: docker.redpanda.com/redpandadata/redpanda:v24.1.7
+  # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage of
+  # everything that talks to it. It still moves if its node goes away for another reason.
+  podAnnotations:
+    karpenter.sh/do-not-disrupt: "true"
   brokerInternal: redpanda:19092
   cores: 2
   # Six, matching upstream and outbox, so the orchestrator can be scaled without repartitioning.
@@ -71,15 +56,8 @@ redpanda:
   storageClass: hcloud-volumes
   externalNodePort: null
   nodeSelector:
-    node.kubernetes.io/instance-type: cx43
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - { key: app.kubernetes.io/component, operator: Exists }
-              - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-          topologyKey: kubernetes.io/hostname
+    topology.kubernetes.io/region: hel1
+    kubernetes.io/arch: amd64
   resources:
     requests: { memory: "2Gi", cpu: "500m" }
     limits:   { memory: "4Gi",  cpu: "2" }
@@ -87,7 +65,11 @@ redpanda:
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
   image: miguelperezcolom/orchestrator-standalone-app
-  imageTag: "2.16.5"
+  # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage of
+  # everything that talks to it. It still moves if its node goes away for another reason.
+  podAnnotations:
+    karpenter.sh/do-not-disrupt: "true"
+  imageTag: "2.22.1"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -99,7 +81,7 @@ orchestrator:
   #
   # Turning this on required emptying the schema first: Flyway will not adopt tables it did not
   # create, and baselining would have meant declaring a Hibernate-built schema equivalent to
-  # migration history it never ran. The database here is disposable by design — it lives on an
+  # migration history it never ran. The database here was disposable by design — it lived on an
   # emptyDir — so dropping it was cheaper than pretending. Keycloak is untouched, it has its own
   # database on the same server.
   ddlAuto: none
@@ -206,15 +188,8 @@ orchestrator:
     WORKFLOW_CONSUMER_PROCESSPARALLELISM: "8"
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
-    node.kubernetes.io/instance-type: ccx13
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - { key: app.kubernetes.io/component, operator: Exists }
-              - { key: app.kubernetes.io/component, operator: NotIn, values: [orchestrator] }
-          topologyKey: kubernetes.io/hostname
+    topology.kubernetes.io/region: hel1
+    kubernetes.io/arch: amd64
   resources:
     requests: { memory: "2Gi", cpu: "1" }
     limits:   { memory: "5Gi", cpu: "2" }
@@ -224,7 +199,8 @@ orchestrator:
 ## ── Forms ────────────────────────────────────────────────────────────────────
 forms:
   image: miguelperezcolom/forms-standalone-app
-  imageTag: "2.16.5"
+  # 2.19.0: announces its human tasks (HumanTaskChanged, topic human-tasks) — the inbox shows them.
+  imageTag: "2.22.1"
   replicas: 1
   servicePort: 8106
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -236,7 +212,7 @@ forms:
   #
   # Turning this on required emptying the schema first: Flyway will not adopt tables it did not
   # create, and baselining would have meant declaring a Hibernate-built schema equivalent to
-  # migration history it never ran. The database here is disposable by design — it lives on an
+  # migration history it never ran. The database here was disposable by design — it lived on an
   # emptyDir — so dropping it was cheaper than pretending. Keycloak is untouched, it has its own
   # database on the same server.
   ddlAuto: none
@@ -261,15 +237,8 @@ forms:
     SPRING_CLOUD_STREAM_BINDINGS_CONSUMEWORKEREVENTFORFORMSENGINE_IN_0_DESTINATION: "forms"
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
-    node.kubernetes.io/instance-type: cx43
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - { key: app.kubernetes.io/component, operator: Exists }
-              - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-          topologyKey: kubernetes.io/hostname
+    topology.kubernetes.io/region: hel1
+    kubernetes.io/arch: amd64
   resources:
     requests: { memory: "1Gi", cpu: "500m" }
     limits:   { memory: "2Gi", cpu: "2" }
@@ -282,7 +251,7 @@ forms:
 # is the honest state: the engine is there and wired, the catalogue is empty.
 rules:
   image: miguelperezcolom/rule-standalone-app
-  imageTag: "2.16.5"
+  imageTag: "2.22.1"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false
@@ -295,7 +264,7 @@ rules:
   #
   # Turning this on required emptying the schema first: Flyway will not adopt tables it did not
   # create, and baselining would have meant declaring a Hibernate-built schema equivalent to
-  # migration history it never ran. The database here is disposable by design — it lives on an
+  # migration history it never ran. The database here was disposable by design — it lived on an
   # emptyDir — so dropping it was cheaper than pretending. Keycloak is untouched, it has its own
   # database on the same server.
   ddlAuto: none
@@ -312,15 +281,8 @@ rules:
     XDG_CONFIG_HOME: "/tmp"
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
-    node.kubernetes.io/instance-type: cx43
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - { key: app.kubernetes.io/component, operator: Exists }
-              - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-          topologyKey: kubernetes.io/hostname
+    topology.kubernetes.io/region: hel1
+    kubernetes.io/arch: amd64
   resources:
     requests: { memory: "1Gi", cpu: "500m" }
     limits:   { memory: "2Gi", cpu: "2" }

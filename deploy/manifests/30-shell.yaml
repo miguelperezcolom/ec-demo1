@@ -27,22 +27,15 @@ spec:
         prometheus.io/port: "8101"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: shell
-          image: miguelperezcolom/ec-demo1-shell:0.14.10
+          image: miguelperezcolom/ec-demo1-shell:0.22.0
           env:
             - name: SERVER_PORT
               value: "8101"

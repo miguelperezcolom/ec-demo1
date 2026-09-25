@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>67.0</apiVersion>
+    <description>A contact with an MDM id is leaving Salesforce — absorbed by a merge, or deleted — and says so: ClienteConsolidado__e. Before the delete a merge's MasterRecordId is still empty, so the event names only what leaves; the MDM reads the survivor afterwards. Salesforce cleans; the MDM decides.</description>
+    <label>MDM - Announce merge</label>
+    <processType>AutoLaunchedFlow</processType>
+    <status>Active</status>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Announce</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>MDM_Id__c</field>
+            <operator>IsNull</operator>
+            <value>
+                <booleanValue>false</booleanValue>
+            </value>
+        </filters>
+        <object>Contact</object>
+        <recordTriggerType>Delete</recordTriggerType>
+        <triggerType>RecordBeforeDelete</triggerType>
+    </start>
+    <recordCreates>
+        <name>Announce</name>
+        <label>Announce</label>
+        <locationX>50</locationX>
+        <locationY>200</locationY>
+        <inputAssignments>
+            <field>AbsorbedMdmId__c</field>
+            <value>
+                <elementReference>$Record.MDM_Id__c</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>AbsorbedContactId__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <object>ClienteConsolidado__e</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+</Flow>

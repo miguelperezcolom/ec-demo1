@@ -50,6 +50,7 @@ public class BookingController {
     final CancelBookingUseCase cancelBookingUseCase;
     final RegisterPaymentUseCase registerPaymentUseCase;
     final AnnotatePmsReferenceUseCase annotatePmsReferenceUseCase;
+    final java.time.Clock clock;
 
     public record Created(String id) {
     }
@@ -73,6 +74,17 @@ public class BookingController {
                                  @RequestParam(defaultValue = "0") int page,
                                  @RequestParam(defaultValue = "50") int size) {
         return queryService.list(search, page, size);
+    }
+
+    @GetMapping("/future")
+    @Operation(summary = "A hotel's bookings still to arrive, not cancelled, by arrival: a page after the given position")
+    public List<BookingDto> future(@RequestParam String hotelCode,
+                                   @RequestParam(required = false) LocalDate from,
+                                   @RequestParam(required = false) LocalDate afterArrival,
+                                   @RequestParam(required = false) String afterId,
+                                   @RequestParam(defaultValue = "50") int limit) {
+        return queryService.future(hotelCode, from == null ? LocalDate.now(clock) : from, afterArrival, afterId,
+                Math.min(limit, 500));
     }
 
     @GetMapping("/{id}")

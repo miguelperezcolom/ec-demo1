@@ -12,6 +12,7 @@ import io.mateu.uidl.data.StatusType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,14 @@ public class BookingDBQueryService implements BookingQueryService {
     public List<BookingDto> list(String text, int page, int size) {
         return repository.search(text, org.springframework.data.domain.PageRequest.of(page, size))
                 .map(BookingMapper::toDomain).map(this::toDto).getContent();
+    }
+
+    @Override
+    public List<BookingDto> future(String hotelCode, LocalDate from, LocalDate afterArrival, String afterId, int limit) {
+        var start = afterArrival == null ? from.minusDays(1) : afterArrival;
+        return repository.future(hotelCode, from, start, afterId == null ? "" : afterId,
+                        org.springframework.data.domain.PageRequest.of(0, limit)).stream()
+                .map(BookingMapper::toDomain).map(this::toDto).toList();
     }
 
     @Override
@@ -93,7 +102,8 @@ public class BookingDBQueryService implements BookingQueryService {
                 booking.getCancellation(),
                 booking.getPmsReference(),
                 booking.getCreated(),
-                booking.getUpdated());
+                booking.getUpdated(),
+                booking.originalAmount());
     }
 
 }

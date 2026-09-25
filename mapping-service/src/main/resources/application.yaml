@@ -1,0 +1,111 @@
+server:
+  port: 8122
+
+spring:
+  application:
+    name: ec-demo1-mapping
+
+  ai:
+    mcp:
+      server:
+        name: mapping
+        version: 1.0.0
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  cloud:
+    function:
+      definition: consumeTasks
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          outboxUpstream:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          notifications:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          audit:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          resolutions:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+      bindings:
+        # IN: the engine's tasks for the mapping — the steps whose definition says topic mapping.
+        consumeTasks-in-0:
+          destination: mapping
+          group: ec-demo1-mapping-worker
+        # OUT: replies to the engine; and, through the outbox, the messages that resume waiting
+        # processes, the starts of their successors, and notifications.
+        upstream:
+          destination: upstream
+        outboxUpstream:
+          destination: upstream
+        notifications:
+          destination: notifications
+        # OUT, through the outbox: every auditable action a person takes here (HLA F016).
+        audit:
+          destination: audit
+        # OUT, through the outbox: what a notification asked for is no longer waiting — the inbox closes it.
+        resolutions:
+          destination: notification-resolutions
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/mapping}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:8}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
+mapping:
+  crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
+  pms-integration-url: ${PMS_INTEGRATION_URL:http://localhost:8123}
+  integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
+  ia-agent-url: ${IA_AGENT_URL:http://localhost:8095}
+  console-url: ${CONSOLE_URL:https://console.ec1.mateu.io}
+  resend-after: 30s
+
+springdoc:
+  packages-to-scan: io.mateu.ecdemo1.mapping.rest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

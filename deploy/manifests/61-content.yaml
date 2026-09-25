@@ -14,9 +14,9 @@ spec:
   replicas: 1
   # Recreate, not the default RollingUpdate.
   #
-  # A rolling update of a one-replica Deployment surges to two pods, and the platform node has no
+  # A rolling update of a one-replica Deployment surges to two pods, and the nodes may have no
   # room for a second copy of this one: Karpenter answers with "no instance type met all
-  # requirements" because a second cx43 would ask the fleet for more vCPU than its limit allows, so
+  # requirements" when another node would ask the fleet for more vCPU than its limit allows, so
   # the new pod sits Pending forever while the old one keeps serving. That is the failure the
   # README warns about, and it reads like a scheduling bug rather than the quota it is.
   #
@@ -39,15 +39,8 @@ spec:
         prometheus.io/port: "8104"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -61,7 +54,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: content
-          image: miguelperezcolom/ec-demo1-content:0.14.7
+          image: miguelperezcolom/ec-demo1-content:0.15.2
           env:
             - name: SERVER_PORT
               value: "8104"

@@ -1,0 +1,92 @@
+server:
+  port: 8123
+
+spring:
+  application:
+    name: ec-demo1-pms-integration
+
+  cloud:
+    function:
+      definition: consumeTasks;consumeCustomerEvents
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          notifications:
+            producer:
+              sync: true
+          notificationResolutions:
+            producer:
+              sync: true
+      bindings:
+        # IN: the engine's tasks for this adapter — the steps whose definition says topic pms.
+        consumeTasks-in-0:
+          destination: pms-integration
+          group: ec-demo1-pms-integration-worker
+        # IN: what the MDM says about a customer, for the front office's kardex. Retried until the
+        # front office takes it — what the MDM decided is not dropped because the desk was down.
+        consumeCustomerEvents-in-0:
+          destination: customers
+          group: ec-demo1-pms-integration-customers
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
+        # OUT: replies to the engine, and the alarm when a write keeps failing.
+        upstream:
+          destination: upstream
+        notifications:
+          destination: notifications
+        notificationResolutions:
+          destination: notification-resolutions
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
+# Opera, through OHIP: what is written the same way for every property. How to reach each property
+# — gateway, application key, client, secret, enterprise — is each hotel's integration's, read from
+# integrations-service; nothing about a tenant is configuration here.
+ohip:
+  external-system-code: ${OPERA_EXTERNAL_SYSTEM:RIUCRS}
+  # OPERA names its UDFs UDFN01…UDFN40: which one carries the CRS version is the tenant's to say.
+  version-udf: ${OPERA_VERSION_UDF:CRS_VERSION}
+  pay-at-hotel-method: ${OPERA_PAY_AT_HOTEL_METHOD:CA}
+  timeout: 30s
+  crm-external-system: ${OPERA_CRM_EXTERNAL_SYSTEM:CRM}
+  profile-references: ${OPERA_PROFILE_REFERENCES:true}
+  post-deposits: ${OPERA_POST_DEPOSITS:true}
+  # The chain's properties, when the tenant does not list them (a client without hub access): each is
+  # read on its own for its name, and one this connection cannot read is not offered.
+  known-properties: ${OPERA_PROPERTIES:}
+  # Opera's «Custom Reference» on every reservation written: a filter in Opera's reservation search.
+  custom-reference: ${OPERA_CUSTOM_REFERENCE:EC-DEMO1}
+
+pms-integration:
+  crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
+  mapping-url: ${MAPPING_URL:http://localhost:8122}
+  integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
+  customer-mdm-url: ${CUSTOMER_MDM_URL:http://localhost:8127}
+  # The hotel's front office: every reservation written into Opera for these CRS hotels, into it too.
+  front-office-url: ${FRONT_OFFICE_URL:}
+  front-office-hotels: ${FRONT_OFFICE_HOTELS:}
+  alert-after: ${RETRY_ALERT_AFTER:10m}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

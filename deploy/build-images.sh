@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 REGISTRY="${REGISTRY:-miguelperezcolom}"
 TAG="${1:-0.8.0}"
 
-APPS="shell shell-redwood gateway booking content users ia-agent ia-control-plane api-mcp control-shell control-shell-redwood"
+APPS="shell shell-redwood gateway booking content users ia-agent ia-control-plane api-mcp control-shell control-shell-redwood partners crs-integration-service mapping-service pms-integration-service communication-service integrations-service customer-mdm-service front-office audit-service"
 
 # grpc-interface first, and installed rather than packaged: it is not an application and gets no
 # image, but `users` compiles against the protobuf stubs generated from its .proto, so it has to
@@ -28,6 +28,10 @@ APPS="shell shell-redwood gateway booking content users ia-agent ia-control-plan
 # the network for something other than dependencies — the protobuf plugin downloads protoc.
 echo "── installing grpc-interface (the stubs users compiles against) ──"
 ( cd grpc-interface && mvn -B -ntp -DskipTests install )
+
+# integration-model likewise: the CRS-PMS integration's services (docs/poc-acl) compile against it.
+echo "── installing integration-model (the integration's business model) ──"
+( cd integration-model && mvn -B -ntp -DskipTests install )
 
 for app in $APPS; do
   echo "── building $app ──"

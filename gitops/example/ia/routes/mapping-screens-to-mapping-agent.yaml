@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: route
+id: mapping-screens-to-mapping-agent
+name: The mapping screens use the mapping agent
+priority: 5
+# Whatever is asked from the mapping screens — the "ask the agent" button included — is answered by
+# the mapping agent, whoever asks.
+routePrefix: /mapping
+targetAgent: mapping-agent

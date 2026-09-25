@@ -15,7 +15,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class BookingHome {
 
+    /**
+     * "Call center", not "Booking": on the console this is the CRS's sales desk, and the label is
+     * what the shell shows. The field name stays, because the routes hang from it.
+     */
     @Menu
+    @Label("Call center")
     BookingMenu booking;
 
 }

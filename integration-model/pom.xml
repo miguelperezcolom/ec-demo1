@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- The integration's own business model: the language crs-integration-service, mapping-service
+         and pms-integration-service speak between them. Neither Rumbo's model (booking) nor Opera's
+         API appears here — each is known by exactly one adapter, and that is what lets a second PMS
+         cost an adapter and not a project (HLA, "Un servicio por extremo").
+
+         A library, not an application: no image. Installed before the services that compile against
+         it — see deploy/build-images.sh. -->
+    <groupId>io.mateu.ecdemo1</groupId>
+    <artifactId>integration-model</artifactId>
+    <version>0.1.0</version>
+    <name>ec-demo1 integration-model</name>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- Annotations only: the services bring their own ObjectMapper. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.18.2</version>
+        </dependency>
+    </dependencies>
+</project>

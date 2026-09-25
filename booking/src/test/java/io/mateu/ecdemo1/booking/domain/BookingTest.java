@@ -78,6 +78,29 @@ class BookingTest {
     }
 
     @Test
+    void aNoShowCancelsTheBookingWhichThenCostsItsFee() {
+        var booking = created();
+        var original = booking.totalAmount();
+        booking.popEvents();
+
+        booking.noShow(25, NOW);
+
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.Cancelled);
+        assertThat(booking.getCancellation().reasonCode()).isEqualTo(Booking.NO_SHOW);
+        assertThat(booking.getCancellation().feePercent()).isEqualTo(25);
+        assertThat(booking.totalAmount()).isEqualByComparingTo(original.multiply(java.math.BigDecimal.valueOf(0.25)));
+        assertThat(booking.originalAmount()).isEqualByComparingTo(original);
+        assertThat(booking.popEvents()).singleElement().isInstanceOfSatisfying(BookingCancelled.class,
+                e -> assertThat(e.reasonCode()).isEqualTo("NOS"));
+
+        // Told twice, one no-show: no second fee, no second event.
+        var version = booking.getVersion();
+        booking.noShow(25, NOW);
+        assertThat(booking.getVersion()).isEqualTo(version);
+        assertThat(booking.popEvents()).isEmpty();
+    }
+
+    @Test
     void repeatingAConfirmationOrACancellationIsNotAChange() {
         var booking = created();
         booking.confirm(NOW);

@@ -18,15 +18,8 @@ spec:
     spec:
       restartPolicy: OnFailure
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 70
@@ -80,17 +73,13 @@ spec:
       labels:
         app: keycloak
         app.kubernetes.io/component: keycloak
+      annotations:
+        # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage.
+        karpenter.sh/do-not-disrupt: "true"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }

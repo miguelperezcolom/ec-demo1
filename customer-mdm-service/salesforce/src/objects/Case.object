@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fields>
+        <fullName>MdmRequestId__c</fullName>
+        <label>Id de la solicitud (MDM)</label>
+        <type>Text</type>
+        <length>64</length>
+        <required>false</required>
+        <externalId>true</externalId>
+        <unique>true</unique>
+        <caseSensitive>false</caseSensitive>
+    </fields>
+    <fields>
+        <fullName>MdmId__c</fullName>
+        <label>Cliente (MDM)</label>
+        <type>Text</type>
+        <length>64</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Nombre__c</fullName>
+        <label>Nombre propuesto</label>
+        <type>Text</type>
+        <length>80</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Apellidos__c</fullName>
+        <label>Apellidos propuestos</label>
+        <type>Text</type>
+        <length>80</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Email__c</fullName>
+        <label>Email propuesto</label>
+        <type>Email</type>
+        <required>false</required>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Telefono__c</fullName>
+        <label>Teléfono propuesto</label>
+        <type>Phone</type>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Nacionalidad__c</fullName>
+        <label>Nacionalidad propuesta</label>
+        <type>Text</type>
+        <length>3</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>FechaNacimiento__c</fullName>
+        <label>Fecha de nacimiento propuesta</label>
+        <type>Date</type>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>TipoDocumento__c</fullName>
+        <label>Tipo de documento propuesto</label>
+        <type>Text</type>
+        <length>20</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>NumeroDocumento__c</fullName>
+        <label>Documento propuesto</label>
+        <type>Text</type>
+        <length>40</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Origen__c</fullName>
+        <label>Origen</label>
+        <type>Text</type>
+        <length>255</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Cambios__c</fullName>
+        <label>Qué cambia</label>
+        <type>Text</type>
+        <length>255</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Decision__c</fullName>
+        <label>Decisión</label>
+        <type>Picklist</type>
+        <required>false</required>
+        <trackHistory>true</trackHistory>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>Pendiente</fullName><default>true</default><label>Pendiente</label></value>
+                <value><fullName>Aprobada</fullName><default>false</default><label>Aprobada</label></value>
+                <value><fullName>Rechazada</fullName><default>false</default><label>Rechazada</label></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Motivo__c</fullName>
+        <label>Motivo (si se rechaza)</label>
+        <type>TextArea</type>
+        <required>false</required>
+    </fields>
+</CustomObject>

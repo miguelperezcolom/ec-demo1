@@ -4,6 +4,7 @@ import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.AI;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
+import io.mateu.uidl.annotations.Script;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTemplate;
@@ -68,6 +69,9 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 // still the browser tab, via @PageTitle.
 @PageTitle("EventConductor demo · Redwood")
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
+// Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
+// what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
+@Script(src = "/_inbox/push/push.js")
 // Served by this app from src/main/resources/static, so it arrives through the gateway's
 // catch-all like the rest of the shell — no route of its own, and no token: the browser loads a
 // logo with an <img> tag, which sends no Authorization header.
@@ -107,18 +111,16 @@ public class ShellHome implements WidgetSupplier {
     // renamed in its own pod and not here goes back to flickering, with the shell's version
     // showing first.
 
-    /**
-     * Running the platform: Workflow, Forms and Worker, behind one entry.
-     *
-     * <p>They used to sit on the bar beside Booking, which made four equals where there are
-     * really two kinds of thing — see AdminMenu.
-     */
-    @Menu
-    AdminMenu admin;
-
     /** Bookings — the CRUD, and the aggregate the booking saga confirms or cancels. */
     @Menu
-    RemoteMenu booking = new RemoteMenu("/_booking").withLabel("Booking");
+    RemoteMenu booking = new RemoteMenu("/_booking").withLabel("Call center");
+
+    /**
+     * The master of trading partners — tour operators, agencies, companies — that the CRS sells
+     * through and the CRS-PMS integration projects to the PMS (PoC ACL, docs/poc-acl).
+     */
+    @Menu
+    RemoteMenu partners = new RemoteMenu("/_partners").withLabel("ERP");
 
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
@@ -127,6 +129,20 @@ public class ShellHome implements WidgetSupplier {
     // Users, groups, roles and permissions moved to the control console: administering access is a
     // control-plane concern, not part of using the product. It is served by the same users pod,
     // now mounted by the control shell behind the ai-admin gate. See ControlShellHome.
+
+    /** What waits for me: the notifications and tasks of my roles, each with where to resolve it. */
+    @Menu
+    RemoteMenu inbox = new RemoteMenu("/_inbox").withLabel("Inbox");
+
+    /**
+     * Running the platform: Workflow, Forms and Worker, behind one entry — last on the bar: it is
+     * what runs the product, not the product.
+     *
+     * <p>They used to sit on the bar beside Booking, which made four equals where there are
+     * really two kinds of thing — see AdminMenu.
+     */
+    @Menu
+    AdminMenu admin;
 
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
@@ -144,11 +160,11 @@ public class ShellHome implements WidgetSupplier {
 
         widgets.add(HorizontalLayout.builder()
                 .content(List.of(
-                        // The signed-in user's own pending human tasks, pulled straight from the
-                        // forms engine so the first thing on screen is work waiting for them.
+                        // What waits for the signed-in user — the notifications and the forms engine's
+                        // tasks of their roles — so the first thing on screen is work waiting for them.
                         MicroFrontend.builder()
-                                .baseUrl("/_forms")
-                                .route("/my-tasks")
+                                .baseUrl("/_inbox")
+                                .route("/badge")
                                 .build(),
                         Popover.builder()
                                 .wrapped(Text.builder()

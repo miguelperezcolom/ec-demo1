@@ -1,0 +1,109 @@
+server:
+  port: 8121
+
+spring:
+  application:
+    name: ec-demo1-crs-integration
+
+  cloud:
+    function:
+      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks;consumeCustomerEvents
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          # The outbox's bindings are synchronous, so a message is marked published only once the
+          # broker acknowledged it, and keyed with a String.
+          integrationEvents:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          outboxUpstream:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+      bindings:
+        # IN: what happened in the CRS (booking) and the master of partners (partners).
+        consumeCrsEvents-in-0:
+          destination: crs-bookings,partners
+          group: ec-demo1-crs-integration-inbox
+        # IN: the integration's business events, to be routed to processes. The router consumes
+        # what the inbox half publishes: two stages, so the business event stays visible on the bus
+        # and the routing table can change without touching the translation.
+        routeIntegrationEvents-in-0:
+          destination: integration-events
+          group: ec-demo1-crs-integration-router
+        # IN: what the MDM says about a customer — a changed golden record, a merge: its reservations
+        # are projected again, so Opera's guest profile is written from the MDM.
+        consumeCustomerEvents-in-0:
+          destination: customers
+          group: ec-demo1-crs-integration-customers
+          # Retried until it goes: a projection the MDM asked for is not dropped on a passing failure.
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
+        # IN: the engine's tasks for this adapter — the steps whose definition says topic
+        # crs-integration. A group of its own, like every binding here.
+        consumeTasks-in-0:
+          destination: crs-integration
+          group: ec-demo1-crs-integration-worker
+        # OUT: business events (outbox), process starts (outbox), and replies to the engine.
+        integrationEvents:
+          destination: integration-events
+        outboxUpstream:
+          destination: upstream
+        upstream:
+          destination: upstream
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/crs_integration}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:8}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
+crs:
+  booking-url: ${BOOKING_URL:http://localhost:8108}
+  partners-url: ${PARTNERS_URL:http://localhost:8120}
+  # A reservation of a hotel with no integration starts no process (Integrations).
+  integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
+  # Business event → process definition (ec-definitions). A new use case is a line here and a
+  # definition there, not code.
+  routes:
+    reservation-created: proyectar-reserva
+    reservation-modified: proyectar-reserva
+    reservation-cancelled: proyectar-cancelacion
+    partner-changed: proyectar-interlocutor
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

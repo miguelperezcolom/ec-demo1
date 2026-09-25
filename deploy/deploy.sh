@@ -32,6 +32,8 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -n ingress-nginx --create-namespace \
   --set controller.replicaCount=1 \
   --set controller.nodeSelector."kubernetes\.io/arch"=amd64 \
+  --set controller.nodeSelector."topology\.kubernetes\.io/region"=hel1 \
+  --set-string controller.podAnnotations."karpenter\.sh/do-not-disrupt"=true \
   --set controller.service.type=LoadBalancer \
   --set controller.resources.requests.cpu=100m \
   --set controller.resources.requests.memory=256Mi \
@@ -102,6 +104,9 @@ append_if_missing GITOPS_WEBHOOK_SECRET "$(openssl rand -hex 24)"
 # Regenerating this one would make every stored LLM credential undecryptable — nothing re-wraps
 # them — so it is written once and then left alone, like the PostgreSQL password above.
 append_if_missing CP_CRYPTO_KEY "$(openssl rand -base64 32)"
+# The same rule for the key the integrations' Opera secrets are sealed under: a new one leaves every
+# stored connection unreadable, and each hotel's secret would have to be entered again.
+append_if_missing INTEGRATIONS_CRYPTO_KEY "$(openssl rand -base64 32)"
 
 # shellcheck disable=SC1090
 set -a; . "$SECRETS"; set +a
@@ -142,6 +147,9 @@ kubectl create secret generic ec-cp-postgres -n "$NS" \
 kubectl create secret generic ec-cp-crypto -n "$NS" \
   --from-literal=CP_CRYPTO_KEY="$CP_CRYPTO_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic ec-integrations-crypto -n "$NS" \
+  --from-literal=INTEGRATIONS_CRYPTO_KEY="$INTEGRATIONS_CRYPTO_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
 # The chat agent's Anthropic key. Not generated — it is bought, not derived — so it is only
 # created when ANTHROPIC_API_KEY is in the environment or in credentials.env, which is also why
@@ -154,6 +162,35 @@ if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
 else
   echo "ANTHROPIC_API_KEY not set — skipping the ec-anthropic secret."
   echo "  The chat panel will answer with a 401 until you add it to $SECRETS and re-run this."
+fi
+
+# The customer MDM's connection to Salesforce (docs/poc-acl, H11): the org's External Client App,
+# client credentials. Bought, not derived, like the Anthropic key — created only when present. Without
+# it the MDM still resolves identities for the connector; projecting to Salesforce and hearing its
+# merges wait until the secret exists and the pod restarts.
+if [ -n "${SF_CLIENT_ID:-}" ] && [ -n "${SF_CLIENT_SECRET:-}" ] && [ -n "${SF_DOMAIN:-}" ]; then
+  kubectl create secret generic ec-salesforce -n "$NS" \
+    --from-literal=SF_DOMAIN="$SF_DOMAIN" \
+    --from-literal=SF_CLIENT_ID="$SF_CLIENT_ID" \
+    --from-literal=SF_CLIENT_SECRET="$SF_CLIENT_SECRET" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "SF_DOMAIN / SF_CLIENT_ID / SF_CLIENT_SECRET not set — skipping the ec-salesforce secret."
+  echo "  The customer MDM runs without cleaning until you add them to $SECRETS and re-run this."
+fi
+
+# The chain's connection to Opera Cloud (OHIP UAT, docs/poc-acl H12): what the integrations start
+# from. Bought, not derived; the integrations need it, so without it they cannot be registered.
+if [ -n "${OPERA_GATEWAY_URL:-}" ] && [ -n "${OPERA_CLIENT_SECRET:-}" ]; then
+  kubectl create secret generic ec-opera -n "$NS" \
+    --from-literal=OPERA_GATEWAY_URL="$OPERA_GATEWAY_URL" \
+    --from-literal=OPERA_APP_KEY="$OPERA_APP_KEY" \
+    --from-literal=OPERA_CLIENT_ID="$OPERA_CLIENT_ID" \
+    --from-literal=OPERA_CLIENT_SECRET="$OPERA_CLIENT_SECRET" \
+    --from-literal=OPERA_ENTERPRISE_ID="$OPERA_ENTERPRISE_ID" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "OPERA_* not set — skipping the ec-opera secret; integrations-service will not start without it."
 fi
 
 # The postfix relay's Gmail App Password. Bought, not derived, like the Anthropic key — so the
@@ -203,6 +240,16 @@ kubectl apply -f deploy/manifests/60-booking.yaml
 kubectl apply -f deploy/manifests/61-content.yaml
 kubectl apply -f deploy/manifests/62-users.yaml
 kubectl apply -f deploy/manifests/63-ia-agent.yaml
+# The CRS-PMS integration PoC (docs/poc-acl).
+kubectl apply -f deploy/manifests/64-partners.yaml
+kubectl apply -f deploy/manifests/65-crs-integration.yaml
+kubectl apply -f deploy/manifests/66-mapping.yaml
+kubectl apply -f deploy/manifests/67-pms-integration.yaml
+kubectl apply -f deploy/manifests/69-communication.yaml
+kubectl apply -f deploy/manifests/75-integrations.yaml
+kubectl apply -f deploy/manifests/76-customer-mdm.yaml
+kubectl apply -f deploy/manifests/77-front-office.yaml
+kubectl apply -f deploy/manifests/78-audit.yaml
 # The control console: its database first, then the service, then its shell.
 kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml

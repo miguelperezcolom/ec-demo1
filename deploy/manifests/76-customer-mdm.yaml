@@ -1,0 +1,107 @@
+# CRS-PMS integration PoC (docs/poc-acl), H11: the customer MDM (HLA CRM-MDM). Owner of the golden
+# record and of identity resolution — the connector asks it who a reservation's passengers are
+# before writing the guest profile — with Salesforce as its cleaning engine and stewardship surface:
+# it projects customers there as contacts, and hears merges back as ClienteConsolidado__e through
+# the Pub/Sub API (outbound gRPC to api.pubsub.salesforce.com:7443). Screens at /_mdm on the control
+# console. Without the ec-salesforce Secret it still resolves identities; cleaning just waits.
+# What it decides about a customer — a changed golden record, a merge — it publishes on the
+# `customers` topic and calls no one: pms-integration takes it to the front office's kardex and
+# crs-integration projects the customer's reservations again for Opera.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-mdm-service
+  namespace: ec-demo1
+  labels: { app: customer-mdm-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: customer-mdm-service }
+  template:
+    metadata:
+      labels:
+        app: customer-mdm-service
+        app.kubernetes.io/component: customer-mdm-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8127"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+        - name: wait-for-redpanda
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for redpanda; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: customer-mdm-service
+          image: miguelperezcolom/ec-demo1-customer-mdm-service:0.23.0
+          env:
+            - name: SERVER_PORT
+              value: "8127"
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/customer_mdm
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "6"
+            # The customers topic, through the outbox.
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            # The org's External Client App, machine to machine (client credentials). Optional, like
+            # the Anthropic key: bought, not derived, so only there when someone put it in.
+            - name: SF_DOMAIN
+              valueFrom: { secretKeyRef: { name: ec-salesforce, key: SF_DOMAIN, optional: true } }
+            - name: SF_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: ec-salesforce, key: SF_CLIENT_ID, optional: true } }
+            - name: SF_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: ec-salesforce, key: SF_CLIENT_SECRET, optional: true } }
+          ports:
+            - { name: http, containerPort: 8127 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "640Mi", cpu: "100m" }
+            limits:   { memory: "1536Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8127 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8127 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customer-mdm-service
+  namespace: ec-demo1
+  labels: { app: customer-mdm-service }
+spec:
+  selector: { app: customer-mdm-service }
+  ports:
+    - { name: http, port: 8127, targetPort: 8127 }

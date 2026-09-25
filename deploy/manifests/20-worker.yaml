@@ -19,7 +19,7 @@ metadata:
   labels: { app: worker }
 spec:
   replicas: 1
-  # Recreate, not the default RollingUpdate: replicas is 1 and the cx43 nodepool runs near-full,
+  # Recreate, not the default RollingUpdate: replicas is 1 and the nodes run near-full,
   # so a rolling update's surge pod cannot schedule and the rollout stalls with the old pod still
   # serving. Recreate terminates the old pod first — a few seconds of downtime, no surge.
   strategy:
@@ -39,17 +39,8 @@ spec:
       # and forms images already have it) and this becomes three lines.
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: ccx13
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  # Exists AND NotIn: `NotIn` alone also matches pods without the label — every
-                  # DaemonSet — and the rule would then exclude every node in the cluster.
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: NotIn, values: [worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -122,7 +113,7 @@ spec:
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           resources:
-            # It has a ccx13 to itself, so it may as well use it. The handler blocks a Reactor
+            # Headroom for the handler, which blocks a Reactor
             # thread per task under jpa persistence, and headroom is the only lever available
             # from here — the concurrency itself is the engine's to fix.
             requests: { memory: "2Gi", cpu: "1" }

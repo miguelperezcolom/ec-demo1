@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.controlshell.infra.in.ui;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
+import io.mateu.uidl.annotations.Script;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTemplate;
@@ -12,6 +13,7 @@ import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
 import io.mateu.uidl.annotations.WelcomeBanner;
 import io.mateu.uidl.data.Anchor;
+import io.mateu.uidl.data.MicroFrontend;
 import io.mateu.uidl.data.HorizontalLayout;
 import io.mateu.uidl.data.Popover;
 import io.mateu.uidl.data.RemoteMenu;
@@ -41,6 +43,9 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 @UI("")
 @PageTitle("IA control plane")
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "control-plane")
+// Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
+// what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
+@Script(src = "/_inbox/push/push.js")
 @Logo("/images/riu.svg")
 @FavIcon("/images/riu.svg")
 // The catalogues are listings with long ids and long URLs in them; the default ~900px container
@@ -99,6 +104,43 @@ public class ControlShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu formsAdmin = new RemoteMenu("/_forms-admin").withLabel("Forms");
 
+    /**
+     * The hotels' integrations with Opera, served by integrations-service: registering one, its
+     * onboarding gate by gate, and activating, pausing or decommissioning it. First of the
+     * integration's menus, because it is where a hotel's integration starts.
+     */
+    @Menu
+    RemoteMenu integrations = new RemoteMenu("/_integrations").withLabel("Integrations");
+
+    /**
+     * The CRS-PMS integration's control plane (PoC ACL): the causes blocking processes, the code
+     * mapping with its proposals and approvals — and the button that asks the mapping agent — and
+     * the partners' profiles in the PMS. A control-plane concern like the rest of this console:
+     * approving an equivalence changes what every hotel's reservations become in the PMS.
+     */
+    @Menu
+    RemoteMenu mapping = new RemoteMenu("/_mapping").withLabel("Mapping");
+
+    /**
+     * The customers — golden records — served by customer-mdm-service (HLA CRM-MDM): who each
+     * reservation's passengers are, what Salesforce's cleaning merged, and whether the new codes
+     * reached the PMS. Read-only: stewards merge in Salesforce.
+     */
+    @Menu
+    RemoteMenu customers = new RemoteMenu("/_mdm").withLabel("Customers");
+
+    /** What the integration told people, and who is told what. */
+    @Menu
+    RemoteMenu notifications = new RemoteMenu("/_communication").withLabel("Notifications");
+
+    /** Who did what on the control plane: every auditable action, searchable (HLA F016). */
+    @Menu
+    RemoteMenu audit = new RemoteMenu("/_audit").withLabel("Audit");
+
+    /** What waits for me: the notifications and tasks of my roles, each with where to resolve it. */
+    @Menu
+    RemoteMenu inbox = new RemoteMenu("/_inbox").withLabel("Inbox");
+
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
         var widgets = new ArrayList<Component>();
@@ -113,7 +155,13 @@ public class ControlShellHome implements WidgetSupplier {
                 .decode(authorization.substring("Bearer ".length()).split("\\.")[1])));
 
         widgets.add(HorizontalLayout.builder()
-                .content(List.of(Popover.builder()
+                .content(List.of(
+                        // What waits for the signed-in user: the notifications and tasks of their roles.
+                        MicroFrontend.builder()
+                                .baseUrl("/_inbox")
+                                .route("/badge")
+                                .build(),
+                        Popover.builder()
                         .wrapped(Text.builder()
                                 .text("Hola, " + claims.get("name"))
                                 .style("margin-right: 20px;")

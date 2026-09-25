@@ -166,3 +166,28 @@ spec:
             # role on this host; pointing the ingress at the shell would route around the only
             # place that check exists.
             backend: { service: { name: gateway, port: { number: 8190 } } }
+---
+# The hotel's front office (docs/poc-acl, H13): a fourth origin, through the gateway like the rest —
+# which keeps its /api (where the integration writes reservations) off the internet.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: front-office
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [front.ec1.mateu.io]
+      secretName: front-office-tls
+  rules:
+    - host: front.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }

@@ -123,12 +123,21 @@ public class SecurityConfig {
                         // HMAC-SHA256 over the body, verified by the engine itself.
                         .pathMatchers("/workflow/webhooks/**", "/forms/webhooks/**").permitAll()
                         .pathMatchers("/_workflow/**", "/_forms/**", "/_worker/**").authenticated()
+                        // Web Push's two scripts, public: a browser loads a <script> and registers a
+                        // service worker without a token. Code, no data — the endpoints they call
+                        // (the key, the subscriptions) stay behind the rule below.
+                        .pathMatchers("/_inbox/push/push.js", "/_inbox/push/sw.js").permitAll()
+                        // The inbox, on every host: what it shows depends on the caller's roles.
+                        .pathMatchers("/_inbox/**").authenticated()
                         // The two demo CRUD services, guarded the same way and for the same
                         // reason: none of them authenticates anything of its own, so this is
                         // the only thing between their screens and whoever types the path. Users
                         // used to be here too; it moved to the control host, behind ai-admin — see
                         // below — because administering access is a control-plane concern.
                         .pathMatchers("/_booking/**", "/_content/**").authenticated()
+                        // The integration PoC's product-side screen: the partners master. Same
+                        // reason as the two above.
+                        .pathMatchers("/_partners/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the
@@ -151,7 +160,14 @@ public class SecurityConfig {
                         // /_workflow/** rule further up matches on any host, and a path it caught
                         // would be decided as `authenticated` before this line was ever reached.
                         .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**",
-                                "/_workflow-admin/**", "/_forms-admin/**")).hasRole("ai-admin")
+                                "/_workflow-admin/**", "/_forms-admin/**",
+                                // The integration's control plane (PoC ACL): activating a hotel or
+                                // approving a mapping decides what reaches the PMS.
+                                "/_integrations/**", "/_mapping/**", "/_communication/**",
+                                // The customer MDM: golden records are personal data.
+                                "/_mdm/**",
+                                // The audit trail: who did what is personal data too.
+                                "/_audit/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and

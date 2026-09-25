@@ -10,10 +10,8 @@
 # same Job shape as keycloak-db-init, for the same reason, and it is deleted and re-applied by
 # deploy.sh because a Job is immutable once created.
 #
-# One thing this inherits from the rest of the deployment: PostgreSQL is on an emptyDir. Whatever
-# these three write dies with the pod, along with the engine's schema and Keycloak's accounts.
-# Treat any data here as disposable — the README says so about the engine and it is no less true
-# of a booking.
+# The PostgreSQL is on a volume (it was an emptyDir while the engine was being measured), so these
+# databases survive its pod — deploy/demo/reset.sh is what takes them back to the demo's baseline.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -27,15 +25,8 @@ spec:
     spec:
       restartPolicy: OnFailure
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 70
@@ -63,7 +54,7 @@ spec:
               until pg_isready -q; do echo "waiting for postgres"; sleep 2; done
               # CREATE DATABASE has no IF NOT EXISTS, and the Job is retried on failure, so the
               # existence check is what makes re-running this harmless.
-              for db in booking content users; do
+              for db in booking content users partners crs_integration mapping communication integrations customer_mdm front_office audit; do
                 if psql -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1; then
                   echo "database $db already exists"
                 else

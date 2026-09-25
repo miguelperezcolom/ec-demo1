@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: mcp
+id: customer-mdm
+name: Customers (MDM)
+url: http://customer-mdm-service:8127
+transport: SSE
+timeoutSeconds: 60
+description: El maestro de clientes — quién es cada pasajero de una reserva (golden record), qué fusionó la limpieza en Salesforce y a qué reservas llegó el código superviviente. Solo consulta.

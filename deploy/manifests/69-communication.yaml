@@ -1,0 +1,116 @@
+# CRS-PMS integration PoC (docs/poc-acl). Sends the integration's notifications by e-mail through the
+# postfix relay (11-postfix.yaml) to the recipients set up per kind and hotel, keeps the history, and
+# serves it at /_communication on the control console. Until someone adds recipients in the screen,
+# everything goes to DEFAULT_RECIPIENT.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: communication-service
+  namespace: ec-demo1
+  labels: { app: communication-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: communication-service }
+  template:
+    metadata:
+      labels:
+        app: communication-service
+        app.kubernetes.io/component: communication-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8125"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-redpanda
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for redpanda; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: communication-service
+          image: miguelperezcolom/ec-demo1-communication-service:0.22.0
+          env:
+            - name: SERVER_PORT
+              value: "8125"
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/communication
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            # Everything that enters an inbox also goes to two Google Chat spaces. A webhook URL carries
+            # a key and a token: from a Secret (ec-googlechat), never from here. Optional, each one.
+            - name: GOOGLE_CHAT_WEBHOOK
+              valueFrom: { secretKeyRef: { name: ec-googlechat, key: GOOGLE_CHAT_WEBHOOK, optional: true } }
+            - name: GOOGLE_CHAT_WEBHOOK_2
+              valueFrom: { secretKeyRef: { name: ec-googlechat, key: GOOGLE_CHAT_WEBHOOK_2, optional: true } }
+            # …and to the browsers of its roles that allowed notifications (Web Push). The VAPID keys
+            # sign what is sent; the private one is a secret (ec-webpush, from
+            # ~/.config/ec-demo1/webpush.env). Without them, no browser is notified.
+            - name: VAPID_PUBLIC_KEY
+              valueFrom: { secretKeyRef: { name: ec-webpush, key: VAPID_PUBLIC_KEY, optional: true } }
+            - name: VAPID_PRIVATE_KEY
+              valueFrom: { secretKeyRef: { name: ec-webpush, key: VAPID_PRIVATE_KEY, optional: true } }
+            - name: VAPID_SUBJECT
+              valueFrom: { secretKeyRef: { name: ec-webpush, key: VAPID_SUBJECT, optional: true } }
+            - name: DB_POOL_SIZE
+              value: "6"
+            - name: SMTP_HOST
+              value: "postfix"
+            - name: SMTP_PORT
+              value: "25"
+            - name: MAIL_FROM
+              value: "integration@ec1.mateu.io"
+            - name: DEFAULT_RECIPIENT
+              value: "integration-admins@example.com"
+          ports:
+            - { name: http, containerPort: 8125 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "640Mi", cpu: "100m" }
+            limits:   { memory: "1536Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8125 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8125 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: communication-service
+  namespace: ec-demo1
+  labels: { app: communication-service }
+spec:
+  selector: { app: communication-service }
+  ports:
+    - { name: http, port: 8125, targetPort: 8125 }

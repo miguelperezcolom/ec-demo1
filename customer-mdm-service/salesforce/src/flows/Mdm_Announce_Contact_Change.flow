@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>67.0</apiVersion>
+    <description>A contact with an MDM id changed the data the hotels use — by hand, or by an approved change request — and says so: ClienteActualizado__e. The MDM reads the contact and projects it to the front office and to Opera. Salesforce is the master; the MDM keeps its projection.</description>
+    <label>MDM - Announce contact change</label>
+    <processType>AutoLaunchedFlow</processType>
+    <status>Active</status>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Announce</targetReference>
+        </connector>
+        <filterFormula>NOT(ISBLANK({!$Record.MDM_Id__c})) &amp;&amp; (ISCHANGED({!$Record.FirstName}) || ISCHANGED({!$Record.LastName}) || ISCHANGED({!$Record.Email}) || ISCHANGED({!$Record.Phone}) || ISCHANGED({!$Record.Birthdate}) || ISCHANGED({!$Record.Nationality__c}) || ISCHANGED({!$Record.Document_Type__c}) || ISCHANGED({!$Record.Document_Number__c}))</filterFormula>
+        <object>Contact</object>
+        <recordTriggerType>Update</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <recordCreates>
+        <name>Announce</name>
+        <label>Announce</label>
+        <locationX>50</locationX>
+        <locationY>200</locationY>
+        <inputAssignments>
+            <field>MdmId__c</field>
+            <value>
+                <elementReference>$Record.MDM_Id__c</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>ContactId__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <object>ClienteActualizado__e</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+</Flow>

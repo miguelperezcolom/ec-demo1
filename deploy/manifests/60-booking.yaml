@@ -31,15 +31,8 @@ spec:
         prometheus.io/port: "8108"
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: cx43
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - { key: app.kubernetes.io/component, operator: Exists }
-                  - { key: app.kubernetes.io/component, operator: In, values: [postgres, orchestrator, worker] }
-              topologyKey: kubernetes.io/hostname
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -61,7 +54,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: booking
-          image: miguelperezcolom/ec-demo1-booking:0.14.7
+          image: miguelperezcolom/ec-demo1-booking:0.23.1
           env:
             - name: SERVER_PORT
               value: "8108"

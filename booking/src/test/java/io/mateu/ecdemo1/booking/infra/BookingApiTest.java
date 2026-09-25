@@ -53,7 +53,12 @@ class BookingApiTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Container
-    static RedpandaContainer redpanda = new RedpandaContainer("docker.redpanda.com/redpandadata/redpanda:v24.1.7");
+    // Data on a tmpfs: Redpanda refuses writes once the disk it sits on has less free space than its
+    // threshold, and a developer machine with a nearly full disk then fails every test after the
+    // first with "BrokerNotAvailable". In memory it is also faster, and a test broker holds nothing
+    // worth keeping.
+    static RedpandaContainer redpanda = new RedpandaContainer("docker.redpanda.com/redpandadata/redpanda:v24.1.7")
+            .withTmpFs(java.util.Map.of("/var/lib/redpanda/data", "rw"));
 
     @DynamicPropertySource
     static void kafka(DynamicPropertyRegistry registry) {
@@ -126,6 +131,21 @@ class BookingApiTest {
     }
 
     @Test
+    void aBackfillReadsAHotelsFutureBookingsInArrivalOrderPageByPageWithoutTheCancelledOnes() throws Exception {
+        var later = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-12-01").replace("2026-10-08", "2026-12-04"));
+        var sooner = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-11-02").replace("2026-10-08", "2026-11-05"));
+        var cancelled = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-11-10").replace("2026-10-08", "2026-11-12"));
+        var past = createIn("CUN01", REQUEST.replace("2026-10-05", "2026-09-01").replace("2026-10-08", "2026-09-03"));
+        mvc.perform(post("/bookings/{id}/cancel", cancelled).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reasonCode\":\"CLI\"}")).andExpect(status().isOk());
+
+        var first = future("hotelCode=CUN01&from=2026-10-01&limit=1");
+        assertThat(first).map(b -> b.get("id").asText()).containsExactly(sooner);
+        var rest = future("hotelCode=CUN01&from=2026-10-01&limit=10&afterArrival=2026-11-02&afterId=" + sooner);
+        assertThat(rest).map(b -> b.get("id").asText()).containsExactly(later).doesNotContain(cancelled, past);
+    }
+
+    @Test
     void nestedPartsAreStoredAsReadableJson() throws Exception {
         var id = create(REQUEST);
 
@@ -178,11 +198,45 @@ class BookingApiTest {
         })).isInstanceOf(IllegalStateException.class).hasMessageContaining("changed concurrently");
     }
 
+    @Test
+    void theSagaStepConfirmsTheBookingAndAnswersTheEngine() throws Exception {
+        var id = create(REQUEST);
+        var task = new io.mateu.workflow.dtos.events.integration.TaskExecutionRequested("TE-" + id, "PROC-" + id,
+                "verify-booking-payment", "confirm-booking", "",
+                List.of(new io.mateu.workflow.dtos.Variable("bookingId", id)));
+        try (var producer = new org.apache.kafka.clients.producer.KafkaProducer<String, String>(Map.of(
+                org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers()),
+                new org.apache.kafka.common.serialization.StringSerializer(), new org.apache.kafka.common.serialization.StringSerializer())) {
+            producer.send(new org.apache.kafka.clients.producer.ProducerRecord<>("booking", task.processId(),
+                    objectMapper.writerFor(io.mateu.workflow.ddd.DomainEvent.class).writeValueAsString(task))).get();
+        }
+
+        var replies = consume("upstream", null, 60).stream().filter(r -> r.value().contains("TE-" + id)).toList();
+        assertThat(replies).singleElement().satisfies(r -> assertThat(json(r.value()).get("status").asText()).isEqualTo("COMPLETED"));
+        assertThat(read(id).get("status").asText()).isEqualTo("Confirmed");
+    }
+
     String create(String request) throws Exception {
         var body = mvc.perform(post("/bookings").contentType(MediaType.APPLICATION_JSON).content(command(request)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return json(body).get("id").asText();
+    }
+
+    String createIn(String hotelCode, String request) throws Exception {
+        var body = mvc.perform(post("/bookings").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hotelCode\":\"" + hotelCode + "\",\"booking\":" + request + "}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return json(body).get("id").asText();
+    }
+
+    List<JsonNode> future(String query) throws Exception {
+        var body = mvc.perform(get("/bookings/future?" + query)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var list = new ArrayList<JsonNode>();
+        json(body).forEach(list::add);
+        return list;
     }
 
     static String command(String request) {

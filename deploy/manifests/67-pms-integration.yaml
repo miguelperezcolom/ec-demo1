@@ -1,0 +1,126 @@
+# CRS-PMS integration PoC (docs/poc-acl). The Opera end of the integration — the connector the PoC measures.
+# The only piece that knows Opera's API (OHIP). No database: its state is Opera's and the engine's.
+#
+# How to reach each Opera property is not here: it is each hotel's integration's, registered in the
+# console and read from integrations-service. On ec1 they point at OHIP UAT (property XMAR), where
+# only reservations and guest profiles are written; partners are read from Opera, never written.
+# What that tenant takes differently — or has not configured yet — is below (docs/poc-acl, H12).
+#
+# One replica: the read-compare-write of a reservation is serialised in memory, per reservation —
+# the engine's LOCK step would be the place, and in 2.18.0 it does not work on PostgreSQL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-integration-service
+  namespace: ec-demo1
+  labels: { app: pms-integration-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: pms-integration-service }
+  template:
+    metadata:
+      labels:
+        app: pms-integration-service
+        app.kubernetes.io/component: pms-integration-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8123"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-redpanda
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for redpanda; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: pms-integration-service
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.25.0
+          env:
+            - name: SERVER_PORT
+              value: "8123"
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            - name: CRS_INTEGRATION_URL
+              value: "http://crs-integration-service:8121"
+            - name: MAPPING_URL
+              value: "http://mapping-service:8122"
+            # Who a reservation's passengers are (HLA CRM-MDM): asked before writing the guest profile.
+            - name: CUSTOMER_MDM_URL
+              value: "http://customer-mdm-service:8127"
+            # No Opera connection here: each hotel's integration carries its own, read from
+            # integrations-service: the chain's OHIP tenant (the ec-opera Secret).
+            - name: INTEGRATIONS_URL
+              value: "http://integrations-service:8126"
+            - name: RETRY_ALERT_AFTER
+              value: "10m"
+            # OHIP UAT: reservations carry the CRS's locator under a context of our own. Not "CRS":
+            # the tenant's real CRS writes its references under it, and ours would mix with theirs.
+            # ECDEMO1 is not one of OPERA's catalogued external systems — a reservation's references
+            # take any context; a profile's would not (see OPERA_PROFILE_REFERENCES). The CRS version
+            # goes in a numeric UDF named as OPERA names them.
+            - name: OPERA_EXTERNAL_SYSTEM
+              value: "ECDEMO1"
+            - name: OPERA_VERSION_UDF
+              value: "UDFN01"
+            - name: OPERA_PAY_AT_HOTEL_METHOD
+              value: "CASH"
+            # Not configured in the tenant yet: profile references need the external systems as
+            # interfaces of the property, and posting deposits needs a cashier for the integration user.
+            - name: OPERA_PROFILE_REFERENCES
+              value: "false"
+            - name: OPERA_CRM_EXTERNAL_SYSTEM
+              value: ""
+            - name: OPERA_POST_DEPOSITS
+              value: "false"
+            # The client has no access to the hub (403 listing the chain's properties): these are
+            # offered instead, each read on its own.
+            - name: OPERA_PROPERTIES
+              value: "XMAR,XMU"
+            # The hotel's front office: MRU01's reservations are written into it too (H13).
+            - name: FRONT_OFFICE_URL
+              value: "http://front-office:8128"
+            - name: FRONT_OFFICE_HOTELS
+              value: "MRU01"
+          ports:
+            - { name: http, containerPort: 8123 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "640Mi", cpu: "100m" }
+            limits:   { memory: "1536Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8123 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8123 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-integration-service
+  namespace: ec-demo1
+  labels: { app: pms-integration-service }
+spec:
+  selector: { app: pms-integration-service }
+  ports:
+    - { name: http, port: 8123, targetPort: 8123 }

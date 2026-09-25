@@ -98,7 +98,12 @@ public record CrsCatalog(List<Hotel> hotels,
                                 new RoomType("DBL", "Doble estándar", 3, new BigDecimal("160")),
                                 new RoomType("DBLOV", "Doble vista océano", 3, new BigDecimal("195")),
                                 new RoomType("JSU", "Junior suite", 4, new BigDecimal("260")),
-                                new RoomType("SUI", "Suite", 4, new BigDecimal("380"))))),
+                                new RoomType("SUI", "Suite", 4, new BigDecimal("380")))),
+                        // Integrated with a real Opera tenant's pilot property (XMAR, "Piloto Mauricio").
+                        new Hotel("MRU01", "Riu Demo Mauricio", "EUR", List.of(
+                                new RoomType("JSU", "Junior suite", 3, new BigDecimal("240")),
+                                new RoomType("JSUSV", "Junior suite vista mar", 3, new BigDecimal("290")),
+                                new RoomType("SWU", "Suite swim-up", 3, new BigDecimal("380"))))),
                 List.of(
                         new RatePlan("BAR", "Tarifa pública", new BigDecimal("1.00")),
                         new RatePlan("NRF", "No reembolsable", new BigDecimal("0.90")),
@@ -121,7 +126,8 @@ public record CrsCatalog(List<Hotel> hotels,
                         new Code("IMP", "Impago"),
                         new Code("DUP", "Reserva duplicada"),
                         new Code("OVB", "Sobreventa / reubicación"),
-                        new Code("OTR", "Otros")),
+                        new Code("OTR", "Otros"),
+                        new Code("NOS", "No show")),
                 List.of(
                         new Code("VISA", "Visa"),
                         new Code("MC", "Mastercard"),
