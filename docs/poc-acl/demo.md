@@ -1,9 +1,11 @@
 # PoC ACL — guión de la demo
 
-Estado a 2026-09-24 (tarde). Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
+Estado a 2026-09-25. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
 **tenant real de Opera** (OHIP UAT, propiedad **XMAR**); ya no hay doble de Opera en el despliegue
-(`opera-mock` queda solo para la batería local de pruebas). Lo marcado *(pendiente)* no está
-construido todavía o espera una decisión.
+(`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.21.0**, y
+todo ec1 corre en la región de su base de datos (hel1): el front office responde en décimas de segundo
+(la home, 0,2 s; una reserva, ~1 s). Lo marcado *(pendiente)* no está construido todavía o espera una
+decisión.
 
 ## 1. Arquitectura (diagramas del HLA)
 
@@ -216,9 +218,16 @@ de Cobros y factura de depósito.
     quedaría con el cambio y no casaría con el estado reseteado. Cada demo deja en XMAR una reserva y
     un perfil de huésped.
 
-La línea base (2026-09-25, 06:58Z): MRU01 ↔ XMAR activa (con la equivalencia `NOS → NOSHOW`) con sus reservas; **CUN01 sin integración con 21
-reservas futuras** retenidas (para el alta en directo contra XMU); interlocutores importados; la
-bandeja con las causas de CUN01; la auditoría vacía.
+La línea base (2026-09-25, 06:58Z): MRU01 ↔ XMAR activa con sus reservas y la equivalencia
+`NOS → NOSHOW`; **CUN01 sin integración con 21 reservas futuras** retenidas (para el alta en directo
+contra XMU); interlocutores importados; la bandeja con las causas de CUN01; la auditoría vacía. Si se
+cambia algo que deba estar en la línea base, hay que volver a tomarla (`snapshot.sh`, con nada en
+marcha).
+
+**Si ec1 pierde sus bases de datos** (el PostgreSQL del motor está en `emptyDir`; pasó el 2026-09-24 al
+actualizar el motor con el chart equivocado — ver `deploy/chart/eventconductor/VENDORED.md`): relanzar
+`keycloak-db-init` y `demo-db-init`, reiniciar los servicios y `deploy/demo/reset.sh`. Lo que no está
+en la línea base (usuarios, contenidos) vuelve vacío.
 
 ## Probar la demo de punta a punta
 
@@ -232,9 +241,10 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
      listado);
   2. el cambio de datos de su titular pasa por Salesforce (Case aprobado) y baja al front office y al
      perfil de Opera, en su sitio;
-  4. un **no show** de esa reserva: el CRS la cancela con su cargo del 25 % y lo que cuesta llega al
+  3. un **no show** de esa reserva: el CRS la cancela con su cargo del 25 % y lo que cuesta llega al
      front office y a Opera (cancelada con NOSHOW, sus noches sumando el cargo);
-  5. una acción auditable aparece en *Audit*, y la bandeja muestra lo que espera (las causas de CUN01).
+  4. una acción auditable aparece en *Audit*;
+  5. la bandeja muestra lo que espera (las causas de CUN01).
 
   Deja en XMAR una reserva y un perfil por ejecución (las reglas de la demo); en Salesforce, nada
   después del reset.
@@ -246,6 +256,10 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 - [ ] Comprobar el agente de la consola (MCP de `booking`) y el agente de mapeado con el LLM real.
 - [ ] Destinatarios de email reales (hoy el de por defecto es un `example.com` y el correo falla) y
       qué espacio de Google Chat recibe qué (el segundo espacio está bloqueado por su administrador).
+- [ ] Mateu **3.0-alpha.361** en todas las apps (renovación del token tras un 401, el botón «atrás»):
+      en curso; después, pasar las dos baterías (`npx playwright test` y `npm run demo`).
+- [ ] Probar el **no show** (§10 bis) desde la pantalla: en una reserva que venga del CRS y llegue hoy,
+      marcar No show en todos los huéspedes. Las reservas de demostración del front office no van al CRS.
 - [ ] Probar el §10 desde la pantalla del front office (con usuario) y el Case desde la consola de
       Salesforce. Ojo: el Case lleva la sección *Cambio de datos de cliente (MDM)*; para poder añadirla
       se quitaron del layout de Case las acciones y el panel de resumen propios (quedan los de por
@@ -254,8 +268,9 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 - [ ] Datos de prueba en XMAR que conviene conocer: reservas 39481284, 39481745, 39481775, 39481943,
       39481944, 39482155 (y dos canceladas); perfiles de interlocutor 20538292 y 20538322
       (ECDEMO0001/0002); el perfil de huésped 20538296 conserva un email antiguo como secundario, de
-      antes del arreglo (la API de Opera no permite borrarlo). En Salesforce, los dos Cases de prueba
-      y el contacto de C-E572C893A59C con los datos cambiados.
+      antes del arreglo (la API de Opera no permite borrarlo). Cada ejecución de `npm run demo` deja una
+      reserva `E2E-<fecha>` (cancelada como no show) y su perfil; Salesforce vuelve a la línea base con
+      el reset.
 - En Opera, lo que necesita un administrador de OPERA: la interfaz de las referencias externas de
   perfil (OPERAWS-GEN01187) y un cajero para los depósitos (FOF00094). Sin eso, los perfiles van
   sin referencia externa y los depósitos no se apuntan al folio.
