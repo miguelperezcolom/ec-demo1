@@ -54,6 +54,8 @@ ohip:
   # The chain's properties, when the tenant does not list them (a client without hub access): each is
   # read on its own for its name, and one this connection cannot read is not offered.
   known-properties: ${OPERA_PROPERTIES:}
+  # Opera's «Custom Reference» on every reservation written: a filter in Opera's reservation search.
+  custom-reference: ${OPERA_CUSTOM_REFERENCE:EC-DEMO1}
 
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}

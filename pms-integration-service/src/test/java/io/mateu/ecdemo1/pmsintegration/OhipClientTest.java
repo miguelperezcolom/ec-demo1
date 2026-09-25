@@ -63,7 +63,7 @@ class OhipClientTest {
         var gateway = "http://localhost:" + ohip.getAddress().getPort();
         connections.put("RIUPMI", new OhipConnection("RIUPMI", gateway, "app", "id", "secret", "RIUE"));
         connections.put("RIUCUN", new OhipConnection("RIUCUN", gateway, "app2", "id2", "secret2", "RIUE"));
-        client = clientWith(new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null, null));
+        client = clientWith(new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null, null, null));
     }
 
     OhipClient clientWith(OhipProperties properties) {
@@ -146,7 +146,7 @@ class OhipClientTest {
 
     @Test
     void knownPropertiesAreReadOneByOneAndThoseItCannotReadAreLeftOut() {
-        var known = clientWith(new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null, List.of("XMAR", "XOTHER")));
+        var known = clientWith(new OhipProperties(null, null, null, Duration.ofSeconds(2), null, null, null, List.of("XMAR", "XOTHER"), null));
         answers.add(new Answer(200, "{\"hotelConfigInfo\":{\"hotelId\":\"XMAR\",\"hotelName\":\"Piloto Mauricio\"}}"));
         answers.add(new Answer(403, "{\"title\":\"User is not authorized to access data for resort.\"}"));
 

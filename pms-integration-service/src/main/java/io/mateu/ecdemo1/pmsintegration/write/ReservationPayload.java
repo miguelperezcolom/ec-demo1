@@ -22,7 +22,7 @@ import java.math.BigDecimal;
  * cannot change the price the CRS agreed; the CRS locator and the partner's voucher as external
  * references; the guest profile and, when sold through a partner, the partner's profile, with the
  * stay routed to the partner's folio window when the partner pays (NO_FRONT); and the CRS version
- * in a UDF — the order guard.
+ * in a UDF — the order guard; and the integration's «Custom Reference», for the desk to search by.
  *
  * <p>One simplification the PoC makes and says so: a CRS booking of several rooms is written as one
  * Opera reservation with one room rate per room. Opera's own model is a reservation per room,
@@ -40,6 +40,9 @@ public class ReservationPayload {
         var body = objectMapper.createObjectNode();
         var reservation = body.putObject("reservations").putArray("reservation").addObject();
         reservation.put("hotelId", pmsHotelId);
+        if (!properties.customReference().isBlank()) {
+            reservation.put("customReference", properties.customReference());
+        }
         var channel = codes.translation(CodeType.CHANNEL, r.channelCode());
 
         var stay = reservation.putObject("roomStay");

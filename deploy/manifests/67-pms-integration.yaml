@@ -44,7 +44,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: pms-integration-service
-          image: miguelperezcolom/ec-demo1-pms-integration-service:0.23.2
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.24.0
           env:
             - name: SERVER_PORT
               value: "8123"

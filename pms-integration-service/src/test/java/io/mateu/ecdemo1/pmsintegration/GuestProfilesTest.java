@@ -58,7 +58,7 @@ class GuestProfilesTest {
         });
         ohip.start();
         var connection = new OhipConnection("XMAR", "http://localhost:" + ohip.getAddress().getPort(), "app", "id", "s", "RIUE");
-        var properties = new OhipProperties("CRS", "UDFN01", "CASH", Duration.ofSeconds(2), "", false, false, null);
+        var properties = new OhipProperties("CRS", "UDFN01", "CASH", Duration.ofSeconds(2), "", false, false, null, null);
         var client = new OhipClient(new Connections() {
             @Override
             public Optional<OhipConnection> of(String pmsHotelCode) {

@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReservationPayloadTest {
 
     final ReservationPayload payload = new ReservationPayload(new ObjectMapper(),
-            new OhipProperties("RIUCRS", "CRS_VERSION", "CA", Duration.ofSeconds(5), null, null, null, null));
+            new OhipProperties("RIUCRS", "CRS_VERSION", "CA", Duration.ofSeconds(5), null, null, null, null, null));
 
     static final LocalDate IN = LocalDate.of(2026, 10, 9);
 
@@ -78,12 +78,13 @@ class ReservationPayloadTest {
     }
 
     @Test
-    void itCarriesTheLocatorTheVoucherTheVersionAndTheProfiles() {
+    void itCarriesTheLocatorTheVoucherTheVersionTheCustomReferenceAndTheProfiles() {
         var r = payload.build(reservation(List.of(), "AD"), codes(), "RIUPMI", "G1", partner(BillingMode.FRONT), "P1", "Agent")
                 .path("reservations").path("reservation").get(0);
 
         assertThat(r.path("externalReferences").toString()).contains("\"id\":\"LOC1\",\"idContext\":\"RIUCRS\"")
                 .contains("\"id\":\"NT-42\",\"idContext\":\"NORDTRAVEL\"");
+        assertThat(r.path("customReference").asText()).isEqualTo("EC-DEMO1");
         assertThat(r.path("userDefinedFields").path("numericUDFs").get(0).path("name").asText()).isEqualTo("CRS_VERSION");
         assertThat(r.path("userDefinedFields").path("numericUDFs").get(0).path("value").asLong()).isEqualTo(3);
         assertThat(r.path("reservationGuests").get(0).path("profileInfo").path("profileIdList").get(0).path("id").asText()).isEqualTo("G1");
