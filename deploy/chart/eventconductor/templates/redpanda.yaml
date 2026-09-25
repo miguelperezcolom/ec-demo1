@@ -36,6 +36,10 @@ spec:
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: redpanda
+      {{- with .Values.redpanda.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- with (default .Values.nodeSelector (get .Values "redpanda").nodeSelector) }}
       nodeSelector:

@@ -20,6 +20,10 @@
 ## ── PostgreSQL ───────────────────────────────────────────────────────────────
 postgres:
   image: postgres:16
+  # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage of
+  # everything that talks to it. It still moves if its node goes away for another reason.
+  podAnnotations:
+    karpenter.sh/do-not-disrupt: "true"
   database: workflow
   username: workflow
   existingSecret: ec-postgres
@@ -40,6 +44,10 @@ postgres:
 ## ── Redpanda ─────────────────────────────────────────────────────────────────
 redpanda:
   image: docker.redpanda.com/redpandadata/redpanda:v24.1.7
+  # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage of
+  # everything that talks to it. It still moves if its node goes away for another reason.
+  podAnnotations:
+    karpenter.sh/do-not-disrupt: "true"
   brokerInternal: redpanda:19092
   cores: 2
   # Six, matching upstream and outbox, so the orchestrator can be scaled without repartitioning.
@@ -57,6 +65,10 @@ redpanda:
 ## ── Orchestrator ─────────────────────────────────────────────────────────────
 orchestrator:
   image: miguelperezcolom/orchestrator-standalone-app
+  # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage of
+  # everything that talks to it. It still moves if its node goes away for another reason.
+  podAnnotations:
+    karpenter.sh/do-not-disrupt: "true"
   imageTag: "2.21.0"
   replicas: 1
   servicePort: 8105

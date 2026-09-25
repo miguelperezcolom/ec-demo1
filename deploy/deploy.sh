@@ -33,6 +33,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --set controller.replicaCount=1 \
   --set controller.nodeSelector."kubernetes\.io/arch"=amd64 \
   --set controller.nodeSelector."topology\.kubernetes\.io/region"=hel1 \
+  --set-string controller.podAnnotations."karpenter\.sh/do-not-disrupt"=true \
   --set controller.service.type=LoadBalancer \
   --set controller.resources.requests.cpu=100m \
   --set controller.resources.requests.memory=256Mi \

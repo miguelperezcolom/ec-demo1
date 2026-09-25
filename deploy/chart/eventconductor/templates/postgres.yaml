@@ -63,6 +63,11 @@ spec:
         # engine's tables and Keycloak's database both — while everything else stayed up and
         # looked healthy. Only meaningful with localDisk; a PersistentVolume follows the pod.
         karpenter.sh/do-not-disrupt: "true"
+      {{- else }}
+      {{- with .Values.postgres.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- end }}
     spec:
       {{- with (default .Values.nodeSelector (get .Values "postgres").nodeSelector) }}

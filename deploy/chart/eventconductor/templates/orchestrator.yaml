@@ -24,6 +24,10 @@ spec:
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: orchestrator
+      {{- with .Values.orchestrator.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- with (default .Values.nodeSelector (get .Values "orchestrator").nodeSelector) }}
       nodeSelector:

@@ -73,6 +73,9 @@ spec:
       labels:
         app: keycloak
         app.kubernetes.io/component: keycloak
+      annotations:
+        # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage.
+        karpenter.sh/do-not-disrupt: "true"
     spec:
       nodeSelector:
         topology.kubernetes.io/region: hel1

@@ -18,6 +18,8 @@ spec:
         app: front-office
         app.kubernetes.io/component: front-office
       annotations:
+        # Karpenter does not move it to consolidate nodes: a restart under a demo is an outage.
+        karpenter.sh/do-not-disrupt: "true"
         prometheus.io/scrape: "true"
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8128"

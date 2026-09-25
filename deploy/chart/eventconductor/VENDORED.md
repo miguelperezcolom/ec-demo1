@@ -28,8 +28,8 @@ checkout of the engine repo beside it.
 
 ## The changes
 
-Three. The first two fill gaps that make a real deployment impossible rather than inconvenient;
-the third is a default of Kubernetes' that is wrong for a JVM.
+Four. The first two fill gaps that make a real deployment impossible rather than inconvenient;
+the third is a default of Kubernetes' that is wrong for a JVM; the fourth keeps a demo up.
 
 ### 1. `extraEnv` on `forms` and `rules`
 
@@ -80,3 +80,11 @@ Liveness has to mean wedged, never busy.
 
 Worth upstreaming as configurable values rather than as these numbers; every deployment's idea of
 "wedged" is different.
+
+### 4. `podAnnotations` on `postgres`, `redpanda` and `orchestrator`
+
+Upstream annotates PostgreSQL's pod only with `localDisk`. Here each of the three takes a
+`podAnnotations` map, and `deploy/values/eventconductor.yaml` sets `karpenter.sh/do-not-disrupt` on
+all three: with no instance type pinned, Karpenter consolidates nodes whenever it finds a cheaper
+packing, and each move is a restart of the engine under whoever is using it. With `localDisk` the
+PostgreSQL annotation is still the chart's own.
