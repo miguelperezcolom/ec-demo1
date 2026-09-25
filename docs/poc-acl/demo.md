@@ -1,11 +1,21 @@
 # PoC ACL — guión de la demo
 
-Estado a 2026-09-25. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
+Estado a 2026-09-25, tarde. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
 **tenant real de Opera** (OHIP UAT, propiedad **XMAR**); ya no hay doble de Opera en el despliegue
-(`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.21.0**, y
-todo ec1 corre en la región de su base de datos (hel1): el front office responde en décimas de segundo
-(la home, 0,2 s; una reserva, ~1 s). Lo marcado *(pendiente)* no está construido todavía o espera una
+(`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.21.0** y
+las apps, Mateu **3.0-alpha.361**. Lo marcado *(pendiente)* no está construido todavía o espera una
 decisión.
+
+**ec1 está a cero** desde las 08:20Z (`deploy/demo/zero.sh`): sin integraciones, reservas, mapeados,
+clientes ni procesos, y sin contactos en Salesforce, para recorrer el alta paso a paso. Hasta que se
+recorra y se tome una línea base nueva, `reset.sh` y `npm run demo` no se pueden usar (ver
+[Resetear la demo](#resetear-la-demo)).
+
+La infraestructura, desde hoy: todo ec1 en **hel1**, en los nodos que elige Karpenter (hoy, uno
+cx53 para todo ec1 y el de observabilidad), sin la topología del benchmark; el PostgreSQL del motor en
+un **volumen** (ya no muere con su pod); los pods clave marcados para que Karpenter no los mueva; y el
+DNS de `ec1.mateu.io` apuntando al balanceador de hel1. El motor tiene **solo los seis procesos de la
+PoC** (ec-definitions #23).
 
 ## 1. Arquitectura (diagramas del HLA)
 
@@ -57,7 +67,7 @@ MRU01 que llegan a Opera llegan también aquí como estancias; check-in, huéspe
 | Notifications | Lo que se ha comunicado y a quién; destinatarios |
 | Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
 | Inbox | La misma bandeja, en la consola de control |
-| Workflow / Forms | Las definiciones de proceso y de formulario |
+| Workflow / Forms | Las definiciones de proceso: los seis de la PoC (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show`, `verify-booking-payment`); formularios, hoy ninguno |
 | IA | El agente de mapeado y los MCP de cada servicio |
 | Usuarios | Quién puede hacer qué |
 
@@ -65,9 +75,17 @@ Todos los listados paginan.
 
 ## 3. El punto de partida
 
-MRU01 (el hotel del CRS) está integrado con **XMAR** (Opera) y activo: sus reservas viajan a Opera
-en tiempo real. Otro hotel del CRS, sin integración, vende y sus reservas **esperan** en la causa
-`INTEGRATION_INACTIVE:<hotel>`.
+Hoy, **cero**: ninguna integración. Lo que hay es lo que no hace la integración — los hoteles y el
+catálogo del CRS, los 259 interlocutores del ERP, las 15 habitaciones y los catálogos del front
+office — y Opera con lo que ya tenía.
+
+Un hotel del CRS **sin integración** vende y sus reservas se quedan en el CRS: no arranca ningún
+proceso (antes esperaban en la causa `INTEGRATION_INACTIVE`, y se acumulaban). Cuando el hotel se da
+de alta, el backfill las trae. Las de un hotel con integración **aún no activa** sí esperan, y se
+reanudan al activarla.
+
+Cuando esté hecha el alta de MRU01 con XMAR, el punto de partida de la demo será ese, y se guardará
+como línea base.
 
 ## 4. Crear una integración
 
@@ -92,8 +110,9 @@ Cada puerta que necesita a alguien deja un aviso **en la bandeja** con el enlace
 se cierra solo cuando la integración la pasa.
 
 > *(pendiente de decidir)* **Contra qué propiedad hacer el alta en directo.** Un alta completa
-> escribe en Opera las reservas futuras del hotel. XMU está vacía y es la candidata; XMAR ya tiene
-> MRU01 activo.
+> escribe en Opera las reservas futuras del hotel. Ahora mismo se está recorriendo **MRU01 → XMAR**
+> desde cero; para la demo en directo, o se repite esa (la línea base tendría que tomarse antes del
+> alta) o se hace la de otro hotel contra XMU, que está vacía.
 
 ## 5. Se bloquea: espera, no falla
 
@@ -124,6 +143,11 @@ Una reserva nueva de MRU01 en *Call center* (o por el chat del agente, *«Crea 3
 
 - En Opera (XMAR): la reserva con los códigos traducidos, tarifa fija por noche, el perfil del
   huésped, el del interlocutor cuando lo hay, y la versión del CRS en el UDF.
+- **Cómo encontrarlas en Opera**: todas las que escribe la integración llevan **Custom Reference =
+  `EC-DEMO1`** — en la búsqueda avanzada de reservas, ese filtro las lista todas. Una concreta, por el
+  localizador del CRS en *Conf / Cxl / External*: va como referencia externa con el contexto
+  **`ECDEMO1`** (no `CRS`, que es el del CRS real de este tenant). Las escritas antes del 2026-09-25 no
+  llevan ninguna de las dos cosas.
 - En el front office: la estancia, con su titular.
 - En el CRS: dónde ha quedado en Opera.
 - En *Customers*: los pasajeros resueltos contra el maestro de clientes.
@@ -160,9 +184,9 @@ Cualquier cambio hecho a mano en el contacto de Salesforce baja igual. Qué ense
 | Consola — *Customers* | El cliente con sus xref (Salesforce, front office, perfiles de Opera) y sus solicitudes de cambio |
 | Opera | El perfil del huésped con el dato nuevo, en la misma entrada |
 
-Probado en ec1 con C-E572C893A59C (reserva CU838F): dos cambios aprobados en Salesforce (Cases
-500d100000H0YeFAAV y 500d100000H0dNlAAJ) llegaron al front office y al perfil 20538296 de Opera; el
-segundo cambió el email en su sitio.
+Probado en ec1 el 2026-09-24 con C-E572C893A59C (reserva CU838F): dos cambios aprobados en
+Salesforce llegaron al front office y al perfil 20538296 de Opera; el segundo cambió el email en su
+sitio. (Ese cliente y sus Cases se borraron al poner ec1 a cero.)
 
 ## 10 bis. No show: el hotel lo dice y el CRS lo cobra
 
@@ -180,8 +204,9 @@ resultado baja por la proyección de siempre.
      Opera solo lo pone su Night Audit; por API es una cancelación.)
    - **Front office**: la estancia pasa a **No show**, costando el cargo.
 
-Hace falta la equivalencia `NOS → NOSHOW` (motivo de cancelación, MRU01), que ya está en la línea
-base. Solo reservas que vienen del CRS: las de demostración del front office se quedan en local.
+Hace falta la equivalencia `NOS → NOSHOW` (motivo de cancelación, MRU01): desde cero hay que
+aprobarla en el alta, o la cancelación espera en *Mapping → Pending*. Solo reservas que vienen del
+CRS.
 
 ## 11. Quién hizo qué, y qué me espera
 
@@ -201,33 +226,33 @@ de Cobros y factura de depósito.
 
 ## Resetear la demo
 
-`deploy/demo/reset.sh` devuelve ec1 a la **línea base** (`deploy/demo/snapshot.sh` la guarda, en
-`~/.local/share/ec-demo1/demo-baseline`; unos 4 minutos):
+Dos scripts en `deploy/demo/`, y ninguno toca Opera:
 
-- **Nuestros servicios y el motor**: se restauran sus bases de datos (CRS, ERP, integraciones,
-  mapeado, MDM, front office, comunicación y bandeja, auditoría) y el estado del motor (procesos,
-  pasos, tareas); se paran y arrancan.
-- **Salesforce**: se borran los contactos y Cases que creó la demo (solo los de ec1; el org se
-  comparte con el entorno local) y los contactos de la línea base vuelven a sus datos.
-- **Opera no se toca**: ni se cancela ni se borra nada. Por eso la demo se hace para repetirse encima
-  de lo que dejó escrito:
-  - las reservas de CUN01 son siempre las mismas (localizadores de la línea base): la primera demo
-    las escribe en XMU; después, el backfill las **encuentra ya en Opera** y no escribe nada;
-  - durante la demo solo se modifica **lo que se crea en la demo** (una reserva nueva de MRU01, y el
-    cambio de datos sobre **su** titular), nunca reservas o clientes de la línea base: Opera se
-    quedaría con el cambio y no casaría con el estado reseteado. Cada demo deja en XMAR una reserva y
-    un perfil de huésped.
+- **`zero.sh` — antes de cualquier integración** (unos 3 minutos). Vacía lo que hace la integración:
+  reservas del CRS, integraciones, mapeados, MDM, huéspedes y estancias del front office (las
+  habitaciones quedan libres), avisos, auditoría y los procesos del motor; y en Salesforce borra
+  **todos** los contactos y los Cases del MDM (el org se comparte con el entorno local). Se queda lo
+  que está configurado: interlocutores del ERP, habitaciones y catálogos del front office,
+  definiciones, usuarios y Keycloak. El front office ya no se rellena solo con huéspedes de muestra.
+- **`reset.sh` — a la línea base** (unos 4 minutos), la que guarda `snapshot.sh` en
+  `~/.local/share/ec-demo1/demo-baseline`: restaura las bases de datos de nuestros servicios y el
+  estado del motor, borra en Salesforce los contactos y Cases que creó la demo y devuelve los de la
+  línea base a sus datos.
 
-La línea base (2026-09-25, 06:58Z): MRU01 ↔ XMAR activa con sus reservas y la equivalencia
-`NOS → NOSHOW`; **CUN01 sin integración con 21 reservas futuras** retenidas (para el alta en directo
-contra XMU); interlocutores importados; la bandeja con las causas de CUN01; la auditoría vacía. Si se
-cambia algo que deba estar en la línea base, hay que volver a tomarla (`snapshot.sh`, con nada en
-marcha).
+**Hoy no hay línea base**: la anterior (06:58Z, con MRU01 ↔ XMAR activa) se apartó a
+`demo-baseline-pre-zero` al poner ec1 a cero, para que `reset.sh` no la trajera de vuelta; sin línea
+base, se niega a arrancar. Cuando el alta desde cero esté recorrida, se toma otra (`snapshot.sh`, con
+nada en marcha).
 
-**Si ec1 pierde sus bases de datos** (el PostgreSQL del motor está en `emptyDir`; pasó el 2026-09-24 al
-actualizar el motor con el chart equivocado — ver `deploy/chart/eventconductor/VENDORED.md`): relanzar
-`keycloak-db-init` y `demo-db-init`, reiniciar los servicios y `deploy/demo/reset.sh`. Lo que no está
-en la línea base (usuarios, contenidos) vuelve vacío.
+Opera no se toca ni para resetear: ni se cancela ni se borra nada. Por eso la demo se hace para
+repetirse encima de lo que dejó escrito — reservas y partners se buscan antes de escribir (por
+localizador y por CorporateId), y durante la demo solo se modifica **lo que se crea en la demo** (una
+reserva nueva de MRU01, y el cambio de datos sobre **su** titular), nunca lo de la línea base. Cada
+demo deja en XMAR una reserva y un perfil de huésped.
+
+Las bases de datos ya no se pierden al mover un pod: el PostgreSQL del motor está en un volumen desde
+el 2026-09-25 (antes, en un `emptyDir`, se perdieron el 24 al actualizar el motor con el chart
+equivocado — `deploy/chart/eventconductor/VENDORED.md`). Solo las pierde borrar su PVC.
 
 ## Probar la demo de punta a punta
 
@@ -244,33 +269,48 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
   3. un **no show** de esa reserva: el CRS la cancela con su cargo del 25 % y lo que cuesta llega al
      front office y a Opera (cancelada con NOSHOW, sus noches sumando el cargo);
   4. una acción auditable aparece en *Audit*;
-  5. la bandeja muestra lo que espera (las causas de CUN01).
+  5. la bandeja muestra lo que espera (las causas de CUN01). *Este paso ya no puede pasar*: un hotel
+     sin integración no deja causas (ver §3); hay que cambiarlo por algo que sí espere.
 
-  Deja en XMAR una reserva y un perfil por ejecución (las reglas de la demo); en Salesforce, nada
+  Hoy no se puede lanzar: necesita el alta de MRU01 hecha y una línea base nueva (su teardown hace
+  `reset.sh`). Deja en XMAR una reserva y un perfil por ejecución (las reglas de la demo); en Salesforce, nada
   después del reset.
 
 ## Preparación de la demo
 
+- [ ] **Recorrer el alta desde cero**, MRU01 → XMAR (en curso): conectividad, contraste, mapeados
+      (incluida `NOS → NOSHOW`), interlocutores, backfill y activación. **Antes del alta, crear
+      reservas futuras de MRU01** en *Call center* (con algún interlocutor): el CRS está vacío, y sin
+      ellas el contraste, los interlocutores y el backfill no tienen nada que llevar. Mientras no haya
+      integración se quedan en el CRS, sin proceso; el backfill las trae.
+- [ ] Con la primera reserva escrita, comprobar en Opera que acepta el contexto **`ECDEMO1`** en la
+      referencia externa (no es un sistema externo del catálogo de OPERA; si lo rechaza, el proceso
+      se para con la causa «rechazada por el PMS» y se vuelve a `CRS`) y que el filtro **Custom
+      Reference = `EC-DEMO1`** la encuentra.
+- [ ] Tomar la **línea base nueva** (`snapshot.sh`) y cambiar el paso 5 de `npm run demo`, que busca
+      las causas de CUN01; después, pasar las dos baterías.
 - [ ] Decidir la propiedad para el alta en directo (§4) y, si es XMU, sembrar un hotel del CRS con
       reservas futuras (`e2e/poc-acl-demo/seed.py`; cuidado: todo lo sembrado acaba en Opera).
 - [ ] Comprobar el agente de la consola (MCP de `booking`) y el agente de mapeado con el LLM real.
 - [ ] Destinatarios de email reales (hoy el de por defecto es un `example.com` y el correo falla) y
       qué espacio de Google Chat recibe qué (el segundo espacio está bloqueado por su administrador).
-- [ ] Mateu **3.0-alpha.361** en todas las apps (renovación del token tras un 401, el botón «atrás»):
-      en curso; después, pasar las dos baterías (`npx playwright test` y `npm run demo`).
 - [ ] Probar el **no show** (§10 bis) desde la pantalla: en una reserva que venga del CRS y llegue hoy,
-      marcar No show en todos los huéspedes. Las reservas de demostración del front office no van al CRS.
+      marcar No show en todos los huéspedes.
 - [ ] Probar el §10 desde la pantalla del front office (con usuario) y el Case desde la consola de
       Salesforce. Ojo: el Case lleva la sección *Cambio de datos de cliente (MDM)*; para poder añadirla
       se quitaron del layout de Case las acciones y el panel de resumen propios (quedan los de por
       defecto).
 - [ ] Solo el titular viaja al maestro: los acompañantes no llevan código de cliente en el front office.
-- [ ] Datos de prueba en XMAR que conviene conocer: reservas 39481284, 39481745, 39481775, 39481943,
-      39481944, 39482155 (y dos canceladas); perfiles de interlocutor 20538292 y 20538322
-      (ECDEMO0001/0002); el perfil de huésped 20538296 conserva un email antiguo como secundario, de
-      antes del arreglo (la API de Opera no permite borrarlo). Cada ejecución de `npm run demo` deja una
-      reserva `E2E-<fecha>` (cancelada como no show) y su perfil; Salesforce vuelve a la línea base con
-      el reset.
+- [x] Mateu **3.0-alpha.361** en todas las apps (renovación del token tras un 401, el botón «atrás»):
+      desplegado; las pantallas, 67/67.
+- [x] Menos nodos: de 7 a 3 (ec1 entero en un cx53 de hel1, la observabilidad en el suyo, y uno de
+      sistema del clúster); fuera `swapi`, una app vieja y su balanceador.
+- Datos de prueba que quedan en XMAR de antes de poner ec1 a cero (Opera no se limpia): reservas
+  39481284, 39481745, 39481775, 39481943, 39481944, 39482155 (y dos canceladas, y las `E2E-<fecha>`
+  de cada `npm run demo`, canceladas como no show), con la referencia en el contexto `CRS` y sin Custom
+  Reference; perfiles de interlocutor 20538292 y 20538322 (ECDEMO0001/0002), que el alta volverá a
+  encontrar por su CorporateId; el perfil de huésped 20538296 conserva un email antiguo como
+  secundario (la API de Opera no permite borrarlo).
 - En Opera, lo que necesita un administrador de OPERA: la interfaz de las referencias externas de
   perfil (OPERAWS-GEN01187) y un cajero para los depósitos (FOF00094). Sin eso, los perfiles van
   sin referencia externa y los depósitos no se apuntan al folio.
