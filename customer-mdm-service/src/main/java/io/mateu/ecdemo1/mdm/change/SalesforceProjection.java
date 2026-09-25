@@ -5,8 +5,7 @@ import io.mateu.ecdemo1.mdm.resolution.Normalizer;
 import io.mateu.ecdemo1.mdm.salesforce.SalesforceClient;
 import io.mateu.ecdemo1.mdm.store.Customer;
 import io.mateu.ecdemo1.mdm.store.CustomerRepository;
-import io.mateu.ecdemo1.mdm.store.HotelUpdate;
-import io.mateu.ecdemo1.mdm.store.HotelUpdateRepository;
+import io.mateu.ecdemo1.mdm.outbox.CustomerEvents;
 import io.mateu.ecdemo1.mdm.store.SalesforceState;
 import io.mateu.ecdemo1.mdm.store.Xref;
 import lombok.RequiredArgsConstructor;
@@ -17,13 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Salesforce is the master of the customer's data; the MDM keeps a projection of it. When Salesforce
  * says a contact changed — by hand, or by an approved change request — the MDM reads it and takes its
- * data as its own; if anything actually changed, the hotels learn it (the front office's kardex,
- * Opera's guest profiles). A write of the MDM's own echoing back changes nothing, and goes no further.
+ * data as its own; if anything actually changed — or a change a hotel proposed was decided — it says
+ * so on the customers topic, and the hotels learn it from there (the front office's kardex, Opera's
+ * guest profiles). A write of the MDM's own echoing back changes nothing, and goes no further.
  */
 @Slf4j
 @Component
@@ -32,7 +31,7 @@ public class SalesforceProjection {
 
     final SalesforceClient salesforce;
     final CustomerRepository customers;
-    final HotelUpdateRepository updates;
+    final CustomerEvents events;
     final Xrefs xrefs;
     final Clock clock;
 
@@ -68,15 +67,8 @@ public class SalesforceProjection {
         }
         customers.save(customer);
         if (changed || requestId != null) {
-            var update = new HotelUpdate();
-            update.id = UUID.randomUUID().toString();
-            update.customerId = customer.id;
-            update.version = customer.version;
-            update.requestId = requestId;
-            update.decision = decision;
-            update.dataChanged = changed;
-            update.createdAt = clock.instant();
-            updates.save(update);
+            // Whoever holds a copy of the customer learns it from the customers topic.
+            events.changed(customer, changed, requestId, decision);
         }
         return changed;
     }

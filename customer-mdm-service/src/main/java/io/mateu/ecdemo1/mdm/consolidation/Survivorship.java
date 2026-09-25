@@ -27,7 +27,8 @@ import java.util.function.Supplier;
  * what the survivor is. The rule, field by field: the value the steward kept on the surviving
  * contact, which is data a person looked at; else what the MDM already had; else the absorbed
  * customer's. Nothing is deleted: the absorbed customer becomes an alias of the survivor, and its
- * reservations are re-pointed and queued to carry the survivor's code to the PMS (F005).
+ * reservations are re-pointed, and the merge is announced on the customers topic, whose subscribers
+ * carry the survivor's code to the PMS (F005).
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +38,7 @@ public class Survivorship {
     final CustomerRepository customers;
     final SourceRepository sources;
     final ConsolidationRepository consolidations;
+    final io.mateu.ecdemo1.mdm.outbox.CustomerEvents events;
     final Clock clock;
 
     @Transactional
@@ -96,9 +98,12 @@ public class Survivorship {
         c.appliedAt = clock.instant();
         c.reservations = reservations.size();
         c.reservationKeys = String.join(",", reservations);
-        c.propagatedAt = reservations.isEmpty() ? clock.instant() : null;
+        // Carried to the reservations by whoever subscribes to the customers topic (F005): the event
+        // leaves with this transaction, so the merge is propagated once it is saved.
+        c.propagatedAt = clock.instant();
         c.detail = survivor.survivorship;
         consolidations.save(c);
+        events.merged(survivor, absorbedId);
         log.info("{} merged into {} (via {}): {}; {} reservation(s) to carry the new code",
                 absorbedId, survivorId, via, notes, reservations.size());
     }

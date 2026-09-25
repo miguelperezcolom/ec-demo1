@@ -7,7 +7,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks
+      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks;consumeCustomerEvents
     stream:
       kafka:
         binder:
@@ -37,6 +37,16 @@ spring:
         routeIntegrationEvents-in-0:
           destination: integration-events
           group: ec-demo1-crs-integration-router
+        # IN: what the MDM says about a customer — a changed golden record, a merge: its reservations
+        # are projected again, so Opera's guest profile is written from the MDM.
+        consumeCustomerEvents-in-0:
+          destination: customers
+          group: ec-demo1-crs-integration-customers
+          # Retried until it goes: a projection the MDM asked for is not dropped on a passing failure.
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
         # IN: the engine's tasks for this adapter — the steps whose definition says topic
         # crs-integration. A group of its own, like every binding here.
         consumeTasks-in-0:

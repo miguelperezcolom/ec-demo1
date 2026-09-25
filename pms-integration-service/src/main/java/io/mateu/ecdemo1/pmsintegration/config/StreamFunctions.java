@@ -18,7 +18,8 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The engine's tasks for the PMS adapter, handled on the consumer thread. A step that fails is
+ * The engine's tasks for the PMS adapter, and the MDM's customer events. Handled on the consumer
+ * thread. A step that fails is
  * answered as an error and the engine retries it with backoff; a transient failure also goes on the
  * watch that raises the alarm when it lasts.
  */
@@ -30,6 +31,27 @@ public class StreamFunctions {
     final TaskHandlers tasks;
     final RetryWatch retryWatch;
     final StreamBridge streamBridge;
+    final io.mateu.ecdemo1.pmsintegration.frontoffice.FrontOfficeWriter frontOffice;
+    final TolerantReader reader;
+
+    /**
+     * What the MDM says about a customer, taken to the front office's kardex. Opera's guest profile is
+     * written by projecting the customer's reservations again, which crs-integration starts from the
+     * same event.
+     */
+    @Bean
+    public Consumer<org.springframework.messaging.Message<byte[]>> consumeCustomerEvents() {
+        return message -> {
+            io.mateu.ecdemo1.integration.model.customer.CustomerEvent event;
+            try {
+                event = reader.mapper().readValue(message.getPayload(), io.mateu.ecdemo1.integration.model.customer.CustomerEvent.class);
+            } catch (java.io.IOException e) {
+                log.error("Unreadable customer event, skipped: {}", new String(message.getPayload()), e);
+                return;
+            }
+            frontOffice.kardex(event);
+        };
+    }
 
     @Bean
     public Consumer<DomainEvent> consumeTasks() {

@@ -27,7 +27,7 @@ wipe crs_integration inbox_entry outbox_message
 wipe integrations integration backfill_run outbox_message
 wipe mapping cause mapping_entry partner_profile waiter waiter_cause outbox_message
 wipe communication inbox_item notification resolution
-wipe customer_mdm customer customer_source customer_xref consolidation change_request hotel_update
+wipe customer_mdm customer customer_source customer_xref consolidation change_request outbox_message
 wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line
 echo "update room set occupancy = 'FREE';" | psql_in front_office
 wipe audit audit_record

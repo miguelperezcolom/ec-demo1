@@ -3,12 +3,14 @@ package io.mateu.ecdemo1.mdm;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import io.mateu.ecdemo1.integration.model.customer.CustomerStatus;
+import io.mateu.ecdemo1.integration.model.customer.CustomerChanged;
+import io.mateu.ecdemo1.integration.model.customer.CustomerEvent;
+import io.mateu.ecdemo1.integration.model.customer.CustomersMerged;
 import io.mateu.ecdemo1.integration.model.customer.IdentityRequest;
 import io.mateu.ecdemo1.integration.model.customer.ResolvedIdentity;
 import io.mateu.ecdemo1.integration.model.reservation.GuestType;
 import io.mateu.ecdemo1.integration.model.reservation.Person;
 import io.mateu.ecdemo1.mdm.consolidation.Consolidations;
-import io.mateu.ecdemo1.mdm.consolidation.Propagation;
 import io.mateu.ecdemo1.mdm.resolution.IdentityResolution;
 import io.mateu.ecdemo1.mdm.salesforce.Projection;
 import io.mateu.ecdemo1.mdm.store.ConsolidationRepository;
@@ -43,6 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -131,8 +134,9 @@ class MdmTest {
         others.start();
         var base = "http://localhost:" + others.getAddress().getPort();
         registry.add("mdm.salesforce.domain", () -> base);
-        registry.add("mdm.crs-integration-url", () -> base);
-        registry.add("mdm.front-office-url", () -> base);
+        // No broker here: the events are read from the outbox, where they are written, and the relay
+        // that would publish them is kept from running.
+        registry.add("outbox.interval", () -> "1h");
     }
 
     @AfterAll
@@ -151,8 +155,6 @@ class MdmTest {
     @Autowired
     Consolidations consolidations;
     @Autowired
-    Propagation propagation;
-    @Autowired
     CustomerRepository customers;
     @Autowired
     SourceRepository sources;
@@ -163,15 +165,13 @@ class MdmTest {
     @Autowired
     io.mateu.ecdemo1.mdm.change.SalesforceProjection salesforceProjection;
     @Autowired
-    io.mateu.ecdemo1.mdm.change.HotelPropagation hotelPropagation;
-    @Autowired
-    io.mateu.ecdemo1.mdm.store.HotelUpdateRepository hotelUpdates;
+    io.mateu.ecdemo1.mdm.outbox.OutboxMessageRepository outboxMessages;
     @Autowired
     io.mateu.ecdemo1.mdm.change.SalesforceInbox salesforceInbox;
 
     @Test
     void anApprovalArrivingTwiceAtOnceIsProjectedOnce() throws Exception {
-        hotelUpdates.deleteAll();
+        outboxMessages.deleteAll();
         var eva = resolve("L11", person("Eva", "Soler", "eva@example.com", null, null)).get(0).customerId();
         projection.projectPending();
         var contactId = contactByMdmId.get(eva);
@@ -192,8 +192,29 @@ class MdmTest {
 
         assertThat(customers.findById(eva).orElseThrow().version).isEqualTo(before + 1);
         assertThat(changeRequests.get(requestId).status).isEqualTo("APPROVED");
-        assertThat(hotelUpdates.findAll()).filteredOn(u -> u.customerId.equals(eva)).hasSize(2)
-                .anyMatch(u -> u.dataChanged).anyMatch(u -> "APPROVED".equals(u.decision));
+        // Whichever of the two lands first, the new data is announced once and the decision reaches the
+        // hotels — in one event, when the decision arrived first and already carried the data, or in two.
+        assertThat(changes(eva)).filteredOn(CustomerChanged::dataChanged).hasSize(1);
+        assertThat(changes(eva)).anyMatch(e -> "APPROVED".equals(e.decision()) && requestId.equals(e.changeRequestId()));
+    }
+
+    /** What the MDM said about a customer on the customers topic, oldest first. */
+    List<CustomerEvent> events(String customerId) {
+        return outboxMessages.findAll().stream()
+                .filter(m -> customerId.equals(m.getMessageKey()))
+                .sorted(java.util.Comparator.comparing(m -> m.getSeq()))
+                .map(m -> {
+                    try {
+                        return json.readValue(m.getPayload(), CustomerEvent.class);
+                    } catch (IOException e) {
+                        throw new IllegalStateException(e);
+                    }
+                })
+                .toList();
+    }
+
+    List<CustomerChanged> changes(String customerId) {
+        return events(customerId).stream().filter(CustomerChanged.class::isInstance).map(CustomerChanged.class::cast).toList();
     }
 
     static void await(java.util.concurrent.CountDownLatch latch) {
@@ -217,7 +238,7 @@ class MdmTest {
 
     @Test
     void aChangeProposedByAHotelIsDecidedInSalesforceAndTheDecisionReachesTheHotels() throws Exception {
-        hotelUpdates.deleteAll();
+        outboxMessages.deleteAll();
         var ana = resolve("L9", person("Ana", "García", "ana@example.com", null, null)).get(0).customerId();
         projection.projectPending();
         var contactId = contactByMdmId.get(ana);
@@ -245,13 +266,12 @@ class MdmTest {
         assertThat(projected.firstName).isEqualTo("Ana María");
         assertThat(changeRequests.get(requestId).status).isEqualTo("APPROVED");
 
-        // The hotels learn it: the front office's kardex, with the decision; Opera, by projecting her reservation again.
-        calls.clear();
-        hotelPropagation.propagate();
-        assertThat(calls).anyMatch(c -> c.startsWith("PUT /api/guests/" + ana + "/kardex") && c.contains("\"decision\":\"APPROVED\"")
-                && c.contains("ana.maria@example.com") && c.contains("Ana María García") && c.contains(requestId));
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /projections") && c.contains("\"locator\":\"L9\"")
-                && c.contains("mdm-update-" + ana));
+        // The MDM says so on the customers topic — the new data, the decision and her reservation — and calls
+        // no one: the front office's kardex and Opera's profile are its subscribers' to keep.
+        assertThat(changes(ana)).anyMatch(e -> "APPROVED".equals(e.decision()) && requestId.equals(e.changeRequestId())
+                && e.dataChanged() && "ana.maria@example.com".equals(e.data().email()) && "Ana María García".equals(e.data().fullName())
+                && e.reservations().contains("PMI01/L9"));
+        assertThat(calls).noneMatch(c -> c.contains("/kardex") || c.startsWith("POST /projections"));
 
         // A second change, rejected: the contact stays as it was; the front office learns it, Opera is not touched.
         var rejected = json.readTree(propose(ana, """
@@ -259,16 +279,14 @@ class MdmTest {
         changeRequests.send();
         decisions.put(rejected, "Rechazada");
         salesforceInbox.poll();
-        calls.clear();
-        hotelPropagation.propagate();
-        assertThat(calls).anyMatch(c -> c.startsWith("PUT /api/guests/" + ana + "/kardex") && c.contains("\"decision\":\"REJECTED\""));
-        assertThat(calls).noneMatch(c -> c.startsWith("POST /projections"));
+        assertThat(changes(ana)).anyMatch(e -> "REJECTED".equals(e.decision()) && rejected.equals(e.changeRequestId())
+                && !e.dataChanged());
         assertThat(customers.findById(ana).orElseThrow().phone).isNull();
     }
 
     @Test
     void aContactChangedInSalesforceIsProjectedOnceAndItsEchoGoesNoFurther() throws Exception {
-        hotelUpdates.deleteAll();
+        outboxMessages.deleteAll();
         var leo = resolve("L10", person("Leo", "Pons", "leo@example.com", null, null)).get(0).customerId();
         projection.projectPending();
         var contactId = contactByMdmId.get(leo);
@@ -278,11 +296,28 @@ class MdmTest {
         assertThat(customers.findById(leo).orElseThrow().lastName).isEqualTo("Pons Vidal");
         // The same again — an echo, or the event delivered twice — changes nothing and goes nowhere.
         assertThat(salesforceProjection.refresh(leo, null, null)).isFalse();
-        assertThat(hotelUpdates.findAll()).hasSize(1);
+        assertThat(changes(leo)).hasSize(1);
+    }
+
+    @Test
+    void aCustomerIsFoundByWhereItIsKnownOutsideTheMdm() throws Exception {
+        var ana = resolve("L20", person("Ana", "Vidal", "ana.vidal@example.com", null, null)).get(0).customerId();
+        mvc.perform(put("/customers/" + ana + "/xrefs").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"target":"OPERA","reference":"20538296","context":"XMAR/L20"}"""))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/customers").param("xref", "OPERA:20538296")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(ana));
+        mvc.perform(get("/customers").param("xref", "opera:99999999")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/customers").param("xref", "20538296")).andExpect(status().isBadRequest());
     }
 
     @BeforeEach
     void clean() {
+        outboxMessages.deleteAll();
         consolidationRecords.deleteAll();
         sources.deleteAll();
         customers.deleteAll();
@@ -388,11 +423,15 @@ class MdmTest {
                 .andExpect(jsonPath("$.reservations.length()").value(2));
         assertThat(resolve("L2", person("Ana", "Garcia", "ana@exmaple.com", "DNI", "12345678Z")).get(0).customerId()).isEqualTo(survivor);
 
-        // The code travels to the PMS: the absorbed customer's reservation is projected again, once.
-        propagation.propagate();
-        propagation.propagate();
-        assertThat(calls.stream().filter(c -> c.startsWith("POST /projections")).toList()).singleElement()
-                .satisfies(c -> assertThat(c).contains("\"locator\":\"L2\"", "\"origin\":\"mdm-merge-" + absorbed + "\""));
+        // The merge is announced once, with the survivor's data and every reservation that now carries its
+        // code — the absorbed customer's included; its subscribers take the code to the PMS.
+        assertThat(events(survivor)).filteredOn(CustomersMerged.class::isInstance).singleElement()
+                .satisfies(e -> {
+                    var merged = (CustomersMerged) e;
+                    assertThat(merged.absorbedId()).isEqualTo(absorbed);
+                    assertThat(merged.reservations()).contains("PMI01/L1", "PMI01/L2");
+                    assertThat(merged.data().documentNumber()).isEqualTo("12345678Z");
+                });
 
         // The poll reports the same merge: it finds it done.
         consolidations.received(absorbed, absorbedContact, "POLL");

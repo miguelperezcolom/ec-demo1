@@ -239,8 +239,22 @@ no tienen operativa propia que enseñar.
   `queryAll` de los contactos borrados. Los dos acaban en la misma bandeja, deduplicada por cliente.
 - **Supervivencia**: gana, campo a campo, lo que el *steward* dejó en el contacto superviviente;
   si no lo hay, lo que el MDM tenía; si tampoco, lo del absorbido. El absorbido queda como alias.
-- **Propagación**: cada reserva de un cliente absorbido se proyecta de nuevo (`POST /projections`
-  con origen `mdm-merge-<cliente>`).
+- **Proxy de las modificaciones**: un hotel propone un cambio (`POST /customers/{id}/change-requests`)
+  y el MDM lo abre en Salesforce como Case; nadie más escribe en Salesforce.
+- **Proyección de Salesforce**: el MDM guarda los datos del contacto como golden record cuando
+  Salesforce los cambia (a mano o al aprobar un Case) — `ClienteActualizado__e`,
+  `CambioClienteResuelto__e`.
+- **Eventos, no llamadas**: lo que el MDM decide de un cliente lo publica en el topic **`customers`**
+  (por su outbox, con clave el cliente): `CustomerChanged` (golden record nuevo, o la decisión de un
+  cambio propuesto) y `CustomersMerged` (fusión, con el superviviente). Cada evento lleva el golden
+  record y las reservas del cliente. El MDM no llama a nadie: **pms-integration** lleva el kárdex al
+  front office, y **crs-integration** proyecta de nuevo las reservas del cliente (origen
+  `mdm-update-<cliente>-v<versión>` o `mdm-merge-<absorbido>`) en los hoteles con integración, para
+  que Opera reescriba el perfil. Un sistema nuevo que necesite el cliente es un suscriptor más.
+- **Xref**: dónde se conoce al cliente fuera del MDM (contacto de Salesforce, huésped del front office,
+  perfiles de Opera). En los dos sentidos: `GET /customers/{id}` los lista, y
+  `GET /customers?xref=OPERA:20538296` dice qué cliente es (el superviviente, si se fusionó); también
+  como herramienta MCP (`findCustomerByXref`).
 - **Salesforce** (`salesforce/`): campos en `Contact`, el Platform Event, dos Flows, un Permission Set
   para el usuario de integración, una regla de coincidencia amplia y una regla de duplicados que
   **registra** los posibles duplicados sin bloquear. `deploy.py` lo despliega con las credenciales del

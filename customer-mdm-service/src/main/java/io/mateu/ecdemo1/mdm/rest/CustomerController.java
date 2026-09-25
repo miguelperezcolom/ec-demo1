@@ -77,8 +77,12 @@ public class CustomerController {
     }
 
     @GetMapping("/customers")
-    @Operation(summary = "Customers whose name, email, document or code contains the text; merged ones are left out")
-    public List<CustomerView> search(@RequestParam(defaultValue = "") String q) {
+    @Operation(summary = "Customers whose name, email, document or code contains the text; merged ones are left out. "
+            + "With xref=SYSTEM:REFERENCE (SALESFORCE, FRONT_OFFICE, OPERA), the customer known by that reference there")
+    public List<CustomerView> search(@RequestParam(defaultValue = "") String q, @RequestParam(required = false) String xref) {
+        if (xref != null && !xref.isBlank()) {
+            return byXref(xref);
+        }
         var text = q.toLowerCase(Locale.ROOT);
         return customers.findAllByOrderByUpdatedAtDesc().stream()
                 .filter(c -> c.aliasOf == null)
@@ -87,6 +91,24 @@ public class CustomerController {
                 .limit(100)
                 .map(c -> view(c, c.id))
                 .toList();
+    }
+
+    /**
+     * The customer known by a reference in another system — «which customer is Opera profile
+     * 20538296». The survivor, if the one it was recorded for was merged since.
+     */
+    public List<CustomerView> byXref(String xref) {
+        var parts = xref.split(":", 2);
+        if (parts.length != 2 || parts[1].isBlank()) {
+            throw new IllegalArgumentException("xref is SYSTEM:REFERENCE, e.g. OPERA:20538296");
+        }
+        var system = io.mateu.ecdemo1.mdm.store.Xref.Target.valueOf(parts[0].trim().toUpperCase(Locale.ROOT)).name();
+        var found = new java.util.LinkedHashMap<String, Customer>();
+        for (var x : xrefRepository.findBySystemAndReference(system, parts[1].trim())) {
+            var survivor = resolution.survivorOf(x.customerId);
+            found.putIfAbsent(survivor.id, survivor);
+        }
+        return found.values().stream().map(c -> view(c, c.id)).toList();
     }
 
     public CustomerView view(Customer c, String requestedId) {

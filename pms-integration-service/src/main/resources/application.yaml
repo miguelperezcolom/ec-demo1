@@ -7,7 +7,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeTasks
+      definition: consumeTasks;consumeCustomerEvents
     stream:
       kafka:
         binder:
@@ -25,6 +25,15 @@ spring:
         consumeTasks-in-0:
           destination: pms-integration
           group: ec-demo1-pms-integration-worker
+        # IN: what the MDM says about a customer, for the front office's kardex. Retried until the
+        # front office takes it — what the MDM decided is not dropped because the desk was down.
+        consumeCustomerEvents-in-0:
+          destination: customers
+          group: ec-demo1-pms-integration-customers
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
         # OUT: replies to the engine, and the alarm when a write keeps failing.
         upstream:
           destination: upstream

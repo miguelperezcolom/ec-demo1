@@ -1,5 +1,8 @@
 package io.mateu.ecdemo1.crsintegration.config;
 
+import io.mateu.ecdemo1.integration.model.customer.CustomerChanged;
+import io.mateu.ecdemo1.integration.model.customer.CustomerEvent;
+import io.mateu.ecdemo1.integration.model.customer.CustomersMerged;
 import io.mateu.ecdemo1.crsintegration.in.CrsEventHandler;
 import io.mateu.ecdemo1.crsintegration.router.ProcessRouter;
 import io.mateu.ecdemo1.crsintegration.worker.TaskHandlers;
@@ -19,7 +22,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The three things this service consumes. Each on the consumer thread and synchronously: a failure
+ * The four things this service consumes. Each on the consumer thread and synchronously: a failure
  * leaves the offset uncommitted and the message is redelivered, which the inboxes make harmless.
  */
 @Configuration
@@ -29,6 +32,7 @@ public class StreamFunctions {
 
     final CrsEventHandler crsEventHandler;
     final ProcessRouter router;
+    final io.mateu.ecdemo1.crsintegration.router.Integrations integrations;
     final TaskHandlers tasks;
     final StreamBridge streamBridge;
     final TolerantReader reader;
@@ -42,6 +46,41 @@ public class StreamFunctions {
             } catch (IOException e) {
                 log.error("Unreadable CRS event, skipped: {}", new String(message.getPayload()), e);
             }
+        };
+    }
+
+    /**
+     * What the MDM says about a customer. When its data changed, or two customers became one, every
+     * reservation it is on is projected again — the PMS's guest profile is written from the MDM — for
+     * the hotels that have an integration. A decision that changed nothing (a rejection) moves
+     * nothing here: the front office learns it from pms-integration.
+     */
+    @Bean
+    public Consumer<Message<byte[]>> consumeCustomerEvents() {
+        return message -> {
+            CustomerEvent event;
+            try {
+                event = reader.mapper().readValue(message.getPayload(), CustomerEvent.class);
+            } catch (IOException e) {
+                log.error("Unreadable customer event, skipped: {}", new String(message.getPayload()), e);
+                return;
+            }
+            var origin = switch (event) {
+                case CustomerChanged c -> c.dataChanged() ? "mdm-update-" + c.customerId() + "-v" + c.version() : null;
+                case CustomersMerged m -> "mdm-merge-" + m.absorbedId();
+            };
+            if (origin == null) {
+                return;
+            }
+            var projected = 0;
+            for (var reservation : event.reservations()) {
+                var parts = reservation.split("/", 2);
+                if (parts.length == 2 && integrations.integrated(parts[0])) {
+                    router.project(parts[0], parts[1], origin);
+                    projected++;
+                }
+            }
+            log.info("{}: {} of {} reservation(s) projected again", origin, projected, event.reservations().size());
         };
     }
 

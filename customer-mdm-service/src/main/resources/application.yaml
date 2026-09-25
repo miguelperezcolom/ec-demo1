@@ -23,6 +23,26 @@ spring:
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:8}
 
+  # OUT, through the outbox: what the MDM tells whoever holds a copy of a customer — the front
+  # office's kardex and Opera's guest profiles are kept by subscribers (pms-integration,
+  # crs-integration), not called from here. Synchronous, so a message is marked published only once
+  # the broker acknowledged it; keyed by the customer.
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          customers:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+      bindings:
+        customers:
+          destination: customers
+
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -40,12 +60,8 @@ mdm:
     pubsub-host: ${SF_PUBSUB_HOST:api.pubsub.salesforce.com}
     pubsub-port: ${SF_PUBSUB_PORT:7443}
     subscribe: ${SF_SUBSCRIBE:true}
-  crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
-  # The hotels' front office: its kardex learns what Salesforce decides about a customer.
-  front-office-url: ${FRONT_OFFICE_URL:}
   projection-tick: ${PROJECTION_TICK:5s}
   poll: ${CONSOLIDATION_POLL:60s}
-  propagation-tick: ${PROPAGATION_TICK:5s}
 
 springdoc:
   packages-to-scan: io.mateu.ecdemo1.mdm.rest

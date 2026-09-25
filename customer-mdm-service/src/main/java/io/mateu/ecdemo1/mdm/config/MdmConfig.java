@@ -9,7 +9,7 @@ import java.time.Clock;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(MdmProperties.class)
+@EnableConfigurationProperties({MdmProperties.class, io.mateu.ecdemo1.mdm.outbox.OutboxProperties.class})
 public class MdmConfig {
 
     @Bean

@@ -36,7 +36,13 @@ public class CustomerMcpTools {
 
     @Tool(description = "Customers (golden records) whose name, email, document or code contains the text; absorbed ones are left out")
     public List<CustomerView> findCustomers(@ToolParam(description = "Text to look for; empty for the most recently changed") String text) {
-        return api.search(text == null ? "" : text);
+        return api.search(text == null ? "" : text, null);
+    }
+
+    @Tool(description = "The customer known by a reference in another system: its Salesforce contact (SALESFORCE), its guest in a front office (FRONT_OFFICE) or its guest profile in Opera (OPERA)")
+    public List<CustomerView> findCustomerByXref(@ToolParam(description = "SALESFORCE, FRONT_OFFICE or OPERA") String system,
+                                                 @ToolParam(description = "The reference in that system, e.g. an Opera profile id") String reference) {
+        return api.byXref(system + ":" + reference);
     }
 
     @Tool(description = "A customer by any code it ever had — an absorbed code answers with its survivor — with its aliases, reservations and what won each field in its last merge")

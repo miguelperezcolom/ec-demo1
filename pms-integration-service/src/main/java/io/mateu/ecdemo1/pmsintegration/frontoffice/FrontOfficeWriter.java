@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.pmsintegration.frontoffice;
 
+import io.mateu.ecdemo1.integration.model.customer.CustomerChanged;
+import io.mateu.ecdemo1.integration.model.customer.CustomerEvent;
 import io.mateu.ecdemo1.integration.model.customer.IdentityRequest;
 import io.mateu.ecdemo1.integration.model.customer.ResolvedIdentity;
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
@@ -69,6 +71,41 @@ public class FrontOfficeWriter {
                     converters.addFirst(new MappingJackson2HttpMessageConverter(reader.mapper()));
                 })
                 .build();
+    }
+
+    /**
+     * What the MDM says about a customer, into the front office's kardex: the golden record and, when
+     * it decides a change the desk proposed, how it was decided. Only if the customer is on a
+     * reservation of a hotel with this front office; a customer the front office has no guest for is
+     * nothing to update there. A front office that does not answer throws, and the event is retried.
+     */
+    public void kardex(CustomerEvent event) {
+        if (event.reservations().stream().map(r -> r.split("/", 2)[0]).noneMatch(this::hasFrontOffice)) {
+            return;
+        }
+        try {
+            frontOffice.put().uri("/api/guests/{id}/kardex", event.customerId()).body(kardexOf(event))
+                    .retrieve().toBodilessEntity();
+            log.info("{} v{} taken to the front office's kardex{}", event.customerId(), event.version(),
+                    event instanceof CustomerChanged c && c.decision() != null ? " (" + c.decision() + ")" : "");
+        } catch (HttpClientErrorException.NotFound e) {
+            log.debug("The front office has no guest {}: nothing to update", event.customerId());
+        }
+    }
+
+    /** The kardex the front office takes: its data as the MDM holds it, and the decision it answers, if any. */
+    public static Map<String, Object> kardexOf(CustomerEvent event) {
+        var d = event.data();
+        var kardex = new java.util.HashMap<String, Object>();
+        kardex.put("name", d.fullName());
+        kardex.put("email", d.email());
+        kardex.put("phone", d.phone());
+        kardex.put("document", d.documentNumber());
+        if (event instanceof CustomerChanged c) {
+            kardex.put("requestId", c.changeRequestId());
+            kardex.put("decision", c.decision());
+        }
+        return kardex;
     }
 
     boolean hasFrontOffice(String crsHotelCode) {

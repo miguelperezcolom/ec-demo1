@@ -191,6 +191,25 @@ class CrsIntegrationTest {
     }
 
     @Test
+    void aCustomerTheMdmChangedHasItsReservationsProjectedAgainWhereThereIsAnIntegration() throws Exception {
+        send("customers", "C-1", """
+                {"type":"customer-changed","eventId":"M-1","occurredAt":"2026-09-25T10:00:00Z","customerId":"C-1","version":2,
+                 "data":{"firstName":"Ana","lastName":"García","email":"ana.maria@example.com"},"dataChanged":true,
+                 "changeRequestId":"CR-1","decision":"APPROVED","reservations":["PMI01/LOC1","CUN01/LOC3"]}""");
+        send("customers", "C-2", """
+                {"type":"customer-changed","eventId":"M-2","occurredAt":"2026-09-25T10:00:00Z","customerId":"C-2","version":5,
+                 "data":{"firstName":"Leo"},"dataChanged":false,"changeRequestId":"CR-2","decision":"REJECTED",
+                 "reservations":["PMI01/LOC1"]}""");
+
+        // PMI01 has an integration: projected again, with an origin the connector writes the profile for.
+        assertThat(consume("upstream", r -> r.value().contains("mdm-update-C-1-v2"), 2, 15)).singleElement()
+                .satisfies(r -> assertThat(json(r.value()).get("businessKey").asText())
+                        .isEqualTo("proyectar-reserva:PMI01/LOC1:mdm-update-C-1-v2"));
+        // CUN01 has none; and a rejection changed nothing, so nothing is written again.
+        assertThat(consume("upstream", r -> r.value().contains("CUN01/LOC3") || r.value().contains("C-2"), 1, 5)).isEmpty();
+    }
+
+    @Test
     void aBookingThatNoLongerExistsIsNotIntegrated() throws Exception {
         send("crs-bookings", "GONE", """
                 {"type":"booking-created","eventId":"E-4","bookingId":"GONE","hotelCode":"PMI01","version":1,
