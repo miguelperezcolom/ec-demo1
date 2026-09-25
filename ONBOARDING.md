@@ -51,52 +51,22 @@ anything or ask anyone.
 You need `kubectl` pointed at the CloudFleet cluster, plus `helm`, `docker` and `gh`. Ask for
 cluster access first — it is not something you can grant yourself.
 
-Six things about this cluster that will cost you an afternoon if nobody says them:
+Five things about this cluster that will cost you an afternoon if nobody says them:
 
-- **PostgreSQL is on an `emptyDir`.** That is what makes it local NVMe instead of a network
-  volume, and it means the database dies with the pod — the engine's schema and Keycloak's
-  database both. It happened once during an upgrade while every pod stayed `Running` and every
-  endpoint answered 200. The pod is annotated `karpenter.sh/do-not-disrupt` now, but treat any
-  data here as disposable.
+- **Both PostgreSQLs are on volumes.** The engine's was on an `emptyDir` (local NVMe, for the
+  benchmark) until 2026-09-25, and died with its pod more than once; it is on a PVC now, like
+  `cp-postgres`. Deleting either PVC is not recoverable.
 - **The fleet's CPU limit can only be changed through the CloudFleet Fleet API.** `kubectl patch`
   on a NodePool is refused outright, and so is creating one.
-- **Not every instance type exists.** Asking for one that does not — `ccx33`, here — gets you
-  "no instance type met all requirements" from Karpenter and no node, which reads exactly like a
-  quota problem. Probe with a throwaway pod before designing around a type.
+- **Do not pin an instance type.** A pin to `cx43` left every pod `Pending` the day hel1 had none to
+  sell, and not every type exists (there is no `ccx33`): Karpenter answers "no instance type ..."
+  and creates no node, which reads like a quota. Pin the region and `amd64`, nothing else.
 - **Do not touch the `ingress-nginx` Helm release.** It holds the LoadBalancer the DNS points at.
   Reinstalling it changes the IP and every hostname breaks until DNS catches up.
-- **The fleet's CPU budget has not been re-measured since the demo services and the control plane
-  were added.** Seven more pods land in the platform group with the shell and the gateway. If they
-  do not fit on the node already there, Karpenter asks for a second `cx43` and the fleet refuses —
-  the pods sit `Pending` and it reads like a scheduling bug. Check the pods after the first deploy.
-- **One database here is not disposable.** `cp-postgres` holds the control plane's catalogues and
-  the encrypted LLM credentials, and it is the one thing in this namespace on a real
-  PersistentVolume. Everything the first bullet says about data dying with the pod applies to the
-  *engine's* PostgreSQL, not to this one — and deleting its PVC is not recoverable.
+- **Karpenter moves pods to consolidate nodes,** and each move is a restart. The pods a demo cannot
+  lose for a minute carry `karpenter.sh/do-not-disrupt`; a new one that matters as much should too.
 
-## 4. Before you quote a number
-
-Two measurements, and they cannot come from the same run — see the README for the full argument.
-
-```sh
-./deploy/loadgen.sh 20 1        # unsaturated  -> cost per transition
-./deploy/loadgen.sh 5000 50     # saturated    -> throughput
-./deploy/measure.sh             # reports both, and says which run each is valid for
-```
-
-Mistakes worth not repeating, all of them made here:
-
-- **Measuring mid-burst.** Throughput sampled while the producer is still running reads less than
-  half the steady-state figure.
-- **Measuring right after a restart.** The first run against a cold JVM and a schema being created
-  read 5.5 processes/s; the identical load minutes later read 17.2.
-- **Reading cumulative counters as a rate.** `nr_throttled / nr_periods` from `cpu.stat` read once
-  is not a percentage, and taking it for one produced a confident and completely wrong diagnosis.
-- **Trusting an exit code for the outcome.** A load job reported success while producing 1500
-  messages the engine silently discarded. Check that processes were created, not that the producer
-  exited 0.
-
-## 5. The chat panel needs a key you have to supply
+## 4. The chat panel needs a key you have to supply
 
 `deploy.sh` generates every password except one. The console's chat panel is an LLM, and the
 Anthropic key that pays for it is bought rather than derived, so the script writes a commented
@@ -127,7 +97,7 @@ nothing re-wraps them, and the only way back is entering the keys again. A re-ru
 existing cluster appends whichever of these is missing and leaves every password already stored in
 the cluster exactly as it was.
 
-## 6. Known gaps
+## 5. Known gaps
 
 Documented in the README's notes, and worth knowing before you go hunting: the test worker cannot
 be run at load in either persistence mode, and the engine's ceiling here is the outbox relay

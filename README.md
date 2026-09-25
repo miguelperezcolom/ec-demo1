@@ -95,64 +95,22 @@ git-ignored. The demo user is `demo` / `demo`, from the realm file.
 
 ## The demo, in one pass
 
-1. **Open the console** at `https://ec1.mateu.io` and log in as `demo` / `demo`. The menu bar is
-   assembled from three separate applications; none of their screens is written in the shell.
-2. **Workflow → Definitions**, on the *control* console at `https://console.ec1.mateu.io`. The
-   three definitions are already there — the orchestrator cloned this repository at startup. Open
-   *Order fulfilment* to see its graph. Definitions live on that console rather than this one
-   because they are configuration; see [The control console](#the-control-console). Same
-   orchestrator pod, reached through a second `@UI` of its own.
-3. **Start a process** and give it a `TEST_CONFIG` variable. Nothing here implements a single
-   business step: one test worker answers every task, and this variable is what tells it how.
+The demo is the CRS-PMS integration PoC: onboarding a hotel's integration, its reservations
+reaching Opera and the front office, a customer's change going through Salesforce, a no-show. The
+script, step by step, is [`docs/poc-acl/demo.md`](docs/poc-acl/demo.md); `deploy/demo/` has what
+takes ec1 back to its baseline (`reset.sh`) or to before anything was integrated (`zero.sh`).
 
-   ```json
-   {"default": {"durationMs": 400, "outcome": "COMPLETED"}}
-   ```
-4. **Watch it run.** It validates, then reserves stock and charges the card at the same time,
-   then stops at *Review shipping* — a human task. The step stays `PENDING` and the forms engine
-   creates a form execution for it; nothing advances until a person answers. That step is the one
-   that names `topic: forms`; drop that line and the worker would answer it too.
-5. **Answer it** from **Forms → My tasks**. Tick *Approve shipping*, pick a carrier, submit. The
-   field values become process variables, and `approved == 'true'` is what routes the flow to
-   *Ship order* rather than *Cancel order*.
-6. **Then break it.** Start another one and make the charge fail:
+The engine runs only that PoC's processes, imported from
+[ec-definitions](https://github.com/miguelperezcolom/ec-definitions): `alta-integracion`,
+`proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show` and
+`verify-booking-payment`, which the CRS starts to confirm each new reservation. The engine's own
+examples (`order-fulfilment`, the sagas) were removed from it on 2026-09-25.
 
-   ```json
-   {"default": {"durationMs": 400},
-    "tasks": {"charge-card": {"outcome": "ERROR", "reason": "card declined"}}}
-   ```
-
-   The saga rolls back: *Release stock* and *Refund card* run in reverse order, and nothing had
-   to be coded to make that happen — `compensable` and `compensationStepId` on the two steps is
-   the whole of it.
-7. **Run one with no human in it.** `payment-review` leaves its `USER_TASK` on the default topic,
-   so the worker plays the reviewer:
-
-   ```json
-   {"tasks": {"verify-payment": {"variables": [{"name": "paymentReceived", "value": "true"}]}}}
-   ```
-
-   The variable it hands back is what the guards read, so the process routes to *Confirm booking*
-   and the `JOIN·XOR` cancels the other branch. Swap the value for `"false"`, or use
-   `{"outcome": "NO_REPLY"}` to let the 30-second deadline fire instead.
-8. **Watch the events themselves** at `https://kafka.ec1.mateu.io`. This engine is event-driven end
-   to end, so when a process does not move the question is always the same — was the message
-   produced, and did anyone consume it. Four topics answer it: `upstream` (what was asked of the
-   engine), `outbox` (every state change it recorded), `downstream` (tasks for workers) and `forms`
-   (tasks for people). Consumer-group lag per partition is on the Groups tab.
-9. **Look at what happened.** *Worker → Received tasks* shows every task the worker was handed
-   and which scenario answered it. Grafana has the logs of every pod (Loki), the engine's metrics
-   (Prometheus). Traces are wired but not yet arriving — see below.
-10. **Then look at the menu that is not the engine.** *Booking* is another application serving its
-    own screens from its own pod — the shell states a path and nothing else about it. The content
-    service is another, still deployed and still serving `/content/**`, but no longer on the bar:
-    a route can outlive the menu entry that used to point at it.
-11. **Ask the chat panel for something.** "Lista las reservas", "crea una reserva para Ana García en
-    el PMI01 del 5 al 8 de octubre, doble con desayuno". It has
-    no database and no screens: it answers by calling the MCP tools the orchestrator, the forms
-    engine and the booking service advertise, and it is told to report a tool failure rather than
-    answer around one. Ask it for something no tool covers and it will say so. It needs an
-    Anthropic key — see the note below — and every prompt is billed.
+Two places to look while it runs: **Workflow → Processes** on the control console
+(`https://console.ec1.mateu.io`), and the events themselves at `https://kafka.ec1.mateu.io` —
+`upstream` (what was asked of the engine), `outbox` (every state change it recorded),
+`downstream` (tasks for workers). Grafana has the logs of every pod (Loki) and the engine's metrics
+(Prometheus).
 
 ## The services around the engine
 
@@ -674,230 +632,39 @@ read by walking shadow roots by hand rather than with a selector, because the tw
 their components differently and a selector tuned to one returns nothing on the other, which would
 make a renderer gap look like a passing test.
 
-## Measuring it
-
-```sh
-./deploy/loadgen.sh 20 1        # unsaturated
-./deploy/measure.sh             # -> cost per transition
-
-./deploy/loadgen.sh 5000 50     # saturated
-./deploy/measure.sh             # -> throughput
-```
-
-Two numbers, and they cannot come from the same run.
-
-**Cost per transition** is the gap between one step finishing and the next starting. Nothing but
-the engine happens in that window — writing the transition, publishing it to the outbox, relaying
-it, routing it, dispatching the next task — so it does not move when the workers get faster or
-slower. It is the answer to *does the orchestrator resolve steps quickly*.
-
-**Throughput** is steps and processes per second across the whole run. It answers *how much can
-this deployment absorb*, and it includes the worker's simulated 200ms and every second a step
-spent queued. Raise `durationMs` in `TEST_CONFIG` and it collapses without the engine having
-changed at all.
-
-Measured here, the same workflow on the same cluster:
-
-| | transitions | throughput |
-|---|---|---|
-| 20 processes at 1/s | **37 ms** mean, 34 p50, 54 p95 | 3.6 steps/s |
-| 5000 processes at 50/s | 24 355 ms mean | **135 steps/s** |
-
-A factor of 650 between the two transition figures, and none of it is the engine getting slower —
-under saturation that gap is queueing and stops describing the engine at all. Reading a low
-arrival rate as "the engine is fast", or a saturated one as "the engine is slow", are the same
-mistake pointing in opposite directions.
-
-## What one orchestrator can carry
-
-The question this deployment exists to answer: *how many processes a second, at N steps each,
-before the orchestrator is the bottleneck.* Measured on `orchestration-only`, a definition with no
-`ACTION` in it — only `START`, `END` and a chain of pass-through `JOIN`s, so no task is ever
-dispatched and no worker is involved. Twelve transitions per process; `processes/s x 12` is the
-orchestrator's transition rate and nothing else's.
-
-**Measured as a ladder**, because one saturated run gives you a rate and cannot tell you whether
-that rate is a ceiling. Four runs, each at an arrival rate the producer actually held — these are
-the first figures on this page taken at the rate written on their label, and `loadgen.sh` now
-prints the rate it achieved so the claim is checkable:
-
-| arrivals/s | processes | throughput | transitions/s | drained |
-|---|---|---|---|---|
-| 20 | 1200 | 13.06/s | 157 | yes |
-| 40 | 1600 | 13.34/s | 160 | yes |
-| 80 | 2400 | 13.50/s | 162 | yes |
-| 160 | 3200 | 13.76/s | **165** | yes |
-
-**Eight times the arrival rate buys five percent more throughput.** That is the shape of a ceiling,
-and it is a shape rather than a number — which is why the ladder is worth the four runs. All four
-drained completely: 8400 processes, zero errors, zero timeouts. It queues; it does not fall over.
-
-**The ceiling is not CPU, and it is not the hardware.** At the top of the ladder, with **2903
-processes in flight**:
-
-    orchestrator CPU     0.44 of 2.0     22%, and never throttled
-    outbox pending       18 rows
-    threads waiting on a JDBC connection 0
-    PostgreSQL           0.39 cores
-    Redpanda             0.14 of 2.0
-
-Nearly three thousand processes waiting, and nothing in the deployment is busy. The outbox does not
-even back up, and those 18 rows locate the constraint more precisely than the spare CPU does: the
-relay is not slow at *reading* its backlog, it is slow at *publishing*. The queue forms in front of
-it, not inside it.
-
-It is the outbox relay publishing **synchronously**, one message at a time, waiting for `acks=all`
-on each:
-
-    batch deliver   2.44 s for a batch of 497   =>  4.9 ms per message
-    redpanda CPU    0.14 of 2.0                     idle while this happens
-
-That is deliberate and documented in the engine's own configuration: asynchronously, a send to a
-broker that is down still reports success and the relay marks the row `Sent`. The outbox stops
-being transactional. So the round-trip is the price of the guarantee, and it is the ceiling.
-
-### Turning knobs up made it slower
-
-| partitions | relay-concurrency | process-parallelism | transitions/s |
-|---|---|---|---|
-| 6 | 1 (default) | 1 (default) | 94, with 7335 rows stuck in the outbox |
-| 6 | 4 | 8 | **184** |
-| 6 | 12 | 16 | 160 |
-| 24 | 4 | 16 | 125 — superseded, see the ladder: 165 |
-
-The first row is the one worth reading twice: the defaults are a 500ms poll of at most 100 rows by
-a single thread — 200 events/s whatever the hardware — and the backlog that produces looks exactly
-like an engine that cannot keep up.
-
-Past that, more threads made it worse. The relay's claim holds row locks for the length of its
-transaction, so additional relay threads contend rather than parallelise, and more partitions
-spread the same synchronous publishing thinner.
-
-**Partitions cannot be reduced.** Raising `outbox` and `upstream` from 6 to 24 to test that
-hypothesis is not undoable. Recreating the topics is the only way back, and it means dropping
-whatever they hold — which is also why the 6-partition rows above cannot be re-measured.
-
-**Those three rows were measured with the old rig**, before `loadgen.sh` was fixed to hold the rate
-it is given, so each was fed below its label and each is a floor rather than a ceiling: 184 is
-probably low too. The 24-partition row is the live configuration, and the ladder supersedes it —
-165 transitions/s, not 125. That gap is not a change to the engine. It is what happens when a
-deployment is finally fed at the rate it was always being asked for.
-
-So, on this deployment as it stands:
-
-    ~165 transitions/s   =>  13.8 processes/s at 12 steps
-                             23.6 processes/s at  7 steps, if the orchestrator were the only cost
-
-The measurement disagrees with that second line, and the disagreement is the useful part:
-`notify-parallel` has 7 steps and runs at 19.2 processes/s, not 23.6. The missing 4 is the worker —
-a real round trip over Kafka to a process that has to answer — which `orchestration-only`
-deliberately does not have. The projection is the orchestrator's share of the budget, never the
-whole of it, and the difference between the two is the only honest way to see the worker's.
-
-## Giving it work
-
-```sh
-./deploy/loadgen.sh 1500 25 notify-parallel     # count, arrivals per second, definition
-./deploy/loadgen.sh 500 10 payment-review       # a human task the worker answers
-TEST_CONFIG='{"tasks":{"charge-card":{"outcome":"ERROR"}}}' ./deploy/loadgen.sh 200 5 order-fulfilment
-```
-
-A Job that produces `ProcessCreationRequested` events onto the same `upstream` topic everything
-else uses, so it drives this deployment rather than a rig of its own. No image to build — the
-Redpanda image already on the node ships `rpk`.
-
-Measured on the topology above, EventConductor 2.5.0: **5000 instances of `notify-parallel` at
-50/s, all 5000 completed, zero errors, in 260 seconds** — **19.2 processes/s and 135 step
-executions/s**.
-
-| | processes/s | steps/s | duration |
-|---|---|---|---|
-| shared nodes, 2.2.1 | 2.6 | 18 | 32 min |
-| separated nodes, 2.2.1 | 12.7 | 89 | 6.5 min |
-| separated nodes, 2.3.0 | 17.2 | 120 | 4.9 min |
-| 2.5.0, at a rate actually held | **19.2** | **135** | **4.3 min** |
-
-**Only the last row was taken at the rate on its label.** The first three say 50/s and were
-produced at 29 — see the fourth lesson below. The gap between the last two is almost entirely that:
-the same cluster and the same definition, measured on the same afternoon, read 17.6 processes/s at
-29 arrivals/s and 19.2 at 50. Feeding it properly is worth more than the version bump, and at 29/s
-it had moments with nothing to do.
-
-Almost all of the first jump is placement, not tuning: the orchestrator was pinned at 11% of a
-core on the shared topology and reached 860m once it had a node to itself, because it had been
-sharing two shared vCPUs with the broker.
-
-Four things those runs took to learn, all of them about measurement rather than about the engine.
-
-An early attempt failed almost entirely — 4722 of 5000 in ERROR — because `defaultStepTimeoutMs`
-was two minutes, sized against what the worker simulates (200ms) rather than against how long a
-step waits in a burst. A deadline starts when the step starts, and under load a step is queued for
-nearly all of it.
-
-Throughput sampled mid-burst reads less than half the steady-state figure, because the orchestrator
-is splitting its attention between accepting new processes and stepping the ones it has. Measure
-end to end.
-
-And a run started immediately after a restart measures the restart. The first 2.3.0 run read 5.5
-processes/s against 17.2 for the identical load minutes later, with nothing changed but a warm JVM
-and a schema that already existed.
-
-And a rig that could not produce the rate it was given, silently. `loadgen.sh` slept a whole
-second after each batch, on top of however long `rpk` took to start, connect, produce and exit — so
-a run asking for 50/s produced 5000 events in 174 seconds rather than 100, at 29/s, and nothing
-reported it because nothing was measuring the rate achieved. It now paces against a deadline and
-prints `arrival rate: X/s produced, N/s requested` on every run, warning when a batch was already
-late. A throughput figure is only as good as the arrival rate it was taken at, and that rate has to
-be measured rather than assumed — including, and especially, when you wrote it on the command line
-yourself.
-
-`notify-parallel` is the useful default for volume: three parallel `ACTION`s and a barrier, no
-human in it. `order-fulfilment` stops at its `USER_TASK`, so loading it builds a backlog of
-waiting tasks instead — a different thing to watch, and also worth watching.
-
 ## The node topology
 
-Five groups, each on hardware chosen for what it does, and kept apart by pod anti-affinity rather
-than by hope — an instance-type selector alone lets Karpenter pack two components onto one node
-the moment they both fit.
+One pool, in hel1, and Karpenter chooses the machines. Every workload is pinned only to the region
+and to `amd64` (the images are single-arch, and Hetzner's CAX line is arm64); no instance type and
+no anti-affinity. On 2026-09-25 that packed all of ec-demo1 onto one cx53, with observability on its
+own ccx23 in fsn1, where its volumes are.
 
-| group | instance | why |
-|---|---|---|
-| `postgres` | ccx13, alone | dedicated vCPU and **local NVMe**: a WAL commit blocks on fsync, and on the shared-vCPU line that syscall is stalled by noisy-neighbour CPU steal |
-| `orchestrator` | ccx13, alone | the thing under test should not share a core with what it drives |
-| `worker` | ccx13, alone | same |
-| platform | cx43 | redpanda, forms, rules, keycloak, shell, gateway, kafka console, booking, content, users, ia-agent, ia-control-plane, control-shell — none of them blocks on fsync |
-| `cp-postgres` | cx43, with the platform group | the control plane's own database. The one thing here on a PersistentVolume rather than an `emptyDir`, because it holds configuration rather than measurements |
-| observability | ccx23 | its own namespace and its own instance type; anti-affinity is namespace-scoped and could not keep it off the engine's nodes from here |
+- **No instance type.** A pin to `cx43` left every pod `Pending` the day hel1 had none to sell —
+  Karpenter says "no instance type ... had a required offering", which reads like a quota and is
+  stock. Nor is every type in the catalogue: there is no `ccx33`. Probe with a throwaway pod.
+- **The pods that break a demo when they restart are not consolidated.** Karpenter moves pods
+  whenever it finds a cheaper packing; `karpenter.sh/do-not-disrupt` on the engine's PostgreSQL,
+  Redpanda, the orchestrator, Keycloak, the gateway, the front office, `cp-postgres` and the ingress
+  controller keeps the node they are on. It does not stop a node that goes away for another reason.
+- **Both PostgreSQLs are on volumes** (`hcloud-volumes`): the engine's since 2026-09-25 — before it
+  was an `emptyDir`, local NVMe for the benchmark, and it died with its pod — and `cp-postgres`.
+  Deleting a PVC is what loses data now.
+- **The ingress controller is in hel1 too,** and `ec1.mateu.io` / `*.ec1` point at the hel1 load
+  balancer. CloudFleet creates one per region that has nodes; a region that loses its last node
+  loses its load balancer, and the DNS must not point at it.
+- **The fleet's CPU limit** (40) can only be changed through the CloudFleet Fleet API — `kubectl`
+  is refused, NodePools included.
 
-Two things worth knowing before changing it. **Postgres is on an `emptyDir`** — that is what makes
-it local NVMe rather than a network volume, and it means the data dies with the pod. It is the
-right trade for a load rig and the wrong one for anything else. And **this fleet has no `ccx33`**:
-Karpenter answers a request for one with "no instance type met all requirements" and creates
-nothing, which reads exactly like a quota problem and is not. Probe a type with a throwaway pod
-before designing around it.
-
-The fleet's own cpu limit is the binding constraint, and it can only be changed through the
-CloudFleet Fleet API — `kubectl` is refused. This topology asks for 20 of the 24 it currently
-allows.
-
-**The four demo services and the three control-plane pods land in the platform group, and that
-budget has not been re-measured since.** They carry the same anti-affinity as the shell and the gateway — off the postgres,
-orchestrator and worker nodes — so they compete for the platform node's room with everything
-already there, and between them they request about 1.6 CPU and 4.6 GiB. If that does not fit,
-Karpenter provisions a second `cx43` and the fleet is asked for 8 more vCPU than it allows: the
-node is never created and the pods sit `Pending`, which reads like a scheduling bug and is a quota.
-Check `kubectl get pods -n ec-demo1` and `kubectl describe node` after the first deploy, and shrink
-their requests or raise the fleet limit through the Fleet API — not `kubectl` — if they do not fit.
+The benchmark this deployment was first built for — the engine alone on dedicated-vCPU nodes, a
+load generator and the throughput it measured — is in the git history before that date.
 
 ## Notes worth knowing
 
 - **A human task is opt-in.** The worker listens on `downstream`, the default destination for a
   step that names no topic — so it answers the whole workflow, human tasks included, which is what
   a definition under test wants. The forms engine listens on `forms` instead, and a `USER_TASK`
-  reaches it only by naming `topic: forms`. `order-fulfilment`'s *Review shipping* does;
-  `payment-review`'s *Verify payment* deliberately does not, which is how its 30-second deadline
-  stays testable — `NO_REPLY` is a reviewer who never answered, on demand.
+  reaches it only by naming `topic: forms`. None of the PoC's processes has a human task today;
+  the one that gets one will have to name that topic, or the worker will answer it.
 
   The two cannot share `downstream`, and no consumer group fixes it: in different groups both
   receive every message and the worker answers the human task itself; in one group they compete
