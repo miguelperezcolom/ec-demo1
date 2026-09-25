@@ -69,7 +69,7 @@ orchestrator:
   # everything that talks to it. It still moves if its node goes away for another reason.
   podAnnotations:
     karpenter.sh/do-not-disrupt: "true"
-  imageTag: "2.21.0"
+  imageTag: "2.22.1"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -200,7 +200,7 @@ orchestrator:
 forms:
   image: miguelperezcolom/forms-standalone-app
   # 2.19.0: announces its human tasks (HumanTaskChanged, topic human-tasks) — the inbox shows them.
-  imageTag: "2.21.0"
+  imageTag: "2.22.1"
   replicas: 1
   servicePort: 8106
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -251,7 +251,7 @@ forms:
 # is the honest state: the engine is there and wired, the catalogue is empty.
 rules:
   image: miguelperezcolom/rule-standalone-app
-  imageTag: "2.21.0"
+  imageTag: "2.22.1"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false
