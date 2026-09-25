@@ -44,7 +44,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: communication-service
-          image: miguelperezcolom/ec-demo1-communication-service:0.21.3
+          image: miguelperezcolom/ec-demo1-communication-service:0.22.0
           env:
             - name: SERVER_PORT
               value: "8125"
@@ -56,10 +56,21 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
             - name: DB_PASSWORD
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
-            # Urgent notifications also go to a Google Chat space. Its webhook URL carries a key and a
-            # token: from a Secret (ec-googlechat), never from here. Optional: without it, email only.
+            # Everything that enters an inbox also goes to two Google Chat spaces. A webhook URL carries
+            # a key and a token: from a Secret (ec-googlechat), never from here. Optional, each one.
             - name: GOOGLE_CHAT_WEBHOOK
               valueFrom: { secretKeyRef: { name: ec-googlechat, key: GOOGLE_CHAT_WEBHOOK, optional: true } }
+            - name: GOOGLE_CHAT_WEBHOOK_2
+              valueFrom: { secretKeyRef: { name: ec-googlechat, key: GOOGLE_CHAT_WEBHOOK_2, optional: true } }
+            # …and to the browsers of its roles that allowed notifications (Web Push). The VAPID keys
+            # sign what is sent; the private one is a secret (ec-webpush, from
+            # ~/.config/ec-demo1/webpush.env). Without them, no browser is notified.
+            - name: VAPID_PUBLIC_KEY
+              valueFrom: { secretKeyRef: { name: ec-webpush, key: VAPID_PUBLIC_KEY, optional: true } }
+            - name: VAPID_PRIVATE_KEY
+              valueFrom: { secretKeyRef: { name: ec-webpush, key: VAPID_PRIVATE_KEY, optional: true } }
+            - name: VAPID_SUBJECT
+              valueFrom: { secretKeyRef: { name: ec-webpush, key: VAPID_SUBJECT, optional: true } }
             - name: DB_POOL_SIZE
               value: "6"
             - name: SMTP_HOST

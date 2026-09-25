@@ -7,20 +7,38 @@ import java.util.Map;
 
 /**
  * @param inbox who sees what in the inbox, and what is urgent enough to be emailed as well
- * @param chat  the chat space the urgent notifications are also posted to
+ * @param chat  the chat spaces everything that enters an inbox is also posted to
+ * @param push  the VAPID keys Web Push is sent with; without them, no browser is notified
  */
 @ConfigurationProperties("communication")
-public record CommunicationProperties(String from, String defaultEmail, int maxAttempts, Inbox inbox, Chat chat) {
+public record CommunicationProperties(String from, String defaultEmail, int maxAttempts, Inbox inbox, Chat chat, Push push) {
 
     public CommunicationProperties {
         if (from == null) from = "integration@ec1.mateu.io";
         if (maxAttempts <= 0) maxAttempts = 5;
         if (inbox == null) inbox = new Inbox(null, null, null, null);
         if (chat == null) chat = new Chat(null);
+        if (push == null) push = new Push(null, null, null);
     }
 
-    /** @param webhook a Google Chat space's incoming webhook; blank, no chat */
-    public record Chat(String webhook) {
+    /** @param webhooks the incoming webhooks of the Google Chat spaces; blank ones are left out */
+    public record Chat(List<String> webhooks) {
+
+        public Chat {
+            webhooks = webhooks == null ? List.of() : webhooks.stream().filter(w -> w != null && !w.isBlank()).toList();
+        }
+    }
+
+    /**
+     * @param publicKey  the VAPID public key, uncompressed P-256, base64url — what the browser subscribes with
+     * @param privateKey the VAPID private key, base64url; a secret
+     * @param subject    who sends, for the push services: a mailto: or an https: URL
+     */
+    public record Push(String publicKey, String privateKey, String subject) {
+
+        public boolean configured() {
+            return publicKey != null && !publicKey.isBlank() && privateKey != null && !privateKey.isBlank();
+        }
     }
 
     /**

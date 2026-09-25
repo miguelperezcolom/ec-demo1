@@ -1,7 +1,7 @@
 package io.mateu.ecdemo1.communication.send;
 
 import io.mateu.ecdemo1.communication.config.CommunicationProperties;
-import io.mateu.ecdemo1.communication.store.Notification;
+import io.mateu.ecdemo1.communication.store.InboxItem;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -10,11 +10,12 @@ import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Google Chat, for what is urgent: a message to the space whose incoming webhook is configured. The
- * webhook's URL carries its key and token — it is a secret, and comes from one.
+ * Google Chat: every item that enters an inbox is posted to each configured space, through its
+ * incoming webhook. The webhook's URL carries its key and token — it is a secret, and comes from one.
  */
 @Slf4j
 @Component
@@ -31,28 +32,28 @@ public class GoogleChat {
         this.rest = RestClient.builder().requestFactory(factory).build();
     }
 
-    public boolean configured() {
-        var webhook = properties.chat().webhook();
-        return webhook != null && !webhook.isBlank();
+    /** The spaces, numbered from 1 as the channels chat:1, chat:2 … name them. */
+    public List<String> webhooks() {
+        return properties.chat().webhooks();
     }
 
-    /** Posts the notification; throws if Google Chat does not take it. */
-    public void post(Notification n) {
-        rest.post().uri(URI.create(properties.chat().webhook()))
+    /** Posts the item to the n-th space; throws if Google Chat does not take it. */
+    public void post(int space, InboxItem item) {
+        rest.post().uri(URI.create(webhooks().get(space - 1)))
                 .contentType(new MediaType(MediaType.APPLICATION_JSON, java.nio.charset.StandardCharsets.UTF_8))
-                .body(Map.of("text", text(n)))
+                .body(Map.of("text", text(item)))
                 .retrieve().toBodilessEntity();
     }
 
     /** Chat's own light markup: *bold*, and a link as <url|label>. */
-    static String text(Notification n) {
-        var text = new StringBuilder("🚨 *").append(n.title).append("*");
-        if (n.hotelCode != null) {
-            text.append(" · ").append(n.hotelCode);
+    static String text(InboxItem item) {
+        var text = new StringBuilder(item.urgent ? "🚨 *" : "🔔 *").append(item.title).append("*");
+        if (item.hotelCode != null) {
+            text.append(" · ").append(item.hotelCode);
         }
-        text.append("\n").append(n.body == null ? "" : n.body);
-        if (n.link != null && !n.link.isBlank()) {
-            text.append("\n<").append(n.link).append("|Open>");
+        text.append("\n").append(item.body == null ? "" : item.body);
+        if (item.link != null && !item.link.isBlank()) {
+            text.append("\n<").append(item.link).append("|Open>");
         }
         return text.toString();
     }

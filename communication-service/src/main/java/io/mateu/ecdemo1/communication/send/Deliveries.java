@@ -34,7 +34,6 @@ public class Deliveries {
     final CommunicationProperties properties;
     final Clock clock;
     final io.mateu.ecdemo1.communication.inbox.Inbox inbox;
-    final GoogleChat chat;
 
     @Transactional
     public void accept(NotificationRequested request) {
@@ -53,11 +52,11 @@ public class Deliveries {
         n.dedupKey = request.dedupKey();
         n.requestedAt = request.requestedAt();
         notifications.save(n);
-        // Everything goes to the inbox of the roles that see to it; only what cannot wait is emailed too.
+        // Everything goes to the inbox of the roles that see to it — and from there to the chat spaces
+        // and the browsers (Announcements); only what cannot wait is emailed too.
         inbox.post(request);
         if (properties.inbox().isUrgent(n.type.name())) {
             deliver(n);
-            toChat(n);
         } else {
             n.status = DeliveryStatus.INBOX_ONLY;
             notifications.save(n);
@@ -76,26 +75,6 @@ public class Deliveries {
     @Transactional
     public void retryFailed() {
         notifications.findByStatusAndAttemptsLessThan(DeliveryStatus.FAILED, properties.maxAttempts()).forEach(this::deliver);
-        notifications.findByChatStatusAndChatAttemptsLessThan(DeliveryStatus.FAILED, properties.maxAttempts()).forEach(this::toChat);
-    }
-
-    /** Urgent: to the chat space too, when there is one. Retried like the email. */
-    void toChat(Notification n) {
-        if (!chat.configured()) {
-            return;
-        }
-        n.chatAttempts++;
-        try {
-            chat.post(n);
-            n.chatStatus = DeliveryStatus.SENT;
-            n.chatError = null;
-            log.info("Posted {} to Google Chat: {}", n.type, n.title);
-        } catch (RuntimeException e) {
-            n.chatStatus = DeliveryStatus.FAILED;
-            n.chatError = e.getMessage();
-            log.warn("Could not post {} to Google Chat (attempt {}): {}", n.id, n.chatAttempts, e.getMessage());
-        }
-        notifications.save(n);
     }
 
     void deliver(Notification n) {

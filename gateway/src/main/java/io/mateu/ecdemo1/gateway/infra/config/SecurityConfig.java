@@ -123,6 +123,10 @@ public class SecurityConfig {
                         // HMAC-SHA256 over the body, verified by the engine itself.
                         .pathMatchers("/workflow/webhooks/**", "/forms/webhooks/**").permitAll()
                         .pathMatchers("/_workflow/**", "/_forms/**", "/_worker/**").authenticated()
+                        // Web Push's two scripts, public: a browser loads a <script> and registers a
+                        // service worker without a token. Code, no data — the endpoints they call
+                        // (the key, the subscriptions) stay behind the rule below.
+                        .pathMatchers("/_inbox/push/push.js", "/_inbox/push/sw.js").permitAll()
                         // The inbox, on every host: what it shows depends on the caller's roles.
                         .pathMatchers("/_inbox/**").authenticated()
                         // The two demo CRUD services, guarded the same way and for the same

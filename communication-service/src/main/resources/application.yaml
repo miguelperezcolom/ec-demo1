@@ -71,9 +71,16 @@ communication:
     # Everything goes to the inbox; these are also emailed.
     urgent: ${INBOX_URGENT:PMS_REJECTED,RETRYING_TOO_LONG}
     tasks-link: ${INBOX_TASKS_LINK:/forms/tasks}
+  # Everything that enters an inbox is also posted to these Google Chat spaces (their incoming
+  # webhooks, from a Secret; blank ones are left out)…
   chat:
-    # A Google Chat space's incoming webhook, from a Secret: the urgent notifications are posted there too.
-    webhook: ${GOOGLE_CHAT_WEBHOOK:}
+    webhooks: ${GOOGLE_CHAT_WEBHOOK:},${GOOGLE_CHAT_WEBHOOK_2:}
+  # …and pushed to the browsers of its roles that allowed notifications (Web Push, VAPID keys from a
+  # Secret; without them, no browser is notified).
+  push:
+    public-key: ${VAPID_PUBLIC_KEY:}
+    private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:mailto:integration@ec1.mateu.io}
 
 management:
   endpoints:

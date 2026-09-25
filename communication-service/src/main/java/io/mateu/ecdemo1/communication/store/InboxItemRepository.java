@@ -10,4 +10,6 @@ public interface InboxItemRepository extends JpaRepository<InboxItem, String> {
     List<InboxItem> findBySubjectAndResolvedAtIsNullAndCreatedAtBefore(String subject, Instant before);
 
     List<InboxItem> findByResolvedAtIsNullOrderByCreatedAtDesc();
+
+    List<InboxItem> findTop50ByAnnouncedAtIsNullOrderByCreatedAtAsc();
 }

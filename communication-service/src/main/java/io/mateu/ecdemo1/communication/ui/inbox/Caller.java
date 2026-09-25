@@ -21,19 +21,39 @@ public final class Caller {
     }
 
     public static Set<String> roles(HttpRequest httpRequest) {
+        return roles(httpRequest.getHeaderValue("Authorization"));
+    }
+
+    public static Set<String> roles(String authorization) {
         var roles = new HashSet<String>();
-        try {
-            var authorization = httpRequest.getHeaderValue("Authorization");
-            if (authorization == null || !authorization.startsWith("Bearer ")) {
-                return roles;
-            }
-            var parts = authorization.substring("Bearer ".length()).split("\\.");
-            var claims = JSON.readTree(new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8));
+        var claims = claims(authorization);
+        if (claims != null) {
             claims.path("realm_access").path("roles").forEach(r -> roles.add(r.asText()));
             claims.path("resource_access").forEach(client -> client.path("roles").forEach(r -> roles.add(r.asText())));
-        } catch (Exception e) {
-            // an unreadable token has no roles
         }
         return roles;
+    }
+
+    /** Who it is: the token's preferred username, else its subject. */
+    public static String username(String authorization) {
+        var claims = claims(authorization);
+        if (claims == null) {
+            return null;
+        }
+        var name = claims.path("preferred_username").asText("");
+        return name.isBlank() ? claims.path("sub").asText(null) : name;
+    }
+
+    static com.fasterxml.jackson.databind.JsonNode claims(String authorization) {
+        try {
+            if (authorization == null || !authorization.startsWith("Bearer ")) {
+                return null;
+            }
+            var parts = authorization.substring("Bearer ".length()).split("\\.");
+            return JSON.readTree(new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            // an unreadable token is nobody, with no roles
+            return null;
+        }
     }
 }

@@ -215,8 +215,11 @@ CRS.
   cuándo, parámetros y respuesta. Solo lectura.
 - *Inbox*: los avisos de mis roles y las **tareas del motor de formularios** (una tarea es un aviso
   más), cada uno con su enlace; se van solos cuando se resuelven.
-- **Urgente** (Opera rechaza una escritura, un reintento que no acaba): además de la bandeja, por
-  email y al **espacio de Google Chat**.
+- **Donde esté la gente**: todo lo que entra en una bandeja se publica también en los **dos espacios de
+  Google Chat** y llega como **notificación push del navegador** a quien tenga uno de sus roles (la
+  consola ofrece «Enable notifications» la primera vez; un clic en la notificación abre la pantalla que
+  lo resuelve). Lo **urgente** (Opera rechaza una escritura, un reintento que no acaba) va además por
+  email.
 
 ## 12. Casos de negocio propuestos *(pendientes de decidir)*
 

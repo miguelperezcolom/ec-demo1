@@ -52,9 +52,13 @@ class CommunicationTest {
     static GreenMailExtension smtp = new GreenMailExtension(new ServerSetup(3025, null, ServerSetup.PROTOCOL_SMTP))
             .withConfiguration(GreenMailConfiguration.aConfig().withDisabledAuthentication());
 
-    /** The chat space's webhook, played by a small server that keeps what it is posted. */
+    /** The two chat spaces' webhooks and a push service, played by a small server that keeps what it is sent. */
     static final java.util.List<String> chatPosts = new java.util.concurrent.CopyOnWriteArrayList<>();
+    static final java.util.List<String> chatPosts2 = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** path → the request's Content-Encoding, Authorization and body. */
+    static final java.util.List<Object[]> pushes = new java.util.concurrent.CopyOnWriteArrayList<>();
     static final com.sun.net.httpserver.HttpServer chatSpace;
+    static final java.security.KeyPair vapid;
 
     static {
         try {
@@ -64,8 +68,20 @@ class CommunicationTest {
                 exchange.sendResponseHeaders(200, -1);
                 exchange.close();
             });
+            chatSpace.createContext("/v1/spaces/TEST2/messages", exchange -> {
+                chatPosts2.add(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                exchange.sendResponseHeaders(200, -1);
+                exchange.close();
+            });
+            chatSpace.createContext("/push/", exchange -> {
+                pushes.add(new Object[]{exchange.getRequestURI().getPath(), exchange.getRequestHeaders().getFirst("Content-Encoding"),
+                        exchange.getRequestHeaders().getFirst("Authorization"), exchange.getRequestBody().readAllBytes()});
+                exchange.sendResponseHeaders(exchange.getRequestURI().getPath().endsWith("/gone") ? 410 : 201, -1);
+                exchange.close();
+            });
             chatSpace.start();
-        } catch (java.io.IOException e) {
+            vapid = io.mateu.ecdemo1.communication.send.WebPushCrypto.newKeyPair();
+        } catch (java.io.IOException | java.security.GeneralSecurityException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -74,6 +90,13 @@ class CommunicationTest {
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("GOOGLE_CHAT_WEBHOOK", () -> "http://localhost:" + chatSpace.getAddress().getPort()
                 + "/v1/spaces/TEST/messages?key=k&token=t");
+        registry.add("GOOGLE_CHAT_WEBHOOK_2", () -> "http://localhost:" + chatSpace.getAddress().getPort()
+                + "/v1/spaces/TEST2/messages?key=k&token=t");
+        registry.add("VAPID_PUBLIC_KEY", () -> io.mateu.ecdemo1.communication.send.WebPushCrypto.b64(
+                io.mateu.ecdemo1.communication.send.WebPushCrypto.encode((java.security.interfaces.ECPublicKey) vapid.getPublic())));
+        registry.add("VAPID_PRIVATE_KEY", () -> io.mateu.ecdemo1.communication.send.WebPushCrypto.b64(
+                io.mateu.ecdemo1.communication.send.WebPushCrypto.encode((java.security.interfaces.ECPrivateKey) vapid.getPrivate())));
+        registry.add("communication.announce-every", () -> "300ms");
         registry.add("KAFKA_BROKERS", redpanda::getBootstrapServers);
         registry.add("SMTP_PORT", () -> 3025);
     }
@@ -86,6 +109,8 @@ class CommunicationTest {
     RecipientRepository recipients;
     @Autowired
     io.mateu.ecdemo1.communication.inbox.Inbox inbox;
+    @Autowired
+    io.mateu.ecdemo1.communication.store.PushSubscriptionRepository subscriptions;
 
     @Test
     void theSameUrgentNotificationAskedForTwiceIsEmailedOnceAndAHotelsPeopleOnlyGetTheirHotel() throws Exception {
@@ -115,12 +140,14 @@ class CommunicationTest {
                 java.util.Set.of("admins@example.com", "palma@example.com"), java.util.Set.of("admins@example.com"));
         assertThat(notifications.findAll()).filteredOn(n -> n.type == NotificationType.PMS_REJECTED)
                 .hasSize(2).allMatch(n -> n.status == DeliveryStatus.SENT);
-        // Urgent: posted to the chat space as well, once each, with the link to act on it.
-        waitFor(() -> chatPosts.stream().filter(p -> p.contains("PMS_REJECTED:")).count() >= 2);
-        assertThat(chatPosts).filteredOn(p -> p.contains("Processes waiting PMS_REJECTED:PMI01:X")).singleElement().asString()
-                .contains("PMI01").contains("<https://console/mapping/causes|Open>");
-        assertThat(notifications.findAll()).filteredOn(n -> n.type == NotificationType.PMS_REJECTED)
-                .allMatch(n -> n.chatStatus == DeliveryStatus.SENT);
+        // Posted to both chat spaces as well, once each, with the link to act on it.
+        waitFor(() -> chatPosts.stream().filter(p -> p.contains("PMS_REJECTED:")).count() >= 2
+                && chatPosts2.stream().filter(p -> p.contains("PMS_REJECTED:")).count() >= 2);
+        Thread.sleep(1000);
+        for (var space : List.of(chatPosts, chatPosts2)) {
+            assertThat(space).filteredOn(p -> p.contains("Processes waiting PMS_REJECTED:PMI01:X")).singleElement().asString()
+                    .contains("\\uD83D\\uDEA8").contains("PMI01").contains("<https://console/mapping/causes|Open>");
+        }
     }
 
     @Test
@@ -141,11 +168,53 @@ class CommunicationTest {
         Thread.sleep(1500);
         assertThat(notifications.findById(n.notificationId())).get().extracting(x -> x.status).isEqualTo(DeliveryStatus.INBOX_ONLY);
         assertThat(smtp.getReceivedMessages()).noneMatch(m -> subjectOf(m).contains("Processes waiting " + key));
-        assertThat(chatPosts).noneMatch(p -> p.contains(key));
+        // But everything that enters an inbox goes to the chat spaces, urgent or not.
+        waitFor(() -> chatPosts.stream().anyMatch(p -> p.contains(key)) && chatPosts2.stream().anyMatch(p -> p.contains(key)));
 
         send("notification-resolutions", key, new NotificationResolved(key, "ana", Instant.now()));
         waitFor(() -> inbox.openFor(Set.of("ai-admin")).stream().noneMatch(i -> key.equals(i.subject)));
         assertThat(inbox.openFor(Set.of("ai-admin"))).noneMatch(i -> key.equals(i.subject));
+    }
+
+    @Test
+    void itIsPushedEncryptedToTheBrowsersOfItsRolesAndABrowserThatUnsubscribedIsDropped() throws Exception {
+        var browser = io.mateu.ecdemo1.communication.send.WebPushCrypto.newKeyPair();
+        var auth = new byte[16];
+        new java.security.SecureRandom().nextBytes(auth);
+        var base = "http://localhost:" + chatSpace.getAddress().getPort() + "/push/";
+        subscription("admin", base + "admin", browser, auth, "ai-admin,offline_access");
+        subscription("desk", base + "desk", browser, auth, "front-desk");
+        subscription("old", base + "gone", browser, auth, "ai-admin");
+
+        var key = "MISSING_MAPPING:MRU01:ROOM_TYPE:PUSH";
+        send(request(NotificationType.CAUSE_OPENED, key, "cause-opened:" + key + ":1", "MRU01"));
+
+        waitFor(() -> pushes.stream().anyMatch(p -> p[0].equals("/push/admin")) && !subscriptions.existsById("old"));
+        Thread.sleep(1000);
+        // The administrator's browser, once: encrypted for it, signed with our VAPID key.
+        assertThat(pushes).filteredOn(p -> p[0].equals("/push/admin")).singleElement().satisfies(p -> {
+            assertThat(p[1]).isEqualTo("aes128gcm");
+            assertThat((String) p[2]).startsWith("vapid t=");
+            var plain = WebPushCryptoTest.decrypt((byte[]) p[3], browser, auth);
+            var json = new String(plain, 0, plain.length - 1, java.nio.charset.StandardCharsets.UTF_8);
+            assertThat(json).contains("MRU01 · ").contains(key).contains("\"url\":\"https://console/mapping/causes\"");
+        });
+        // Not the front desk's: it does not see to mappings.
+        assertThat(pushes).noneMatch(p -> p[0].equals("/push/desk"));
+        // The push service said 410: that browser is gone, and so is its subscription.
+        assertThat(subscriptions.existsById("old")).isFalse();
+    }
+
+    void subscription(String id, String endpoint, java.security.KeyPair browser, byte[] auth, String roles) {
+        var s = new io.mateu.ecdemo1.communication.store.PushSubscription();
+        s.id = id;
+        s.endpoint = endpoint;
+        s.p256dh = io.mateu.ecdemo1.communication.send.WebPushCrypto.b64(
+                io.mateu.ecdemo1.communication.send.WebPushCrypto.encode((java.security.interfaces.ECPublicKey) browser.getPublic()));
+        s.auth = io.mateu.ecdemo1.communication.send.WebPushCrypto.b64(auth);
+        s.username = id;
+        s.roles = roles;
+        subscriptions.save(s);
     }
 
     @Test

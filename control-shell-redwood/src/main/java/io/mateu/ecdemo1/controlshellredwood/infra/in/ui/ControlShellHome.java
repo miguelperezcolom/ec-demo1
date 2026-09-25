@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.controlshellredwood.infra.in.ui;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
+import io.mateu.uidl.annotations.Script;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTemplate;
@@ -48,6 +49,9 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
 @UI("")
 @PageTitle("IA control plane · Redwood")
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "control-plane")
+// Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
+// what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
+@Script(src = "/_inbox/push/push.js")
 @Logo("/images/riu.svg")
 @FavIcon("/images/riu.svg")
 // The catalogues are listings with long ids and long URLs in them; the default ~900px container

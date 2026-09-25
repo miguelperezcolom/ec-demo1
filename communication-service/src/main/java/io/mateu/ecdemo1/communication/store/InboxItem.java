@@ -46,6 +46,8 @@ public class InboxItem {
     public Instant createdAt;
     public Instant resolvedAt;
     public String resolvedBy;
+    /** When it was handed to the chat spaces and the browsers of its roles; null, not yet. */
+    public Instant announcedAt;
 
     public boolean isOpen() {
         return resolvedAt == null;
