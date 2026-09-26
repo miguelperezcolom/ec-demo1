@@ -1,19 +1,28 @@
 package io.mateu.ecdemo1.booking.infra.out.persistence;
 
 import io.mateu.ecdemo1.booking.application.out.query.BookingQueryService;
+import io.mateu.ecdemo1.booking.application.out.query.dto.BookingCriteria;
 import io.mateu.ecdemo1.booking.application.out.query.dto.BookingDto;
 import io.mateu.ecdemo1.booking.application.out.query.dto.BookingRow;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.Booking;
+import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.Pageable;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,13 +33,49 @@ public class BookingDBQueryService implements BookingQueryService {
     static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     final BookingEntityRepository repository;
+    final CrsCatalog catalog;
 
     @Override
     public ListingData<BookingRow> findAll(String searchText, Object filters, Pageable pageable) {
-        var page = repository.search(searchText, org.springframework.data.domain.PageRequest
-                .of(pageable.page(), pageable.size()));
+        var page = repository.findAll(matching(searchText, filters instanceof BookingCriteria c ? c : null),
+                PageRequest.of(pageable.page(), pageable.size(), Sort.by(Sort.Direction.DESC, "created")));
         return new ListingData<>(new Page<>(searchText, page.getSize(), page.getNumber(), page.getTotalElements(),
                 page.getContent().stream().map(BookingMapper::toDomain).map(this::toRow).toList()));
+    }
+
+    /** The listing's query: the free text as {@link BookingEntityRepository#search}, and the criteria. */
+    static Specification<BookingEntity> matching(String text, BookingCriteria criteria) {
+        return (root, query, cb) -> {
+            var where = new ArrayList<Predicate>();
+            if (text != null && !text.isBlank()) {
+                var like = "%" + text.trim().toLowerCase() + "%";
+                where.add(cb.or(
+                        cb.like(cb.lower(root.get("id")), like),
+                        cb.like(cb.lower(root.get("holderName")), like),
+                        cb.like(cb.lower(root.get("hotelCode")), like)));
+            }
+            if (criteria != null) {
+                if (criteria.hotelCode() != null) {
+                    where.add(cb.equal(root.get("hotelCode"), criteria.hotelCode()));
+                }
+                if (criteria.statuses() != null && !criteria.statuses().isEmpty()) {
+                    where.add(root.get("status").in(criteria.statuses().stream().map(Enum::name).toList()));
+                }
+                between(root.get("arrival"), criteria.arrivalFrom(), criteria.arrivalTo(), cb, where);
+                between(root.get("departure"), criteria.departureFrom(), criteria.departureTo(), cb, where);
+            }
+            return cb.and(where.toArray(Predicate[]::new));
+        };
+    }
+
+    private static void between(Path<LocalDate> date, LocalDate from, LocalDate to, CriteriaBuilder cb,
+                                List<Predicate> where) {
+        if (from != null) {
+            where.add(cb.greaterThanOrEqualTo(date, from));
+        }
+        if (to != null) {
+            where.add(cb.lessThanOrEqualTo(date, to));
+        }
     }
 
     @Override
@@ -61,7 +106,7 @@ public class BookingDBQueryService implements BookingQueryService {
         var terms = booking.getTerms();
         return new BookingRow(
                 booking.getId().id(),
-                booking.getHotelCode(),
+                hotelName(booking.getHotelCode()),
                 terms.holder().fullName(),
                 terms.stay().arrival().format(DATE),
                 terms.stay().departure().format(DATE),
@@ -69,6 +114,12 @@ public class BookingDBQueryService implements BookingQueryService {
                 status(booking),
                 booking.getVersion(),
                 booking.getPmsReference() != null ? booking.getPmsReference().reservationId() : null);
+    }
+
+    /** A person reads a hotel by its name; the code stays for a hotel the catalog no longer has. */
+    String hotelName(String code) {
+        return catalog.hotels().stream().filter(h -> h.code().equals(code)).map(CrsCatalog.Hotel::name)
+                .findFirst().orElse(code);
     }
 
     static Status status(Booking booking) {
