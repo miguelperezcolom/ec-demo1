@@ -5,9 +5,11 @@ import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Script;
 import io.mateu.uidl.annotations.Logo;
+import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTemplate;
 import io.mateu.uidl.annotations.PageTitle;
+import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
@@ -41,7 +43,10 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
  * into the generated bootstrap page — so changing the hostname means rebuilding this image.
  */
 @UI("")
-@PageTitle("IA control plane")
+// Which plane this console is, next to the logo: the data plane is what the business uses, the
+// control plane what governs the platform.
+@Title("Control plane")
+@PageTitle("Control plane")
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "control-plane")
 // Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
 // what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
@@ -137,9 +142,13 @@ public class ControlShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu audit = new RemoteMenu("/_audit").withLabel("Audit");
 
-    /** What waits for me: the notifications and tasks of my roles, each with where to resolve it. */
+    /**
+     * The inbox, hidden from the bar: the badge in the widgets below is the way in, and it says how
+     * much is waiting on the way. Still declared, so a deep link or a reload on /inbox/... resolves.
+     */
     @Menu
-    RemoteMenu inbox = new RemoteMenu("/_inbox").withLabel("Inbox");
+    @Hidden
+    RemoteMenu inbox = new RemoteMenu("/_inbox");
 
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {

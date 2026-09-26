@@ -32,7 +32,7 @@ const host = (envVar: string, fallback: string) => process.env[envVar] ?? fallba
 
 /** The data plane: what a person uses to get work done. */
 const dataScreens = [
-    // Workflow, Forms and Worker hang under Admin here — they are how the platform is driven,
+    // Workflow and Forms hang under Admin here — they are how the platform is driven,
     // where Booking is the product. The ROUTES are untouched by that grouping;
     // only where the entry sits in the bar changed.
     //
@@ -42,14 +42,10 @@ const dataScreens = [
     { menu: 'Admin', entry: 'Processes', route: '/workflow/processes' },
     { menu: 'Admin', entry: 'Executions', route: '/forms/executions' },
     { menu: 'Admin', entry: 'Tasks', route: '/forms/tasks' },
-    { menu: 'Admin', entry: 'Received tasks', route: '/worker/receivedTasks' },
-    { menu: 'Admin', entry: 'Task overrides', route: '/worker/taskOverrides' },
     { menu: 'Call center', entry: 'Bookings', route: '/booking/bookings' },
     // The CRS -> Opera integration PoC (docs/poc-acl): the partners master. The Opera double is no
     // longer deployed: the integration writes to the chain's real tenant.
     { menu: 'ERP', entry: 'Partners', route: '/partners/partners' },
-    // What waits for the signed-in user: notifications and tasks of their roles.
-    { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' },
 ]
 
 /**
@@ -73,7 +69,6 @@ const controlScreens = [
     // The integration PoC's operation: the hotels' integrations, mapping and causes, and the alerts.
     { menu: 'Integrations', entry: 'Integrations', route: '/integrations/registry' },
     { menu: 'Mapping', entry: 'Causes', route: '/mapping/causes' },
-    { menu: 'Mapping', entry: 'Pending', route: '/mapping/pending' },
     { menu: 'Mapping', entry: 'Dictionary', route: '/mapping/dictionary' },
     { menu: 'Mapping', entry: 'Partner profiles', route: '/mapping/partnerProfiles' },
     { menu: 'Customers', entry: 'Golden records', route: '/customers/golden' },
@@ -81,33 +76,38 @@ const controlScreens = [
     { menu: 'Notifications', entry: 'History', route: '/notifications/history' },
     { menu: 'Notifications', entry: 'Recipients', route: '/notifications/recipients' },
     { menu: 'Audit', entry: 'Audited actions', route: '/audit/actions' },
-    { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' },
 ]
+
+/**
+ * The inbox as a menu entry — only in the Redwood shells, whose renderer does not draw the header
+ * widgets yet: there the badge that replaced this entry is not shown, so the entry stays.
+ */
+const inboxScreen = { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' }
 
 export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
         host: host('CONSOLE_HOST', 'ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP', 'Inbox'],
+        menus: ['Admin', 'Call center', 'ERP'],
         screens: dataScreens,
     },
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
         menus: ['Admin', 'Call center', 'ERP', 'Inbox'],
-        screens: dataScreens,
+        screens: [...dataScreens, inboxScreen],
     },
     {
         name: 'control · vaadin', plane: 'control', renderer: 'vaadin',
         host: host('CONTROL_HOST', 'console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications', 'Audit', 'Inbox'],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications', 'Audit'],
         screens: controlScreens,
     },
     {
         name: 'control · redwood', plane: 'control', renderer: 'redwood',
         host: host('RW_CONTROL_HOST', 'rw-console.ec1.mateu.io'),
         menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications', 'Audit', 'Inbox'],
-        screens: controlScreens,
+        screens: [...controlScreens, inboxScreen],
     },
 ]
 
