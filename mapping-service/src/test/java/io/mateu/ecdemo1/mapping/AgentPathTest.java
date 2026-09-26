@@ -42,7 +42,7 @@ class AgentPathTest {
 
             assertThat(answer).isEqualTo("Propuestas registradas: 6");
             assertThat(authorization.get()).isEqualTo("Bearer the-persons-token");
-            assertThat(received.get()).contains("\"currentRoute\":\"/mapping/pending\"").contains("PMI01")
+            assertThat(received.get()).contains("\"currentRoute\":\"/mapping/dictionary\"").contains("PMI01")
                     .contains("listPendingCodes").contains("proposeMappings").contains("No apruebes nada");
         } finally {
             agent.stop(0);

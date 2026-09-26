@@ -99,12 +99,7 @@ the cluster exactly as it was.
 
 ## 5. Known gaps
 
-Documented in the README's notes, and worth knowing before you go hunting: the test worker cannot
-be run at load in either persistence mode, and the engine's ceiling here is the outbox relay
-publishing synchronously — not CPU, which sits below half everywhere. Neither is a mystery; both
-are written down with the measurements behind them.
-
-Two more, both about the services added around the engine:
+Worth knowing before you go hunting, all about the services added around the engine:
 
 - **`booking`'s saga half has no definition to answer.** It consumes the `booking` topic, and no
   definition in `ec-definitions` names `topic: booking` yet. Adding `verify-booking-payment` there

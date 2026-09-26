@@ -16,13 +16,13 @@ import java.util.UUID;
  * with them, and nothing it proposes is in force until a person approves it.
  *
  * <p>The request goes as the person who pressed the button — their token is passed on — and from
- * the pending-mapping screen's route, which is what the control plane's routing rule keys on to
+ * the dictionary screen's route, which is what the control plane's routing rule keys on to
  * pick the mapping agent rather than the console's general one.
  */
 @Component
 public class AgentProposals {
 
-    static final String ROUTE = "/mapping/pending";
+    static final String ROUTE = "/mapping/dictionary";
 
     final RestClient agent;
 

@@ -140,7 +140,7 @@ class CommunicationTest {
                 java.util.Set.of("admins@example.com", "palma@example.com"), java.util.Set.of("admins@example.com"));
         assertThat(notifications.findAll()).filteredOn(n -> n.type == NotificationType.PMS_REJECTED)
                 .hasSize(2).allMatch(n -> n.status == DeliveryStatus.SENT);
-        // Posted to both chat spaces as well, once each, with the link to act on it.
+        // Posted to both chat spaces as well (the seeded Google Chat recipient), once each, with the link to act on it.
         waitFor(() -> chatPosts.stream().filter(p -> p.contains("PMS_REJECTED:")).count() >= 2
                 && chatPosts2.stream().filter(p -> p.contains("PMS_REJECTED:")).count() >= 2);
         Thread.sleep(1000);
@@ -151,7 +151,7 @@ class CommunicationTest {
     }
 
     @Test
-    void whatIsNotUrgentGoesToTheInboxOfItsRolesOnlyAndLeavesItWhenResolved() throws Exception {
+    void whatNobodyWantsByEmailGoesToTheInboxOfItsPeopleOnlyAndLeavesItWhenResolved() throws Exception {
         var key = "MISSING_MAPPING:MRU01:BOARD:XX";
         var n = request(NotificationType.CAUSE_OPENED, key, "cause-opened:" + key + ":1", "MRU01");
         send(n);
@@ -168,12 +168,30 @@ class CommunicationTest {
         Thread.sleep(1500);
         assertThat(notifications.findById(n.notificationId())).get().extracting(x -> x.status).isEqualTo(DeliveryStatus.INBOX_ONLY);
         assertThat(smtp.getReceivedMessages()).noneMatch(m -> subjectOf(m).contains("Processes waiting " + key));
-        // But everything that enters an inbox goes to the chat spaces, urgent or not.
+        // But the seeded Google Chat recipient wants every type, urgent or not.
         waitFor(() -> chatPosts.stream().anyMatch(p -> p.contains(key)) && chatPosts2.stream().anyMatch(p -> p.contains(key)));
 
         send("notification-resolutions", key, new NotificationResolved(key, "ana", Instant.now()));
         waitFor(() -> inbox.openFor(Set.of("ai-admin")).stream().noneMatch(i -> key.equals(i.subject)));
         assertThat(inbox.openFor(Set.of("ai-admin"))).noneMatch(i -> key.equals(i.subject));
+    }
+
+    @Test
+    void seenIsEachPersonsOwnAndLeavesTheItemInTheInbox() throws Exception {
+        var key = "MISSING_MAPPING:MRU01:ROOM:SEEN";
+        var n = request(NotificationType.CAUSE_OPENED, key, "cause-opened:" + key + ":1", "MRU01");
+        send(n);
+        waitFor(() -> inbox.openFor(Set.of("ai-admin")).stream().anyMatch(i -> key.equals(i.subject)));
+
+        assertThat(inbox.markSeen(List.of(n.notificationId()), "ana")).isEqualTo(1);
+        // Marking it again records nothing new, and nobody signed in marks nothing.
+        assertThat(inbox.markSeen(List.of(n.notificationId()), "ana")).isZero();
+        assertThat(inbox.markSeen(List.of(n.notificationId()), null)).isZero();
+
+        assertThat(inbox.seenBy("ana")).contains(n.notificationId());
+        assertThat(inbox.seenBy("luis")).doesNotContain(n.notificationId());
+        // Seen resolves nothing: it is still in the inbox of its roles.
+        assertThat(inbox.openFor(Set.of("ai-admin"))).anyMatch(i -> key.equals(i.subject));
     }
 
     @Test

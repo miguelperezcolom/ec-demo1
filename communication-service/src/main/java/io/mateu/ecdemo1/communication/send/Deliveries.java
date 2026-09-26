@@ -1,11 +1,10 @@
 package io.mateu.ecdemo1.communication.send;
 
 import io.mateu.ecdemo1.communication.config.CommunicationProperties;
+import io.mateu.ecdemo1.communication.routing.Routing;
 import io.mateu.ecdemo1.communication.store.DeliveryStatus;
 import io.mateu.ecdemo1.communication.store.Notification;
 import io.mateu.ecdemo1.communication.store.NotificationRepository;
-import io.mateu.ecdemo1.communication.store.Recipient;
-import io.mateu.ecdemo1.communication.store.RecipientRepository;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +19,10 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 /**
- * The integration decides what to tell and about which hotel; this decides who, and tells them —
- * by e-mail, through the SMTP relay. A notification whose key was already seen is not sent again.
+ * The integration decides what to tell and about which hotel; the recipients decide who hears of it
+ * and where. This keeps the notification, puts it in the inbox of the people it is for, and e-mails
+ * it — through the SMTP relay — to the recipients that want it by e-mail: what somebody asked to be
+ * e-mailed about is what is urgent. A notification whose key was already seen is not sent again.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
 public class Deliveries {
 
     final NotificationRepository notifications;
-    final RecipientRepository recipients;
+    final Routing routing;
     final JavaMailSender mail;
     final CommunicationProperties properties;
     final Clock clock;
@@ -52,15 +53,10 @@ public class Deliveries {
         n.dedupKey = request.dedupKey();
         n.requestedAt = request.requestedAt();
         notifications.save(n);
-        // Everything goes to the inbox of the roles that see to it — and from there to the chat spaces
-        // and the browsers (Announcements); only what cannot wait is emailed too.
+        // Into the inbox of its people — and from there to the chat spaces and the browsers
+        // (Announcements); e-mailed too if somebody asked for it by e-mail.
         inbox.post(request);
-        if (properties.inbox().isUrgent(n.type.name())) {
-            deliver(n);
-        } else {
-            n.status = DeliveryStatus.INBOX_ONLY;
-            notifications.save(n);
-        }
+        deliver(n);
     }
 
     /** Sends a notification again, to whoever should receive it now. */
@@ -78,12 +74,14 @@ public class Deliveries {
     }
 
     void deliver(Notification n) {
-        var to = recipients.findAll().stream().filter(r -> r.wants(n.type, n.hotelCode)).map(Recipient::getEmail)
-                .distinct().toList();
+        var plan = routing.plan(n.type.name(), n.hotelCode);
+        var to = plan.emailList();
         n.recipients = String.join(", ", to);
         if (to.isEmpty()) {
-            n.status = DeliveryStatus.NO_RECIPIENTS;
-            log.warn("Nobody receives {} for hotel {}: '{}'", n.type, n.hotelCode, n.title);
+            n.status = plan.anyone() ? DeliveryStatus.INBOX_ONLY : DeliveryStatus.NO_RECIPIENTS;
+            if (!plan.anyone()) {
+                log.warn("Nobody receives {} for hotel {}: '{}'", n.type, n.hotelCode, n.title);
+            }
             notifications.save(n);
             return;
         }

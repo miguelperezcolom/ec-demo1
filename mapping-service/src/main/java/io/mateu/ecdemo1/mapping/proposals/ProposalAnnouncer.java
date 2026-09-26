@@ -30,7 +30,7 @@ public class ProposalAnnouncer {
                 NotificationType.PROPOSAL_READY, null, SUBJECT,
                 "%d mapping proposal(s) to review".formatted(count),
                 "The agent proposed %d equivalence(s). None is in force until someone approves it.".formatted(count),
-                properties.consoleUrl() + "/mapping/proposals",
+                properties.consoleUrl() + "/mapping/dictionary",
                 "proposal-ready:" + now.toEpochMilli(), now));
     }
 }

@@ -64,12 +64,6 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_inbox/**
 
-        - id: worker
-          uri: ${WORKER_URL:http://worker:8091}
-          predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
-            - Path=/_worker/**
-
         # The four demo services. Each one's Mateu UI is served under the prefix its @UI
         # annotation declares, and the shell names the same prefix in a RemoteMenu — so a path
         # here, a field in ShellHome and the @UI value have to agree or the menu renders empty.

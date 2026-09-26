@@ -4,11 +4,12 @@ import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.AI;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
-import io.mateu.uidl.annotations.Script;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTemplate;
 import io.mateu.uidl.annotations.PageTitle;
+import io.mateu.uidl.annotations.Title;
+import io.mateu.uidl.annotations.Script;
 import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
@@ -53,7 +54,7 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
  *
  * <p>Everything below the menu bar is served by another pod: each {@link RemoteMenu} names a
  * path, the gateway routes that path to the app that owns it, and the shell renders whatever
- * menu that app declares. So the orchestrator, the forms engine, the worker and the three demo
+ * menu that app declares. So the orchestrator, the forms engine and the three demo
  * services keep their own UIs — nothing about them is restated here — and the shell only has to
  * know where they live. Adding one is a field below, a route in the gateway and a manifest; the
  * path in all three has to match the {@code @UI} value the service itself declares.
@@ -63,11 +64,10 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
  * deployment's hostname means rebuilding this image.
  */
 @UI("")
-// No @Title on purpose. The renderer places the logo and the title side by side with a
-// margin-left on the image and nothing between them, so a title here reads as part of the mark —
-// "RIU EventConductor demo" as one phrase. The name is not lost: it is still the page heading and
-// still the browser tab, via @PageTitle.
-@PageTitle("EventConductor demo · Redwood")
+// Which plane this console is, next to the logo: the data plane is what the business uses, the
+// control plane what governs the platform.
+@Title("Data plane")
+@PageTitle("Data plane · Redwood")
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
 // Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
 // what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
@@ -130,12 +130,15 @@ public class ShellHome implements WidgetSupplier {
     // control-plane concern, not part of using the product. It is served by the same users pod,
     // now mounted by the control shell behind the ai-admin gate. See ControlShellHome.
 
-    /** What waits for me: the notifications and tasks of my roles, each with where to resolve it. */
+    /**
+     * What waits for me. Still on the bar here, unlike the Vaadin shell: the Redwood renderer does not
+     * draw the header widgets yet, so the badge that replaces this entry there is not shown here.
+     */
     @Menu
     RemoteMenu inbox = new RemoteMenu("/_inbox").withLabel("Inbox");
 
     /**
-     * Running the platform: Workflow, Forms and Worker, behind one entry — last on the bar: it is
+     * Running the platform: Workflow and Forms, behind one entry — last on the bar: it is
      * what runs the product, not the product.
      *
      * <p>They used to sit on the bar beside Booking, which made four equals where there are

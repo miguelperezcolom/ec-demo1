@@ -7,7 +7,11 @@ import io.mateu.ecdemo1.communication.store.AnnouncementRepository;
 import io.mateu.ecdemo1.communication.store.AnnouncementStatus;
 import io.mateu.ecdemo1.communication.store.InboxItem;
 import io.mateu.ecdemo1.communication.store.InboxItemRepository;
+import io.mateu.ecdemo1.communication.routing.Plan;
+import io.mateu.ecdemo1.communication.routing.Routing;
+import io.mateu.ecdemo1.communication.store.PushSubscription;
 import io.mateu.ecdemo1.communication.store.PushSubscriptionRepository;
+import io.mateu.ecdemo1.communication.store.Recipient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,14 +21,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 
 /**
- * Everything that enters an inbox — a notification, a task of the forms engine — is also told where
- * people are: each Google Chat space, and the browser of everyone with one of its roles who allowed
- * notifications (Web Push). Off the consumer thread: an item is first handed out, one announcement
- * per channel, and each one is sent — and retried with growing waits — on its own.
+ * Everything that arrives — a notification, a task of the forms engine — is also told where people
+ * are, as the recipients that want it say: in the Google Chat spaces they name, and in the browsers of
+ * their people that allowed notifications (Web Push). A task is pushed to its own people as well: the
+ * ones whose inbox it is in. An item goes once per space and once per browser, however many
+ * recipients ask for it. Off the consumer thread: an item is first handed out, one announcement per
+ * channel, and each one is sent — and retried with growing waits — on its own.
  *
  * <p>Items that were already there when this started are not announced: a deployment does not
  * replay the inbox into the chat spaces.
@@ -39,6 +44,7 @@ public class Announcements {
     final InboxItemRepository items;
     final AnnouncementRepository announcements;
     final PushSubscriptionRepository subscriptions;
+    final Routing routing;
     final GoogleChat chat;
     final WebPush push;
     final CommunicationProperties properties;
@@ -51,14 +57,12 @@ public class Announcements {
         for (var item : items.findTop50ByAnnouncedAtIsNullOrderByCreatedAtAsc()) {
             // What was there before this started, or was resolved before it went, is left alone.
             if (item.isOpen() && item.createdAt != null && item.createdAt.isAfter(startedAt.minus(Duration.ofMinutes(1)))) {
-                for (var space = 1; space <= chat.webhooks().size(); space++) {
-                    pending(item, "chat:" + space);
-                }
-                if (push.configured()) {
-                    subscriptions.findAll().stream()
-                            .filter(s -> sees(item, s.roles))
-                            .forEach(s -> pending(item, "push:" + s.id));
-                }
+                var plan = routing.plan(item.type, item.hotelCode);
+                var channels = new java.util.LinkedHashSet<String>();
+                plan.spaces().forEach(space -> channels.add("chat:" + space));
+                var browsers = push.configured() ? subscriptions.findAll() : List.<PushSubscription>of();
+                browsers.stream().filter(s -> pushed(item, plan, s)).forEach(s -> channels.add("push:" + s.id));
+                channels.forEach(channel -> pending(item, channel));
             }
             item.announcedAt = clock.instant();
             items.save(item);
@@ -122,14 +126,12 @@ public class Announcements {
         announcements.save(a);
     }
 
-    /** Whether a person with these roles sees the item in their inbox. */
-    static boolean sees(InboxItem item, String roles) {
-        var theirs = roles == null ? List.<String>of() : Arrays.stream(roles.split(",")).map(String::trim).toList();
-        for (var role : item.roles == null ? new String[0] : item.roles.split(",")) {
-            if (Inbox.EVERYONE.equals(role.trim()) || theirs.contains(role.trim())) {
-                return true;
-            }
+    /** Whether this browser is told: its person is one a recipient pushes to, or a task is in their inbox. */
+    static boolean pushed(InboxItem item, Plan plan, PushSubscription s) {
+        var roles = Recipient.split(s.roles);
+        if ((s.username != null && plan.pushUsers().contains(s.username)) || roles.stream().anyMatch(plan.pushRoles()::contains)) {
+            return true;
         }
-        return false;
+        return InboxItem.Kind.TASK.name().equals(item.kind) && Inbox.visibleTo(item, roles, s.username);
     }
 }

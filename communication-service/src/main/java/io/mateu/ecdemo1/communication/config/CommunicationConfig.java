@@ -3,11 +3,8 @@ package io.mateu.ecdemo1.communication.config;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.communication.send.Deliveries;
-import io.mateu.ecdemo1.communication.store.Recipient;
-import io.mateu.ecdemo1.communication.store.RecipientRepository;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
@@ -15,7 +12,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.io.IOException;
 import java.time.Clock;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 @Configuration
@@ -67,20 +63,6 @@ public class CommunicationConfig {
                 inbox.task(reader.readValue(message.getPayload(), io.mateu.ecdemo1.communication.inbox.HumanTask.class));
             } catch (IOException e) {
                 log.error("Unreadable human task, skipped: {}", new String(message.getPayload()), e);
-            }
-        };
-    }
-
-    @Bean
-    ApplicationRunner seedRecipients(RecipientRepository recipients, CommunicationProperties properties) {
-        return args -> {
-            if (recipients.count() == 0 && properties.defaultEmail() != null && !properties.defaultEmail().isBlank()) {
-                var r = new Recipient();
-                r.id = UUID.randomUUID().toString();
-                r.name = "Integration administrators";
-                r.email = properties.defaultEmail();
-                r.active = true;
-                recipients.save(r);
             }
         };
     }

@@ -2,8 +2,8 @@
 
 Estado a 2026-09-25, tarde. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
 **tenant real de Opera** (OHIP UAT, propiedad **XMAR**); ya no hay doble de Opera en el despliegue
-(`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.21.0** y
-las apps, Mateu **3.0-alpha.361**. Lo marcado *(pendiente)* no está construido todavía o espera una
+(`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.22.1** y
+las apps, Mateu **3.0-alpha.364**. Lo marcado *(pendiente)* no está construido todavía o espera una
 decisión.
 
 **ec1 está a cero** desde las 08:20Z (`deploy/demo/zero.sh`): sin integraciones, reservas, mapeados,
@@ -31,7 +31,7 @@ los del HLA *CRS-PMS Integration - Solution* y *CRM-MDM Integration - Solution*.
 | 5 | Grabar Reserva — System Model | El camino de una reserva de punta a punta | «Proyectar reserva», contra Opera real y el front office |
 | 6 | Proyectar una reserva (secuencia) | Preparar → identidad del cliente (MDM) → perfil → grabar con guarda de versión → front office → anotar en el CRS | Igual |
 | 7 | Un proceso bloqueado espera, no falla | Causas en vez de errores: una causa, N procesos | *Mapping → Causes*, y cada causa en la bandeja de quien la resuelve |
-| 8 | Mapeado — System Model | Diccionario versionado, aprobación humana, propuesta del agente | Diccionario, Pending (por integración) y el agente |
+| 8 | Mapeado — System Model | Diccionario versionado, aprobación humana, propuesta del agente | Diccionario (filtrado por integración, con lo que falta por mapear) y el agente |
 | 9 | Alta de una integración (secuencia y estados) | Del registro a la activación, por puertas | `integrations-service` y el proceso `alta-integracion` |
 | 10 | Maestro de clientes (HLA CRM-MDM) | Identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación | `customer-mdm-service` + Salesforce |
 | 11 | Auditoría y bandeja | Quién hizo qué (F016); lo que espera a cada persona, con el enlace a la pantalla que lo resuelve | `audit-service`, bandeja en `communication-service` |
@@ -43,7 +43,8 @@ cobro de la penalización y el backfill de cupo.
 
 Dos consolas, una por plano (diagrama 4). Cada servicio trae sus pantallas y la consola las federa;
 cada consola tiene su versión Redwood (`rw.` y `rw-console.`) con los mismos backends. En la barra
-superior de las cuatro, el **aviso de la bandeja** («Inbox (n)»).
+superior de las cuatro, el **aviso de la bandeja** («Inbox (n)», lo que yo aún no he visto): es la
+única entrada a la bandeja, que ya no tiene menú propio.
 
 **Plano de datos — `https://ec1.mateu.io`**: lo que usa el negocio.
 
@@ -51,7 +52,6 @@ superior de las cuatro, el **aviso de la bandeja** («Inbox (n)»).
 | :--- | :---------- |
 | Call center | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario, cobros y su referencia en Opera |
 | ERP | El maestro de interlocutores; cada uno sabe **qué perfil es en Opera** (*Opera profile*); *Resync* |
-| Inbox | Lo que me espera: avisos y tareas de mis roles, cada uno con su enlace |
 | Admin | Los procesos del motor, con sus pasos |
 
 **Front office del hotel — `https://front.ec1.mateu.io`** (Redwood): recepción. Las reservas de
@@ -62,11 +62,10 @@ MRU01 que llegan a Opera llegan también aquí como estancias; check-in, huéspe
 | Menú | Qué enseñar |
 | :--- | :---------- |
 | Integrations | Una integración por hotel: su conexión con Opera, en qué puerta del alta está, *Relaunch backfill*, *Import partners* |
-| Mapping | Causes; Pending (se elige la **integración**); Dictionary (aprobar, rechazar, **retirar**); Partners in the PMS |
+| Mapping | Causes; Dictionary: se filtra por **integración** y muestra también lo **sin mapear** (*Unmapped*), *Ask the agent*, y aprobar, rechazar o **retirar** una entrada o las filas seleccionadas; Partners in the PMS |
 | Customers | El maestro de clientes: golden records y consolidaciones que llegan de Salesforce |
-| Notifications | Lo que se ha comunicado y a quién; destinatarios |
+| Notifications | Lo que se ha comunicado y a quién; **destinatarios**: quién se entera de qué y por dónde (§11) |
 | Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
-| Inbox | La misma bandeja, en la consola de control |
 | Workflow / Forms | Las definiciones de proceso: los seis de la PoC (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show`, `verify-booking-payment`); formularios, hoy ninguno |
 | IA | El agente de mapeado y los MCP de cada servicio |
 | Usuarios | Quién puede hacer qué |
@@ -116,12 +115,13 @@ se cierra solo cuando la integración la pasa.
 
 ## 5. Se bloquea: espera, no falla
 
-- La integración se queda en `MAPPING_PENDING`; los códigos, en *Mapping → Pending* eligiendo la
-  integración, junto a lo que ofrece Opera.
+- La integración se queda en `MAPPING_PENDING`; los códigos, en *Mapping → Dictionary* filtrando por
+  la integración (estado *Unmapped*); cada uno, al abrirlo, junto a lo que ofrece Opera.
 - Si se aprueba sin completarlo, la pasada previa del backfill lo para en `BACKFILL_BLOCKED` con los
   huecos ordenados por cuántas reservas bloquean.
-- Cada causa aparece **en la bandeja** de los roles que la resuelven (por defecto `ai-admin`), con el
-  enlace a su pantalla; al resolverla desaparece de todas las bandejas.
+- Cada causa aparece **en la bandeja** de quien la resuelve — lo dicen los destinatarios (§11); de
+  entrada, el rol `ai-admin` —, con el enlace a su pantalla; al resolverla desaparece de todas las
+  bandejas.
 
 ## 6. Los mapeados que propone la IA
 
@@ -205,7 +205,7 @@ resultado baja por la proyección de siempre.
    - **Front office**: la estancia pasa a **No show**, costando el cargo.
 
 Hace falta la equivalencia `NOS → NOSHOW` (motivo de cancelación, MRU01): desde cero hay que
-aprobarla en el alta, o la cancelación espera en *Mapping → Pending*. Solo reservas que vienen del
+aprobarla en el alta, o la cancelación espera sin mapear en *Mapping → Dictionary*. Solo reservas que vienen del
 CRS.
 
 ## 11. Quién hizo qué, y qué me espera
@@ -213,13 +213,25 @@ CRS.
 - *Audit*: cada acción que decide algo sobre un hotel — alta, aprobar o retirar un mapeado, activar,
   pausar, backfill, resolver una causa — hecha o rechazada, por consola, API o agente, con quién,
   cuándo, parámetros y respuesta. Solo lectura.
-- *Inbox*: los avisos de mis roles y las **tareas del motor de formularios** (una tarea es un aviso
-  más), cada uno con su enlace; se van solos cuando se resuelven.
-- **Donde esté la gente**: todo lo que entra en una bandeja se publica también en los **dos espacios de
-  Google Chat** y llega como **notificación push del navegador** a quien tenga uno de sus roles (la
-  consola ofrece «Enable notifications» la primera vez; un clic en la notificación abre la pantalla que
-  lo resuelve). Lo **urgente** (Opera rechaza una escritura, un reintento que no acaba) va además por
-  email.
+- *Inbox* (desde el aviso de la barra superior): los avisos que son para mí — por nombre o por uno de
+  mis roles — y las **tareas del motor de formularios** (una tarea es un aviso más, en la bandeja de los
+  roles que pide su formulario). Al pulsar una fila se ve el detalle entero; *Open* lleva
+  a la pantalla que lo resuelve y lo marca como **visto**, igual que *Mark as seen* sobre las filas
+  seleccionadas. Visto es de cada persona y no resuelve nada: la fila pierde la marca *New* y deja de
+  contar en el aviso, pero sigue en la bandeja hasta que se resuelve, y entonces se va sola.
+- **Quién se entera de qué, y por dónde**: lo decide **una sola tabla**, *Notifications → Recipients*.
+  Cada destinatario dice **a quién** (usuarios de Keycloak y/o roles, o una dirección de email),
+  **qué** (tipos de aviso — ninguno, todos —, si también las tareas, y un hotel — vacío, todos) y **por
+  dónde**: la **bandeja** de sus personas, la **notificación push** de sus navegadores (la consola ofrece
+  «Enable notifications» la primera vez; un clic abre la pantalla que lo resuelve), **email** o los
+  **espacios de Google Chat** que nombra. Cada aviso llega a todos los destinatarios activos que lo
+  quieren, una vez por persona, navegador, dirección y espacio; **urgente** es lo que alguien pidió por
+  email. No queda nada de esto en la configuración del despliegue.
+- De entrada (tabla vacía) hay tres: *Integration administrators* (rol `ai-admin`, bandeja y push, todos
+  los tipos), *Google Chat* (los dos espacios, todos los tipos y las tareas) y *Urgent, by e-mail*
+  (Opera rechaza una escritura, un reintento que no acaba). Qué enseñar: crear uno para un hotel — p. ej.
+  el rol de recepción de MRU01 solo con sus causas, por push — y ver que un aviso de ese hotel le llega
+  y uno de otro, no.
 
 ## 12. Casos de negocio propuestos *(pendientes de decidir)*
 
@@ -295,8 +307,9 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 - [ ] Decidir la propiedad para el alta en directo (§4) y, si es XMU, sembrar un hotel del CRS con
       reservas futuras (`e2e/poc-acl-demo/seed.py`; cuidado: todo lo sembrado acaba en Opera).
 - [ ] Comprobar el agente de la consola (MCP de `booking`) y el agente de mapeado con el LLM real.
-- [ ] Destinatarios de email reales (hoy el de por defecto es un `example.com` y el correo falla) y
-      qué espacio de Google Chat recibe qué (el segundo espacio está bloqueado por su administrador).
+- [ ] Destinatarios reales en *Notifications → Recipients*: el email de *Urgent, by e-mail* (hoy un
+      `example.com`, y el correo falla) y qué espacio de Google Chat recibe qué (el segundo está bloqueado
+      por su administrador).
 - [ ] Probar el **no show** (§10 bis) desde la pantalla: en una reserva que venga del CRS y llegue hoy,
       marcar No show en todos los huéspedes.
 - [ ] Probar el §10 desde la pantalla del front office (con usuario) y el Case desde la consola de

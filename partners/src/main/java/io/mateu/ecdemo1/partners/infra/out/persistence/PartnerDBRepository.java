@@ -44,6 +44,13 @@ public class PartnerDBRepository implements PartnerRepository {
     }
 
     @Override
+    public PartnerPage search(String text, PartnerType type, BillingMode billingMode, Boolean active, int page, int size) {
+        var found = repository.search(text, type == null ? null : type.name(),
+                billingMode == null ? null : billingMode.name(), active, PageRequest.of(page, size));
+        return new PartnerPage(found.map(PartnerDBRepository::toDomain).getContent(), found.getTotalElements());
+    }
+
+    @Override
     public long count() {
         return repository.count();
     }

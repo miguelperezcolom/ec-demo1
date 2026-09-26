@@ -28,6 +28,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CatalogLookup implements LookupOptionsSupplier, LookupLabelSupplier {
 
+    /**
+     * Not offered as a reason to cancel: a no show is the CRS's cancellation, when the hotel reports
+     * one. It still names itself on a booking cancelled that way.
+     */
+    static final String NO_SHOW = "NOS";
+
     final CrsCatalog catalog;
 
     @Override
@@ -35,6 +41,7 @@ public class CatalogLookup implements LookupOptionsSupplier, LookupLabelSupplier
                                       HttpRequest httpRequest) {
         var text = searchText == null ? "" : searchText.toLowerCase();
         var matching = options(fieldId).entrySet().stream()
+                .filter(e -> !(fieldId.endsWith("cancellationReasonCode") && NO_SHOW.equals(e.getKey())))
                 .filter(e -> (e.getKey() + " " + e.getValue()).toLowerCase().contains(text))
                 .map(e -> new Option(e.getKey(), e.getKey() + " — " + e.getValue()))
                 .toList();

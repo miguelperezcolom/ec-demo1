@@ -14,9 +14,9 @@ set -euo pipefail
 cd "$(dirname "$0")"
 . ./common.sh
 
-echo "Stopping the services, the engine and the worker"
-for d in $SERVICES worker; do kubectl -n $NS scale deploy/$d --replicas=0 >/dev/null; done
-for d in $SERVICES worker; do kubectl -n $NS wait --for=delete pod -l app=$d --timeout=180s >/dev/null 2>&1 || true; done
+echo "Stopping the services and the engine"
+for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=0 >/dev/null; done
+for d in $SERVICES; do kubectl -n $NS wait --for=delete pod -l app=$d --timeout=180s >/dev/null 2>&1 || true; done
 sleep 5
 
 wipe() { local db=$1; shift; echo "truncate $(echo "$@" | tr ' ' ',') cascade;" | psql_in "$db" && echo "  $db: $*"; }
@@ -26,7 +26,7 @@ wipe partners outbox_message
 wipe crs_integration inbox_entry outbox_message
 wipe integrations integration backfill_run outbox_message
 wipe mapping cause mapping_entry partner_profile waiter waiter_cause outbox_message
-wipe communication inbox_item notification resolution
+wipe communication inbox_item inbox_seen notification resolution
 wipe customer_mdm customer customer_source customer_xref consolidation change_request outbox_message
 wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line
 echo "update room set occupancy = 'FREE';" | psql_in front_office
@@ -59,7 +59,7 @@ EOF
 # The MDM resumes Salesforce's events from now: the deletions just made are not the MDM's to replay.
 echo "delete from salesforce_cursor where name like 'pubsub%'; update salesforce_cursor set until = now() where name = 'poll';" | psql_in customer_mdm
 
-echo "Starting the services, the engine and the worker"
-for d in $SERVICES worker; do kubectl -n $NS scale deploy/$d --replicas=1 >/dev/null; done
-for d in $SERVICES worker; do kubectl -n $NS rollout status deploy/$d --timeout=420s | tail -1; done
+echo "Starting the services and the engine"
+for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=1 >/dev/null; done
+for d in $SERVICES; do kubectl -n $NS rollout status deploy/$d --timeout=420s | tail -1; done
 echo "Done: ec1 is at zero."

@@ -15,18 +15,18 @@ so a process is changed by a pull request rather than by an API call.
                         ingress-nginx (TLS, Let's Encrypt)
                                  │
                             gateway  ── requires a Keycloak token on every backend path
-      ┌──────────┬──────────┬────┴─────┬──────────┬────────┬──────┐
-      │          │          │          │          │        │      │
- /_workflow  /_forms   /_worker   /_booking  /_content    /ai     /**
-      │          │          │          │          │        │      │
- orchestrator  forms     worker    booking    content  ia-agent  shell
-      │          │          │          │          │        │      │
-      │          │          │          │          │        │   the only
-      │          │          │          │          │        │   page a user
-      │          │          │          │          │        │   loads
-      └── PostgreSQL ───────┴──────────┴──────────┘        │
-      └── Redpanda (Kafka) ─┴──────────┘                   │
-                            └───────── MCP ────────────────┘
+      ┌──────────┬───────────────┴─┬──────────┬────────┬──────┐
+      │          │                 │          │        │      │
+ /_workflow  /_forms          /_booking  /_content    /ai     /**
+      │          │                 │          │        │      │
+ orchestrator  forms            booking    content  ia-agent  shell
+      │          │                 │          │        │      │
+      │          │                 │          │        │   the only
+      │          │                 │          │        │   page a user
+      │          │                 │          │        │   loads
+      └── PostgreSQL ──────────────┴──────────┘        │
+      └── Redpanda (Kafka) ────────┘                   │
+                                   └──── MCP ──────────┘
                        (ia-agent calls the tools the engine and booking expose)
 
   https://console.ec1.mateu.io  the control console ── needs the `ai-admin` realm role
@@ -70,7 +70,7 @@ so a process is changed by a pull request rather than by an API call.
 | `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
 | `grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
-| `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, worker, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
+| `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
 | `deploy/deploy.sh` | The whole thing, from an empty cluster |
 
@@ -278,7 +278,7 @@ engine definitions (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelac
 | `mapping-service` | `/_mapping` | CRS → Opera code dictionary with approval, the causes a process waits on, MCP tools for the mapping agent |
 | `pms-integration-service` | — | **The connector**: every call to OHIP, with the version guard in a UDF and idempotent writes |
 | `opera-mock` | — | An OHIP double with validation, availability and injectable faults, for the local end-to-end suite only (`e2e/poc-acl-local`). Not deployed: ec1 works against the chain's OHIP tenant |
-| `communication-service` | `/_communication` | Alerts by email |
+| `communication-service` | `/_communication` | Who hears of what, and where: the recipients table routes every notification to inboxes, browsers (Web Push), e-mail and Google Chat; the inbox and its badge |
 | `integrations-service` | `/_integrations` | One integration per hotel: its Opera connection (secret sealed) and its onboarding, gate by gate, to activation. Until then the hotel's reservations wait |
 
 **Nothing writes to a real Opera tenant.** Real OHIP credentials, when there are any, go to
@@ -660,25 +660,21 @@ load generator and the throughput it measured — is in the git history before t
 
 ## Notes worth knowing
 
-- **A human task is opt-in.** The worker listens on `downstream`, the default destination for a
-  step that names no topic — so it answers the whole workflow, human tasks included, which is what
-  a definition under test wants. The forms engine listens on `forms` instead, and a `USER_TASK`
-  reaches it only by naming `topic: forms`. None of the PoC's processes has a human task today;
-  the one that gets one will have to name that topic, or the worker will answer it.
-
-  The two cannot share `downstream`, and no consumer group fixes it: in different groups both
-  receive every message and the worker answers the human task itself; in one group they compete
-  for it.
+- **Every step names its topic.** Nothing listens on `downstream`, the default destination for a
+  step that names none: the test worker that used to answer it (`worker-standalone-app`, which
+  played back a `TEST_CONFIG` instead of doing the work) was removed with its `/_worker` route
+  and menu, since none of the PoC's processes used it. A step without a topic now waits forever.
+  The forms engine listens on `forms`, and a `USER_TASK` reaches it only by naming `topic: forms`.
 - **The shell's Keycloak URL is compiled in.** Mateu writes `@KeycloakSecured` into the generated
   bootstrap page, so it cannot be an environment variable yet. Changing the hostname means
   rebuilding the shell image.
-- **The gateway is what protects the backends.** The orchestrator, the forms engine and the
-  worker only understand HTTP basic auth, so their UIs — which can pause definitions and cancel
+- **The gateway is what protects the backends.** The orchestrator and the forms engine only
+  understand HTTP basic auth, so their UIs — which can pause definitions and cancel
   processes — would otherwise be open to anyone who typed the path. The three demo services are
   worse: they authenticate nothing at all, and one of them arrived with a `permitAll()` chain and a
   `JwtDecoder` built from a hardcoded secret, which was removed rather than deployed. The chat
   agent is worse again, because an open prompt endpoint is a bill. The gateway validates the
-  realm's access token on all seven prefixes before any of them sees a request; see
+  realm's access token on all six prefixes before any of them sees a request; see
   `SecurityConfig.java` for the paths that stay public, and why they have to.
 - **`ddl-auto: update` never drops a column.** Renaming a JPA field adds the new column and leaves
   the old one, `NOT NULL`, and every insert then fails on a column no code mentions any more. It
@@ -720,9 +716,6 @@ load generator and the throughput it measured — is in the git history before t
   Spring cannot resolve the argument and every call dies with `IllegalArgumentException` before the
   signature is even checked. One line in the engine's root pom fixes it for all three:
   `<parameters>true</parameters>`. Until then, definitions reload on pod restart.
-- **The worker exposes no metrics.** Same shape of gap: its image has actuator but no
-  `micrometer-registry-prometheus`, so `/actuator/prometheus` is a 404. It is deliberately not
-  annotated for scraping, rather than left as a target that is permanently down.
 - **The Kafka console is behind HTTP basic auth**, because Redpanda Console's open-source build
   has no access control of its own and anyone who reaches it can produce and delete messages, not
   just read them. Its password is generated alongside the others.

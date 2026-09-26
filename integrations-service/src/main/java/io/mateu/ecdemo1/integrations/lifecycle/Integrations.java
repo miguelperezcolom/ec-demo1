@@ -306,7 +306,7 @@ public class Integrations {
                         .formatted(i.pendingMappings));
             } catch (RuntimeException e) {
                 i.record(clock.instant(), "onboarding", "The mapping agent could not be asked (" + e.getMessage()
-                        + "); the codes can be mapped by hand, or proposed from Mapping → Pending");
+                        + "); the codes can be mapped by hand, or proposed by the agent from Mapping → Dictionary");
             }
         }
         i.gate = Definitions.GATE_MAPPING;

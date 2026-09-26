@@ -28,7 +28,8 @@ import java.util.Map;
  * Web Push for the consoles: the script every shell loads, the service worker that shows what
  * arrives, and where a browser registers. The two scripts are the only public paths under /_inbox
  * (the gateway lets them through without a token: a browser loads a script or a service worker
- * without one); the rest needs the signed-in user, whose roles decide what their browser receives.
+ * without one); the rest needs the signed-in user: the recipients that push to them — by name or by
+ * one of their roles — decide what their browser receives.
  */
 @Slf4j
 @RestController
@@ -63,7 +64,7 @@ public class PushController {
         return ResponseEntity.ok(Map.of("publicKey", properties.push().publicKey()));
     }
 
-    /** The browser the signed-in user allowed: it receives what enters the inbox of their roles. Refreshed on every load. */
+    /** The browser the signed-in user allowed, with who they are and their roles. Refreshed on every load. */
     @PostMapping("/_inbox/push/subscriptions")
     public ResponseEntity<Void> subscribe(@RequestHeader(value = "Authorization", required = false) String authorization,
                                           @RequestBody Subscription subscription) {

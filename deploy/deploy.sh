@@ -221,13 +221,12 @@ echo "══ 3/6  EventConductor engine (PostgreSQL, Redpanda, orchestrator, for
 helm upgrade --install ec deploy/chart/eventconductor -n "$NS" \
   -f deploy/values/eventconductor.yaml
 
-echo "══ 4/6  Keycloak, worker, shells, gateway, ingress, demo services, control plane ══"
+echo "══ 4/6  Keycloak, shells, gateway, ingress, demo services, control plane ══"
 kubectl apply -f deploy/manifests/05-clusterissuer.yaml
 # The Job is immutable once created, so a re-run has to replace it rather than patch it.
 kubectl delete job keycloak-db-init -n "$NS" --ignore-not-found
 kubectl apply -f deploy/manifests/10-keycloak.yaml
 kubectl apply -f deploy/manifests/11-postfix.yaml
-kubectl apply -f deploy/manifests/20-worker.yaml
 kubectl apply -f deploy/manifests/30-shell.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
@@ -290,7 +289,6 @@ echo "══ 6/6  Waiting for the workloads ══"
 kubectl rollout status deployment/ec-eventconductor-orchestrator -n "$NS" --timeout=10m
 kubectl rollout status deployment/ec-eventconductor-forms -n "$NS" --timeout=10m
 kubectl rollout status deployment/keycloak -n "$NS" --timeout=10m
-kubectl rollout status deployment/worker -n "$NS" --timeout=10m
 kubectl rollout status deployment/shell -n "$NS" --timeout=10m
 kubectl rollout status deployment/gateway -n "$NS" --timeout=10m
 kubectl rollout status deployment/kafka-console -n "$NS" --timeout=10m

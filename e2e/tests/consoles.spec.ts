@@ -43,6 +43,27 @@ for (const console_ of CONSOLES) {
                 .toEqual([])
         })
 
+        // The inbox has no entry on the bar: the badge in the top bar is the way in. Its menu is
+        // still declared, hidden, so a reload on the inbox resolves too — both are checked here.
+        test('the inbox badge opens the inbox', async ({ page }) => {
+            test.skip(console_.renderer === 'redwood', 'Redwood does not draw the header widgets yet; its inbox is a menu entry')
+            await signIn(page, console_)
+            const badge = page.locator('a', { hasText: /Inbox/ }).first()
+            await expect(badge, `${console_.name} shows no inbox badge`).toBeVisible({ timeout: 60_000 })
+            await badge.click()
+            await expect
+                .poll(async () => {
+                    const { ok } = await screenRendered(page)
+                    return ok && await page.locator('text=Mark as seen').count() > 0
+                }, { message: 'the badge never opened the inbox', timeout: 60_000 })
+                .toBe(true)
+            await page.reload({ waitUntil: 'domcontentloaded' })
+            await expect
+                .poll(async () => await page.locator('text=Mark as seen').count() > 0,
+                      { message: 'a reload on the inbox did not resolve it', timeout: 60_000 })
+                .toBe(true)
+        })
+
         for (const screen of console_.screens) {
             test(`${screen.menu} → ${screen.entry} renders`, async ({ page }) => {
                 await signIn(page, console_)
