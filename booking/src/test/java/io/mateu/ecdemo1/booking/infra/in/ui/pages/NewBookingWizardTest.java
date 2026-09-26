@@ -65,6 +65,31 @@ class NewBookingWizardTest {
     }
 
     @Test
+    void theListActionsOfAStepAreTheStepsLists() {
+        assertThat(WizardStepLists.listField(RoomsStep.class, "rooms_add")).isNotNull();
+        assertThat(WizardStepLists.listField(RoomsStep.class, "rooms_create-and-stay").getName()).isEqualTo("rooms");
+        assertThat(WizardStepLists.listField(GuestsStep.class, "guests_remove")).isNotNull();
+        assertThat(WizardStepLists.listField(PaymentsStep.class, "payments_save")).isNotNull();
+        // not a list action, or not a list of this step: the wizard's own flow handles it
+        assertThat(WizardStepLists.listField(RoomsStep.class, "next")).isNull();
+        assertThat(WizardStepLists.listField(RoomsStep.class, "guests_add")).isNull();
+        assertThat(WizardStepLists.listField(RoomsStep.class, "rooms_frobnicate")).isNull();
+        assertThat(WizardStepLists.listField(StayStep.class, "hotelCode_add")).isNull();
+    }
+
+    @Test
+    void noStepIsNamedLikeTheListItHolds() {
+        // The wizard's state is one flat map: a list named like its step overwrote the step.
+        for (var step : NewBookingWizard.class.getDeclaredFields()) {
+            if (io.mateu.core.infra.declarative.orchestrators.wizard.WizardStep.class.isAssignableFrom(step.getType())) {
+                for (var field : step.getType().getDeclaredFields()) {
+                    assertThat(field.getName()).as(step.getName()).isNotEqualTo(step.getName());
+                }
+            }
+        }
+    }
+
+    @Test
     void theStayNeedsADepartureAfterTheArrival() {
         wizard.stay = stay("WEB", null, ARRIVAL, ARRIVAL);
         assertThat(wizard.problemLeaving("stay")).contains("after the arrival");
@@ -81,25 +106,25 @@ class NewBookingWizardTest {
 
     @Test
     void aBookingHasARoomAtLeast() {
-        wizard.rooms = new RoomsStep(List.of());
-        assertThat(wizard.problemLeaving("rooms")).isEqualTo("Add at least one room");
+        wizard.roomsStep = new RoomsStep(List.of());
+        assertThat(wizard.problemLeaving("roomsStep")).isEqualTo("Add at least one room");
 
-        wizard.rooms = new RoomsStep(List.of(room()));
-        assertThat(wizard.problemLeaving("rooms")).isNull();
+        wizard.roomsStep = new RoomsStep(List.of(room()));
+        assertThat(wizard.problemLeaving("roomsStep")).isNull();
     }
 
     @Test
     void aGuestIsInOneOfTheRooms() {
-        wizard.rooms = new RoomsStep(List.of(room()));
-        wizard.guests = new GuestsStep(List.of(guest(2)));
-        assertThat(wizard.problemLeaving("guests")).contains("is in room 2, and the booking has 1 room(s)");
+        wizard.roomsStep = new RoomsStep(List.of(room()));
+        wizard.guestsStep = new GuestsStep(List.of(guest(2)));
+        assertThat(wizard.problemLeaving("guestsStep")).contains("is in room 2, and the booking has 1 room(s)");
     }
 
     @Test
     void theSummaryReadsTheSteps() {
         wizard.stay = stay("WEB", null, ARRIVAL, ARRIVAL.plusDays(3));
-        wizard.rooms = new RoomsStep(List.of(room()));
-        wizard.guests = new GuestsStep(List.of(guest(1)));
+        wizard.roomsStep = new RoomsStep(List.of(room()));
+        wizard.guestsStep = new GuestsStep(List.of(guest(1)));
 
         var summary = wizard.summarise();
 
@@ -112,9 +137,9 @@ class NewBookingWizardTest {
     @Test
     void creatingGoesThroughTheUseCasesAndOpensTheBooking() {
         wizard.stay = stay("WEB", null, ARRIVAL, ARRIVAL.plusDays(3));
-        wizard.rooms = new RoomsStep(List.of(room()));
-        wizard.guests = new GuestsStep(List.of(guest(1)));
-        wizard.payments = new PaymentsStep(List.of(
+        wizard.roomsStep = new RoomsStep(List.of(room()));
+        wizard.guestsStep = new GuestsStep(List.of(guest(1)));
+        wizard.paymentsStep = new PaymentsStep(List.of(
                 new PaymentViewModel(null, PaymentType.Deposit, "VISA", new BigDecimal("100"), null, null)));
 
         var result = (List<?>) wizard.createBooking();

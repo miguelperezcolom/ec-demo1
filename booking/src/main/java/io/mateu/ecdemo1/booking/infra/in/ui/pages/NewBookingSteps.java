@@ -19,23 +19,26 @@ import java.util.List;
 // The steps of NewBookingWizard, one record each. Field names are unique across the steps: the
 // wizard's state is one flat map.
 
-/** Where and when, through which channel, and who holds the booking. */
+/**
+ * Where and when, through which channel, and who holds the booking. Four columns: the stay's codes
+ * on one line, its dates on the next, the holder on two more — the step fits without scrolling.
+ */
 record StayStep(
-        @Section(value = "Stay", columns = 2)
+        @Section(value = "Stay", columns = 4)
         @NotEmpty @Lookup(search = CatalogLookup.class, label = CatalogLookup.class) String hotelCode,
         @NotEmpty @Lookup(search = CatalogLookup.class, label = CatalogLookup.class) String channelCode,
         String partnerCode,
         String externalReference,
         @NotNull LocalDate arrival,
         @NotNull LocalDate departure,
-        @Section(value = "Holder", columns = 2)
+        @Section(value = "Holder", columns = 4)
         @NotEmpty String holderFirstName,
         @NotEmpty String holderLastName,
         String holderEmail,
         String holderPhone,
         String holderNationality,
         @Section("Comments")
-        @Stereotype(FieldStereotype.textarea) @Colspan(2) String comments)
+        @Stereotype(FieldStereotype.textarea) @Colspan(4) String comments)
         implements WizardStep {
 }
 
@@ -57,10 +60,10 @@ record PaymentsStep(
         implements WizardStep {
 }
 
-/** The booking as it will be asked for, to read before creating it. */
+/** The booking as it will be asked for, to read before creating it: rooms, guests and payments side by side. */
 @ReadOnly
 record SummaryStep(
-        @Section(value = "Summary", columns = 1) String booking,
+        @Section(value = "Summary", columns = 3) @Colspan(2) String booking,
         String holder,
         @Stereotype(FieldStereotype.textarea) String roomsSummary,
         @Stereotype(FieldStereotype.textarea) String guestsSummary,
