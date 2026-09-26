@@ -45,7 +45,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: communication-service
-          image: miguelperezcolom/ec-demo1-communication-service:0.23.3
+          image: miguelperezcolom/ec-demo1-communication-service:0.23.4
           env:
             - name: SERVER_PORT
               value: "8125"

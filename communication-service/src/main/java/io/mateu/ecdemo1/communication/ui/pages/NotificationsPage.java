@@ -18,6 +18,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.NoSuchElementException;
 
 /** Everything the integration asked to tell someone, newest first, and whether it went. */
@@ -27,6 +30,9 @@ import java.util.NoSuchElementException;
 @Title("Notifications")
 public class NotificationsPage implements Listing<NotificationRow>, Searchable, Navigable<NotificationViewModel, String> {
 
+    /** When, as a person reads it: local time to the minute — the year short, since history spans more than one. */
+    static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM/yy HH:mm").withZone(ZoneId.of("Europe/Madrid"));
+
     final NotificationRepository notifications;
     final ObjectProvider<NotificationViewModel> detail;
 
@@ -35,10 +41,14 @@ public class NotificationsPage implements Listing<NotificationRow>, Searchable, 
         var text = request.searchText() == null ? "" : request.searchText().toLowerCase();
         var rows = notifications.findAllByOrderByRequestedAtDesc().stream()
                 .filter(n -> (n.title + " " + n.hotelCode + " " + n.type).toLowerCase().contains(text))
-                .map(n -> new NotificationRow(n.id, String.valueOf(n.requestedAt), String.valueOf(n.type), n.hotelCode,
+                .map(n -> new NotificationRow(n.id, when(n.requestedAt), String.valueOf(n.type), n.hotelCode,
                         n.title, n.recipients, status(n)))
                 .toList();
         return Paging.page(rows, request);
+    }
+
+    static String when(Instant at) {
+        return at == null ? "" : WHEN.format(at);
     }
 
     static Status status(Notification n) {
