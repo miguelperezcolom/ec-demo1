@@ -7,6 +7,7 @@ import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPay
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.Holder;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.uidl.annotations.Label;
+import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.WizardCompletionAction;
 import io.mateu.uidl.annotations.WizardProgress;
@@ -33,6 +34,9 @@ import java.util.stream.Collectors;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("New booking")
+// The default page style caps the width but does not take it: a form of fixed-width fields then
+// shrinks the page to their width, a narrow column in the middle. Taking the width fixes that.
+@Style("width: 100%; max-width: 1100px; margin: auto;")
 @WizardProgress(WizardProgressStyle.STEPS)
 public class NewBookingWizard extends Wizard {
 
