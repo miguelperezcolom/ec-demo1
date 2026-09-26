@@ -50,8 +50,12 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
                 + "detail: {route: '/inbox/pending', consumedRoute: '', baseUrl: '/_inbox', uriPrefix: '',"
                 + " serverSideType: '" + InboxHome.class.getName() + "'}, bubbles: true, composed: true}))";
         var label = waiting.isEmpty() ? "Inbox" : "Inbox (" + waiting.size() + (urgent > 0 ? ", " + urgent + " urgent" : "") + ")";
-        content = "<a href=\"#\" onclick=\"" + go + "\" style=\"text-decoration: none;"
-                + (urgent > 0 ? " font-weight: 600;" : "") + "\">🔔 " + label + "</a>&nbsp;&nbsp;";
+        // The bell is Vaadin's own icon (the shells that draw this widget load vaadin-icons), sized to
+        // the text beside it; in the error colour while something urgent waits.
+        var bell = "<vaadin-icon icon=\"vaadin:bell\" style=\"width: 1em; height: 1em; vertical-align: -0.125em;"
+                + " margin-inline-end: 0.3em;" + (urgent > 0 ? " color: var(--lumo-error-color);" : "") + "\"></vaadin-icon>";
+        content = "<a href=\"#\" onclick=\"" + go + "\" style=\"text-decoration: none; white-space: nowrap;"
+                + (urgent > 0 ? " font-weight: 600;" : "") + "\">" + bell + label + "</a>&nbsp;&nbsp;";
     }
 
     @Override

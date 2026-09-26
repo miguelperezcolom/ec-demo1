@@ -46,14 +46,17 @@ public class NewBookingWizard extends Wizard {
     @Label("Stay")
     StayStep stay;
 
+    // A step is not named like the list it holds: the wizard's state is one flat map, where a step's
+    // fields are merged in beside the step itself, so a list called like its step overwrote it and the
+    // rooms were lost the moment the wizard moved on.
     @Label("Rooms")
-    RoomsStep rooms;
+    RoomsStep roomsStep;
 
     @Label("Guests")
-    GuestsStep guests;
+    GuestsStep guestsStep;
 
     @Label("Payments")
-    PaymentsStep payments;
+    PaymentsStep paymentsStep;
 
     @Label("Summary")
     SummaryStep summary;
@@ -67,6 +70,10 @@ public class NewBookingWizard extends Wizard {
 
     @Override
     public Object handleAction(String actionId, HttpRequest httpRequest) {
+        var list = WizardStepLists.listField(currentStepField().getType(), actionId);
+        if (list != null) {
+            return WizardStepLists.dispatch(this, actionId, list, httpRequest);
+        }
         if ("next".equals(actionId)) {
             var problem = problemLeaving(currentStepField().getName());
             if (problem != null) {
@@ -97,18 +104,19 @@ public class NewBookingWizard extends Wizard {
                 }
                 yield null;
             }
-            case "rooms" -> rooms == null || rooms.rooms() == null || rooms.rooms().isEmpty()
+            case "roomsStep" -> roomsStep == null || roomsStep.rooms() == null || roomsStep.rooms().isEmpty()
                     ? "Add at least one room" : null;
-            case "guests" -> BookingRequests.guestOutsideTheRooms(
-                    rooms != null ? rooms.rooms() : null, guests != null ? guests.guests() : null);
+            case "guestsStep" -> BookingRequests.guestOutsideTheRooms(
+                    roomsStep != null ? roomsStep.rooms() : null, guestsStep != null ? guestsStep.guests() : null);
             default -> null;
         };
     }
 
     SummaryStep summarise() {
-        var roomList = rooms != null && rooms.rooms() != null ? rooms.rooms() : List.<RoomViewModel>of();
-        var guestList = guests != null && guests.guests() != null ? guests.guests() : List.<GuestViewModel>of();
-        var paymentList = payments != null && payments.payments() != null ? payments.payments() : List.<PaymentViewModel>of();
+        var roomList = roomsStep != null && roomsStep.rooms() != null ? roomsStep.rooms() : List.<RoomViewModel>of();
+        var guestList = guestsStep != null && guestsStep.guests() != null ? guestsStep.guests() : List.<GuestViewModel>of();
+        var paymentList = paymentsStep != null && paymentsStep.payments() != null
+                ? paymentsStep.payments() : List.<PaymentViewModel>of();
         var hotel = catalog.hotels().stream().filter(h -> h.code().equals(stay.hotelCode()))
                 .map(CrsCatalog.Hotel::name).findFirst().orElse(stay.hotelCode());
         var roomLines = new StringBuilder();
@@ -140,9 +148,11 @@ public class NewBookingWizard extends Wizard {
                 stay.arrival(), stay.departure(),
                 new Holder(stay.holderFirstName(), stay.holderLastName(), stay.holderEmail(), stay.holderPhone(),
                         stay.holderNationality()),
-                rooms != null ? rooms.rooms() : null, guests != null ? guests.guests() : null, stay.comments());
+                roomsStep != null ? roomsStep.rooms() : null, guestsStep != null ? guestsStep.guests() : null,
+                stay.comments());
         var id = createBookingUseCase.handle(new CreateBookingCommand(stay.hotelCode(), request));
-        BookingRequests.registerNewPayments(registerPaymentUseCase, id, payments != null ? payments.payments() : null);
+        BookingRequests.registerNewPayments(registerPaymentUseCase, id,
+                paymentsStep != null ? paymentsStep.payments() : null);
         return List.of(new Message("Booking " + id + " created"), UICommand.navigateTo("/booking/bookings/" + id));
     }
 }
