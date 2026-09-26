@@ -1,7 +1,8 @@
-# CRS-PMS integration PoC (docs/poc-acl). Sends the integration's notifications by e-mail through the
-# postfix relay (11-postfix.yaml) to the recipients set up per kind and hotel, keeps the history, and
-# serves it at /_communication on the control console. Until someone adds recipients in the screen,
-# everything goes to DEFAULT_RECIPIENT.
+# CRS-PMS integration PoC (docs/poc-acl). Tells people about the integration's notifications — in their
+# inbox, their browsers, the Google Chat spaces and by e-mail through the postfix relay (11-postfix.yaml)
+# — as the recipients table says (Notifications → Recipients on the control console), keeps the history,
+# and serves the inbox. Nothing here says who hears of what: an empty table is seeded with the ai-admin
+# role's inbox and browsers, both chat spaces, and the urgent ones e-mailed to DEFAULT_RECIPIENT.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,7 +45,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: communication-service
-          image: miguelperezcolom/ec-demo1-communication-service:0.22.0
+          image: miguelperezcolom/ec-demo1-communication-service:0.23.3
           env:
             - name: SERVER_PORT
               value: "8125"
@@ -56,13 +57,13 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
             - name: DB_PASSWORD
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
-            # Everything that enters an inbox also goes to two Google Chat spaces. A webhook URL carries
-            # a key and a token: from a Secret (ec-googlechat), never from here. Optional, each one.
+            # The two Google Chat spaces recipients can post to (1 and 2). A webhook URL carries a key
+            # and a token: from a Secret (ec-googlechat), never from here. Optional, each one.
             - name: GOOGLE_CHAT_WEBHOOK
               valueFrom: { secretKeyRef: { name: ec-googlechat, key: GOOGLE_CHAT_WEBHOOK, optional: true } }
             - name: GOOGLE_CHAT_WEBHOOK_2
               valueFrom: { secretKeyRef: { name: ec-googlechat, key: GOOGLE_CHAT_WEBHOOK_2, optional: true } }
-            # …and to the browsers of its roles that allowed notifications (Web Push). The VAPID keys
+            # Web Push, to the browsers that allowed notifications. The VAPID keys
             # sign what is sent; the private one is a secret (ec-webpush, from
             # ~/.config/ec-demo1/webpush.env). Without them, no browser is notified.
             - name: VAPID_PUBLIC_KEY

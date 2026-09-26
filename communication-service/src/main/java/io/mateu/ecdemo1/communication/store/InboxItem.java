@@ -9,9 +9,12 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 /**
- * Something waiting for a person, in the inbox of the roles that see to it: a notification with the
+ * Something waiting for a person, in the inbox of the people who see to it: a notification with the
  * link to the screen that resolves it, or a task of the forms engine. It stays open until what it is
  * about is resolved — the cause, the gate, the task — and then leaves every inbox at once.
+ *
+ * <p>Whose inbox it is in is worked out once, when it arrives, and kept here: changing the recipients
+ * decides who gets what from then on, and does not take back what was already in someone's inbox.
  */
 @Entity
 @Table(name = "inbox_item", indexes = {
@@ -42,11 +45,15 @@ public class InboxItem {
     /** The roles whose inbox shows it, comma-separated; "*" is everyone's. */
     @Column(length = 500)
     public String roles;
+    /** The people whose inbox shows it besides, by username, comma-separated. */
+    @Column(length = 1000)
+    public String users;
+    /** Somebody asked to be e-mailed about it. */
     public boolean urgent;
     public Instant createdAt;
     public Instant resolvedAt;
     public String resolvedBy;
-    /** When it was handed to the chat spaces and the browsers of its roles; null, not yet. */
+    /** When it was handed to the chat spaces and the browsers; null, not yet. */
     public Instant announcedAt;
 
     public boolean isOpen() {

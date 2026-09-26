@@ -34,6 +34,10 @@ public final class Caller {
         return roles;
     }
 
+    public static String username(HttpRequest httpRequest) {
+        return username(httpRequest.getHeaderValue("Authorization"));
+    }
+
     /** Who it is: the token's preferred username, else its subject. */
     public static String username(String authorization) {
         var claims = claims(authorization);

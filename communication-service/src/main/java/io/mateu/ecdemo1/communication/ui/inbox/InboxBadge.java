@@ -19,6 +19,10 @@ import org.springframework.stereotype.Service;
  * The shells' widget: how many things wait for me, and a way to them. It replaces the forms engine's
  * "my tasks" badge — a task is one of the things that wait, next to the notifications that link to
  * a screen. Refreshed every few seconds.
+ *
+ * <p>It counts what I have not seen yet — like unread mail, so it says when something new arrived —
+ * and says "urgent" only of those. What I have seen is still in the inbox until it is resolved; the
+ * link goes there all the same.
  */
 @UI("/_inbox/badge")
 @Title("")
@@ -39,7 +43,8 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
 
     @Override
     public void hydrate(HttpRequest httpRequest) {
-        var waiting = inbox.openFor(Caller.roles(httpRequest));
+        var seen = inbox.seenBy(Caller.username(httpRequest));
+        var waiting = inbox.openFor(Caller.roles(httpRequest), Caller.username(httpRequest)).stream().filter(i -> !seen.contains(i.id)).toList();
         var urgent = waiting.stream().filter(i -> i.urgent).count();
         var go = "event.preventDefault(); this.dispatchEvent(new CustomEvent('navigation-requested', {"
                 + "detail: {route: '/inbox/pending', consumedRoute: '', baseUrl: '/_inbox', uriPrefix: '',"
