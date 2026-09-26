@@ -82,7 +82,7 @@ const controlScreens = [
  * The inbox as a menu entry — only in the Redwood shells, whose renderer does not draw the header
  * widgets yet: there the badge that replaced this entry is not shown, so the entry stays.
  */
-const inboxScreen = { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' }
+export const inboxScreen = { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' }
 
 export const CONSOLES: Console[] = [
     {
