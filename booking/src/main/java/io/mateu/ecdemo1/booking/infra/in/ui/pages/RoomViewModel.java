@@ -24,4 +24,11 @@ public record RoomViewModel(
         @HiddenInList List<Integer> childrenAges,
         @ReadOnly BigDecimal total
 ) {
+
+    /** A new room starts as a double: two adults is the common case, and zero is never valid. */
+    public RoomViewModel {
+        if (adults < 1) {
+            adults = 2;
+        }
+    }
 }
