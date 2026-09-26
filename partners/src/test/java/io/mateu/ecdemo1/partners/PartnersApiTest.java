@@ -1,6 +1,10 @@
 package io.mateu.ecdemo1.partners;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.mateu.ecdemo1.partners.application.out.PartnerRepository;
+import io.mateu.ecdemo1.partners.domain.partner.BillingMode;
+import io.mateu.ecdemo1.partners.domain.partner.Partner;
+import io.mateu.ecdemo1.partners.domain.partner.PartnerType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -60,6 +64,8 @@ class PartnersApiTest {
     MockMvc mvc;
     @Autowired
     ObjectMapper objectMapper;
+    @Autowired
+    PartnerRepository partners;
 
     @Test
     void changesAndResyncsAreAnnouncedWithTheVersionTheyLeaveThePartnerAt() throws Exception {
@@ -115,6 +121,22 @@ class PartnersApiTest {
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    @Test
+    void theListingFiltersByTypeBillingModeAndStatus() {
+        var tourOperators = partners.search(null, PartnerType.TourOperator, null, null, 0, 50);
+        assertThat(tourOperators.partners()).extracting(Partner::getCode).contains("NORDTRAVEL")
+                .doesNotContain("BOOKIT", "VIAJESSOL", "ACME");
+        assertThat(tourOperators.total()).isEqualTo(tourOperators.partners().size());
+
+        var onCredit = partners.search("", null, BillingMode.NoFront, true, 0, 50);
+        assertThat(onCredit.partners()).extracting(Partner::getCode).contains("NORDTRAVEL", "VIAJESSOL", "ACME")
+                .doesNotContain("BOOKIT");
+        assertThat(onCredit.partners()).allMatch(Partner::isActive);
+
+        assertThat(partners.search("acme", PartnerType.Company, BillingMode.NoFront, false, 0, 50).total()).isZero();
+        assertThat(partners.search(null, null, null, null, 0, 2).partners()).hasSize(2);
     }
 
     static List<ConsumerRecord<String, String>> consume(String key, int expected) {

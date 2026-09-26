@@ -24,4 +24,18 @@ public interface PartnerEntityRepository extends JpaRepository<PartnerEntity, St
             order by p.code
             """)
     Page<PartnerEntity> search(@Param("text") String text, Pageable pageable);
+
+    @Query("""
+            select p from PartnerEntity p
+            where (:text is null or :text = ''
+                   or lower(p.code) like lower(concat('%', :text, '%'))
+                   or lower(p.name) like lower(concat('%', :text, '%')))
+              and (:type is null or p.type = :type)
+              and (:billingMode is null or p.billingMode = :billingMode)
+              and (:active is null or p.active = :active)
+            order by p.code
+            """)
+    Page<PartnerEntity> search(@Param("text") String text, @Param("type") String type,
+                               @Param("billingMode") String billingMode, @Param("active") Boolean active,
+                               Pageable pageable);
 }

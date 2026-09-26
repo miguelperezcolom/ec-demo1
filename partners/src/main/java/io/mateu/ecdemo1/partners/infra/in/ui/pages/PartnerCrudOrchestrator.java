@@ -2,10 +2,11 @@ package io.mateu.ecdemo1.partners.infra.in.ui.pages;
 
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.ecdemo1.partners.application.out.PartnerRepository;
+import io.mateu.ecdemo1.partners.domain.partner.BillingMode;
 import io.mateu.ecdemo1.partners.domain.partner.Partner;
+import io.mateu.ecdemo1.partners.domain.partner.PartnerType;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.NoFilters;
 import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
@@ -22,7 +23,7 @@ import java.util.NoSuchElementException;
 @RequiredArgsConstructor
 @Scope("prototype")
 @Title("Partners")
-public class PartnerCrudOrchestrator extends Crud<PartnerViewModel, PartnerViewModel, PartnerViewModel, NoFilters,
+public class PartnerCrudOrchestrator extends Crud<PartnerViewModel, PartnerViewModel, PartnerViewModel, PartnerFilters,
         PartnerRow, String> {
 
     final PartnerViewModel viewModel;
@@ -30,15 +31,21 @@ public class PartnerCrudOrchestrator extends Crud<PartnerViewModel, PartnerViewM
 
     @Override
     public ListingData<PartnerRow> search(SearchRequest request, HttpRequest httpRequest) {
-        var rows = repository.search(request.searchText(), request.pageable().page(), request.pageable().size())
-                .stream().map(PartnerCrudOrchestrator::row).toList();
+        var filters = filters(request);
+        var found = filters == null
+                ? repository.search(request.searchText(), null, null, null,
+                        request.pageable().page(), request.pageable().size())
+                : repository.search(request.searchText(), filters.type, filters.billingMode,
+                        filters.status == null ? null : filters.status == PartnerFilters.PartnerStatus.Active,
+                        request.pageable().page(), request.pageable().size());
+        var rows = found.partners().stream().map(PartnerCrudOrchestrator::row).toList();
         return new ListingData<>(new Page<>(request.searchText(), request.pageable().size(),
-                request.pageable().page(), repository.count(), rows));
+                request.pageable().page(), found.total(), rows));
     }
 
     static PartnerRow row(Partner p) {
-        return new PartnerRow(p.getCode(), p.getDetails().name(), p.getDetails().type().name(),
-                p.getDetails().billingMode().name(),
+        return new PartnerRow(p.getCode(), p.getDetails().name(), typeName(p.getDetails().type()),
+                billingModeName(p.getDetails().billingMode()),
                 p.isActive() ? new Status(StatusType.SUCCESS, "Active") : new Status(StatusType.NONE, "Inactive"),
                 p.getVersion());
     }
@@ -82,5 +89,23 @@ public class PartnerCrudOrchestrator extends Crud<PartnerViewModel, PartnerViewM
     @Override
     public String getIdFieldForRow() {
         return "code";
+    }
+
+    /** How a person names each type of partner, rather than the constant. */
+    static String typeName(PartnerType type) {
+        return switch (type) {
+            case TravelAgent -> "Travel agent";
+            case TourOperator -> "Tour operator";
+            case OnlineAgency -> "Online agency";
+            case Company -> "Company";
+        };
+    }
+
+    /** Who pays the stay, in words: the guest at the desk, or the partner on credit. */
+    static String billingModeName(BillingMode mode) {
+        return switch (mode) {
+            case Front -> "Guest pays";
+            case NoFront -> "Partner pays (credit)";
+        };
     }
 }
