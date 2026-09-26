@@ -1,6 +1,6 @@
 # The engine's own Micrometer metrics. The orchestrator and the forms engine are deployed by
 # the Helm chart, which sets no pod annotations, so they are scraped by selector rather than by
-# the annotated-pods job that picks up the worker and the shell.
+# the annotated-pods job that picks up the shell.
 #
 # `release: kps` is what the kube-prometheus-stack operator matches on; without it these are
 # ignored no matter how correct the selector is.

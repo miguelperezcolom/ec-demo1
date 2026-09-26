@@ -5,7 +5,7 @@
 #
 # The console is one origin with one backend — the gateway — and the path routing happens there,
 # not here. That is deliberate: the gateway has to see every request to be able to require a
-# token on /_workflow, /_forms and /_worker, and splitting the paths at the ingress would let
+# token on /_workflow and /_forms, and splitting the paths at the ingress would let
 # anything it did not know about reach a backend directly.
 #
 # One origin also matters to the UI. The shell's menus are RemoteMenus naming paths, not URLs,

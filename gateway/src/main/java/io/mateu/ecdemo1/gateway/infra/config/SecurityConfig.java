@@ -122,7 +122,7 @@ public class SecurityConfig {
                         // GitHub cannot hold a Keycloak token, so these authenticate by
                         // HMAC-SHA256 over the body, verified by the engine itself.
                         .pathMatchers("/workflow/webhooks/**", "/forms/webhooks/**").permitAll()
-                        .pathMatchers("/_workflow/**", "/_forms/**", "/_worker/**").authenticated()
+                        .pathMatchers("/_workflow/**", "/_forms/**").authenticated()
                         // Web Push's two scripts, public: a browser loads a <script> and registers a
                         // service worker without a token. Code, no data — the endpoints they call
                         // (the key, the subscriptions) stay behind the rule below.

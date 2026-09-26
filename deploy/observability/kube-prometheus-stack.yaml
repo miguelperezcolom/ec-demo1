@@ -59,7 +59,7 @@ prometheus:
     resources:
       requests: { memory: "640Mi", cpu: "250m" }
       limits:   { memory: "1536Mi", cpu: "1" }
-    # Pods that carry prometheus.io/scrape: "true" — the worker and the shell — are scraped
+    # Pods that carry prometheus.io/scrape: "true" — the shell — are scraped
     # without a ServiceMonitor each.
     additionalScrapeConfigs:
       - job_name: 'annotated-pods'

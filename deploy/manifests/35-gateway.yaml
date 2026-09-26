@@ -1,10 +1,10 @@
 # The gateway — one entry point for both consoles, and the only thing that checks a token before
 # the backends see a request.
 #
-# The ingress hands it every path on ec1.mateu.io. It routes /_workflow, /_forms, /_worker,
+# The ingress hands it every path on ec1.mateu.io. It routes /_workflow, /_forms,
 # /_booking, /_content and /_users to the apps that own them, /ai to the chat agent, and
-# everything else to the shell — and it rejects unauthenticated calls to all seven, which is what
-# none of those apps can do for itself: the three engine apps speak only HTTP basic auth and the
+# everything else to the shell — and it rejects unauthenticated calls to all six, which is what
+# none of those apps can do for itself: the two engine apps speak only HTTP basic auth and the
 # four demo services have no security at all. See gateway/.../SecurityConfig.java for what stays
 # public and why.
 #
@@ -43,7 +43,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: gateway
-          image: miguelperezcolom/ec-demo1-gateway:0.22.0
+          image: miguelperezcolom/ec-demo1-gateway:0.22.1
           env:
             - name: SERVER_PORT
               value: "8190"
@@ -51,8 +51,6 @@ spec:
               value: http://orchestrator:8105
             - name: FORMS_URL
               value: http://forms:8106
-            - name: WORKER_URL
-              value: http://worker:8091
             - name: SHELL_URL
               value: http://shell:8101
             - name: BOOKING_URL
