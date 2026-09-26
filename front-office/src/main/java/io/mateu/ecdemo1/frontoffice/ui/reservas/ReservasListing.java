@@ -4,12 +4,14 @@ import io.mateu.ecdemo1.frontoffice.ui.Paging;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel.StayRow;
 import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
+import io.mateu.ecdemo1.frontoffice.ui.common.Tiers;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.Trigger;
 import io.mateu.uidl.annotations.TriggerType;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
+import io.mateu.uidl.data.Status;
 import io.mateu.uidl.interfaces.Filterable;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
@@ -59,7 +61,7 @@ public class ReservasListing
       @Label("Habitación") String habitacion,
       @Label("Noches") long noches,
       @Label("Estado") String estado,
-      @Label("Tier") String tier) {}
+      @Label("Tier") Status tier) {}
 
   @Override
   public ListingData<Reserva> search(SearchRequest request, HttpRequest httpRequest) {
@@ -111,7 +113,7 @@ public class ReservasListing
         habitacion + " · " + stay.roomType(),
         java.time.temporal.ChronoUnit.DAYS.between(stay.checkIn(), stay.checkOut()),
         estadoLabel(stay.status(), stay.checkIn(), stay.checkOut()),
-        stay.guestTier());
+        Tiers.badge(stay.guestTier()));
   }
 
   private boolean matches(Reserva row, String searchText) {
@@ -119,7 +121,7 @@ public class ReservasListing
       return true;
     }
     // The locator too: it is what the desk reads off a voucher or a call.
-    var hay = (row.id() + " " + row.huesped() + " " + row.habitacion() + " " + row.estado() + " " + row.tier())
+    var hay = (row.id() + " " + row.huesped() + " " + row.habitacion() + " " + row.estado() + " " + (row.tier() == null ? "" : row.tier().message()))
         .toLowerCase();
     for (var word : searchText.trim().toLowerCase().split("\\s+")) {
       if (!hay.contains(word)) {

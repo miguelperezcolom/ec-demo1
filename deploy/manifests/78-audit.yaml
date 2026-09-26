@@ -46,7 +46,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: audit-service
-          image: miguelperezcolom/ec-demo1-audit-service:0.19.2
+          image: miguelperezcolom/ec-demo1-audit-service:0.19.3
           env:
             - name: SERVER_PORT
               value: "8129"

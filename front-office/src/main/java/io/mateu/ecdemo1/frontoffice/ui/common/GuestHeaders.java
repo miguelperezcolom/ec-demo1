@@ -29,7 +29,7 @@ public final class GuestHeaders {
     var guest = view.guest();
     return EntityHeader.builder()
         .title(guest.name())
-        .badges(List.of(Chip.builder().label(guest.tier().name()).color("contrast").build()))
+        .badges(List.of(Tiers.chip(guest.tier())))
         .subtitle(staySubtitle(stay))
         .facts(
             List.of(
@@ -50,7 +50,7 @@ public final class GuestHeaders {
     // no folio facts here — the check-out screen shows the breakdown and the preauth below
     return EntityHeader.builder()
         .title(guest.name())
-        .badges(List.of(Chip.builder().label(guest.tier().name()).color("contrast").build()))
+        .badges(List.of(Tiers.chip(guest.tier())))
         .subtitle(
             stay.roomLabel() + " · " + stay.roomType() + " · " + stay.board() + " · "
                 + stay.nights() + "N")
@@ -65,7 +65,7 @@ public final class GuestHeaders {
     var guest = view.guest();
     var folio = view.folio();
     var badges = new ArrayList<Chip>();
-    badges.add(Chip.builder().label(guest.tier().name()).color("contrast").build());
+    badges.add(Tiers.chip(guest.tier()));
     if (stay.wishesTotal() > 0) {
       badges.add(Chip.builder().label(wishes(stay)).color("success").build());
     }
