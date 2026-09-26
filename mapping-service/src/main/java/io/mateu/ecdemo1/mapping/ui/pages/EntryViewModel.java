@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.mapping.ui.pages;
 
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.mapping.dictionary.Dictionary;
+import io.mateu.ecdemo1.mapping.dictionary.Pending;
 import io.mateu.ecdemo1.mapping.store.EntryStatus;
 import io.mateu.ecdemo1.mapping.store.MappingEntry;
 import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
@@ -20,6 +21,7 @@ import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
+import io.mateu.uidl.interfaces.VisibilitySupplier;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -33,11 +35,15 @@ import java.util.List;
  * An equivalence. Created here it is approved at once, by the person creating it; a proposal — the
  * agent's, typically — is approved or rejected with the toolbar actions. Leaving the hotel empty
  * makes it a chain-level equivalence, valid for every hotel that has no exception of its own.
+ *
+ * <p>It is also how an unmapped code is mapped: its row opens this with the CRS code filled in, and
+ * saving it with a PMS code defines the equivalence. While a code waits for a decision, what Opera
+ * offers for its type is shown beside it.
  */
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class EntryViewModel implements Identifiable {
+public class EntryViewModel implements Identifiable, VisibilitySupplier {
 
     @ReadOnly
     @HiddenInCreate
@@ -78,8 +84,17 @@ public class EntryViewModel implements Identifiable {
     @HiddenInCreate
     String decided;
 
+    /** What Opera offers for this type at this hotel — for a code that waits for a decision. */
+    @Section("What Opera offers")
+    @ReadOnly
+    @HiddenInCreate
+    @Stereotype(FieldStereotype.grid)
+    @Colspan(2)
+    List<PmsCodeRow> pmsCodes = List.of();
+
     final Dictionary dictionary;
     final MappingEntryRepository entries;
+    final Pending pending;
 
     public String create(HttpRequest httpRequest) {
         return dictionary.define(proposal(), user(httpRequest)).getId();
@@ -126,6 +141,41 @@ public class EntryViewModel implements Identifiable {
         return io.mateu.ecdemo1.mapping.ui.ConsoleUser.of(httpRequest);
     }
 
+    /** A CRS code of the hotel that nothing translates yet: not an entry until it is saved. */
+    public EntryViewModel loadUnmapped(String hotel, CodeType codeType, String code) {
+        status = new Status(StatusType.DANGER, "Unmapped");
+        type = codeType;
+        hotelCode = hotel;
+        crsCode = code;
+        pmsCode = null;
+        attributes = List.of();
+        pmsCodes = offered(hotel, codeType);
+        return this;
+    }
+
+    List<PmsCodeRow> offered(String hotel, CodeType codeType) {
+        if (hotel == null) {
+            return List.of();
+        }
+        try {
+            return pending.pmsCatalog(hotel).stream().filter(c -> c.type() == codeType)
+                    .map(c -> new PmsCodeRow(c.type().name(), c.code(), c.description())).toList();
+        } catch (RuntimeException e) {
+            return List.of(new PmsCodeRow(codeType.name(), "", "The PMS catalog could not be read: " + e.getMessage()));
+        }
+    }
+
+    /** Each decision only where it applies; an unmapped code has none — it is mapped by saving it. */
+    @Override
+    public boolean isHidden(String memberName, HttpRequest httpRequest) {
+        return switch (memberName) {
+            case "approve", "reject" -> !"Proposed".equals(status.message());
+            case "withdraw" -> !"Approved".equals(status.message());
+            case "pmsCodes" -> pmsCodes == null || pmsCodes.isEmpty();
+            default -> false;
+        };
+    }
+
     public EntryViewModel load(MappingEntry e) {
         status = DictionaryCrud.status(e.status);
         type = e.type;
@@ -140,6 +190,7 @@ public class EntryViewModel implements Identifiable {
         confidence = e.confidence;
         rationale = e.rationale;
         decided = e.decidedBy == null ? "" : e.decidedBy + " at " + e.decidedAt;
+        pmsCodes = e.status == EntryStatus.PROPOSED ? offered(e.hotelCode, e.type) : List.of();
         return this;
     }
 

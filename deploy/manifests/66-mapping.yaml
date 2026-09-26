@@ -43,7 +43,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: mapping-service
-          image: miguelperezcolom/ec-demo1-mapping-service:0.21.3
+          image: miguelperezcolom/ec-demo1-mapping-service:0.21.5
           env:
             - name: SERVER_PORT
               value: "8122"
