@@ -72,8 +72,8 @@ public class NotificationViewModel implements Identifiable {
         body = n.body;
         link = n.link;
         recipients = n.recipients;
-        requestedAt = String.valueOf(n.requestedAt);
-        sentAt = String.valueOf(n.sentAt);
+        requestedAt = NotificationsPage.when(n.requestedAt);
+        sentAt = NotificationsPage.when(n.sentAt);
         attempts = n.attempts;
         lastError = n.lastError;
         id = n.id;
