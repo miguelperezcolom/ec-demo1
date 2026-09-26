@@ -55,7 +55,11 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
         var bell = "<vaadin-icon icon=\"vaadin:bell\" style=\"width: 1em; height: 1em; vertical-align: -0.125em;"
                 + " margin-inline-end: 0.3em;" + (urgent > 0 ? " color: var(--lumo-error-color);" : "") + "\"></vaadin-icon>";
         content = "<a href=\"#\" onclick=\"" + go + "\" style=\"text-decoration: none; white-space: nowrap;"
-                + (urgent > 0 ? " font-weight: 600;" : "") + "\">" + bell + label + "</a>&nbsp;&nbsp;";
+                + (urgent > 0 ? " font-weight: 600;" : "") + "\">" + bell
+                // A narrow header keeps the bell and the count; the header says which through a CSS variable.
+                + "<span style=\"display: var(--mateu-header-wide-only, inline)\">" + label + "</span>"
+                + (waiting.isEmpty() ? "" : "<span style=\"display: var(--mateu-header-narrow-only, none)\">" + waiting.size() + "</span>")
+                + "</a>&nbsp;&nbsp;";
     }
 
     @Override
