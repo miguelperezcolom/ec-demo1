@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { CONSOLES, inboxScreen, signIn, menuLabels, screenRendered } from './consoles'
+import { CONSOLES, inboxScreen, signIn, menuLabels, screenRendered, screenIs } from './consoles'
 
 /**
  * Every screen of every console, on both planes and through both renderers.
@@ -16,7 +16,8 @@ import { CONSOLES, inboxScreen, signIn, menuLabels, screenRendered } from './con
  *   <li><b>Each screen</b> catches three different things wearing the same face: a gateway route
  *       missing for a host, a Mateu route that resolves to "Not found." with an HTTP 200, and a
  *       component type the renderer does not cover — which Mateu paints as a placeholder rather
- *       than failing.</li>
+ *       than failing. And then that it is the RIGHT screen: its heading names the entry and, for a
+ *       listing, a table is on it — a route resolved to the wrong page renders just as well.</li>
  *   <li><b>The two planes</b> catch each other: Workflow and Forms exist on both and mean
  *       different things, so a screen appearing on the wrong one is a defect the console it is
  *       missing from cannot see.</li>
@@ -78,6 +79,17 @@ for (const console_ of CONSOLES) {
 
                 const { ok, why } = await screenRendered(page)
                 expect(ok, `${console_.name} ${screen.route}: ${why}`).toBe(true)
+
+                // Rendering is not arriving. A route that lands on the wrong screen still renders
+                // one, so the page has to name itself as the screen the menu entry opens.
+                await expect
+                    .poll(async () => (await screenIs(page, screen)).ok,
+                          { message: `${screen.route} never showed ${screen.entry}`, timeout: 30_000 })
+                    .toBe(true)
+                    .catch(async () => {
+                        const { why: wrong } = await screenIs(page, screen)
+                        throw new Error(`${console_.name} ${screen.route} is not ${screen.menu} → ${screen.entry}: ${wrong}`)
+                    })
             })
         }
     })
