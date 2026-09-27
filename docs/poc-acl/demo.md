@@ -566,7 +566,9 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 **`deploy/demo/demo-prep.sh`** — un comando para preparar una demo o un ensayo:
 
 - `demo-prep.sh` (o `health`): la tabla PASS/FAIL — despliegues listos, motor, token de Opera y XMAR
-  legible (GET), token de Salesforce (GET), estado de la integración de MRU01 y de la pms-fo de XMAR
+  legible (GET), token de Salesforce (GET) y lo que le queda de **cupo diario de API** (WARN por debajo de
+  `SF_API_RESERVE`, 1000 por defecto; FAIL si está agotado), clientes del MDM pendientes o fallidos en
+  Salesforce (y cambios de contacto por leer), estado de la integración de MRU01 y de la pms-fo de XMAR
   (ninguna tras `zero.sh`: ahí empieza el flujo 1; su último sondeo y su cursor), diccionario y causas abiertas, que no quede un corte de Opera puesto ni el
   umbral del aviso bajado, el contexto de Opera y las habitaciones libres del front office. Sale con 1
   si algo falla. `--zero` pasa antes `zero.sh`; sin él no se resetea nada.
@@ -580,6 +582,46 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 Se pueden lanzar a mitad de demo y repetir: lo que crean lleva la marca `demo-prep:<semilla>` en los
 comentarios de la reserva y se reutiliza. Para los flujos 6–8, `opera-outage.sh` y `ec1.py` (book,
 modify, cancel, show, rate-plan, ask-agent, proposal); `opera.py` lee Opera (solo GET).
+
+### El cupo diario de la API de Salesforce
+
+La org es una Base Edition: **15.000 llamadas en 24 h móviles** (`DailyApiRequests`), contando toda
+llamada REST o SOAP de cualquiera — el MDM, los scripts, las pruebas, un `curl`. Pasado el cupo,
+Salesforce contesta `REQUEST_LIMIT_EXCEEDED` a todo hasta que las llamadas de hace 24 h salen de la
+ventana. No cuentan: pedir el token, los eventos por Pub/Sub (la suscripción del MDM) ni lo que se hace
+a mano en la consola de Salesforce. El 2026-09-27 se agotó (a las 20:57Z quedaban 0; a las 21:05Z,
+566 de 15.000).
+
+Lo que gasta cada cosa (llamadas):
+
+| Qué | Llamadas |
+|---|---|
+| MDM en reposo | ~100/día: el sondeo de fusiones cada 15 min (antes cada minuto, 1.440/día) y, solo mientras haya un Case abierto, el de decisiones cada 5 min (antes cada 30 s, 2.880/día) |
+| Proyectar clientes | 1 por cada 200 pendientes (sObject Collections; antes 1 por cliente) |
+| Flujo 1 (alta de MRU01, 10 reservas) | ~5: los titulares a Salesforce en uno o dos lotes |
+| Flujo 2 (cliente que repite) | ~5: su contacto, y al fusionar en Salesforce el MDM lee los dos contactos (2) |
+| Flujo 3 (recepción cambia datos) | ~5: el Case, y al decidirlo leer el contacto (y el motivo si se rechaza) |
+| Escanear un documento | 1 si cambia datos (va en el siguiente lote); 1 SOAP `merge()` si fusiona |
+| `demo-prep.sh health` | 2 (contar contactos y leer el cupo) |
+| `zero.sh` / `reset.sh` | 2–3 consultas + 1 por cada 200 contactos o Cases borrados (antes 1 por registro) |
+| Una consulta del front office al MDM (p. ej. el backfill pms-fo) | 0: el MDM contesta de su base de datos |
+
+Una demo completa gasta menos de 100; el umbral de 1000 de `demo-prep.sh` deja para ensayos y pruebas.
+
+**Si se agota:** el MDM no insiste. La primera negativa pausa todas sus llamadas 5 min, el doble en cada
+negativa seguida hasta 1 h, y deja **un aviso** en el buzón de los administradores de la integración
+(«Salesforce: daily API allowance spent»), que se cierra solo cuando Salesforce vuelve a contestar.
+Mientras, nada se pierde: los clientes siguen *pendientes* (no fallidos), los contactos que Salesforce
+dijo que cambiaron quedan marcados para leerlos, las fusiones y los Cases esperan, y el sondeo retoma
+desde su cursor. Qué hacer:
+
+1. `demo-prep.sh health` dice cuánto queda. Parar lo que llame a Salesforce por fuera (scripts, pruebas
+   `npm run demo`, agentes).
+2. Esperar: la ventana es móvil y el cupo vuelve a medida que salen las llamadas de hace 24 h — en la
+   práctica, se recupera a lo largo de la mañana siguiente si el gasto fue por la tarde.
+3. Al volver, el MDM se pone al día solo (primer intento tras la pausa). `MDM → Salesforce` en el health
+   debe acabar sin pendientes ni fallidos.
+4. Si la demo no puede esperar, los flujos 1, 4–8 no usan Salesforce; el 2 y el 3 sí.
 
 - [ ] **Recorrer el alta desde cero**, MRU01 → XMAR (en curso): conectividad, contraste, mapeados
       (incluida `NOS → NOSHOW`), interlocutores, backfill y activación. **Antes del alta, crear

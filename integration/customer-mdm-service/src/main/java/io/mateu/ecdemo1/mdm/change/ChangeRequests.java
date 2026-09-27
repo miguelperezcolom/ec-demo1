@@ -35,6 +35,14 @@ public class ChangeRequests {
     final SalesforceProjection projection;
     final TransactionTemplate tx;
     final Clock clock;
+    io.mateu.ecdemo1.mdm.salesforce.Backoff backoff;
+
+    io.mateu.ecdemo1.mdm.salesforce.Backoff backoff() {
+        if (backoff == null) {
+            backoff = new io.mateu.ecdemo1.mdm.salesforce.Backoff(clock, java.time.Duration.ofSeconds(10), java.time.Duration.ofMinutes(10));
+        }
+        return backoff;
+    }
 
     /** What a hotel proposes; a null field is left as it is. */
     public record Proposal(String firstName, String lastName, String name, String email, String phone, String nationality,
@@ -144,7 +152,7 @@ public class ChangeRequests {
     /** Opens in Salesforce what is waiting to be opened, once the customer is a contact there. */
     @Scheduled(fixedDelayString = "${mdm.change-tick:5s}")
     public void send() {
-        if (!salesforce.enabled()) {
+        if (!salesforce.available() || !backoff().ready()) {
             return;
         }
         for (var pending : requests.findByStatusOrderByRequestedAtAsc(ChangeRequest.Status.PENDING.name())) {
@@ -167,8 +175,15 @@ public class ChangeRequests {
                     requests.save(r);
                 }));
                 log.info("{} opened in Salesforce as Case {}", pending.id, caseId);
+                backoff().succeeded();
+            } catch (SalesforceClient.LimitExceeded e) {
+                // Waits for the allowance, as it is: nothing to say on the request.
+                return;
             } catch (RuntimeException e) {
-                log.warn("{} not opened in Salesforce yet: {}", pending.id, e.getMessage());
+                // Tried again, but not every tick: a Case Salesforce refuses would otherwise be sent
+                // every five seconds, all day.
+                backoff().failed();
+                log.warn("{} not opened in Salesforce yet, again at {}: {}", pending.id, backoff().next(), e.getMessage());
                 tx.executeWithoutResult(s -> requests.findById(pending.id).ifPresent(r -> {
                     r.sendError = e.getMessage();
                     requests.save(r);

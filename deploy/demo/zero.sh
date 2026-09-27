@@ -58,13 +58,20 @@ def call(method, path):
         raw = r.read()
         return json.loads(raw) if raw else None
 def ids(soql):
-    return [r["Id"] for r in call("GET", "/query?q=" + urllib.parse.quote(soql))["records"]]
+    page = call("GET", "/query?q=" + urllib.parse.quote(soql))
+    found = [r["Id"] for r in page["records"]]
+    while not page.get("done", True):
+        page = call("GET", page["nextRecordsUrl"].split("/services/data/v67.0", 1)[1])
+        found += [r["Id"] for r in page["records"]]
+    return found
+# Two hundred records a call (sObject Collections), not one: the org's daily API allowance counts calls.
+def delete(records):
+    for i in range(0, len(records), 200):
+        call("DELETE", "/composite/sobjects?allOrNone=false&ids=" + ",".join(records[i:i + 200]))
 cases = ids("SELECT Id FROM Case WHERE MdmRequestId__c != null")
-for case in cases:
-    call("DELETE", f"/sobjects/Case/{case}")
+delete(cases)
 contacts = ids("SELECT Id FROM Contact")
-for contact in contacts:
-    call("DELETE", f"/sobjects/Contact/{contact}")
+delete(contacts)
 print(f"  deleted {len(cases)} Case(s) and {len(contacts)} contact(s)")
 EOF
 # The MDM resumes Salesforce's events from now: the deletions just made are not the MDM's to replay.

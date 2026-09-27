@@ -16,9 +16,11 @@
 # again: what it made is found by its tag (the booking's comments, «demo-prep:<seed>») and reused.
 #
 # The checks: every deployment Ready; the engine up; Opera's token and property XMAR readable (GET);
-# Salesforce's token (GET); MRU01's integration (none after zero.sh: that is flow 1's start); the
-# dictionary and the open causes; no Opera outage left on (opera-outage.sh) and its alert threshold;
-# the Opera context; the front office's free rooms. Exit status 1 if any check FAILs.
+# Salesforce's token (GET) and its daily API allowance (WARN under SF_API_RESERVE calls left, 1000 by
+# default; FAIL when spent — docs/poc-acl/demo.md); the MDM's customers pending or failed in
+# Salesforce; MRU01's integration (none after zero.sh: that is flow 1's start); the dictionary and
+# the open causes; no Opera outage left on (opera-outage.sh) and its alert threshold; the Opera
+# context; the front office's free rooms. Exit status 1 if any check FAILs.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -38,9 +40,9 @@ case "${1:-}" in
     exec python3 ec1.py seed "$@"
     ;;
   -h|--help|help)
-    sed -n '2,24p' "$0"
+    sed -n '2,27p' "$0"
     ;;
   *)
-    echo "Unknown: $1"; sed -n '2,24p' "$0"; exit 2
+    echo "Unknown: $1"; sed -n '2,27p' "$0"; exit 2
     ;;
 esac

@@ -287,7 +287,11 @@ def health():
         code, out = opera("property", "XMAR")
         return ("PASS" if code == 0 else "FAIL"), out
 
-    def salesforce():
+    sf = {}
+
+    def salesforce_session():
+        if sf:
+            return sf
         env = dict(os.environ)
         for key in ("SF_DOMAIN", "SF_CLIENT_ID", "SF_CLIENT_SECRET"):
             if not env.get(key):
@@ -297,11 +301,42 @@ def health():
         body = urllib.parse.urlencode({"grant_type": "client_credentials", "client_id": env["SF_CLIENT_ID"],
                                        "client_secret": env["SF_CLIENT_SECRET"]}).encode()
         tok = json.load(urllib.request.urlopen(f"https://{env['SF_DOMAIN']}/services/oauth2/token", body, timeout=30))
+        sf.update(tok)
+        return sf
+
+    def salesforce():
+        tok = salesforce_session()
         req = urllib.request.Request(tok["instance_url"] + "/services/data/v67.0/query?q="
                                      + urllib.parse.quote("SELECT COUNT() FROM Contact"),
                                      headers={"Authorization": "Bearer " + tok["access_token"]})
         total = json.load(urllib.request.urlopen(req, timeout=30))["totalSize"]
         return "PASS", f"token granted; {total} contact(s) in the org"
+
+    def salesforce_allowance():
+        # The org's daily API allowance: every call in a rolling 24 h counts (15,000 on this Base
+        # Edition). The limits resource answers even when it is spent. Flows 2 and 3 need Salesforce;
+        # docs/poc-acl/demo.md has what each flow spends and what to do when it is short.
+        reserve = int(os.environ.get("SF_API_RESERVE", "1000"))
+        tok = salesforce_session()
+        req = urllib.request.Request(tok["instance_url"] + "/services/data/v67.0/limits",
+                                     headers={"Authorization": "Bearer " + tok["access_token"]})
+        daily = json.load(urllib.request.urlopen(req, timeout=30))["DailyApiRequests"]
+        left, most = daily["Remaining"], daily["Max"]
+        detail = f"{left} of {most} API calls left in the rolling 24 h (demo reserve {reserve})"
+        if left <= 0:
+            return "FAIL", detail + " — spent: Salesforce refuses every call until earlier ones roll out"
+        return ("PASS" if left >= reserve else "WARN"), detail
+
+    def mdm_salesforce():
+        rows_ = psql("customer_mdm", "select coalesce(salesforce_state, '-'), count(*) from customer group by 1 order by 1")
+        waiting = psql("customer_mdm", "select count(*) from customer where salesforce_refresh_pending")[0][0] \
+            if psql("customer_mdm", "select count(*) from information_schema.columns where table_name = 'customer' "
+                                    "and column_name = 'salesforce_refresh_pending'")[0][0] != "0" else "0"
+        states = {r[0]: int(r[1]) for r in rows_}
+        detail = ", ".join(f"{n} {st.lower()}" for st, n in states.items()) or "no customers"
+        detail += f"; {waiting} contact change(s) to read"
+        stuck = states.get("FAILED", 0) + int(waiting)
+        return ("PASS" if not stuck and states.get("PENDING", 0) == 0 else "WARN"), detail
 
     def integration():
         try:
@@ -366,6 +401,8 @@ def health():
     check("Opera token", opera_token)
     check("Opera XMAR (GET)", opera_property)
     check("Salesforce token", salesforce)
+    check("Salesforce API allowance", salesforce_allowance)
+    check("MDM → Salesforce", mdm_salesforce)
     check("Integration MRU01", integration)
     check("Integration XMAR → FO", front_office_integration)
     check("Dictionary", dictionary)
