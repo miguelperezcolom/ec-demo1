@@ -81,7 +81,7 @@ class DemoBookingGeneratorTest {
                 assertThat(request.rooms()).allSatisfy(r -> {
                     assertThat(r.ratePlanCode()).isIn(ratePlans);
                     assertThat(r.boardCode()).isIn("SOLO-ALOJAMIENTO", "DESAYUNO", "COMIDAS", "TODO-INCLUIDO");
-                    if ("EXPEDIA-AD".equals(r.ratePlanCode())) {
+                    if (List.of("EXPEDIA-AD", "AGRO-MAYOR").contains(r.ratePlanCode())) {
                         assertThat(r.boardCode()).isEqualTo("DESAYUNO");
                     }
                 });
