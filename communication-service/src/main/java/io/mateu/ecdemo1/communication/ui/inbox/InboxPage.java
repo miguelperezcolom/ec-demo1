@@ -108,7 +108,40 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
             return null;
         }
         inbox.markSeen(List.of(item.id), Caller.username(httpRequest));
-        return List.of(UICommand.navigateTo(item.link), UICommand.dispatchEvent(SEEN));
+        return List.of(UICommand.navigateTo(destination(item.link, origin(httpRequest))), UICommand.dispatchEvent(SEEN));
+    }
+
+    /**
+     * Where Open goes. The shell opens an absolute URL in a new tab and navigates a path in this one, so
+     * a link into the console the person is in becomes its path — the page they came to resolve opens
+     * right here — and a link into the other console stays absolute, in a tab of its own.
+     */
+    static String destination(String link, String origin) {
+        if (origin == null || origin.isBlank()) {
+            return link;
+        }
+        try {
+            var target = java.net.URI.create(link);
+            var here = java.net.URI.create(origin);
+            if (target.getHost() == null || !target.getHost().equalsIgnoreCase(here.getHost())) {
+                return link;
+            }
+            var path = target.getRawPath() == null || target.getRawPath().isEmpty() ? "/" : target.getRawPath();
+            return path + (target.getRawQuery() == null ? "" : "?" + target.getRawQuery())
+                    + (target.getRawFragment() == null ? "" : "#" + target.getRawFragment());
+        } catch (IllegalArgumentException e) {
+            return link;
+        }
+    }
+
+    /** The console the request comes from: the browser's Origin, or the host the gateway forwarded. */
+    static String origin(HttpRequest httpRequest) {
+        var origin = httpRequest.getHeaderValue("Origin");
+        if (origin != null && !origin.isBlank()) {
+            return origin;
+        }
+        var host = httpRequest.getHeaderValue("X-Forwarded-Host");
+        return host == null || host.isBlank() ? null : "https://" + host;
     }
 
     /** Marks the selected rows seen. The work is in handleAction, like every action of this listing. */
