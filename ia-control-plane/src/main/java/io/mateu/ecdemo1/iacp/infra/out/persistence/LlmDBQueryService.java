@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 import io.mateu.ecdemo1.iacp.application.out.query.LlmQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.LlmDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.LlmRow;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.StatusBadge;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmProvider;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmUsability;
 import io.mateu.uidl.data.ListingData;
@@ -72,6 +73,6 @@ public class LlmDBQueryService implements LlmQueryService {
         var usability = LlmUsability.of(e.isEnabled(),
                 LlmProvider.valueOf(e.getProvider()), credentialSet);
         return new LlmRow(e.getId(), e.getName(), e.getProvider(), e.getModel(),
-                credentialSet ? "set" : "missing", usability.label());
+                credentialSet ? "set" : "missing", StatusBadge.of(usability.label()));
     }
 }

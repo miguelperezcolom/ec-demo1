@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 import io.mateu.ecdemo1.iacp.application.out.query.RouteQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.RouteDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.RouteRow;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.StatusBadge;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.Pageable;
@@ -62,6 +63,6 @@ public class RouteDBQueryService implements RouteQueryService {
 
     static RouteRow toRow(RouteEntity e) {
         return new RouteRow(e.getId(), e.getName(), e.getPriority(), e.getTargetAgentId(),
-                e.isEnabled() ? "enabled" : "disabled");
+                StatusBadge.enabled(e.isEnabled()));
     }
 }

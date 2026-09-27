@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.iacp.application.out.query.dto;
 
+import io.mateu.uidl.data.Status;
+
 /**
  * What a listing of API-backed MCP servers shows.
  *
@@ -7,5 +9,5 @@ package io.mateu.ecdemo1.iacp.application.out.query.dto;
  * offering anything, and that is the single most useful thing to see while scanning.
  */
 public record ApiMcpRow(String id, String name, String kind, String baseUrl,
-                        int tools, String credential, String status) {
+                        int tools, String credential, Status status) {
 }

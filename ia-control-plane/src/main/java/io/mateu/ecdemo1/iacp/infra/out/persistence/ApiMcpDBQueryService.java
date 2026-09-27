@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 import io.mateu.ecdemo1.iacp.application.out.query.ApiMcpQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.ApiMcpDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.ApiMcpRow;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.StatusBadge;
 import io.mateu.ecdemo1.iacp.domain.aggregates.apimcp.vo.ApiKind;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
@@ -77,8 +78,8 @@ public class ApiMcpDBQueryService implements ApiMcpQueryService {
                 api.getCredential().isSet() ? "set" : "missing",
                 // Catalogued but offering nothing is the state worth seeing in a listing: the entry
                 // looks finished and an agent given it gets no tools at all.
-                !e.isEnabled() ? "disabled"
+                StatusBadge.of(!e.isEnabled() ? "disabled"
                         : api.getTools().isEmpty() ? "no tools yet"
-                        : "enabled");
+                        : "enabled"));
     }
 }

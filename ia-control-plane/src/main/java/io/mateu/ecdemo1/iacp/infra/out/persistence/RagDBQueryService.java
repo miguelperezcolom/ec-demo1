@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 import io.mateu.ecdemo1.iacp.application.out.query.RagQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.RagDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.RagRow;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.StatusBadge;
 import io.mateu.ecdemo1.iacp.domain.aggregates.rag.vo.RagKind;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
@@ -64,6 +65,6 @@ public class RagDBQueryService implements RagQueryService {
 
     static RagRow toRow(RagEntity e) {
         return new RagRow(e.getId(), e.getName(), e.getKind(), e.getCollectionName(),
-                e.isEnabled() ? "enabled" : "disabled");
+                StatusBadge.enabled(e.isEnabled()));
     }
 }
