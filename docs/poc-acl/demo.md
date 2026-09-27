@@ -29,7 +29,7 @@ los del HLA *CRS-PMS Integration - Solution* y *CRM-MDM Integration - Solution*.
 | 3 | Container Model TO-BE | Los servicios: ACL del CRS, mapeado, conector PMS, integraciones, MDM, comunicación, auditoría, motor | Un servicio por contenedor, y el front office del hotel |
 | 4 | El modelo mental: dos planos | Plano de datos (lo que fluye) y plano de control (quién lo gobierna) | Dos consolas: `ec1` y `console.ec1` |
 | 5 | Grabar Reserva — System Model | El camino de una reserva de punta a punta | «Proyectar reserva», contra Opera real y el front office |
-| 6 | Proyectar una reserva (secuencia) | Preparar → identidad del cliente (MDM) → perfil → grabar con guarda de versión → front office → anotar en el CRS | Igual |
+| 6 | Proyectar una reserva (secuencia) | Preparar → identidad del cliente (MDM) → perfil → grabar con guarda de versión → anotar en el CRS | Igual; el front office ya no es un paso: cuelga de Opera (pms-fo, «Proyectar estancia») |
 | 7 | Un proceso bloqueado espera, no falla | Causas en vez de errores: una causa, N procesos | *Mapping → Causes*, y cada causa en la bandeja de quien la resuelve |
 | 8 | Mapeado — System Model | Diccionario versionado, aprobación humana, propuesta del agente | Diccionario (filtrado por integración, con lo que falta por mapear) y el agente |
 | 9 | Alta de una integración (secuencia y estados) | Del registro a la activación, por puertas | `integrations-service` y el proceso `alta-integracion` |
@@ -55,8 +55,10 @@ superior de las cuatro, el **aviso de la bandeja** («Inbox (n)», lo que yo aú
 | Clientes | La cara de negocio del maestro de clientes, solo consulta: *Buscar clientes* por nombre, email, teléfono o documento; la ficha con sus datos vigentes (lo que decidió Salesforce), dónde está (contacto de Salesforce, huésped del front office, perfiles de Opera), sus reservas en el CRS y sus estancias en el front office — cada una con su enlace — y sus solicitudes de cambio; *Solicitudes de cambio*: todas, con su estado. Los cambios se piden en recepción y los decide Salesforce |
 | Admin | Los procesos del motor, con sus pasos |
 
-**Front office del hotel — `https://front.ec1.mateu.io`** (Redwood): recepción. Las reservas de
-MRU01 que llegan a Opera llegan también aquí como estancias; check-in, huéspedes, folios. Cada
+**Front office del hotel — `https://front.ec1.mateu.io`** (Redwood): recepción. **Consume el PMS**
+(integración pms-fo, cadena CRS → PMS → front office): las reservas de XMAR — las que escribe la
+integración y las nacidas en Opera — llegan aquí como estancias **tal como Opera las tiene**, con los
+nombres del catálogo de Opera (tipo de habitación, régimen); check-in, huéspedes, folios. Cada
 reserva enseña *En otros sistemas*: la reserva del CRS, sus clientes en Clientes y su contacto en
 Salesforce (enlaces), y el perfil de Opera.
 
@@ -64,12 +66,12 @@ Salesforce (enlaces), y el perfil de Opera.
 
 | Menú | Qué enseñar |
 | :--- | :---------- |
-| Integrations | Una integración por hotel: su conexión con Opera, en qué puerta del alta está, *Relaunch backfill*, *Import partners* |
+| Integrations | Dos tipos. **CRS → PMS**: una por hotel del CRS, su conexión con Opera, en qué puerta del alta está, *Relaunch backfill*, *Import partners*. **PMS → Front office** (pms-fo): una por propiedad de Opera y su front office — conexión, catálogo, backfill, activación, y el sondeo de cambios de Opera (cursor, último sondeo); *Resync catalogue*, *Poll now*, *Relaunch backfill* |
 | Mapping | Causes; Dictionary: se filtra por **integración** y muestra también lo **sin mapear** (*Unmapped*), *Ask the agent*, y aprobar, rechazar o **retirar** una entrada o las filas seleccionadas; Partners in the PMS |
 | Customers | El maestro de clientes, lo técnico: golden records, su estado de proyección y las consolidaciones que llegan de Salesforce (la cara de negocio está en Clientes, en el plano de datos) |
 | Notifications | Lo que se ha comunicado y a quién; **destinatarios**: quién se entera de qué y por dónde (§11) |
 | Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
-| Workflow / Forms | Las definiciones de proceso: los cinco de la PoC (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show`); formularios, hoy ninguno |
+| Workflow / Forms | Las definiciones de proceso: los siete de la PoC (`alta-integracion`, `alta-integracion-fo`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-estancia`, `proyectar-interlocutor`, `registrar-no-show`); formularios, hoy ninguno |
 | IA | El agente de mapeado y los MCP de cada servicio |
 | Usuarios | Quién puede hacer qué |
 
@@ -88,6 +90,11 @@ reanudan al activarla.
 
 Cuando esté hecha el alta de MRU01 con XMAR, el punto de partida de la demo será ese, y se guardará
 como línea base.
+
+**Desde cero hay dos altas**: la crs-pms de MRU01 (§4) y la **pms-fo de XMAR** (§4 bis). Sin la
+segunda, las reservas llegan a Opera pero no al front office. Mejor hacerla **antes** (el front office
+se llena con lo que Opera ya tiene y queda activa): así en el flujo 1 las reservas aparecen en el front
+office en cuanto llegan a Opera.
 
 ## 4. Crear una integración
 
@@ -115,6 +122,37 @@ se cierra solo cuando la integración la pasa.
 > escribe en Opera las reservas futuras del hotel. Ahora mismo se está recorriendo **MRU01 → XMAR**
 > desde cero; para la demo en directo, o se repite esa (la línea base tendría que tomarse antes del
 > alta) o se hace la de otro hotel contra XMU, que está vacía.
+
+## 4 bis. El front office cuelga del PMS: la integración pms-fo
+
+Las reservas van en cadena **CRS → PMS → front office**: el front office no recibe lo que se mandó a
+Opera, sino lo que **Opera tiene**. Es otra integración, *Integrations → PMS → Front office → New*:
+propiedad de Opera (XMAR), el front office (MRU01), ámbito (`ALL`: todas las reservas de la propiedad,
+también las nacidas en Opera; `CHAIN`: solo las que escribió la integración) y horizonte (60 días). Al
+guardarla arranca `alta-integracion-fo`:
+
+1. **Conexión**: Opera legible y el front office responde.
+2. **Catálogo**: el de la propiedad — 15 tipos de habitación, 78 tarifas, 25 paquetes, 367
+   habitaciones — va al front office, que lee con él las estancias.
+3. **Backfill**: las reservas de XMAR en casa o que llegan en los próximos 60 días, una
+   `proyectar-estancia` cada una. Las estancias que ya había se reconocen (por la reserva de Opera, el
+   localizador del CRS o el walk-in): no se duplican. Las nacidas en Opera abren `OP-<confirmación>`.
+4. **Lista para activar**; al activar, fluyen los cambios.
+
+Qué llega y cómo: lo que la integración crs-pms graba en Opera lo avisa el conector
+(`pms-reservations`) y arranca `proyectar-estancia` al momento; lo que cambia en Opera por otras vías
+lo encuentra el **sondeo** (cada 60 s: OHIP no tiene filtro «modificadas desde», así que se recorren las
+reservas de la ventana y se proyectan las modificadas desde el cursor). En *Admin → Processes*, cada
+`proyectar-estancia` lleva en la clave la reserva de Opera y su modificación (`…:2026-09-28T00:44:46`)
+o el evento (`…:evt-…`).
+
+**Ojo, volumen**: con `ALL`, el front office de MRU01 pasa a tener todas las reservas reales de XMAR en
+la ventana (841 procesos, 814 estancias nuevas `OP-…` el 2026-09-27), con sus huéspedes tal como están en
+el UAT de Opera. Para enseñar solo las de la demo, una integración `CHAIN`.
+
+**Ojo, nombres de Opera**: el front office enseña las palabras de Opera — «Standard King», «Suite
+Junior Standard Balcón», «Pensión Todo Incluido» —, pero el paquete `BRKFST` de XMAR se describe en
+Opera como «BRKFST»: esa es su palabra, y el front office la enseña tal cual.
 
 ## 5. Se bloquea: espera, no falla
 
@@ -169,7 +207,8 @@ Una reserva nueva de MRU01 por su *Central de reservas* (canal `CALLCENTER`; o p
   ejecución** — `ECDEMO1`, o `ECDEMO1-<MMddHHmm>` desde que `zero.sh` estrena uno en cada puesta a cero
   (ver [Resetear la demo](#resetear-la-demo)); nunca `CRS`, que es el del CRS real de este tenant. Las
   escritas antes del 2026-09-25 no llevan ninguna de las dos cosas.
-- En el front office: la estancia, con su titular.
+- En el front office: la estancia, con su titular, leída de Opera (`proyectar-estancia`, segundos
+  después): los nombres de Opera y, en `ec1.py show`, «from Opera <reserva> as modified <fecha>».
 - En el CRS: dónde ha quedado en Opera.
 - En *Customers*: los pasajeros resueltos contra el maestro de clientes.
 
@@ -285,8 +324,9 @@ El CRS es el dueño de todas las reservas; el front office es un canal más (`WA
    el check-in al momento— y se pide al CRS la reserva con esa referencia y **al precio dado**; si el
    CRS ya no la cobra así, la rechaza y la estancia lo muestra. Si el CRS no responde, se reenvía sola.
    La cabecera de la estancia dice «Walk-in · pendiente del CRS», y luego «Walk-in · CRS <localizador>».
-4. Baja como cualquier reserva (`proyectar-reserva`): a **Opera** y de vuelta al **front office**, que
-   la reconoce por la referencia y la escribe **sobre la misma estancia** (sin crear otra ni deshacer el
+4. Baja como cualquier reserva (`proyectar-reserva`): a **Opera**, y de Opera al **front office**
+   (`proyectar-estancia`), que la reconoce por el localizador que el CRS le dio al walk-in y la escribe
+   **sobre la misma estancia** (sin crear otra ni deshacer el
    check-in): la cabecera pasa a «Walk-in · CRS <localizador> · Opera <reserva>» y el huésped pasa a ser
    el cliente del MDM, con el documento que tomó recepción.
 
@@ -338,7 +378,9 @@ localizador, la versión del CRS va en el UDF (`UDFN01`) y solo se escribe una v
    --arrival 2026-11-12 --nights 4 --room JS-STD`: fechas y tipo de habitación. El CRS la reprecia y
    sube la versión.
 3. Se ve: un `proyectar-reserva` más; en Opera **el mismo número de reserva** con las fechas, el tipo
-   (`SJSB`) y la versión nuevas; en el front office la estancia con las fechas y la habitación nuevas.
+   (`SJSB`) y la versión nuevas; en el front office la estancia con las fechas y la habitación nuevas,
+   **leídas de Opera**: llega por el evento del conector y otra vez por el sondeo (dos
+   `proyectar-estancia` con claves distintas; la segunda no cambia nada).
 4. **Cancelar** en *Call center* o `ec1.py cancel <localizador> --reason OTR`: `proyectar-cancelacion`;
    Opera la cancela (motivo `OTROS`) y la estancia pasa a *Cancelada*.
 
@@ -354,6 +396,13 @@ Probado en ec1 el 2026-09-27 con **ZMPBEY** / Opera **39484599**: v2 a `JS-SEA` 
 (RSV00138, causa y aviso); v3 a `JS-STD` y del 12 al 16 de noviembre, en su sitio (`SJSB`, UDF 3); v4
 del 13 al 17, en su sitio, y la causa de la v2 resuelta sola («pms-integration: v4 is in Opera»); la
 cancelación, en Opera *Cancelled* y en el front office *CANCELLED*. Siempre una sola reserva en Opera.
+
+Probado en ec1 el 2026-09-27 con la integración pms-fo ya activa: **5CMMKN** (MRU01, WEB, DIRECTA,
+STD-KING, DESAYUNO, 10–13 de noviembre) en Opera como **39484606** y en el front office por el evento
+(«Standard King / BRKFST», 558,00); modificada en el CRS a JS-STD del 12 al 16: Opera `SJSB`, UDF 2, y
+el front office «Suite Junior Standard Balcón», 1090,00, con la versión de Opera `2026-09-28T00:44:46`
+— la que trajo el sondeo (`proyectar-estancia:XMAR:39484606:2026-09-28T00:44:46`, cursor movido a esa
+modificación).
 
 ## Flujo 8. Un código nuevo con la integración ya activa
 
@@ -445,7 +494,7 @@ de Cobros y factura de depósito.
 Dos scripts en `deploy/demo/`, y ninguno toca Opera:
 
 - **`zero.sh` — antes de cualquier integración** (unos 3 minutos). Vacía lo que hace la integración:
-  reservas del CRS (y las tarifas abiertas después, flujo 8), integraciones, mapeados, MDM, huéspedes y estancias del front office (las
+  reservas del CRS (y las tarifas abiertas después, flujo 8), integraciones (crs-pms y pms-fo, con su cursor), mapeados, MDM, huéspedes, estancias y catálogo del PMS del front office (las
   habitaciones quedan libres), avisos, auditoría y los procesos del motor; y en Salesforce borra
   **todos** los contactos y los Cases del MDM (el org se comparte con el entorno local). Se queda lo
   que está configurado: interlocutores del ERP, habitaciones y catálogos del front office,
@@ -513,8 +562,8 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 **`deploy/demo/demo-prep.sh`** — un comando para preparar una demo o un ensayo:
 
 - `demo-prep.sh` (o `health`): la tabla PASS/FAIL — despliegues listos, motor, token de Opera y XMAR
-  legible (GET), token de Salesforce (GET), estado de la integración de MRU01 (ninguna tras `zero.sh`:
-  ahí empieza el flujo 1), diccionario y causas abiertas, que no quede un corte de Opera puesto ni el
+  legible (GET), token de Salesforce (GET), estado de la integración de MRU01 y de la pms-fo de XMAR
+  (ninguna tras `zero.sh`: ahí empieza el flujo 1; su último sondeo y su cursor), diccionario y causas abiertas, que no quede un corte de Opera puesto ni el
   umbral del aviso bajado, el contexto de Opera y las habitaciones libres del front office. Sale con 1
   si algo falla. `--zero` pasa antes `zero.sh`; sin él no se resetea nada.
 - `demo-prep.sh seed returning-customer [--create]` (flujo 2): a quién teclear en el asistente — el
