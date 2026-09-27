@@ -92,18 +92,4 @@ public class CrsSource {
         var created = this.booking.post().uri("/bookings").body(body).retrieve().body(Map.class);
         return created == null ? null : String.valueOf(created.get("id"));
     }
-
-    /** Which profile the partner is in the PMS, recorded in the master: it is not created there again. */
-    public void annotatePartnerProfile(String partnerCode, String pmsProfileId, String profileType) {
-        partners.put().uri("/partners/{code}/pms-profile", partnerCode)
-                .body(Map.of("profileId", pmsProfileId, "profileType", profileType == null ? "" : profileType))
-                .retrieve().toBodilessEntity();
-    }
-
-    /** Records in the CRS where the booking landed in the PMS, so an operator of the CRS can find it. */
-    public void annotatePmsReference(String bookingId, String pmsReservationId) {
-        booking.put().uri("/bookings/{id}/pms-reference", bookingId)
-                .body(Map.of("reservationId", pmsReservationId))
-                .retrieve().toBodilessEntity();
-    }
 }

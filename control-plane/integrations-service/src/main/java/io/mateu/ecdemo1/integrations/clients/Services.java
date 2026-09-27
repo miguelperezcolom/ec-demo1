@@ -8,7 +8,6 @@ import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
 import io.mateu.ecdemo1.integration.model.integration.PmsProperty;
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
-import io.mateu.ecdemo1.integration.model.partner.PartnerType;
 import io.mateu.ecdemo1.integrations.config.IntegrationsProperties;
 import io.mateu.ecdemo1.integrations.config.TolerantReader;
 import org.springframework.core.ParameterizedTypeReference;
@@ -19,11 +18,14 @@ import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 /**
- * The services an onboarding drives, in the integration's terms. The integrations service touches
- * neither the CRS nor Opera: it asks the adapters, the mapping and the master of partners.
+ * What an onboarding asks other services, in the integration's terms — queries only: whether the
+ * connection works, what the property and the CRS have, what the mapping still lacks, whether a
+ * partner is a PMS profile. Each is something a decision needs to know now. What the integration asks
+ * other services to do goes as commands through the outbox ({@code outbox.Commands}), never from here.
+ * The integrations service touches neither the CRS nor Opera: it asks the adapters, the mapping and
+ * the master of partners.
  */
 @Component
 public class Services {
@@ -64,58 +66,10 @@ public class Services {
 
     // ── the mapping ───────────────────────────────────────────────────────────
 
-    /** The hotel's own equivalence — which Opera property the CRS hotel is — entered by the integration. */
-    public void defineHotel(String crsHotelCode, String pmsHotelCode, String by) {
-        mapping.post().uri(b -> b.path("/entries/definitions").queryParam("by", by).build())
-                .body(Map.of("type", CodeType.HOTEL, "hotelCode", crsHotelCode, "sourceCode", crsHotelCode,
-                        "targetCode", pmsHotelCode, "attributes", Map.of()))
-                .retrieve().toBodilessEntity();
-    }
-
-    /** An equivalence entered directly, approved by whoever enters it; nothing new if it is in force. */
-    public void define(CodeType type, String hotelCode, String sourceCode, String targetCode, String by) {
-        var body = new java.util.HashMap<String, Object>();
-        body.put("type", type);
-        body.put("hotelCode", hotelCode);
-        body.put("sourceCode", sourceCode);
-        body.put("targetCode", targetCode);
-        body.put("attributes", Map.of());
-        mapping.post().uri(b -> b.path("/entries/definitions").queryParam("by", by).build()).body(body)
-                .retrieve().toBodilessEntity();
-    }
-
-    /**
-     * Which OPERA profile type each partner type is: certain when the partners come from Opera, so the
-     * integration enters it rather than leaving it pending for a person. Keyed by the integration's
-     * canonical type, which is what preparing a partner resolves.
-     */
-    public void definePartnerTypes(String by) {
-        for (var type : Map.of(
-                PartnerType.TRAVEL_AGENT, "Agent",
-                PartnerType.TOUR_OPERATOR, "Agent",
-                PartnerType.COMPANY, "Company",
-                PartnerType.ONLINE_AGENCY, "Source").entrySet()) {
-            define(CodeType.PARTNER_TYPE, null, type.getKey().name(), type.getValue(), by);
-        }
-    }
-
-    /** Which PMS profile a partner already is, as an import from the PMS found it. */
-    public void recordPartnerProfile(String partnerCode, String pmsProfileId, String profileType) {
-        mapping.put().uri("/partner-profiles/{code}", partnerCode)
-                .body(Map.of("pmsProfileId", pmsProfileId, "profileType", profileType))
-                .retrieve().toBodilessEntity();
-    }
-
     public List<PendingCode> pendingMappings(String crsHotelCode) {
         return mapping.get().uri(b -> b.path("/pending").queryParam("hotelCode", crsHotelCode).build())
                 .retrieve().body(new ParameterizedTypeReference<>() {
                 });
-    }
-
-    /** Asks the mapping agent to propose the hotel's pending mapping. It answers in the background. */
-    public void requestAgentProposal(String crsHotelCode) {
-        mapping.post().uri(b -> b.path("/agent-proposals").queryParam("hotelCode", crsHotelCode).build())
-                .retrieve().toBodilessEntity();
     }
 
     public List<Gap> gaps(FutureUsage usage) {
@@ -132,11 +86,6 @@ public class Services {
         }
     }
 
-    public void resolveCauseIfOpen(String causeKey, String by) {
-        mapping.post().uri(b -> b.path("/causes/resolve-if-open").queryParam("key", causeKey).queryParam("by", by).build())
-                .retrieve().toBodilessEntity();
-    }
-
     // ── the master of partners ───────────────────────────────────────────────
 
     /** A partner of the master, as it has it; empty when it has none by that code. */
@@ -147,26 +96,6 @@ public class Services {
         } catch (HttpClientErrorException.NotFound e) {
             return java.util.Optional.empty();
         }
-    }
-
-    public void createPartner(String code, Map<String, Object> details) {
-        partners.post().uri("/partners").body(Map.of("code", code, "details", details)).retrieve().toBodilessEntity();
-    }
-
-    public void updatePartner(String code, Map<String, Object> details) {
-        partners.put().uri("/partners/{code}", code).body(details).retrieve().toBodilessEntity();
-    }
-
-    /** Announces a partner again, unchanged, so that the integration projects it to the PMS. */
-    /** Records in the ERP which Opera profile the partner is: the integration does not create it there. */
-    public void recordErpPmsProfile(String code, String pmsProfileId, String profileType) {
-        partners.put().uri("/partners/{code}/pms-profile", code)
-                .body(Map.of("profileId", pmsProfileId, "profileType", profileType))
-                .retrieve().toBodilessEntity();
-    }
-
-    public void resyncPartner(String code) {
-        partners.post().uri("/partners/{code}/resync", code).retrieve().toBodilessEntity();
     }
 
     // ── the connector ─────────────────────────────────────────────────────────
@@ -200,11 +129,6 @@ public class Services {
             return b.build(crsHotelCode);
         }).retrieve().body(new ParameterizedTypeReference<>() {
         });
-    }
-
-    public void project(String crsHotelCode, String locator, String origin) {
-        crs.post().uri("/projections").body(Map.of("hotelCode", crsHotelCode, "locator", locator, "origin", origin))
-                .retrieve().toBodilessEntity();
     }
 
     private static RestClient client(String baseUrl, TolerantReader reader) {

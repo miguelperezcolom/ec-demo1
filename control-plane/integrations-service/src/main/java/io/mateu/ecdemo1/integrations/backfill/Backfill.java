@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.integrations.backfill;
 
 import io.mateu.ecdemo1.integrations.clients.Services;
 import io.mateu.ecdemo1.integrations.config.IntegrationsProperties;
+import io.mateu.ecdemo1.integrations.outbox.Commands;
 import io.mateu.ecdemo1.integrations.store.BackfillRun;
 import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
 import io.mateu.ecdemo1.integrations.store.IntegrationRepository;
@@ -9,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 
@@ -16,6 +19,10 @@ import java.time.Clock;
  * Runs the backfills (HLA «Backfill» #10): a batch per tick, nearest arrival first, each reservation
  * projected by the same path a change in the CRS takes — the backfill invokes «Proyectar Reserva»,
  * it does not rewrite it. The throttle is the batch size and the tick.
+ *
+ * <p>Each page of the hotel's future reservations is read from the CRS adapter (a query), and asking
+ * it to project them is a command per reservation, written to the outbox in the same transaction that
+ * moves the cursor past them: a page is either dispatched and passed, or neither.
  *
  * <p>Resumable by construction: the cursor is saved after every batch, and a reservation projected
  * twice is harmless — its process key comes from the reservation and the run, and the write is
@@ -35,6 +42,8 @@ public class Backfill {
     final BackfillRunRepository runs;
     final IntegrationRepository integrations;
     final Services services;
+    final Commands commands;
+    final PlatformTransactionManager transactions;
     final IntegrationsProperties properties;
     final Clock clock;
 
@@ -52,8 +61,12 @@ public class Backfill {
 
     void advance(BackfillRun run) {
         var page = services.future(run.crsHotelCode, run.cursorArrival, run.cursorLocator, properties.backfillPerTick());
+        new TransactionTemplate(transactions).executeWithoutResult(status -> dispatch(run, page));
+    }
+
+    void dispatch(BackfillRun run, java.util.List<io.mateu.ecdemo1.integration.model.integration.FutureReservation> page) {
         for (var reservation : page) {
-            services.project(run.crsHotelCode, reservation.locator(), "backfill:" + run.id);
+            commands.project(run.crsHotelCode, reservation.locator(), "backfill:" + run.id);
             run.cursorArrival = reservation.arrival();
             run.cursorLocator = reservation.locator();
             run.dispatched++;

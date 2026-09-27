@@ -3,8 +3,11 @@ package io.mateu.ecdemo1.integrations.outbox;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integration.model.audit.AuditedAction;
+import io.mateu.ecdemo1.integration.model.command.MappingCommand;
+import io.mateu.ecdemo1.integration.model.command.ProjectReservation;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationResolved;
+import io.mateu.ecdemo1.integrations.clients.PartnerCommand;
 import io.mateu.workflow.ddd.DomainEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -14,8 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 
 /**
- * What must leave only if the decision that produced it was saved: the message that resumes a
- * process once its causes are resolved, the start of its successor, and the notifications.
+ * What must leave only if the decision that produced it was saved: the start of an onboarding and
+ * the messages that open its gates, the notifications, and the commands to other services — to the
+ * mapping, to the master of partners, to the CRS adapter. A decision rolled back asks nothing of
+ * anyone; a decision saved has its commands on the way, and the other side takes each once (its
+ * inbox deduplicates on the command's id).
  */
 @Component
 @RequiredArgsConstructor
@@ -25,6 +31,9 @@ public class Outbox {
     public static final String NOTIFICATIONS = "notifications";
     public static final String AUDIT = "audit";
     public static final String RESOLUTIONS = "resolutions";
+    public static final String MAPPING_COMMANDS = "mappingCommands";
+    public static final String PARTNER_COMMANDS = "partnerCommands";
+    public static final String PROJECTIONS = "projectionRequests";
 
     final OutboxMessageRepository repository;
     final ObjectMapper objectMapper;
@@ -52,6 +61,24 @@ public class Outbox {
     @Transactional(propagation = Propagation.MANDATORY)
     public void appendAudit(AuditedAction action) {
         write(AUDIT, action.actionId(), "AuditedAction", serialise(AuditedAction.class, action));
+    }
+
+    /** A command for the mapping. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendToMapping(MappingCommand command) {
+        write(MAPPING_COMMANDS, command.key(), command.getClass().getSimpleName(), serialise(MappingCommand.class, command));
+    }
+
+    /** A command for the master of partners. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendToPartners(PartnerCommand command) {
+        write(PARTNER_COMMANDS, command.key(), command.getClass().getSimpleName(), serialise(PartnerCommand.class, command));
+    }
+
+    /** A reservation for the CRS adapter to project: the backfill's. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendProjection(ProjectReservation request) {
+        write(PROJECTIONS, request.key(), "ProjectReservation", serialise(ProjectReservation.class, request));
     }
 
     private String serialise(Class<?> as, Object value) {

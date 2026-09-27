@@ -44,6 +44,21 @@ spring:
               sync: true
               configuration:
                 key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          mappingCommands:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          partnerCommands:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          projectionRequests:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
       bindings:
         # IN: the engine's tasks for the integrations — the steps of «alta-integracion».
         consumeTasks-in-0:
@@ -63,6 +78,16 @@ spring:
         # OUT, through the outbox: what a notification asked for is no longer waiting — the inbox closes it.
         resolutions:
           destination: notification-resolutions
+        # OUT, through the outbox: the commands this service sends others — never over HTTP. The
+        # mapping (equivalences, the agent's proposal, causes, partner profiles), the master of
+        # partners (resync, import), the CRS adapter (the backfill's projections). Each consumer takes
+        # a command once, by its id.
+        mappingCommands:
+          destination: mapping-commands
+        partnerCommands:
+          destination: partner-commands
+        projectionRequests:
+          destination: projection-requests
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/integrations}

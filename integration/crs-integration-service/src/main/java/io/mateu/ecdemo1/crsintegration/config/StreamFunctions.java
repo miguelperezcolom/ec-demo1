@@ -6,6 +6,7 @@ import io.mateu.ecdemo1.integration.model.customer.CustomersMerged;
 import io.mateu.ecdemo1.crsintegration.in.CrsEventHandler;
 import io.mateu.ecdemo1.crsintegration.router.ProcessRouter;
 import io.mateu.ecdemo1.crsintegration.worker.TaskHandlers;
+import io.mateu.ecdemo1.integration.model.command.ProjectReservation;
 import io.mateu.ecdemo1.integration.model.events.IntegrationEvent;
 import io.mateu.workflow.ddd.DomainEvent;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The four things this service consumes. Each on the consumer thread and synchronously: a failure
+ * The five things this service consumes. Each on the consumer thread and synchronously: a failure
  * leaves the offset uncommitted and the message is redelivered, which the inboxes make harmless.
  */
 @Configuration
@@ -81,6 +82,29 @@ public class StreamFunctions {
                 }
             }
             log.info("{}: {} of {} reservation(s) projected again", origin, projected, event.reservations().size());
+        };
+    }
+
+    /**
+     * The reservations the integrations service's backfill asks to project ({@code projection-requests}),
+     * each by «Proyectar Reserva». Asked twice, the process starts once: its key comes from the
+     * reservation and the origin, and goes into the inbox.
+     */
+    @Bean
+    public Consumer<Message<byte[]>> consumeProjectionRequests() {
+        return message -> {
+            ProjectReservation request;
+            try {
+                request = reader.mapper().readValue(message.getPayload(), ProjectReservation.class);
+            } catch (IOException e) {
+                log.error("Unreadable projection request, dropped: {}", new String(message.getPayload()), e);
+                return;
+            }
+            if (request.hotelCode() == null || request.locator() == null || request.origin() == null) {
+                log.error("Incomplete projection request, dropped: {}", request);
+                return;
+            }
+            router.project(request.hotelCode(), request.locator(), request.origin());
         };
     }
 

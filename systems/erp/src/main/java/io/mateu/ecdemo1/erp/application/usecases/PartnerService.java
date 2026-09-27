@@ -2,7 +2,9 @@ package io.mateu.ecdemo1.erp.application.usecases;
 
 import io.mateu.ecdemo1.erp.application.out.PartnerRepository;
 import io.mateu.ecdemo1.erp.domain.partner.Partner;
+import io.mateu.ecdemo1.erp.domain.partner.BillingMode;
 import io.mateu.ecdemo1.erp.domain.partner.PartnerDetails;
+import io.mateu.ecdemo1.erp.domain.partner.PartnerType;
 import io.mateu.ecdemo1.erp.domain.partner.PmsProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -59,6 +61,31 @@ public class PartnerService {
     public void resync(String code) {
         var partner = locked(code);
         partner.announce(clock.instant());
+        repository.save(partner);
+    }
+
+    /**
+     * A partner as the PMS has it, brought in: created if the master does not have it — who pays is the
+     * guest, at the desk, until someone here says otherwise — or its name and type brought up to date,
+     * keeping what only the master knows (tax id, address, contact, billing). Then which PMS profile it
+     * is, so that it is never created there again. Brought in twice, the second time changes nothing.
+     */
+    @Transactional
+    public void importFromPms(String code, PartnerType type, String name, PmsProfile profile) {
+        var existing = repository.findByCodeForUpdate(code);
+        Partner partner;
+        if (existing.isEmpty()) {
+            partner = Partner.create(code, new PartnerDetails(type, name, null, null, null, null, BillingMode.Front),
+                    clock.instant());
+        } else {
+            partner = existing.get();
+            var d = partner.getDetails();
+            if (d.type() != type || !d.name().equals(name)) {
+                partner.update(new PartnerDetails(type, name, d.taxId(), d.address(), d.email(), d.phone(), d.billingMode()),
+                        clock.instant());
+            }
+        }
+        partner.recordPmsProfile(profile, clock.instant());
         repository.save(partner);
     }
 

@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.mapping.config;
 
+import io.mateu.ecdemo1.integration.model.command.MappingCommand;
+import io.mateu.ecdemo1.mapping.commands.MappingCommands;
 import io.mateu.ecdemo1.mapping.worker.TaskHandlers;
 import io.mateu.workflow.ddd.DomainEvent;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
@@ -9,13 +11,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.Message;
+
+import java.io.IOException;
+import java.util.NoSuchElementException;
 
 import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The engine's tasks for the mapping, handled on the consumer thread: a reply the broker will not
- * take leaves the offset uncommitted and the task is redelivered — every step is idempotent.
+ * What the mapping consumes: the engine's tasks, and the commands other services send it. Both on
+ * the consumer thread: a failure leaves the offset uncommitted and the message is redelivered — every
+ * step is idempotent, and every command is taken once (its inbox).
  */
 @Configuration
 @RequiredArgsConstructor
@@ -24,6 +31,31 @@ public class StreamFunctions {
 
     final TaskHandlers tasks;
     final StreamBridge streamBridge;
+    final MappingCommands commands;
+    final TolerantReader reader;
+
+    /**
+     * The commands other services send the mapping ({@code mapping-commands}). One that cannot be
+     * read, or that the mapping refuses — an equivalence it will not take — is logged and dropped:
+     * repeating it would be refused again. Anything else (the database away) is retried.
+     */
+    @Bean
+    public Consumer<Message<byte[]>> consumeMappingCommands() {
+        return message -> {
+            MappingCommand command;
+            try {
+                command = reader.mapper().readValue(message.getPayload(), MappingCommand.class);
+            } catch (IOException e) {
+                log.error("Unreadable mapping command, dropped: {}", new String(message.getPayload()), e);
+                return;
+            }
+            try {
+                commands.handle(command);
+            } catch (IllegalArgumentException | IllegalStateException | NoSuchElementException e) {
+                log.error("Mapping command refused, dropped: {} — {}", command, e.getMessage());
+            }
+        };
+    }
 
     /**
      * The engine's tasks for the mapping. A step that throws is answered as an error, which the

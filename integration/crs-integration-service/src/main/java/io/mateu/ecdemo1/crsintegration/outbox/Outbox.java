@@ -12,9 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 
 /**
- * Messages that leave only if the transaction that produced them commits — here, always the same
- * transaction that recorded the event they answer in the inbox. So an event is either handled and
- * its consequence on its way, or neither.
+ * Messages that leave only if the transaction that produced them commits — the same transaction that
+ * recorded the event they answer in the inbox, or that a step of the engine did its work in. So an
+ * event is either handled and its consequence on its way, or neither. The commands to the systems
+ * this adapter fronts go here too: none is sent over HTTP.
  */
 @Component
 @RequiredArgsConstructor
@@ -22,6 +23,8 @@ public class Outbox {
 
     public static final String INTEGRATION_EVENTS = "integrationEvents";
     public static final String ENGINE = "outboxUpstream";
+    public static final String BOOKING_COMMANDS = "bookingCommands";
+    public static final String PARTNER_COMMANDS = "partnerCommands";
 
     final OutboxMessageRepository repository;
     final ObjectMapper objectMapper;
@@ -36,6 +39,18 @@ public class Outbox {
     @Transactional(propagation = Propagation.MANDATORY)
     public void appendToEngine(DomainEvent event) {
         write(ENGINE, event.partitionKey(), event.getClass().getSimpleName(), serialise(DomainEvent.class, event));
+    }
+
+    /** A command for the CRS. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendToCrs(io.mateu.ecdemo1.crsintegration.commands.SystemCommands.AnnotatePmsReference command) {
+        write(BOOKING_COMMANDS, command.key(), command.type(), serialise(command.getClass(), command));
+    }
+
+    /** A command for the master of partners. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendToPartners(io.mateu.ecdemo1.crsintegration.commands.SystemCommands.RecordPmsProfile command) {
+        write(PARTNER_COMMANDS, command.key(), command.type(), serialise(command.getClass(), command));
     }
 
     private String serialise(Class<?> as, Object event) {

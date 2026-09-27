@@ -7,8 +7,6 @@ import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
 import io.mateu.ecdemo1.integrations.backfill.Backfill;
 import io.mateu.ecdemo1.integrations.lifecycle.Gates;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
-import io.mateu.ecdemo1.integrations.outbox.RemoteCall;
-import io.mateu.ecdemo1.integrations.outbox.RemoteCalls;
 import io.mateu.ecdemo1.integrations.store.BackfillRun;
 import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
 import io.mateu.ecdemo1.integrations.store.IntegrationRepository;
@@ -66,9 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "integrations.opera.gateway-url=https://ohip.example", "integrations.opera.app-key=chain-app",
         "integrations.opera.client-id=chain-client", "integrations.opera.client-secret=ch41n",
         "integrations.opera.enterprise-id=RIUE",
-        "integrations.backfill-per-tick=2", "integrations.activation-window-days=10",
-        // The remote-call relay off too: the test sends what is due itself.
-        "integrations.remote-calls.interval=1h"})
+        "integrations.backfill-per-tick=2", "integrations.activation-window-days=10"})
 @AutoConfigureMockMvc
 @Testcontainers
 class IntegrationsTest {
@@ -199,8 +195,6 @@ class IntegrationsTest {
     @Autowired
     JdbcTemplate jdbc;
     @Autowired
-    RemoteCalls remoteCalls;
-    @Autowired
     MockMvc mvc;
     @Autowired
     ObjectMapper objectMapper;
@@ -209,7 +203,7 @@ class IntegrationsTest {
     void reset() {
         runs.deleteAll();
         integrations.deleteAll();
-        jdbc.update("delete from remote_call");
+        jdbc.update("delete from outbox_message");
         calls.clear();
         mappingDown = false;
         connectorDown = false;
@@ -235,8 +229,9 @@ class IntegrationsTest {
 
         // Connectivity: verified, and the hotel's own equivalence entered for it.
         lifecycle.stepVerifyConnectivity(id);
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /entries/definitions") && c.contains("\"sourceCode\":\"NEW01\"")
+        assertThat(commands("mappingCommands")).anyMatch(c -> c.contains("\"define-equivalence\"") && c.contains("\"sourceCode\":\"NEW01\"")
                 && c.contains("\"targetCode\":\"RIUNEW\""));
+        assertThat(calls).noneMatch(c -> c.contains("/entries/definitions"));
         assertGateSignalled(id, "integration-connectivity-ok");
 
         // The catalogues: the property is configured, codes are pending.
@@ -249,7 +244,7 @@ class IntegrationsTest {
 
         // The mapping: the agent is asked, and the gate opens once nothing is pending.
         lifecycle.stepRequestMapping(id);
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /agent-proposals?hotelCode=NEW01"));
+        assertThat(commands("mappingCommands")).anyMatch(c -> c.contains("\"request-agent-proposal\"") && c.contains("\"hotelCode\":\"NEW01\""));
         assertThat(lifecycle.gateOpen(integrations.findById(id).orElseThrow())).isFalse();
         pendingCodes = 0;
         lifecycle.recheck(id, "test");
@@ -257,7 +252,7 @@ class IntegrationsTest {
 
         // The partners of the hotel's reservations: announced again until they are PMS profiles.
         lifecycle.stepSyncPartners(id);
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /partners/NORDTRAVEL/resync"));
+        assertThat(commands("partnerCommands")).anyMatch(c -> c.contains("\"resync-partner\"") && c.contains("\"partnerCode\":\"NORDTRAVEL\""));
         assertThat(integrations.findById(id).orElseThrow().partnersMissing).containsExactly("NORDTRAVEL");
         nordtravelIsAProfile = true;
         lifecycle.recheck(id, "test");
@@ -282,9 +277,10 @@ class IntegrationsTest {
         backfill.tick();
         assertGateSignalled(id, "integration-window-covered");
         backfill.tick();
-        assertThat(calls.stream().filter(c -> c.startsWith("POST /projections")).map(c -> c.replaceAll(".*\"locator\":\"(R\\d)\".*", "$1")))
+        assertThat(commands("projectionRequests").stream().map(c -> c.replaceAll(".*\"locator\":\"(R\\d)\".*", "$1")))
                 .containsExactly("R1", "R2", "R3", "R4", "R5");
-        assertThat(calls).filteredOn(c -> c.startsWith("POST /projections")).allMatch(c -> c.contains("\"origin\":\"backfill:"));
+        assertThat(commands("projectionRequests")).allMatch(c -> c.contains("\"origin\":\"backfill:"));
+        assertThat(consume("projection-requests", rec -> rec.value().contains("\"locator\":\"R5\""), 1, 15)).isNotEmpty();
         assertThat(runs.findAll()).singleElement().satisfies(r -> {
             assertThat(r.status).isEqualTo(BackfillRun.Status.COMPLETED);
             assertThat(r.dispatched).isEqualTo(5);
@@ -299,16 +295,19 @@ class IntegrationsTest {
         assertGateSignalled(id, "integration-activation-requested");
         lifecycle.stepActivate(id);
         assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.ACTIVE);
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01"));
+        assertThat(commands("mappingCommands")).anyMatch(c -> c.contains("\"resolve-cause-if-open\"")
+                && c.contains("\"causeKey\":\"INTEGRATION_INACTIVE:NEW01\""));
+        assertThat(consume("mapping-commands", rec -> rec.value().contains("INTEGRATION_INACTIVE:NEW01"), 1, 15)).isNotEmpty();
         mvc.perform(get("/integrations/hotels/NEW01")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE")).andExpect(jsonPath("$.pmsHotelCode").value("RIUNEW"));
 
         // Paused, its traffic waits; resumed, what waited goes on.
         lifecycle.pause(id, "ana");
         assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.PAUSED);
-        calls.clear();
+        jdbc.update("delete from outbox_message");
         lifecycle.resume(id, "ana");
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01"));
+        assertThat(commands("mappingCommands")).anyMatch(c -> c.contains("\"resolve-cause-if-open\"")
+                && c.contains("\"causeKey\":\"INTEGRATION_INACTIVE:NEW01\"") && c.contains("\"by\":\"ana\""));
     }
 
     @Test
@@ -412,28 +411,22 @@ class IntegrationsTest {
         var i = lifecycle.importPartners(id, "ana");
 
         // The type equivalences come with the import: certain, since the partners came from Opera.
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /entries/definitions") && c.contains("\"PARTNER_TYPE\"")
+        assertThat(commands("mappingCommands")).anyMatch(c -> c.contains("\"PARTNER_TYPE\"")
                 && c.contains("\"sourceCode\":\"TRAVEL_AGENT\"") && c.contains("\"targetCode\":\"Agent\""));
-        // New to the ERP: created with Opera's name and type; who pays is the guest until the ERP says otherwise.
-        assertThat(calls).anyMatch(c -> c.startsWith("POST /partners ") && c.contains("\"code\":\"05100908\"")
-                && c.contains("\"name\":\"ABREU ONLINE PORTUGAL\"") && c.contains("\"type\":\"TravelAgent\"")
-                && c.contains("\"billingMode\":\"Front\""));
-        // Known to the ERP: Opera's name and type, and what only the ERP knew kept.
-        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partners/NORDTRAVEL") && c.contains("\"type\":\"Company\"")
-                && c.contains("\"name\":\"Nordtravel AB\"") && c.contains("\"billingMode\":\"NoFront\"")
-                && c.contains("\"taxId\":\"SE556677\""));
-        // The ERP records which Opera profile each one is, so it is not created there again...
-        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partners/05100908/pms-profile") && c.contains("\"profileId\":\"16120675\"")
-                && c.contains("\"profileType\":\"Agent\""));
-        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partners/NORDTRAVEL/pms-profile") && c.contains("\"profileId\":\"16120699\""));
+        // To the ERP, as commands: each partner with Opera's name and type and the Opera profile it is —
+        // the ERP creates or updates it, keeping what only it knows.
+        assertThat(commands("partnerCommands")).anyMatch(c -> c.contains("\"import-partner\"") && c.contains("\"partnerCode\":\"05100908\"")
+                && c.contains("\"name\":\"ABREU ONLINE PORTUGAL\"") && c.contains("\"partnerType\":\"TravelAgent\"")
+                && c.contains("\"pmsProfileId\":\"16120675\"") && c.contains("\"profileType\":\"Agent\""));
+        assertThat(commands("partnerCommands")).anyMatch(c -> c.contains("\"partnerCode\":\"NORDTRAVEL\"")
+                && c.contains("\"partnerType\":\"Company\"") && c.contains("\"name\":\"Nordtravel AB\""));
         // ...and the mapping learns it too.
-        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partner-profiles/05100908") && c.contains("\"pmsProfileId\":\"16120675\"")
-                && c.contains("\"profileType\":\"Agent\""));
-        assertThat(calls).anyMatch(c -> c.startsWith("PUT /partner-profiles/NORDTRAVEL") && c.contains("\"pmsProfileId\":\"16120699\""));
-        // Nothing asked of the connector but the list: no partner is projected to Opera.
-        assertThat(calls).noneMatch(c -> c.contains("/resync") || c.contains("/crm/"));
+        assertThat(commands("mappingCommands")).anyMatch(c -> c.contains("\"record-partner-profile\"")
+                && c.contains("\"partnerCode\":\"05100908\"") && c.contains("\"pmsProfileId\":\"16120675\""));
+        // Nothing is written anywhere over HTTP: the import only reads.
+        assertThat(calls).allMatch(c -> c.startsWith("GET "));
         // A code on two profiles is nobody in particular: left out, and said.
-        assertThat(calls).noneMatch(c -> c.contains("12345678"));
+        assertThat(commands("partnerCommands")).noneMatch(c -> c.contains("12345678"));
         assertThat(i.history).anyMatch(h -> h.what().contains("1 new, 1 updated, 0 unchanged")
                 && h.what().contains("left out, on more than one Opera profile: 12345678"));
     }
@@ -474,44 +467,12 @@ class IntegrationsTest {
         var after = integrations.findById(id).orElseThrow();
         assertThat(after.gate).isEqualTo(before.gate);
         assertThat(after.history).hasSameSizeAs(before.history);
-        assertThat(calls).noneMatch(c -> c.startsWith("POST /agent-proposals"));
-        assertThat(remoteCalls.pending()).isEmpty();
-        assertThat(jdbc.queryForObject("select count(*) from remote_call where kind = 'RequestAgentProposal'", Integer.class)).isZero();
+        assertThat(commands("mappingCommands")).noneMatch(c -> c.contains("request-agent-proposal"));
 
         // Tried again — as the engine retries a step — it is saved, and the agent asked once.
         lifecycle.stepRequestMapping(id);
         assertThat(integrations.findById(id).orElseThrow().gate).isEqualTo("integration-mapping-approved");
-        assertThat(calls).filteredOn(c -> c.startsWith("POST /agent-proposals?hotelCode=NEW01")).hasSize(1);
-        assertThat(remoteCalls.pending()).isEmpty();
-    }
-
-    @Test
-    void aServiceThatDoesNotAnswerDoesNotUndoTheDecisionAndIsAskedAgainUntilItDoes() {
-        var id = register();
-        jdbc.update("update integration set status = 'PAUSED' where id = ?", id);
-        mappingDown = true;
-
-        var resumed = lifecycle.resume(id, "ana");
-
-        // Resumed and saved, though the mapping did not take the cause's resolution: that waits in the outbox.
-        assertThat(resumed.getStatus()).isEqualTo(IntegrationStatus.ACTIVE);
-        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.ACTIVE);
-        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01")).hasSize(1);
-        assertThat(remoteCalls.pending()).containsExactly(new RemoteCall.ResolveCause("INTEGRATION_INACTIVE:NEW01", "ana"));
-        assertThat(jdbc.queryForObject("select last_error from remote_call", String.class)).isNotBlank();
-
-        // Not before its backoff...
-        remoteCalls.relay();
-        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open")).hasSize(1);
-
-        // ...and once it is due and the mapping answers, it is sent, and done.
-        mappingDown = false;
-        jdbc.update("update remote_call set next_attempt_at = now() - interval '1 second'");
-        remoteCalls.relay();
-        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01")).hasSize(2);
-        assertThat(remoteCalls.pending()).isEmpty();
-        remoteCalls.relay();
-        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open")).hasSize(2);
+        assertThat(commands("mappingCommands")).filteredOn(c -> c.contains("request-agent-proposal")).hasSize(1);
     }
 
     @Test
@@ -528,7 +489,7 @@ class IntegrationsTest {
         assertThat(after.gate).isNull();
         assertThat(after.connectivityOk).isNull();
         assertThat(after.history).hasSameSizeAs(before.history);
-        assertThat(remoteCalls.pending()).isEmpty();
+        assertThat(commands("mappingCommands")).isEmpty();
     }
 
     @Test
@@ -550,6 +511,7 @@ class IntegrationsTest {
         assertThat(decommissioned.gate).isNull();
         assertThat(decommissioned.getStatus()).isEqualTo(IntegrationStatus.DECOMMISSIONED);
         assertThat(calls).isEmpty();
+        assertThat(commands("mappingCommands")).isEmpty();
     }
 
     void assertGateSignalled(String id, String gate) {
@@ -559,6 +521,11 @@ class IntegrationsTest {
         gates.look();
         assertThat(consume("upstream", r -> r.value().contains("\"messageName\":\"" + gate + "\"")
                 && r.value().contains(integration.processKey), 1, 15)).isNotEmpty();
+    }
+
+    /** The commands the outbox holds for a binding, oldest first — published or not. */
+    List<String> commands(String binding) {
+        return jdbc.queryForList("select payload from outbox_message where binding = ? order by seq", String.class, binding);
     }
 
     JsonNode json(String value) {
