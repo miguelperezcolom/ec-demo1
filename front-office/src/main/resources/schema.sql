@@ -152,3 +152,16 @@ create table if not exists guest_kardex (
 -- The change field by field (JSON) and why the master rejected it, if it said.
 alter table guest_kardex add column if not exists fields varchar(2000);
 alter table guest_kardex add column if not exists reason varchar(500);
+
+-- The stays the desk opened for guests with no reservation, and the CRS booking each became.
+create table if not exists walk_in (
+    stay_id            varchar(64)   primary key,
+    request            varchar(4000) not null,
+    expected_total     decimal(12, 2),
+    status             varchar(20)   not null,
+    locator            varchar(64),
+    pms_reservation_id varchar(64),
+    message            varchar(500),
+    created_at         timestamp     not null,
+    booked_at          timestamp
+);

@@ -77,6 +77,22 @@ public class CrsSource {
         return booking.get().uri("/catalog").retrieve().body(CatalogView.class);
     }
 
+    /** What the CRS would charge for a booking, priced now and kept nowhere. The CRS's answer, as it gives it. */
+    public Map<?, ?> quote(String hotelCode, Map<String, Object> booking) {
+        return this.booking.post().uri("/bookings/quote").body(Map.of("hotelCode", hotelCode, "booking", booking))
+                .retrieve().body(Map.class);
+    }
+
+    /** Makes the booking; its id. The CRS refuses it (409) if it no longer costs {@code expectedTotal}. */
+    public String create(String hotelCode, Map<String, Object> booking, java.math.BigDecimal expectedTotal) {
+        var body = new java.util.HashMap<String, Object>();
+        body.put("hotelCode", hotelCode);
+        body.put("booking", booking);
+        body.put("expectedTotal", expectedTotal);
+        var created = this.booking.post().uri("/bookings").body(body).retrieve().body(Map.class);
+        return created == null ? null : String.valueOf(created.get("id"));
+    }
+
     /** Which profile the partner is in the PMS, recorded in the master: it is not created there again. */
     public void annotatePartnerProfile(String partnerCode, String pmsProfileId, String profileType) {
         partners.put().uri("/partners/{code}/pms-profile", partnerCode)

@@ -27,9 +27,12 @@ public final class GuestHeaders {
     var view = FrontOffice.stayView(stayId);
     var stay = view.stay();
     var guest = view.guest();
+    var badges = new ArrayList<Chip>();
+    badges.add(Tiers.chip(guest.tier()));
+    walkIn(stay).ifPresent(badges::add);
     return EntityHeader.builder()
         .title(guest.name())
-        .badges(List.of(Tiers.chip(guest.tier())))
+        .badges(badges)
         .subtitle(staySubtitle(stay))
         .facts(
             List.of(
@@ -72,6 +75,7 @@ public final class GuestHeaders {
     if (stay.vipNote() != null) {
       badges.add(Chip.builder().label(stay.vipNote()).color("warning").build());
     }
+    walkIn(stay).ifPresent(badges::add);
     return EntityHeader.builder()
         .title(guest.name())
         .badges(badges)
@@ -90,6 +94,21 @@ public final class GuestHeaders {
         .metricCaption(guest.stays() + " estancias")
         .style("width: 100%;")
         .build();
+  }
+
+  /**
+   * A walk-in's standing with the CRS: pending while the CRS has not booked it, its locator (and
+   * Opera's) once it has, and why not if it refused it.
+   */
+  public static java.util.Optional<Chip> walkIn(Stay stay) {
+    return io.mateu.ecdemo1.frontoffice.infra.crs.WalkInDesk.of(stay.id()).map(w -> Chip.builder()
+        .label(w.label())
+        .color(switch (w.status()) {
+          case PENDING -> "warning";
+          case BOOKED -> "success";
+          case REFUSED -> "error";
+        })
+        .build());
   }
 
   /** "Ocean Suite · 15 Jul → 22 Jul · 7N · 2pax · All Inclusive" */
@@ -145,7 +164,8 @@ public final class GuestHeaders {
     var segs = route.replaceFirst("^/", "").split("/");
     for (int i = 0; i < segs.length; i++) {
       if (mount.equals(segs[i])) {
-        return i + 1 < segs.length && !segs[i + 1].isBlank() ? segs[i + 1] : null;
+        return i + 1 < segs.length && !segs[i + 1].isBlank()
+            ? io.mateu.ecdemo1.frontoffice.infra.crs.WalkInDesk.stayIdFor(segs[i + 1]) : null;
       }
     }
     return segs.length > 0 && !segs[0].isBlank() ? segs[0] : null;

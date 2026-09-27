@@ -33,6 +33,12 @@ public class BookingDBRepository implements BookingRepository {
         return repository.findByIdForUpdate(id.id()).map(BookingMapper::toDomain);
     }
 
+    @Override
+    public Optional<BookingId> findByChannelReference(String hotelCode, String channelCode, String externalReference) {
+        return repository.findFirstByHotelCodeAndChannelCodeAndExternalReference(hotelCode, channelCode, externalReference)
+                .map(entity -> new BookingId(entity.getId()));
+    }
+
     /**
      * Writes the booking and, in the same transaction, the events it recorded to the outbox.
      *

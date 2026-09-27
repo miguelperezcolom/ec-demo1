@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.booking.application.usecases.booking;
 
+import io.mateu.ecdemo1.booking.application.usecases.booking.quote.Quote;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookedRoom;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingTerms;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.Stay;
@@ -41,6 +42,40 @@ public class BookingTermsFactory {
                         .mapToObj(i -> room(hotelCode, i + 1, rooms.get(i), stay))
                         .toList(),
                 blankToNull(request.comments()));
+    }
+
+    /**
+     * The price the terms would have, room by room, without the holder a booking needs: each code
+     * checked and each night priced as {@link #terms} does it, so a booking made from the quote costs
+     * what it said. A room its people do not fit in is refused here.
+     */
+    public Quote quote(CrsCatalog.Hotel hotel, BookingRequest request) {
+        var channel = catalog.channel(hotel.code(), request.channelCode());
+        if (channel.requiresPartner() && blankToNull(request.partnerCode()) == null) {
+            throw new IllegalArgumentException(
+                    "Channel %s sells through a partner: the booking needs a partner code".formatted(channel.code()));
+        }
+        var stay = new Stay(request.arrival(), request.departure());
+        var requested = request.rooms() == null ? List.<RoomRequest>of() : request.rooms();
+        if (requested.isEmpty()) {
+            throw new IllegalArgumentException("A booking needs at least one room");
+        }
+        var rooms = IntStream.range(0, requested.size()).mapToObj(i -> {
+            var r = requested.get(i);
+            var roomType = catalog.roomType(hotel.code(), r.roomTypeCode());
+            var people = r.adults() + (r.childrenAges() == null ? 0 : r.childrenAges().size());
+            if (people > roomType.maxOccupancy()) {
+                throw new IllegalArgumentException("Room %d: %s takes at most %d people, not %d"
+                        .formatted(i + 1, roomType.name(), roomType.maxOccupancy(), people));
+            }
+            var booked = room(hotel.code(), i + 1, r, stay);
+            return new Quote.QuotedRoom(booked.line(), roomType.code(), roomType.name(),
+                    booked.ratePlanCode(), catalog.ratePlan(hotel.code(), booked.ratePlanCode()).name(),
+                    booked.boardCode(), catalog.board(hotel.code(), booked.boardCode()).name(),
+                    booked.adults(), booked.childrenAges(), booked.nightlyRates(), booked.total());
+        }).toList();
+        return new Quote(hotel.code(), hotel.currency(), channel.code(), stay.arrival(), stay.departure(), stay.nights(),
+                rooms, rooms.stream().map(Quote.QuotedRoom::total).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
     }
 
     private BookedRoom room(String hotelCode, int line, RoomRequest request, Stay stay) {

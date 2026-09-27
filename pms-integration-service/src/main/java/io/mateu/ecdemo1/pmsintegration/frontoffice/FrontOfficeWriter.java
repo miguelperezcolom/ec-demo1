@@ -160,6 +160,11 @@ public class FrontOfficeWriter {
         body.put("pax", pax);
         body.put("agency", agency);
         body.put("total", r.totalAmount());
+        // A walk-in the front office made carries its own reference as the booking's: it is how the
+        // front office finds the stay it already has, instead of opening another. And where Opera has
+        // it, when Opera was written first, so the desk can find it there.
+        body.put("externalReference", r.externalReference());
+        body.put("pmsReservationId", optionalVar(task, ProcessVariables.PMS_RESERVATION_ID));
         var written = frontOffice.put().uri("/api/reservations/{locator}", r.locator()).body(body).retrieve()
                 .body(Map.class);
         log.info("{} written into the front office: stay {}", r.locator(), written == null ? "?" : written.get("status"));
@@ -274,6 +279,11 @@ public class FrontOfficeWriter {
             catalogues.put(pmsHotel, cached);
         }
         return cached.descriptions();
+    }
+
+    static String optionalVar(TaskExecutionRequested task, String name) {
+        return task.variables().stream().filter(v -> name.equals(v.name())).map(Variable::value)
+                .filter(v -> v != null && !v.isBlank()).findFirst().orElse(null);
     }
 
     static String var(TaskExecutionRequested task, String name) {
