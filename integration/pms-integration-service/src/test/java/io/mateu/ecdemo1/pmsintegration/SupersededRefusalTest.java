@@ -14,6 +14,7 @@ import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.ohip.OperaReservations;
 import io.mateu.ecdemo1.pmsintegration.worker.ReservationLocks;
 import io.mateu.ecdemo1.pmsintegration.worker.TaskHandlers;
+import io.mateu.ecdemo1.pmsintegration.frontoffice.PmsEvents;
 import io.mateu.ecdemo1.pmsintegration.write.ReservationPayload;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
@@ -50,12 +51,13 @@ class SupersededRefusalTest {
     IntegrationClients integration = mock(IntegrationClients.class);
     OperaReservations reservations = mock(OperaReservations.class);
     ReservationPayload payload = mock(ReservationPayload.class);
+    PmsEvents events = mock(PmsEvents.class);
     TaskHandlers handlers;
 
     @BeforeEach
     void setUp() {
         var ohip = new OhipProperties("ECDEMO1", "UDFN01", "CASH", Duration.ofSeconds(2), "", false, false, null, null);
-        handlers = new TaskHandlers(integration, null, reservations, payload, null, new ReservationLocks(), null, ohip, null);
+        handlers = new TaskHandlers(integration, null, reservations, payload, null, new ReservationLocks(), null, ohip, null, events);
         when(integration.resolve(eq("MRU01"), any())).thenReturn(new IntegrationClients.Resolved(
                 List.of(new Translation(CodeType.HOTEL, "MRU01", "XMAR", Map.of())), List.of()));
         when(payload.build(any(), any(), anyString(), any(), any(), any(), any()))
@@ -92,6 +94,8 @@ class SupersededRefusalTest {
         verify(reservations).update(eq("XMAR"), any(), any());
         verify(integration).resolveCauseIfOpen(UPSERT_REFUSAL, "pms-integration: v3 is in Opera");
         verify(integration).resolveCauseIfOpen(PROFILE_REFUSAL, "pms-integration: v3 is in Opera");
+        // Whoever consumes the PMS — the front office's integration — is told, to read it from Opera.
+        verify(events).written(eq("XMAR"), any(), eq("MRU01"), eq("ZMPBEY"), eq("proyectar-reserva"));
     }
 
     @Test
@@ -105,6 +109,8 @@ class SupersededRefusalTest {
 
         verify(reservations, never()).update(any(), any(), any());
         verify(integration).resolveCauseIfOpen(UPSERT_REFUSAL, "pms-integration: v3 is in Opera");
+        // Opera had it already: it is read again all the same (a merge in the MDM projects the same version).
+        verify(events).written(eq("XMAR"), any(), eq("MRU01"), eq("ZMPBEY"), eq("proyectar-reserva"));
     }
 
     @Test

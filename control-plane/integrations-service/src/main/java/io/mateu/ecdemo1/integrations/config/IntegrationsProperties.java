@@ -26,12 +26,27 @@ import java.time.Duration;
  * @param backfillTick         how often a backfill projects its next batch
  * @param activationWindowDays how far ahead the backfill has to have reached for the integration to be
  *                             activated (HLA R25, «ventana próxima cubierta»)
+ * @param frontOfficeUrl       the hotel's front office, what a new pms-fo integration starts from: where
+ *                             the integration asks it what it holds (its commands go by Kafka)
+ * @param frontOffice          the pms-fo integrations' defaults and their polling of the PMS
  */
 @ConfigurationProperties("integrations")
 public record IntegrationsProperties(String crsIntegrationUrl, String pmsIntegrationUrl, String mappingUrl,
                                      String partnersUrl, String consoleUrl, String cryptoKey, Opera opera,
                                      Duration gateCheck, Duration recheck, int backfillPerTick, Duration backfillTick,
-                                     int activationWindowDays, Mapping mapping) {
+                                     int activationWindowDays, Mapping mapping, String frontOfficeUrl,
+                                     FrontOffice frontOffice) {
+
+    /**
+     * @param horizonDays how many days ahead a new pms-fo integration backfills and polls
+     * @param poll        how often every active pms-fo integration asks the PMS what changed
+     */
+    public record FrontOffice(Integer horizonDays, Duration poll) {
+        public FrontOffice {
+            if (horizonDays == null || horizonDays <= 0) horizonDays = 60;
+            if (poll == null) poll = Duration.ofSeconds(60);
+        }
+    }
 
     /**
      * @param askAgent whether the mapping gate asks the mapping agent for a proposal on its own (true),
@@ -51,6 +66,8 @@ public record IntegrationsProperties(String crsIntegrationUrl, String pmsIntegra
     public IntegrationsProperties {
         if (opera == null) opera = new Opera(null, null, null, null, null);
         if (mapping == null) mapping = new Mapping(true);
+        if (frontOfficeUrl == null || frontOfficeUrl.isBlank()) frontOfficeUrl = "http://localhost:8128";
+        if (frontOffice == null) frontOffice = new FrontOffice(null, null);
         if (consoleUrl == null) consoleUrl = "";
         if (gateCheck == null) gateCheck = Duration.ofSeconds(5);
         if (recheck == null) recheck = Duration.ofSeconds(30);

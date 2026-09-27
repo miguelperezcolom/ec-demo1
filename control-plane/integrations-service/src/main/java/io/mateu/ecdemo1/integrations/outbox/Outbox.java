@@ -34,6 +34,7 @@ public class Outbox {
     public static final String MAPPING_COMMANDS = "mappingCommands";
     public static final String PARTNER_COMMANDS = "partnerCommands";
     public static final String PROJECTIONS = "projectionRequests";
+    public static final String FRONT_OFFICE_COMMANDS = "frontOfficeCommands";
 
     final OutboxMessageRepository repository;
     final ObjectMapper objectMapper;
@@ -79,6 +80,13 @@ public class Outbox {
     @Transactional(propagation = Propagation.MANDATORY)
     public void appendProjection(ProjectReservation request) {
         write(PROJECTIONS, request.key(), "ProjectReservation", serialise(ProjectReservation.class, request));
+    }
+
+    /** A command for the hotel's front office: the PMS's catalogue, from the pms-fo integration. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendToFrontOffice(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand command) {
+        write(FRONT_OFFICE_COMMANDS, command.key(), command.getClass().getSimpleName(),
+                serialise(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.class, command));
     }
 
     private String serialise(Class<?> as, Object value) {

@@ -24,6 +24,26 @@ public class StreamFunctions {
 
     final TaskHandlers tasks;
     final StreamBridge streamBridge;
+    final io.mateu.ecdemo1.integrations.frontoffice.PmsReservationEvents pmsReservations;
+    final TolerantReader reader;
+
+    /**
+     * The connector wrote a reservation into the PMS ({@code pms-reservations}): the front office fed
+     * from that property takes it. One that cannot be read is logged and skipped: the polling brings it.
+     */
+    @Bean
+    public Consumer<org.springframework.messaging.Message<byte[]>> consumePmsReservations() {
+        return message -> {
+            io.mateu.ecdemo1.integration.model.pms.PmsReservationChanged event;
+            try {
+                event = reader.mapper().readValue(message.getPayload(), io.mateu.ecdemo1.integration.model.pms.PmsReservationChanged.class);
+            } catch (java.io.IOException e) {
+                log.error("Unreadable PMS reservation event, skipped: {}", new String(message.getPayload()), e);
+                return;
+            }
+            pmsReservations.on(event);
+        };
+    }
 
     /**
      * The engine's tasks for the integrations. A step that throws is answered as an error, which the

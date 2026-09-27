@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.integrations.ui;
 
+import io.mateu.ecdemo1.integrations.ui.pages.FrontOfficeIntegrationCrud;
 import io.mateu.ecdemo1.integrations.ui.pages.IntegrationCrud;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Menu;
@@ -12,6 +13,11 @@ public class IntegrationsMenu {
      * screen — a page with a link on it, which is not what anyone opening the menu wants.
      */
     @Menu
-    @Label("Integrations")
+    @Label("CRS → PMS")
     IntegrationCrud registry;
+
+    /** The hotels' front offices, fed from the PMS: the chain's second link (pms-fo). */
+    @Menu
+    @Label("PMS → Front office")
+    FrontOfficeIntegrationCrud frontoffice;
 }

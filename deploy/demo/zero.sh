@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Takes ec1 back to before anything was integrated, to walk the onboarding again step by step:
-#   - the services lose what the integration made: reservations, integrations, mappings, the MDM's
-#     customers, the front office's guests and stays, notifications, audit, the engine's processes;
+#   - the services lose what the integration made: reservations, integrations (crs-pms and pms-fo, with
+#     the pms-fo cursor), mappings, the MDM's customers, the front office's guests, stays and the PMS
+#     catalogue it was given, notifications, audit, the engine's processes;
 #   - what is set up, not integrated, stays: the ERP's partners, the front office's rooms and
 #     catalogs, the process definitions, content, users and Keycloak;
 #   - Salesforce loses every contact and the MDM's change-request Cases.
@@ -32,11 +33,11 @@ echo "Emptying what the integration made"
 wipe booking booking_entity crs_booking catalog_rate_plan outbox_message
 wipe partners outbox_message
 wipe crs_integration inbox_entry outbox_message
-wipe integrations integration backfill_run outbox_message
+wipe integrations integration backfill_run fo_integration fo_backfill_run outbox_message
 wipe mapping cause mapping_entry partner_profile waiter waiter_cause outbox_message
 wipe communication inbox_item inbox_seen notification resolution
 wipe customer_mdm customer customer_source customer_xref consolidation change_request outbox_message
-wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line
+wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line pms_catalogue pms_catalogue_sync command_inbox
 echo "update room set occupancy = 'FREE';" | psql_in front_office
 wipe audit audit_record
 wipe $ENGINE_DB $ENGINE_TABLES log_message_entity outbox_message_entity received_task sync_invocation

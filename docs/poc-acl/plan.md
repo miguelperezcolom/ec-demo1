@@ -126,7 +126,7 @@ ia-agent ── MCP de booking, partners, mapping-service, communication-service
 | `communication-service` | Nuevo | Envío de notificaciones: plantillas, destinatarios, canal email por el relay `postfix`, histórico | Sí | Sí |
 | `ec-definitions` | Cambia | Definiciones `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor` | — | — |
 | `ia-control-plane` | Configuración | Alta de los MCP nuevos y del agente de mapeado | — | — |
-| `front-office` | Nuevo (H13) | El front office del hotel (check-in, en casa, check-out, folios), traído de la demo de Mateu; recibe cada reserva que se graba en Opera como estancia por llegar, con el huésped por su código de cliente del MDM | Sí | No |
+| `front-office` | Nuevo (H13); cambia (H14) | El front office del hotel (check-in, en casa, check-out, folios), traído de la demo de Mateu. Desde H14 **consume el PMS**: la integración pms-fo le manda el catálogo de Opera y cada reserva tal como Opera la tiene (`front-office-commands`), y toma el kárdex del MDM directamente (`customers`) | Sí | No |
 | `customer-mdm-service` | Nuevo (H11) | Maestro de clientes: golden record, resolución de identidad, proyección a Salesforce, suscripción a `ClienteConsolidado__e`, supervivencia y propagación del código; metadatos de Salesforce en `salesforce/` | Sí | Sí |
 
 Los adaptadores (`crs-` y `pms-integration-service`) no tienen UI ni MCP, como en el HLA: traducen, y
@@ -218,6 +218,12 @@ no tienen operativa propia que enseñar.
   | 4xx determinista | Causa y suspensión |
   | Conflicto (la reserva ya existe) | Se lee y se actualiza |
 
+- **Para el front office** (H14, integración pms-fo), solo lecturas: la reserva entera por su id de
+  Opera (con sus paquetes), el catálogo de la propiedad tal como lo lee un front office (tipos de
+  habitación, tarifas con nombre, todos los paquetes, las habitaciones) y las reservas de una ventana
+  con su `lastModifyDateTime`. Tras grabar o cancelar publica `pms-reservations`; el paso
+  `project-stay` de «Proyectar estancia» relee la reserva, la pasa al modelo del front office y la
+  manda por `front-office-commands`.
 - **Pruebas** contra `opera-mock`, que reproduce las rutas y formatos de las especificaciones públicas de OHIP (`oracle/hospitality-api-docs`). No hay respuestas reales del tenant: no se le escribe nada.
 
 ### `communication-service`
@@ -251,8 +257,8 @@ no tienen operativa propia que enseñar.
 - **Eventos, no llamadas**: lo que el MDM decide de un cliente lo publica en el topic **`customers`**
   (por su outbox, con clave el cliente): `CustomerChanged` (golden record nuevo, o la decisión de un
   cambio propuesto) y `CustomersMerged` (fusión, con el superviviente). Cada evento lleva el golden
-  record y las reservas del cliente. El MDM no llama a nadie: **pms-integration** lleva el kárdex al
-  front office, y **crs-integration** proyecta de nuevo las reservas del cliente (origen
+  record y las reservas del cliente. El MDM no llama a nadie: el **front office** toma el kárdex
+  del topic (desde H14; antes lo relevaba pms-integration), y **crs-integration** proyecta de nuevo las reservas del cliente (origen
   `mdm-update-<cliente>-v<versión>` o `mdm-merge-<absorbido>`) en los hoteles con integración, para
   que Opera reescriba el perfil. Un sistema nuevo que necesite el cliente es un suscriptor más.
 - **Xref**: dónde se conoce al cliente fuera del MDM (contacto de Salesforce, huésped del front office,
@@ -265,6 +271,47 @@ no tienen operativa propia que enseñar.
   propio MDM (client credentials), activa los Flows y asigna el Permission Set.
 - UI (golden records, consolidaciones) y MCP de solo consulta.
 
+### La integración pms-fo (H14)
+
+La decisión (2026-09-27): cada dato viaja solo desde su maestro a sus consumidores, en cadena o por un
+hub. Las reservas van **CRS → PMS → front office**: no hay integración crs-fo. El front office
+consume el PMS.
+
+- **Qué es.** Una integración por propiedad de Opera y su front office (`FrontOfficeIntegration` en
+  `integrations-service`, con su máquina de estados y su proceso de alta `alta-integracion-fo`):
+  1. **Conexión**: Opera legible (token y la propiedad) y el front office responde.
+  2. **Catálogo**: el catálogo de la propiedad tal como lo lee un front office — tipos de habitación,
+     tarifas con su nombre, todos los paquetes (también los que no se venden sueltos, como el BKF de
+     XMAR, que llega dentro de una tarifa) y las habitaciones con su tipo — va al front office
+     (`replace-catalogue`). La puerta se abre cuando el front office dice que tiene ese mismo.
+  3. **Backfill**: las reservas de la ventana — en casa o con llegada dentro del horizonte
+     (`horizonDays`, 60 por defecto) —, una `proyectar-estancia` por reserva, a ritmo del backfill.
+  4. **Activación** por una persona: desde ahí fluyen los cambios.
+  Cada puerta que necesita a alguien deja su aviso en la bandeja, que se cierra al pasarla.
+- **Ámbito** (`scope`): `ALL`, todas las reservas de la propiedad (también las nacidas en Opera), o
+  `CHAIN`, solo las que escribió la integración de la cadena (Custom Reference `EC-DEMO1`).
+- **Cómo llega una reserva.** Lo que la integración crs-pms escribe en Opera lo avisa el conector
+  (`pms-reservations`) y la integración pms-fo, si está activa, arranca `proyectar-estancia`. Su paso
+  relee la reserva **de Opera** y la manda al front office con los códigos de Opera; el front office
+  la lee con el catálogo que tiene (el tipo de habitación, el régimen: «Pensión Desayuno Adulto», no
+  `BKF`). El cliente, del MDM: qué cliente es el perfil de Opera (su xref) y su golden record.
+- **Cómo se detecta un cambio hecho en Opera.** OHIP no tiene en la búsqueda de reservas un filtro
+  «modificadas desde» (probado en el tenant: los parámetros de ese tipo se ignoran), y los *business
+  events* son una cola que exige suscribir un sistema externo en la configuración de Opera — algo que
+  esta integración no toca. Lo que sí da la búsqueda es el `lastModifyDateTime` de cada reserva. Así
+  que la integración **sondea** (`FO_POLL`, 60 s): recorre las reservas de la ventana, 200 por página
+  (XMAR: unas mil en 90 días, cinco páginas), y proyecta las modificadas en o después de su **cursor**
+  (la última modificación ya proyectada), que avanza en la misma transacción que arranca los procesos.
+- **Idempotencia.** Cada proceso lleva como clave la reserva de Opera y su `lastModifyDateTime` (o el
+  id del evento): el motor no arranca dos veces la misma. El front office deduplica por `commandId`,
+  y ordena por la versión de Opera: una más antigua que la que tiene no se aplica; la misma se
+  reaplica (así llega un cambio del cliente que no tocó la reserva, como una fusión en el MDM).
+- **Qué casa con lo que ya había.** Una estancia se reconoce por la reserva de Opera; si no, por el
+  localizador del CRS (su referencia externa en el contexto de la ejecución); si no, por el walk-in
+  que abrió recepción. Una reserva nacida en Opera abre la estancia `OP-<confirmación>`.
+- **Lo que no llega de Opera.** Los acompañantes: Opera solo tiene al titular (el conector no escribe
+  acompañantes). Si Opera no manda ninguno, la estancia conserva los que tenía.
+
 ### Definiciones de proceso (`ec-definitions`)
 
 - **`proyectar-reserva`**
@@ -275,6 +322,11 @@ no tienen operativa propia que enseñar.
   3. Si no las hay: asegurar el perfil del huésped → grabar la reserva → anotar en el CRS.
 - **`proyectar-cancelacion`**: esperar a que la reserva esté proyectada → preparar el motivo →
   cancelar en Opera → anotar en el CRS.
+- **`proyectar-estancia`** (H14): releer de Opera la reserva y grabarla en el front office como
+  estancia. La arranca la integración pms-fo: por el evento `pms-reservations` (lo que la integración
+  escribe en Opera), por su sondeo (lo que cambia en Opera por otras vías) y por su backfill.
+- **`alta-integracion-fo`** (H14): el alta de la integración PMS → front office, por puertas:
+  conexión (Opera y front office), catálogo del PMS en el front office, backfill, activación.
 - **`proyectar-interlocutor`**: preparar → asegurar los perfiles → anotar la correspondencia →
   señal de reanudación para las reservas que esperaban ese interlocutor.
 - **Política de reintento en los pasos externos**: backoff acotado sin límite de intentos, con aviso
@@ -296,6 +348,7 @@ Una rama y un PR por hito.
 | H8 ✅ | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
 | H9 ✅ | Despliegue en el clúster, e2e y conclusiones (desplegado; [conclusiones](conclusions.md)) | Demo en `ec1.mateu.io`; conclusiones y coste cerrados |
 | H13 ✅ | El front office del hotel (`front-office`, traído de la demo de Mateu): cada reserva de MRU01 que se graba en Opera se graba también allí como estancia por llegar, y su cancelación la cancela; UI en `front.ec1.mateu.io` tras Keycloak | Una reserva de `ec1` está en XMAR y en el front office en 20 s |
+| H14 ✅ | La integración **pms-fo** (cadena CRS → PMS → front office): el front office se alimenta de lo que Opera tiene, no de lo que se le mandó; su propia integración en `integrations-service` (puertas, avisos, backfill, activación, sondeo de cambios); fuera los pasos `write-front-office` y `cancel-front-office` de las proyecciones | Una reserva de `ec1` llega a XMAR y de XMAR al front office con los nombres de Opera; un cambio en Opera llega por el sondeo |
 | H12 ✅ | El conector contra el tenant real (OHIP UAT, propiedad XMAR): diferencias con las specs corregidas en el conector y en el doble; interlocutores importados de Opera al ERP en vez de proyectados; en `ec1`, MRU01 integrado con XMAR | Una reserva de `ec1` llega a XMAR (13 s); falta en el tenant: cajero para depósitos e interfaces para referencias en perfiles |
 | H11 | `customer-mdm-service` con Salesforce (HLA CRM-MDM): identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación. En local contra la org real ✅; desplegado en `ec1` (0.17.x) ✅ | Una fusión hecha en Salesforce llega al perfil de Opera de las reservas del cliente absorbido |
 | H10 ✅ | `integrations-service`: la integración de cada hotel (conexión con Opera, secreto cifrado) y su alta por puertas como proceso `alta-integracion`; el tráfico de un hotel sin integración activa espera | El alta de un hotel lleva sus reservas a Opera por backfill y la activación libera lo retenido |

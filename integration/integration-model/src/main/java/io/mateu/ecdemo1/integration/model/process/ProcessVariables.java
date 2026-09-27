@@ -30,6 +30,8 @@ public final class ProcessVariables {
     /** The holder's customer code in the MDM, stamped on the guest profile; absent when the MDM did not answer. */
     public static final String CUSTOMER_ID = "customerId";
     public static final String PMS_RESERVATION_ID = "pmsReservationId";
+    /** The PMS property a process is about, when it is not a CRS hotel's: the pms-fo integration's. */
+    public static final String PMS_HOTEL_CODE = "pmsHotelCode";
     public static final String PMS_PROFILE_IDS = "pmsProfileIds";
     public static final String CAUSES = "causes";
 

@@ -18,6 +18,7 @@ import java.util.function.Function;
 public class TaskHandlers {
 
     final Integrations integrations;
+    final io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations frontOffices;
 
     public Optional<Function<TaskExecutionRequested, List<Variable>>> handler(TaskExecutionRequested task) {
         return Optional.ofNullable(switch (task.stepId()) {
@@ -29,6 +30,12 @@ public class TaskHandlers {
             case "start-backfill" -> step(integrations::stepStartBackfill);
             case "await-activation" -> step(integrations::stepAwaitActivation);
             case "activate" -> step(integrations::stepActivate);
+            // «alta-integracion-fo»: the front office fed from the PMS.
+            case "fo-verify-connectivity" -> step(frontOffices::stepVerifyConnectivity);
+            case "fo-sync-catalogue" -> step(frontOffices::stepSyncCatalogue);
+            case "fo-start-backfill" -> step(frontOffices::stepStartBackfill);
+            case "fo-await-activation" -> step(frontOffices::stepAwaitActivation);
+            case "fo-activate" -> step(frontOffices::stepActivate);
             default -> null;
         });
     }

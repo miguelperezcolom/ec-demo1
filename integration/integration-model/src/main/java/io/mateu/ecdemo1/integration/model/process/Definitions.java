@@ -12,6 +12,15 @@ public final class Definitions {
     /** The onboarding of a hotel's integration: gates from registration to activation (F010). */
     public static final String ONBOARD_INTEGRATION = "alta-integracion";
 
+    /**
+     * The onboarding of a hotel's pms-fo integration — its front office fed from the PMS: gates from
+     * registration to activation, as the crs-pms one but smaller (connection, catalogue, backfill,
+     * activation).
+     */
+    public static final String ONBOARD_FO_INTEGRATION = "alta-integracion-fo";
+    /** A PMS reservation, as the PMS holds it, into the hotel's front office as a stay. */
+    public static final String PROJECT_STAY = "proyectar-estancia";
+
     /** The message a waiting process is resumed with once its last cause is resolved. */
     public static final String CAUSES_RESOLVED_MESSAGE = "causes-resolved";
 
@@ -26,6 +35,12 @@ public final class Definitions {
     public static final String GATE_BACKFILL_CLEAR = "integration-backfill-clear";
     public static final String GATE_WINDOW = "integration-window-covered";
     public static final String GATE_ACTIVATION = "integration-activation-requested";
+
+    /** The gates of the pms-fo onboarding, each its own message as the crs-pms ones. */
+    public static final String GATE_FO_CONNECTIVITY = "fo-integration-connectivity-ok";
+    public static final String GATE_FO_CATALOGUE = "fo-integration-catalogue-synced";
+    public static final String GATE_FO_BACKFILL = "fo-integration-backfill-done";
+    public static final String GATE_FO_ACTIVATION = "fo-integration-activation-requested";
 
     private Definitions() {
     }

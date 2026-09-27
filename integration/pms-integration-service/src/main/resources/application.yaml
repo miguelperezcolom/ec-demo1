@@ -7,7 +7,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeTasks;consumeCustomerEvents
+      definition: consumeTasks
     stream:
       kafka:
         binder:
@@ -20,20 +20,21 @@ spring:
           notificationResolutions:
             producer:
               sync: true
+          frontOfficeCommands:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          pmsReservations:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
       bindings:
         # IN: the engine's tasks for this adapter — the steps whose definition says topic pms.
         consumeTasks-in-0:
           destination: pms-integration
           group: ec-demo1-pms-integration-worker
-        # IN: what the MDM says about a customer, for the front office's kardex. Retried until the
-        # front office takes it — what the MDM decided is not dropped because the desk was down.
-        consumeCustomerEvents-in-0:
-          destination: customers
-          group: ec-demo1-pms-integration-customers
-          consumer:
-            max-attempts: 1000
-            back-off-initial-interval: 1000
-            back-off-max-interval: 60000
         # OUT: replies to the engine, and the alarm when a write keeps failing.
         upstream:
           destination: upstream
@@ -41,6 +42,12 @@ spring:
           destination: notifications
         notificationResolutions:
           destination: notification-resolutions
+        # OUT: a reservation was written into Opera — for whoever consumes the PMS (the pms-fo integration).
+        pmsReservations:
+          destination: pms-reservations
+        # OUT: the stays of the hotel's front office, as Opera holds them («proyectar-estancia», pms-fo).
+        frontOfficeCommands:
+          destination: front-office-commands
 
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
@@ -73,9 +80,8 @@ pms-integration:
   mapping-url: ${MAPPING_URL:http://localhost:8122}
   integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
   customer-mdm-url: ${CUSTOMER_MDM_URL:http://localhost:8127}
-  # The hotel's front office: every reservation written into Opera for these CRS hotels, into it too.
-  front-office-url: ${FRONT_OFFICE_URL:}
-  front-office-hotels: ${FRONT_OFFICE_HOTELS:}
+  # Opera's cancellation codes that mean a no-show, for the front office's stays (pms-fo).
+  no-show-cancellation-codes: ${OPERA_NO_SHOW_CODES:NOSHOW}
   alert-after: ${RETRY_ALERT_AFTER:10m}
 
 management:

@@ -38,6 +38,8 @@ public class IntegrationController {
     final Integrations lifecycle;
     final IntegrationRepository integrations;
     final BackfillRunRepository runs;
+    final io.mateu.ecdemo1.integrations.store.FrontOfficeIntegrationRepository frontOffices;
+    final io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations frontOfficeLifecycle;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -133,6 +135,10 @@ public class IntegrationController {
     public OhipConnection connection(@PathVariable String pmsHotelCode) {
         return integrations.findFirstByPmsHotelCodeAndStatusNot(pmsHotelCode, IntegrationStatus.DECOMMISSIONED)
                 .map(lifecycle::connection)
+                // A property only a front office integration reads: the chain's connection, for that property.
+                .or(() -> frontOffices.findFirstByPmsHotelCodeAndStatusNot(pmsHotelCode,
+                                io.mateu.ecdemo1.integrations.store.FoIntegrationStatus.DECOMMISSIONED)
+                        .map(frontOfficeLifecycle::connection))
                 .orElseThrow(() -> new NoSuchElementException("No integration reaches Opera property " + pmsHotelCode));
     }
 

@@ -199,3 +199,34 @@ create table if not exists command_outbox (
     created_at   timestamp     not null,
     published_at timestamp
 );
+
+-- ── The PMS, through the pms-fo integration ─────────────────────────────────
+-- Which PMS reservation each stay is, and the PMS's last modification of it written here: the order
+-- guard (a later version is never overwritten by an earlier one). Kept outside the Stay aggregate's
+-- mapping, so the desk's saves never touch them.
+alter table stay add column if not exists pms_reservation_id varchar(64);
+alter table stay add column if not exists pms_version varchar(32);
+alter table stay add column if not exists rate_plan varchar(200);
+create index if not exists stay_pms_reservation on stay (pms_reservation_id);
+
+-- The PMS's catalogue of the property — room types, rate plans, packages, rooms — in its words: what
+-- the stays it sends are read with. Replaced whole each time the integration sends it.
+create table if not exists pms_catalogue (
+    pms_hotel   varchar(20)  not null,
+    type        varchar(20)  not null,
+    code        varchar(64)  not null,
+    description varchar(300),
+    extra       varchar(100),
+    primary key (pms_hotel, type, code)
+);
+create table if not exists pms_catalogue_sync (
+    pms_hotel  varchar(20) primary key,
+    command_id varchar(64) not null,
+    synced_at  timestamp   not null
+);
+
+-- The commands taken from other services (front-office-commands), by id: each is applied once.
+create table if not exists command_inbox (
+    command_id varchar(64) primary key,
+    taken_at   timestamp   not null
+);
