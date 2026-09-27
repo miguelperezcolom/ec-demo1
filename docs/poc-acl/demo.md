@@ -130,6 +130,19 @@ Al llegar a la puerta de mapeado, el alta pide al **agente de mapeado** una prop
 persona; aprobar reanuda de golpe todo lo que esperaba. Una equivalencia equivocada se corrige
 aprobando otra versión, y la que nunca debió existir se **retira**. Cada decisión queda en *Audit*.
 
+**El catálogo de MRU01 está importado del de XMAR**, para que el agente encuentre siempre su pareja:
+los 15 tipos de habitación de XMAR, 8 de sus tarifas (venta directa, OTA, turoperador), sus 4
+regímenes de verdad (de sus 26 paquetes: `NONE`, `BKF`, `FOOD`, `PENSTI`), 8 canales, 5 formas de pago
+y 5 motivos de cancelación — con **códigos y nombres propios del CRS** (`JS-SEA` «Junior suite con
+balcón y vista al mar» ↔ `SJMB`, `DIRECTA` ↔ `406484DIRXM` «DIRECTOS XMU A26», `TODO-INCLUIDO` ↔
+`PENSTI`…), así que empareja por significado, no por código. Los mercados no son del CRS: cada canal
+lleva el suyo como atributo. MRU01 vende solo con esos códigos; PMI01 y CUN01, con los de la cadena
+(`BAR`, `AD`, `CC`…). La pareja esperada de cada código está en
+[`deploy/demo/crs-catalog/MRU01-expected-pairs.md`](../../deploy/demo/crs-catalog/MRU01-expected-pairs.md);
+el catálogo se regenera con `python3 deploy/demo/crs-catalog/generate.py --live` (lee XMAR por el
+conector, que ahora trae el nombre de cada tarifa) y queda versionado en
+`booking/src/main/resources/crs-catalog/MRU01.json` — el CRS no llama a Opera al arrancar.
+
 ## 7. El backfill
 
 *Relaunch backfill* en la integración: proyecta todas las reservas futuras del hotel; las que Opera
@@ -139,7 +152,8 @@ retenidos.
 
 ## 8. Una reserva de punta a punta
 
-Una reserva nueva de MRU01 en *Call center* (o por el chat del agente, *«Crea 3 reservas en MRU01…»*):
+Una reserva nueva de MRU01 por su *Central de reservas* (canal `CALLCENTER`; o por el chat del agente,
+*«Crea 3 reservas en MRU01…»*, o con *Demo bookings* en la lista de reservas):
 
 - En Opera (XMAR): la reserva con los códigos traducidos, tarifa fija por noche, el perfil del
   huésped, el del interlocutor cuando lo hay, y la versión del CRS en el UDF.
@@ -295,7 +309,7 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 
 - [ ] **Recorrer el alta desde cero**, MRU01 → XMAR (en curso): conectividad, contraste, mapeados
       (incluida `NOS → NOSHOW`), interlocutores, backfill y activación. **Antes del alta, crear
-      reservas futuras de MRU01** en *Call center* (con algún interlocutor): el CRS está vacío, y sin
+      reservas futuras de MRU01** por `CALLCENTER` (con algún interlocutor): el CRS está vacío, y sin
       ellas el contraste, los interlocutores y el backfill no tienen nada que llevar. Mientras no haya
       integración se quedan en el CRS, sin proceso; el backfill las trae.
 - [ ] Con la primera reserva escrita, comprobar en Opera que acepta el contexto **`ECDEMO1`** en la

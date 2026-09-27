@@ -77,7 +77,7 @@ test('a new reservation of MRU01 reaches Opera and the front office', async ({ p
     const created = await api(API.booking, 'POST', '/bookings', { hotelCode: 'MRU01', booking: {
         channelCode: 'WEB', externalReference: RUN, arrival: day(arrival), departure: day(departure),
         holder: { firstName: 'Demo', lastName: RUN, email: `${RUN.toLowerCase()}@example.com`, nationality: 'ES' },
-        rooms: [{ roomTypeCode: 'JSU', ratePlanCode: 'BAR', boardCode: 'SA', adults: 2, childrenAges: [],
+        rooms: [{ roomTypeCode: 'JS-SEA', ratePlanCode: 'DIRECTA', boardCode: 'SOLO-ALOJAMIENTO', adults: 2, childrenAges: [],
                   guests: [{ firstName: 'Demo', lastName: RUN, type: 'Adult' }] }] } })
     locator = created.id
 

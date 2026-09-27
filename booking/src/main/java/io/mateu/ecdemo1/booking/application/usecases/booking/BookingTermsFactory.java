@@ -23,7 +23,7 @@ public class BookingTermsFactory {
     final RoomPricing pricing;
 
     public BookingTerms terms(String hotelCode, BookingRequest request) {
-        var channel = catalog.channel(request.channelCode());
+        var channel = catalog.channel(hotelCode, request.channelCode());
         var partnerCode = blankToNull(request.partnerCode());
         if (channel.requiresPartner() && partnerCode == null) {
             throw new IllegalArgumentException(
@@ -45,8 +45,8 @@ public class BookingTermsFactory {
 
     private BookedRoom room(String hotelCode, int line, RoomRequest request, Stay stay) {
         var roomType = catalog.roomType(hotelCode, request.roomTypeCode());
-        var ratePlan = catalog.ratePlan(request.ratePlanCode());
-        var board = catalog.board(request.boardCode());
+        var ratePlan = catalog.ratePlan(hotelCode, request.ratePlanCode());
+        var board = catalog.board(hotelCode, request.boardCode());
         var childrenAges = request.childrenAges() == null ? List.<Integer>of() : request.childrenAges();
         return new BookedRoom(line, roomType.code(), ratePlan.code(), board.code(), request.adults(),
                 childrenAges, request.guests(),

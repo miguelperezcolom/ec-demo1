@@ -25,8 +25,8 @@ import java.util.regex.Pattern;
  * guests and payments as the form holds them, turned into a request by {@link BookingRequests} — so
  * that creating them goes through the same validations, prices and events as a booking made by hand.
  *
- * <p>Only the catalog's codes are used: the hotel's own room types, and the rate plans, boards and
- * channels the catalog has. A channel that sells through a partner gets one of the partners given,
+ * <p>Only the catalog's codes are used: the hotel's room types, rate plans, boards and channels — MRU01's
+ * own, imported from its Opera property's (deploy/demo/crs-catalog). A channel that sells through a partner gets one of the partners given,
  * of a type that makes sense for it; with none to pick from, the booking is a direct one instead.
  *
  * <p>The same {@link Random} seed and the same day give the same bookings. The external references
@@ -46,7 +46,13 @@ final class DemoBookingGenerator {
     }
 
     /** The mix of a batch of ten; a batch of another size follows it in proportion. */
-    static final List<String> CHANNEL_MIX = List.of("WEB", "WEB", "WEB", "CC", "CC", "TTOO", "TTOO", "TTOO", "OTA", "OTA");
+    static final List<String> CHANNEL_MIX = List.of("WEB", "WEB", "WEB", "CALLCENTER", "CALLCENTER", "TTOO", "TTOO", "TTOO", "OTA", "OTA");
+
+    /** Its call center's bookings carry no reference of their own: a web or a partner booking does. */
+    static final String CALL_CENTER = "CALLCENTER";
+
+    /** A rate plan sold with its board — Expedia's is with breakfast. */
+    static final java.util.Map<String, String> BOARD_OF_RATE = java.util.Map.of("EXPEDIA-AD", "DESAYUNO");
 
     /** Accounts for flight delays and staff travel sell nothing: never a demo booking's partner. */
     static final Pattern NOT_A_SELLER = Pattern.compile("(?i)retraso|delay|staff|crew");
@@ -126,12 +132,13 @@ final class DemoBookingGenerator {
     /** {@code mustPay}: no booking of the batch is paid yet, so a direct one is. */
     DemoBooking booking(int index, String wantedChannel, boolean family, boolean mustPay) {
         var hotel = catalog.hotel(HOTEL);
-        var channel = catalog.channel(wantedChannel);
+        var codes = catalog.codes(HOTEL);
+        var channel = catalog.channel(HOTEL, wantedChannel);
         TradingPartner partner = null;
         if (channel.requiresPartner()) {
             partner = partnerFor(channel.code());
             if (partner == null) {
-                channel = catalog.channel("WEB");
+                channel = catalog.channel(HOTEL, "WEB");
             }
         }
         var arrival = today.plusDays(between(MIN_DAYS_AHEAD, MAX_DAYS_AHEAD));
@@ -141,9 +148,11 @@ final class DemoBookingGenerator {
         var lastName = pick(country.lastNames());
         var holder = new Holder(firstName, lastName, email(firstName, lastName), phone(country), country.code());
 
-        var ratePlan = ratePlan(channel.code(), arrival);
-        var board = pick(existing(catalog.boards().stream().map(CrsCatalog.Board::code).toList(),
-                List.of("AD", "MP", "MP", "PC", "TI", "TI", "TI")));
+        var ratePlan = ratePlan(channel.code());
+        var board = BOARD_OF_RATE.containsKey(ratePlan) ? BOARD_OF_RATE.get(ratePlan)
+                : pick(existing(codes.boards().stream().map(CrsCatalog.Board::code).toList(),
+                List.of("SOLO-ALOJAMIENTO", "DESAYUNO", "DESAYUNO", "COMIDAS", "COMIDAS", "TODO-INCLUIDO",
+                        "TODO-INCLUIDO", "TODO-INCLUIDO")));
         var roomCount = random.nextInt(10) < 7 ? 1 : 2;
         var rooms = new ArrayList<RoomViewModel>();
         var guests = new ArrayList<GuestViewModel>();
@@ -179,7 +188,7 @@ final class DemoBookingGenerator {
             payments.add(payment(hotel, rooms, arrival, departure));
         }
         // The partner's voucher, or the web's own locator; a call center booking has none.
-        var reference = "CC".equals(channel.code()) ? null : "%s-%s-%02d".formatted(channel.code(), batch, index + 1);
+        var reference = CALL_CENTER.equals(channel.code()) ? null : "%s-%s-%02d".formatted(channel.code(), batch, index + 1);
         var comments = random.nextInt(10) < 3 ? pick(COMMENTS) : null;
         var request = BookingRequests.of(channel.code(), partner != null ? partner.code() : null, reference,
                 arrival, departure, holder, rooms, guests, comments);
@@ -207,13 +216,17 @@ final class DemoBookingGenerator {
         return candidates.isEmpty() ? null : pick(candidates);
     }
 
-    /** The tour operator's contract for TTOO; early booking only for an arrival a month away or more. */
-    String ratePlan(String channelCode, LocalDate arrival) {
-        var valid = catalog.ratePlans().stream().map(CrsCatalog.RatePlan::code).toList();
+    /**
+     * A tour operator's or a local agency's contract for TTOO, an online agency's plan for OTA, and the
+     * direct sale's otherwise — the flexible one for residents only now and then. XMAR has no early
+     * booking, so neither has MRU01.
+     */
+    String ratePlan(String channelCode) {
+        var valid = catalog.codes(HOTEL).ratePlans().stream().map(CrsCatalog.RatePlan::code).toList();
         var wanted = switch (channelCode) {
-            case "TTOO" -> List.of("TTOO");
-            case "OTA" -> List.of("BAR", "NRF");
-            default -> arrival.isAfter(today.plusDays(30)) ? List.of("BAR", "NRF", "EB") : List.of("BAR", "NRF");
+            case "TTOO" -> List.of("TUI-NL", "TUI-FR", "DMC-MAURICIO", "AGENCIAS-LOCALES");
+            case "OTA" -> List.of("EXPEDIA-AD", "AGRO-MAYOR");
+            default -> List.of("DIRECTA", "DIRECTA", "DIRECTA", "FLEX-LOCAL");
         };
         var options = existing(valid, wanted);
         return options.isEmpty() ? valid.get(0) : pick(options);
@@ -224,14 +237,14 @@ final class DemoBookingGenerator {
         var stay = new Stay(arrival, departure);
         var total = rooms.stream()
                 .flatMap(r -> pricing.price(catalog.roomType(hotel.code(), r.roomTypeCode()),
-                        catalog.ratePlan(r.ratePlanCode()), catalog.board(r.boardCode()), r.adults(),
+                        catalog.ratePlan(hotel.code(), r.ratePlanCode()), catalog.board(hotel.code(), r.boardCode()), r.adults(),
                         r.childrenAges(), stay).stream())
                 .map(n -> n.amount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         var prepaid = random.nextInt(3) == 0;
         var amount = prepaid ? total : total.multiply(new BigDecimal("0.30")).setScale(0, RoundingMode.HALF_UP);
-        var methods = existing(catalog.paymentMethods().stream().map(CrsCatalog.Code::code).toList(),
-                List.of("VISA", "VISA", "MC", "AMEX", "TRF"));
+        var methods = existing(catalog.codes(hotel.code()).paymentMethods().stream().map(CrsCatalog.Code::code).toList(),
+                List.of("VISA", "VISA", "MASTERCARD", "VISA-MANUAL", "TRANSFERENCIA"));
         return new PaymentViewModel(null, prepaid ? PaymentType.Prepayment : PaymentType.Deposit, pick(methods),
                 amount, today, "AUTH-%06d".formatted(random.nextInt(1_000_000)));
     }

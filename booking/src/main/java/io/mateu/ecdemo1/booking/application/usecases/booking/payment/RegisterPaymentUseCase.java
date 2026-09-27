@@ -24,9 +24,10 @@ public class RegisterPaymentUseCase {
 
     @Transactional
     public String handle(RegisterPaymentCommand command) {
-        var method = catalog.paymentMethod(command.methodCode());
         var booking = repository.findByIdForUpdate(new BookingId(command.id()))
                 .orElseThrow(() -> new NoSuchElementException("Booking not found: " + command.id()));
+        // A hotel may take payment methods of its own: checked against the booking's hotel.
+        var method = catalog.paymentMethod(booking.getHotelCode(), command.methodCode());
         var payment = new Payment(
                 UUID.randomUUID().toString(),
                 command.type(),

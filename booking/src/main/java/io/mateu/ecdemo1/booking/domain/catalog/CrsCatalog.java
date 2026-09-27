@@ -20,10 +20,27 @@ public record CrsCatalog(List<Hotel> hotels,
                          List<Code> cancellationReasons,
                          List<Code> paymentMethods) {
 
-    public record Hotel(String code, String name, String currency, List<RoomType> roomTypes) {
+    /**
+     * {@code codes} are the hotel's own rate plans, boards, channels, cancellation reasons and payment
+     * methods, in place of the chain's; null, the hotel sells with the chain's.
+     */
+    public record Hotel(String code, String name, String currency, List<RoomType> roomTypes, Codes codes) {
+
+        public Hotel(String code, String name, String currency, List<RoomType> roomTypes) {
+            this(code, name, currency, roomTypes, null);
+        }
+
         public Optional<RoomType> roomType(String code) {
             return roomTypes.stream().filter(r -> r.code().equals(code)).findFirst();
         }
+    }
+
+    /** The codes a hotel sells with, other than its room types. */
+    public record Codes(List<RatePlan> ratePlans,
+                        List<Board> boards,
+                        List<Channel> channels,
+                        List<Code> cancellationReasons,
+                        List<Code> paymentMethods) {
     }
 
     /** {@code basePrice} is one night of the room alone, before rate plan, board and weekday. */
@@ -49,30 +66,47 @@ public record CrsCatalog(List<Hotel> hotels,
         return find(hotels, Hotel::code, code, "hotel");
     }
 
+    /** The codes this hotel sells with: its own, or the chain's. */
+    public Codes codes(String hotelCode) {
+        var own = hotel(hotelCode).codes();
+        return own != null ? own : new Codes(ratePlans, boards, channels, cancellationReasons, paymentMethods);
+    }
+
     public RoomType roomType(String hotelCode, String code) {
         var hotel = hotel(hotelCode);
         return hotel.roomType(code).orElseThrow(() -> unknown(
                 "room type of hotel " + hotelCode, code, hotel.roomTypes().stream().map(RoomType::code).toList()));
     }
 
-    public RatePlan ratePlan(String code) {
-        return find(ratePlans, RatePlan::code, code, "rate plan");
+    public RatePlan ratePlan(String hotelCode, String code) {
+        return find(codes(hotelCode).ratePlans(), RatePlan::code, code, "rate plan of hotel " + hotelCode);
     }
 
-    public Board board(String code) {
-        return find(boards, Board::code, code, "board");
+    public Board board(String hotelCode, String code) {
+        return find(codes(hotelCode).boards(), Board::code, code, "board of hotel " + hotelCode);
     }
 
-    public Channel channel(String code) {
-        return find(channels, Channel::code, code, "channel");
+    public Channel channel(String hotelCode, String code) {
+        return find(codes(hotelCode).channels(), Channel::code, code, "channel of hotel " + hotelCode);
     }
 
-    public Code cancellationReason(String code) {
-        return find(cancellationReasons, Code::code, code, "cancellation reason");
+    public Code cancellationReason(String hotelCode, String code) {
+        return find(codes(hotelCode).cancellationReasons(), Code::code, code, "cancellation reason of hotel " + hotelCode);
     }
 
-    public Code paymentMethod(String code) {
-        return find(paymentMethods, Code::code, code, "payment method");
+    public Code paymentMethod(String hotelCode, String code) {
+        return find(codes(hotelCode).paymentMethods(), Code::code, code, "payment method of hotel " + hotelCode);
+    }
+
+    /** Every hotel's codes and the chain's, each code once — for a choice made before the hotel is known. */
+    public <T> List<T> acrossHotels(java.util.function.Function<Codes, List<T>> list,
+                                   java.util.function.Function<T, String> codeOf) {
+        var all = new java.util.LinkedHashMap<String, T>();
+        list.apply(new Codes(ratePlans, boards, channels, cancellationReasons, paymentMethods))
+                .forEach(item -> all.putIfAbsent(codeOf.apply(item), item));
+        hotels.stream().filter(h -> h.codes() != null)
+                .forEach(h -> list.apply(h.codes()).forEach(item -> all.putIfAbsent(codeOf.apply(item), item)));
+        return List.copyOf(all.values());
     }
 
     private static <T> T find(List<T> items, java.util.function.Function<T, String> codeOf, String code,
@@ -84,6 +118,35 @@ public record CrsCatalog(List<Hotel> hotels,
     private static IllegalArgumentException unknown(String what, String code, List<String> valid) {
         return new IllegalArgumentException("Unknown %s '%s'. Valid: %s"
                 .formatted(what, code, valid.stream().collect(Collectors.joining(", "))));
+    }
+
+    /** The file a hotel's catalog imported from its PMS's is versioned in, next to the classes. */
+    static final String IMPORTED = "/crs-catalog/%s.json";
+
+    /**
+     * A hotel whose catalog was imported from its Opera property's — every code the CRS's own, named
+     * its own way, but each with a pair on the other side (deploy/demo/crs-catalog/generate.py makes
+     * the file, and says which pair). Read from the classpath: the CRS never calls Opera.
+     */
+    static Hotel imported(String hotelCode) {
+        try (var in = CrsCatalog.class.getResourceAsStream(IMPORTED.formatted(hotelCode))) {
+            if (in == null) {
+                throw new IllegalStateException("No imported catalog for " + hotelCode);
+            }
+            var file = new com.fasterxml.jackson.databind.ObjectMapper().readValue(in, ImportedHotel.class);
+            return new Hotel(file.hotel().code(), file.hotel().name(), file.hotel().currency(), file.roomTypes(),
+                    new Codes(file.ratePlans(), file.boards(), file.channels(), file.cancellationReasons(),
+                            file.paymentMethods()));
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException("Unreadable imported catalog for " + hotelCode, e);
+        }
+    }
+
+    record ImportedHotel(HotelHeader hotel, List<RoomType> roomTypes, List<RatePlan> ratePlans, List<Board> boards,
+                         List<Channel> channels, List<Code> cancellationReasons, List<Code> paymentMethods) {
+    }
+
+    record HotelHeader(String code, String name, String currency) {
     }
 
     public static CrsCatalog standard() {
@@ -99,11 +162,9 @@ public record CrsCatalog(List<Hotel> hotels,
                                 new RoomType("DBLOV", "Doble vista océano", 3, new BigDecimal("195")),
                                 new RoomType("JSU", "Junior suite", 4, new BigDecimal("260")),
                                 new RoomType("SUI", "Suite", 4, new BigDecimal("380")))),
-                        // Integrated with a real Opera tenant's pilot property (XMAR, "Piloto Mauricio").
-                        new Hotel("MRU01", "Riu Demo Mauricio", "EUR", List.of(
-                                new RoomType("JSU", "Junior suite", 3, new BigDecimal("240")),
-                                new RoomType("JSUSV", "Junior suite vista mar", 3, new BigDecimal("290")),
-                                new RoomType("SWU", "Suite swim-up", 3, new BigDecimal("380"))))),
+                        // Integrated with a real Opera tenant's pilot property (XMAR, "Piloto Mauricio"),
+                        // and its catalog imported from that property's: see imported(String).
+                        imported("MRU01")),
                 List.of(
                         new RatePlan("BAR", "Tarifa pública", new BigDecimal("1.00")),
                         new RatePlan("NRF", "No reembolsable", new BigDecimal("0.90")),

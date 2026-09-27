@@ -66,7 +66,8 @@ public class BookingMcpTools implements McpSystemContext {
     }
 
     @Tool(description = "The CRS's codes: hotels with their room types, rate plans, boards, channels, "
-            + "cancellation reasons and payment methods")
+            + "cancellation reasons and payment methods. A hotel with codes of its own (MRU01) sells only "
+            + "with those; the others, with the chain's")
     public CrsCatalog getCatalog() {
         return catalog;
     }
@@ -118,8 +119,8 @@ public class BookingMcpTools implements McpSystemContext {
         });
     }
 
-    @Tool(description = "Cancel a booking with one of the catalog's cancellation reasons, e.g. CLI "
-            + "(at the customer's request)")
+    @Tool(description = "Cancel a booking with one of its hotel's cancellation reasons, e.g. CLI "
+            + "(at the customer's request) — OTR (other reasons) in MRU01, which has its own")
     public String cancelBooking(String id, String reasonCode) {
         log.info("MCP cancelBooking {} reason={}", id, reasonCode);
         return attempt(() -> {
@@ -129,7 +130,7 @@ public class BookingMcpTools implements McpSystemContext {
     }
 
     @Tool(description = "Register money the central office has collected for a booking: a Deposit or a "
-            + "Prepayment, with one of the catalog's payment methods. Returns the payment id")
+            + "Prepayment, with one of its hotel's payment methods. Returns the payment id")
     public String registerPayment(String id, PaymentType type, String methodCode, BigDecimal amount,
                                   @ToolParam(required = false) String reference) {
         log.info("MCP registerPayment {} {} {}", id, type, amount);

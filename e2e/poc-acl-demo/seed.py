@@ -53,6 +53,11 @@ def main():
     hotel = next((h for h in catalog["hotels"] if h["code"] == args.hotel), None)
     if hotel is None:
         sys.exit(f"No hotel {args.hotel} in the CRS catalog: {[h['code'] for h in catalog['hotels']]}")
+    if hotel.get("codes"):
+        # MRU01's catalog is imported from its Opera property's (deploy/demo/crs-catalog): its rate plans,
+        # boards and channels are not the chain's this script picks from. Its demo bookings are made from
+        # the bookings list (Demo bookings), with its own codes.
+        sys.exit(f"{args.hotel} sells with codes of its own, not the chain's this script uses")
     today = datetime.date.today()
     created = []
     for n in range(args.count):
