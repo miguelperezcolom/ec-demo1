@@ -7,7 +7,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks;consumeCustomerEvents;consumeProjectionRequests
+      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks;consumeCustomerEvents;consumeProjectionRequests;consumeNoShowReports
     stream:
       kafka:
         binder:
@@ -62,6 +62,15 @@ spring:
         consumeProjectionRequests-in-0:
           destination: projection-requests
           group: ec-demo1-crs-integration-projections
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
+        # IN: what the hotels report as no-shows — the front office, through its outbox, never HTTP.
+        # Retried until it goes; the inbox takes each once.
+        consumeNoShowReports-in-0:
+          destination: no-show-reports
+          group: ec-demo1-crs-integration-no-shows
           consumer:
             max-attempts: 1000
             back-off-initial-interval: 1000

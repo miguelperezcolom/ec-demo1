@@ -100,6 +100,16 @@ public class ReservationsApi {
     if (deskGuest.isPresent()) {
       guest = guest.withDeskData(deskGuest.get());
     }
+    // The chain now names another customer for the stay's guest — two customers found to be one, as when
+    // the desk scanned a document the chain already knew: the identity the desk saw goes on with it.
+    var previousGuest = existing.map(Stay::guestId).filter(g -> !g.startsWith("wi-") && !g.equals(guestId))
+        .flatMap(guests::findById).filter(Guest::identityComplete);
+    if (previousGuest.isPresent() && !guest.identityComplete()) {
+      var seen = previousGuest.get().document();
+      if (guest.document() == null || guest.document().isBlank() || guest.document().equals(seen)) {
+        guest = guest.verifyIdentity(seen);
+      }
+    }
     guests.save(guest);
     var companions = companions(r);
     var stay = existing

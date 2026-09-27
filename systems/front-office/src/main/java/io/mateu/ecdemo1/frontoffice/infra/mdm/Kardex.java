@@ -8,19 +8,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.transaction.annotation.Transactional;
+import io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox;
+import io.mateu.ecdemo1.integration.model.command.CustomerCommand;
 
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * The kardex and the chain's master of customers. The desk's changes to a guest's data are kept here
- * at once and shown as pending, and sent to the MDM, which takes them to Salesforce — the master —
- * to be decided. What the master decides, and any change it makes, comes back through the MDM:
- * approved, the data stays; rejected, the master's comes back.
+ * at once and shown as pending, and proposed to the MDM — which takes them to Salesforce, the master,
+ * to be decided — as a command in the front office's outbox, written in the same transaction as the
+ * edit. The request's id is the front office's: a command delivered twice is one request. What the
+ * master decides, and any change it makes, comes back through the MDM: approved, the data stays;
+ * rejected, the master's comes back.
  */
 @Slf4j
 @Service
@@ -28,25 +32,21 @@ public class Kardex {
 
   final KardexChanges changes;
   final GuestRepository guests;
-  final RestClient mdm;
+  final CommandOutbox outbox;
   final String hotel;
   final Clock clock = Clock.systemUTC();
 
-  public Kardex(KardexChanges changes, GuestRepository guests, @Value("${frontoffice.mdm-url:}") String mdmUrl,
+  public Kardex(KardexChanges changes, GuestRepository guests, CommandOutbox outbox,
                 @Value("${frontoffice.hotel:MRU01}") String hotel) {
     this.changes = changes;
     this.guests = guests;
-    this.mdm = mdmUrl == null || mdmUrl.isBlank() ? null : RestClient.builder().baseUrl(mdmUrl).build();
+    this.outbox = outbox;
     this.hotel = hotel;
   }
 
-  /**
-   * The desk changed a guest: if what the master keeps changed, the change is kept as pending and
-   * proposed to it at once. {@link #record} and {@link #send} apart, for a caller that has to send
-   * only once its own transaction committed.
-   */
+  /** The desk changed a guest: if what the master keeps changed, the change is kept as pending and proposed to it. */
   public void edited(Guest before, Guest after) {
-    record(before, after).ifPresent(this::send);
+    record(before, after);
   }
 
   /** The guest's last change to the master's data, if the desk ever made one. */
@@ -55,8 +55,9 @@ public class Kardex {
   }
 
   /**
-   * Keeps what the desk changed of what the master keeps as a change pending its decision — nothing if
-   * the guest is not the chain's or nothing the master keeps changed. It is not sent yet: see {@link #send}.
+   * Keeps what the desk changed of what the master keeps as a change pending its decision, and proposes
+   * it to the MDM through the outbox — in the caller's transaction — nothing if the guest is not the
+   * chain's or nothing the master keeps changed.
    */
   public Optional<KardexChange> record(Guest before, Guest after) {
     if (before == null || !isChainCustomer(after.id())) {
@@ -66,9 +67,9 @@ public class Kardex {
     if (fields.isEmpty()) {
       return Optional.empty();
     }
-    var change = KardexChange.pending(after.id(), fields, clock.instant());
+    var change = propose(KardexChange.pending(after.id(), fields, clock.instant()), after);
     changes.save(change);
-    log.info("{}: {} — pending the master's approval", after.id(), change.changes());
+    log.info("{}: {} — proposed to the master as {}", after.id(), change.changes(), change.requestId());
     return Optional.of(change);
   }
 
@@ -77,41 +78,30 @@ public class Kardex {
     return guestId != null && guestId.startsWith("C-");
   }
 
-  /** What was edited while the MDM did not answer goes now. */
+  /**
+   * A change kept before the front office had an outbox, and never taken by the MDM: it goes now, the
+   * same way. Once — the change is marked as sent in the same transaction.
+   */
   @Scheduled(fixedDelayString = "${frontoffice.kardex-resend:15s}")
+  @Transactional
   public void resend() {
-    changes.unsynced().forEach(this::send);
+    for (var change : changes.unsynced()) {
+      var guest = guests.findById(change.guestId()).orElse(null);
+      if (guest != null) {
+        changes.save(propose(change, guest));
+      }
+    }
   }
 
-  /** Proposes the change to the MDM; one it does not take now goes again with {@link #resend}. */
-  public void send(KardexChange change) {
-    if (mdm == null) {
-      return;
-    }
-    var guest = guests.findById(change.guestId()).orElse(null);
-    if (guest == null) {
-      return;
-    }
-    try {
-      var proposal = new HashMap<String, Object>();
-      proposal.put("name", guest.name());
-      proposal.put("email", guest.email());
-      proposal.put("phone", guest.phone());
-      // A document the desk made up is not the guest's: the master's stays.
-      proposal.put("documentNumber", Guest.placeholderDocument(guest.document()) ? null : guest.document());
-      proposal.put("origin", "front office " + hotel);
-      var answer = mdm.post().uri("/customers/{id}/change-requests", guest.id()).body(proposal).retrieve()
-          .body(java.util.Map.class);
-      var sent = change.sent(answer == null || answer.get("id") == null ? null : String.valueOf(answer.get("id")));
-      if (answer != null && "APPROVED".equals(answer.get("status"))) {
-        // Nothing differs from what the master has: nothing to decide.
-        sent = sent.decided(KardexChange.KardexStatus.APPROVED, null, clock.instant());
-      }
-      changes.save(sent);
-      log.info("{}: change sent to the MDM as {}", guest.id(), sent.requestId());
-    } catch (RuntimeException e) {
-      log.warn("{}: the MDM did not take the change yet ({}); it goes again", guest.id(), e.getMessage());
-    }
+  /** The change as the MDM's command, into the outbox; the change, with its request id, sent. */
+  KardexChange propose(KardexChange change, Guest guest) {
+    var requestId = change.requestId() != null ? change.requestId()
+        : "CR-FO-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
+    // A document the desk made up is not the guest's: the master's stays.
+    var document = Guest.placeholderDocument(guest.document()) ? null : guest.document();
+    outbox.append(CommandOutbox.CUSTOMER_COMMANDS, guest.id(), requestId, new CustomerCommand.ProposeChange(requestId,
+        guest.id(), guest.name(), guest.email(), guest.phone(), document, "front office " + hotel));
+    return change.sent(requestId);
   }
 
   /**

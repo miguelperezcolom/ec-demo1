@@ -179,6 +179,30 @@ Los pasajeros de cada reserva se proyectan a Salesforce como contactos. Allí se
 duplicados (el golden record); la fusión vuelve al MDM (`ClienteConsolidado__e`), que aplica la
 supervivencia y **propaga el código de cliente al perfil de Opera** de las reservas afectadas.
 
+**O en recepción, al escanear el documento** (flujo 2). El cliente que vuelve con otro email es un
+provisional en el MDM y un duplicado en Salesforce. En el front office, en su reserva, *Escanear* en
+el titular: el escáner de demo reconoce por el nombre a un cliente de la cadena que ya tiene documento
+y lee **ese** documento. El documento es la clave más fuerte, así que el MDM sabe que son la misma
+persona:
+
+1. Consolida el provisional en el cliente que tiene el documento, con la misma supervivencia que una
+   fusión de Salesforce: alias, reservas re-apuntadas y `CustomersMerged`, que lleva el código a
+   Opera y al front office. En *Customers → Consolidaciones* sale con vía `SCAN`.
+2. Fusiona los dos contactos en Salesforce con `merge()` de la API SOAP (la misma que usa
+   `dedup.py`). El contacto provisional va a la papelera con el superviviente como `MasterRecordId`,
+   y Salesforce lo anuncia como cualquier fusión (`ClienteConsolidado__e`); el MDM la encuentra ya
+   aplicada. Si Salesforce no deja fusionar, queda anotado en la consolidación y el duplicado se
+   limpia a mano.
+
+Solo fusiona si es seguro: el documento es de un único cliente, el pax no tenía otro documento y el
+nombre del documento es el del cliente. Si algo no cuadra, el documento va como Case (ver 10).
+
+**El escáner de demo** no lee nada: se inventa un documento creíble y siempre el mismo para la misma
+persona, sacado de su nombre. Si el pax ya tiene un documento real en la estancia, lee ese; si un
+cliente de la cadena con su nombre tiene documento, lee el de ese cliente; si no, genera un DNI con
+su letra correcta para un español o un pasaporte para el resto (con la nacionalidad de la reserva) y
+una fecha de nacimiento de adulto o acorde con la edad del niño.
+
 ## 10. Recepción cambia los datos de un cliente
 
 Dónde vive cada dato: **Salesforce es el maestro** del cliente; el **MDM** está delante (guarda las
@@ -190,7 +214,8 @@ de los datos de Salesforce); el **front office** y **Opera** reciben esa proyecc
    Salesforce»** y una línea por campo cambiado («Teléfono: … — pendiente de Salesforce»); el
    formulario del kárdex los lista igual encima de los campos. Un documento inventado por recepción
    (`MAN-…`, `ESC-…`) no se propone.
-2. El front office lo manda al MDM, que abre en Salesforce un **Case «Cambio de datos de cliente»**
+2. El front office lo manda al MDM por Kafka (`customer-commands`, con su propio id de solicitud
+   `CR-FO-…`, así que un reenvío no la duplica), y el MDM abre en Salesforce un **Case «Cambio de datos de cliente»**
    sobre el contacto, con los datos propuestos (sección *Cambio de datos de cliente (MDM)*).
 3. En Salesforce se pone **Decisión** en *Aprobada* (se pueden corregir los datos antes) o
    *Rechazada* (con **Motivo**). Un flow aplica lo aprobado al contacto y anuncia la decisión.
@@ -199,6 +224,19 @@ de los datos de Salesforce); el **front office** y **Opera** reciben esa proyecc
    Salesforce»**, con lo propuesto, lo que se queda y el motivo del Case. Opera reescribe el perfil
    del huésped de las reservas del cliente **en su sitio**: el email y el teléfono cambian en la
    misma entrada, no se añade uno nuevo al lado.
+
+**El escaneo no es un cambio que decidir** (flujos 2 y 3). *Escanear* en cualquier pax (titular o
+acompañante) manda su documento al MDM por Kafka (`customer-commands`): tipo y número, nombre, fecha de
+nacimiento, nacionalidad, y de qué reserva y pax es. Es dato de confianza:
+
+- Lo que el cliente no tiene (documento, fecha de nacimiento, nacionalidad) se rellena al momento y
+  llega al contacto de Salesforce (`Document_Type__c`, `Document_Number__c`, `Birthdate`,
+  `Nationality__c`) **sin Case**.
+- Lo que contradice al maestro (otro nombre, otra fecha de nacimiento, otro documento) no se pisa:
+  el MDM abre un Case «Cambio de datos de cliente» con origen «… · documento escaneado», que se
+  decide como los de arriba. Escanear otra vez lo mismo no abre otro.
+- Los acompañantes son clientes del MDM (pasajeros de la reserva) y así tienen su contacto en
+  Salesforce. Un pax que la reserva no traía pasa a ser cliente al escanearlo.
 
 Cualquier cambio hecho a mano en el contacto de Salesforce baja igual. Qué enseñar en cada sitio:
 
@@ -219,7 +257,8 @@ HLA F006: el no-show se detecta en el hotel, sube al CRS como estado, el CRS apl
 resultado baja por la proyección de siempre.
 
 1. En el front office, en la reserva (que llega hoy), se marca **No show** en cada huésped. Al marcar
-   el último, el front office avisa al CRS: la reserva entera es un no show.
+   el último, el front office avisa al CRS por Kafka (`no-show-reports`): la reserva entera es un no
+   show.
 2. Arranca el proceso **`registrar-no-show`** (*Admin → Processes*): el CRS **cancela la reserva como
    no show** (motivo `NOS`) y la deja costando el **25 % de su precio original** (configurable,
    `booking.no-show-fee-percent`). En *Call center* se ve cancelada, con su cargo y el precio original.

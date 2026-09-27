@@ -43,6 +43,61 @@ public class ChangeRequests {
 
     @Transactional
     public ChangeRequest submit(String customerId, Proposal p) {
+        return submit(customerId, p, null);
+    }
+
+    /**
+     * With the proposer's own id for the request, when it has one: proposing again with the same id —
+     * a retry, a message delivered twice — is the same request, not another.
+     */
+    @Transactional
+    public ChangeRequest submit(String customerId, Proposal p, String requestId) {
+        if (requestId != null && !requestId.isBlank()) {
+            var known = requests.findById(requestId);
+            if (known.isPresent()) {
+                return known.get();
+            }
+        }
+        var r = draft(customerId, p);
+        if (requestId != null && !requestId.isBlank()) {
+            r.id = requestId;
+        }
+        return save(r);
+    }
+
+    /**
+     * As {@link #submit(String, Proposal)}, but a proposal identical to one still waiting for Salesforce
+     * is that one: the same document scanned twice is one Case, not two.
+     */
+    @Transactional
+    public ChangeRequest submitUnlessPending(String customerId, Proposal p) {
+        var r = draft(customerId, p);
+        if (ChangeRequest.Status.PENDING.name().equals(r.status)) {
+            var same = requests.findByCustomerIdOrderByRequestedAtDesc(r.customerId).stream()
+                    .filter(known -> ChangeRequest.Status.PENDING.name().equals(known.status))
+                    .filter(known -> sameProposal(known, r))
+                    .findFirst();
+            if (same.isPresent()) {
+                log.info("{} already proposes this for {}: not proposed again", same.get().id, r.customerId);
+                return same.get();
+            }
+        }
+        return save(r);
+    }
+
+    static boolean sameProposal(ChangeRequest a, ChangeRequest b) {
+        return Objects.equals(a.firstName, b.firstName) && Objects.equals(a.lastName, b.lastName)
+                && Objects.equals(a.email, b.email) && Objects.equals(a.phone, b.phone)
+                && Objects.equals(a.nationality, b.nationality) && Objects.equals(a.birthDate, b.birthDate)
+                && Objects.equals(a.documentType, b.documentType) && Objects.equals(a.documentNumber, b.documentNumber);
+    }
+
+    ChangeRequest save(ChangeRequest r) {
+        log.info("{} proposed for {} from {}: {}", r.id, r.customerId, r.origin, r.changes);
+        return requests.save(r);
+    }
+
+    ChangeRequest draft(String customerId, Proposal p) {
         var customer = survivor(customerId);
         var r = new ChangeRequest();
         r.id = "CR-" + UUID.randomUUID().toString().substring(0, 13).toUpperCase().replace("-", "");
@@ -83,8 +138,7 @@ public class ChangeRequests {
             r.changes = "sin cambios";
             r.decidedAt = r.requestedAt;
         }
-        log.info("{} proposed for {} from {}: {}", r.id, r.customerId, r.origin, r.changes);
-        return requests.save(r);
+        return r;
     }
 
     /** Opens in Salesforce what is waiting to be opened, once the customer is a contact there. */

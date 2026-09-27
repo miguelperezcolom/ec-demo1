@@ -35,4 +35,16 @@ public class Consolidation {
     public Instant propagatedAt;
     @Column(length = 1000)
     public String detail;
+
+    /**
+     * For a consolidation the MDM decided itself (a scanned document already belonged to the survivor):
+     * whether the two contacts were merged in Salesforce too — PENDING, DONE, NOT_NEEDED (the absorbed
+     * customer had no contact) or FAILED (Salesforce refused; the duplicate stays for a steward).
+     * Null for a merge Salesforce made, which needs nothing.
+     */
+    @Column(length = 20)
+    public String salesforceMerge;
+    @Column(length = 1000)
+    public String salesforceMergeError;
+    public Instant salesforceMergedAt;
 }

@@ -28,6 +28,8 @@ spring:
   # crs-integration), not called from here. Synchronous, so a message is marked published only once
   # the broker acknowledged it; keyed by the customer.
   cloud:
+    function:
+      definition: consumeCustomerCommands
     stream:
       kafka:
         binder:
@@ -42,6 +44,15 @@ spring:
       bindings:
         customers:
           destination: customers
+        # IN: what the hotels tell the MDM without waiting — a change the desk made to a customer, a
+        # document it scanned. Taken once each (inbox); retried until it goes.
+        consumeCustomerCommands-in-0:
+          destination: customer-commands
+          group: ec-demo1-customer-mdm-commands
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect

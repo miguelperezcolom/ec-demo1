@@ -1,58 +1,45 @@
 package io.mateu.ecdemo1.frontoffice.infra.crs;
 
+import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
+import io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox;
+import io.mateu.ecdemo1.integration.model.command.ReportNoShow;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestClient;
-
-import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
-import java.util.Map;
 
 /**
  * The hotel tells the chain a reservation's guests did not arrive (HLA F006). What that costs is the
  * CRS's to decide: it cancels the booking as a no-show with its fee, and the result comes back here —
- * the stay as a no-show, costing the fee — and to Opera.
+ * the stay as a no-show, costing the fee — and to Opera. The report is an order, so it goes by Kafka:
+ * written to the outbox with the desk's mark, in its transaction, and taken once by the CRS adapter.
  */
 @Slf4j
 @Service
 public class NoShows {
 
-  final RestClient crs;
   final String hotel;
   final WalkIns walkIns;
+  final CommandOutbox outbox;
 
-  public NoShows(WalkIns walkIns, @Value("${frontoffice.crs-integration-url:}") String crsIntegrationUrl,
-                 @Value("${frontoffice.hotel:MRU01}") String hotel) {
+  public NoShows(WalkIns walkIns, CommandOutbox outbox, @Value("${frontoffice.hotel:MRU01}") String hotel) {
     this.walkIns = walkIns;
-    this.crs = crsIntegrationUrl == null || crsIntegrationUrl.isBlank() ? null
-        : RestClient.builder().baseUrl(crsIntegrationUrl).build();
+    this.outbox = outbox;
     this.hotel = hotel;
   }
 
-  /** Reports the stay as a no-show; what to tell the desk. */
+  /** Reports the stay as a no-show, in the caller's transaction; what to tell the desk. */
   public String report(String stayId) {
-    if (crs == null) {
-      return "Este front office no está conectado al CRS: el no show queda solo aquí.";
-    }
     // A walk-in is a booking of the CRS under another name: the one the CRS gave it.
     var walkIn = walkIns.of(stayId).orElse(null);
     if (walkIn != null && walkIn.locator() == null) {
       return "Este walk-in aún no está en el CRS: el no show queda solo aquí.";
     }
     var locator = walkIn == null ? stayId : walkIn.locator();
-    try {
-      crs.post().uri("/no-shows").body(Map.of("hotelCode", hotel, "locator", locator, "reportedBy", "front office " + hotel))
-          .retrieve().toBodilessEntity();
-      log.info("{}: reported to the CRS as a no-show", stayId);
-      return "Se comunica al CRS, que la cancela con su cargo de no show.";
-    } catch (HttpClientErrorException.NotFound e) {
-      return "Esta reserva no viene del CRS: el no show queda solo aquí.";
-    } catch (HttpClientErrorException.Conflict e) {
-      return "El CRS ya la tenía cancelada.";
-    } catch (RuntimeException e) {
-      log.warn("{}: the CRS did not take the no-show ({})", stayId, e.getMessage());
-      return "El CRS no ha respondido: vuelve a marcarlo en un momento.";
-    }
+    var commandId = "NS-" + UUID.randomUUID();
+    var report = new ReportNoShow(commandId, hotel, locator, "front office " + hotel);
+    outbox.append(CommandOutbox.NO_SHOW_REPORTS, report.key(), commandId, report);
+    log.info("{}: reported to the CRS as a no-show ({})", stayId, commandId);
+    return "Se comunica al CRS: si la reserva es suya, la cancela con su cargo de no show y la estancia lo mostrará.";
   }
 }
