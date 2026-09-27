@@ -1,9 +1,7 @@
 package io.mateu.ecdemo1.frontoffice.infra.api;
 
-import io.mateu.ecdemo1.frontoffice.domain.guest.Guest;
-import io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository;
+import io.mateu.ecdemo1.frontoffice.application.StayWrites;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
-import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIn;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
@@ -60,13 +58,13 @@ public class ReservationsApi {
   public record Written(String stayId, String guestId, String status, boolean created) {}
 
   final StayRepository stays;
-  final GuestRepository guests;
   final WalkIns walkIns;
+  final StayWrites writes;
 
-  public ReservationsApi(StayRepository stays, GuestRepository guests, WalkIns walkIns) {
+  public ReservationsApi(StayRepository stays, WalkIns walkIns, StayWrites writes) {
     this.stays = stays;
-    this.guests = guests;
     this.walkIns = walkIns;
+    this.writes = writes;
   }
 
   /**
@@ -87,39 +85,13 @@ public class ReservationsApi {
   @Transactional
   public Written write(@PathVariable String locator, @RequestBody Reservation r) {
     var stayId = stayOf(locator, r.externalReference());
-    var existing = stays.findById(stayId);
     var holder = r.holder();
     var guestId = holder.customerId() == null || holder.customerId().isBlank() ? "crs-" + locator : holder.customerId();
-    var guest = guests.findById(guestId)
-        .map(g -> g.withReservationData(holder.name(), holder.document(), holder.email(), holder.phone()))
-        .orElseGet(() -> Guest.fromReservation(guestId, holder.name(), holder.document(), holder.email(), holder.phone()));
-    // A walk-in's guest was the desk's until the chain named the customer: what the desk took down
-    // at the counter — the document it saw, the contact — goes on with the chain's customer.
-    var deskGuest = existing.map(Stay::guestId).filter(g -> g.startsWith("wi-") && !g.equals(guestId))
-        .flatMap(guests::findById);
-    if (deskGuest.isPresent()) {
-      guest = guest.withDeskData(deskGuest.get());
-    }
-    // The chain now names another customer for the stay's guest — two customers found to be one, as when
-    // the desk scanned a document the chain already knew: the identity the desk saw goes on with it.
-    var previousGuest = existing.map(Stay::guestId).filter(g -> !g.startsWith("wi-") && !g.equals(guestId))
-        .flatMap(guests::findById).filter(Guest::identityComplete);
-    if (previousGuest.isPresent() && !guest.identityComplete()) {
-      var seen = previousGuest.get().document();
-      if (guest.document() == null || guest.document().isBlank() || guest.document().equals(seen)) {
-        guest = guest.verifyIdentity(seen);
-      }
-    }
-    guests.save(guest);
-    var companions = companions(r);
-    var stay = existing
-        .map(s -> s.applyReservation(guestId, r.roomType(), r.board(), r.checkIn(), r.checkOut(), r.pax(), r.agency(),
-            r.total(), companions))
-        .orElseGet(() -> Stay.fromReservation(locator, guestId, r.roomType(), r.board(), r.checkIn(), r.checkOut(),
-            r.pax(), r.agency(), r.total(), companions));
-    stays.save(stay);
+    var written = writes.write(stayId, new StayWrites.Booking(guestId,
+        new StayWrites.Holder(holder.name(), holder.document(), holder.email(), holder.phone()), companions(r),
+        r.roomType(), r.board(), r.checkIn(), r.checkOut(), r.pax(), r.agency(), r.total()), false);
     walkIns.of(stayId).ifPresent(w -> walkIns.save(w.cameBack(locator, r.pmsReservationId(), java.time.Instant.now())));
-    return new Written(stayId, guestId, stay.status().name(), existing.isEmpty());
+    return new Written(written.stayId(), written.guestId(), written.status(), written.created());
   }
 
   /** Why, and what it still costs: a no-show is a stay the guest owes its fee for. */

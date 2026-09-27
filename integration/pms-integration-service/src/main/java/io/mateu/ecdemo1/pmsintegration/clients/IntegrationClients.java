@@ -91,6 +91,22 @@ public class IntegrationClients {
         }
     }
 
+    /**
+     * The customer an Opera guest profile is, as the MDM's cross references say — the survivor, if it
+     * was merged since. Empty when the MDM does not know the profile (one born in Opera), or does not
+     * answer: the stay then goes as Opera has it.
+     */
+    public java.util.Optional<String> customerByPmsProfile(String profileId) {
+        try {
+            var found = mdm.get().uri(b -> b.path("/customers").queryParam("xref", "OPERA:" + profileId).build())
+                    .retrieve().body(com.fasterxml.jackson.databind.JsonNode.class);
+            return found == null || !found.isArray() || found.isEmpty() ? java.util.Optional.empty()
+                    : java.util.Optional.ofNullable(text(found.get(0), "id"));
+        } catch (RuntimeException e) {
+            return java.util.Optional.empty();
+        }
+    }
+
     static String text(com.fasterxml.jackson.databind.JsonNode node, String field) {
         var value = node.path(field);
         return value.isMissingNode() || value.isNull() || value.asText().isBlank() ? null : value.asText();

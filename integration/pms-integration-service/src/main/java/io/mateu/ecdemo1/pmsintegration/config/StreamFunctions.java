@@ -18,8 +18,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The engine's tasks for the PMS adapter, and the MDM's customer events. Handled on the consumer
- * thread. A step that fails is
+ * The engine's tasks for the PMS adapter. Handled on the consumer thread. A step that fails is
  * answered as an error and the engine retries it with backoff; a transient failure also goes on the
  * watch that raises the alarm when it lasts.
  */
@@ -31,27 +30,6 @@ public class StreamFunctions {
     final TaskHandlers tasks;
     final RetryWatch retryWatch;
     final StreamBridge streamBridge;
-    final io.mateu.ecdemo1.pmsintegration.frontoffice.FrontOfficeWriter frontOffice;
-    final TolerantReader reader;
-
-    /**
-     * What the MDM says about a customer, taken to the front office's kardex. Opera's guest profile is
-     * written by projecting the customer's reservations again, which crs-integration starts from the
-     * same event.
-     */
-    @Bean
-    public Consumer<org.springframework.messaging.Message<byte[]>> consumeCustomerEvents() {
-        return message -> {
-            io.mateu.ecdemo1.integration.model.customer.CustomerEvent event;
-            try {
-                event = reader.mapper().readValue(message.getPayload(), io.mateu.ecdemo1.integration.model.customer.CustomerEvent.class);
-            } catch (java.io.IOException e) {
-                log.error("Unreadable customer event, skipped: {}", new String(message.getPayload()), e);
-                return;
-            }
-            frontOffice.kardex(event);
-        };
-    }
 
     @Bean
     public Consumer<DomainEvent> consumeTasks() {
@@ -72,11 +50,11 @@ public class StreamFunctions {
                 throw e;
             } catch (PmsTransientException e) {
                 log.warn("Step {} of {}: Opera not available, the engine will retry: {}", task.stepId(), task.processId(), e.getMessage());
-                retryWatch.failed(task, value(task, ProcessVariables.HOTEL_CODE), subject(task), e.getMessage());
+                retryWatch.failed(task, hotel(task), subject(task), e.getMessage());
                 WorkerReply.failed(streamBridge, task, List.of(), e.getMessage());
             } catch (RuntimeException e) {
                 log.warn("Step {} of {} failed: {}", task.stepId(), task.processId(), e.toString());
-                retryWatch.failed(task, value(task, ProcessVariables.HOTEL_CODE), subject(task), e.toString());
+                retryWatch.failed(task, hotel(task), subject(task), e.toString());
                 WorkerReply.failed(streamBridge, task, List.of(), e.toString());
             }
         };
@@ -84,7 +62,18 @@ public class StreamFunctions {
 
     static String subject(TaskExecutionRequested task) {
         var locator = value(task, ProcessVariables.LOCATOR);
-        return locator != null ? locator : value(task, ProcessVariables.PARTNER_CODE);
+        if (locator != null) {
+            return locator;
+        }
+        var stay = value(task, ProcessVariables.PMS_RESERVATION_ID);
+        return stay != null && value(task, ProcessVariables.PMS_HOTEL_CODE) != null
+                ? value(task, ProcessVariables.PMS_HOTEL_CODE) + "/" + stay : value(task, ProcessVariables.PARTNER_CODE);
+    }
+
+    /** The CRS hotel the step is about, or — for a stay of the front office — the PMS property. */
+    static String hotel(TaskExecutionRequested task) {
+        var hotel = value(task, ProcessVariables.HOTEL_CODE);
+        return hotel != null ? hotel : value(task, ProcessVariables.PMS_HOTEL_CODE);
     }
 
     static String value(TaskExecutionRequested task, String name) {

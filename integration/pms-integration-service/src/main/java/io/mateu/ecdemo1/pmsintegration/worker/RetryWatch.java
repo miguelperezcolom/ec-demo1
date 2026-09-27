@@ -44,7 +44,8 @@ public class RetryWatch {
             failing.put(key, new Failing(state.since(), true, subject));
             var sent = streamBridge.send("notifications", new NotificationRequested(UUID.randomUUID().toString(),
                     NotificationType.RETRYING_TOO_LONG, hotelCode, subject,
-                    "Writing %s to the PMS keeps failing".formatted(subject),
+                    ("project-stay".equals(task.stepId()) ? "Projecting %s to the front office keeps failing"
+                            : "Writing %s to the PMS keeps failing").formatted(subject),
                     "Step %s has been failing since %s and is still being retried. Last error: %s"
                             .formatted(task.stepId(), state.since(), reason),
                     null, "retrying:" + key, now));

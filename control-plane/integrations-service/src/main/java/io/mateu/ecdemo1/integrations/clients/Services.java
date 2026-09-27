@@ -37,12 +37,15 @@ public class Services {
     final RestClient pms;
     final RestClient mapping;
     final RestClient partners;
+    final TolerantReader reader;
+    final java.util.Map<String, RestClient> frontOffices = new java.util.concurrent.ConcurrentHashMap<>();
 
     public Services(IntegrationsProperties properties, TolerantReader reader) {
         this.crs = client(properties.crsIntegrationUrl(), reader);
         this.pms = client(properties.pmsIntegrationUrl(), reader);
         this.mapping = client(properties.mappingUrl(), reader);
         this.partners = client(properties.partnersUrl(), reader);
+        this.reader = reader;
     }
 
     // ── the connector ─────────────────────────────────────────────────────────
@@ -62,6 +65,41 @@ public class Services {
         return pms.get().uri(b -> b.path("/catalog").queryParam("hotelId", pmsHotelCode).build())
                 .retrieve().body(new ParameterizedTypeReference<>() {
                 });
+    }
+
+    /** The PMS's catalogue of the property as the front office reads it: room types, rate plans, packages, rooms. */
+    public List<io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.CatalogueEntry> pmsFrontOfficeCatalogue(
+            String pmsHotelCode) {
+        return pms.get().uri(b -> b.path("/front-office/catalogue").queryParam("hotelId", pmsHotelCode).build())
+                .retrieve().body(new ParameterizedTypeReference<>() {
+                });
+    }
+
+    /**
+     * The property's reservations in a window — in the house or arriving up to {@code to} — with when
+     * the PMS last modified each; only those modified at or after {@code modifiedSince} if given.
+     */
+    public List<io.mateu.ecdemo1.integration.model.pms.PmsReservationStamp> pmsReservations(String pmsHotelCode,
+            LocalDate from, LocalDate to, String scope, String modifiedSince) {
+        return pms.get().uri(b -> {
+            b.path("/front-office/reservations").queryParam("hotelId", pmsHotelCode).queryParam("from", from)
+                    .queryParam("to", to).queryParam("scope", scope);
+            if (modifiedSince != null && !modifiedSince.isBlank()) {
+                b.queryParam("modifiedSince", modifiedSince);
+            }
+            return b.build();
+        }).retrieve().body(new ParameterizedTypeReference<>() {
+        });
+    }
+
+    // ── the front office ─────────────────────────────────────────────────────
+
+    /** What the front office holds of the PMS's catalogue: whether it answers, and with which command. */
+    public io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCatalogueSummary frontOfficeCatalogueSummary(
+            String frontOfficeUrl) {
+        return frontOffices.computeIfAbsent(frontOfficeUrl, url -> client(url, reader)).get()
+                .uri("/api/pms-catalogue/summary").retrieve()
+                .body(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCatalogueSummary.class);
     }
 
     // ── the mapping ───────────────────────────────────────────────────────────

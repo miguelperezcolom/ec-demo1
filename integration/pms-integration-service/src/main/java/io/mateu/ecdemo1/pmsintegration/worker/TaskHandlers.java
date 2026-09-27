@@ -56,16 +56,25 @@ public class TaskHandlers {
     final ReservationLocks locks;
     final PmsIntegrationProperties settings;
     final OhipProperties ohipProperties;
-    final io.mateu.ecdemo1.pmsintegration.frontoffice.FrontOfficeWriter frontOffice;
+    final io.mateu.ecdemo1.pmsintegration.frontoffice.StayProjection stays;
+    final io.mateu.ecdemo1.pmsintegration.frontoffice.PmsEvents events;
+
+    /**
+     * The steps of earlier versions of «proyectar-reserva» and «proyectar-cancelacion», which wrote the
+     * front office from here. The front office hangs from Opera now (pms-fo); a process started on an
+     * earlier version still reaches them, and they end it: nothing is written.
+     */
+    static final List<String> RETIRED_STEPS = List.of("write-front-office", "cancel-front-office");
 
     public Map<String, Function<TaskExecutionRequested, List<Variable>>> handlers() {
         return Map.of(
+                RETIRED_STEPS.get(0), task -> List.of(),
+                RETIRED_STEPS.get(1), task -> List.of(),
                 "ensure-guest-profile", this::ensureGuestProfile,
                 "upsert-reservation", task -> locked(task, this::upsertReservation),
                 "cancel-reservation", task -> locked(task, this::cancelReservation),
                 "ensure-partner-profile", this::ensurePartnerProfile,
-                "write-front-office", task -> locked(task, frontOffice::write),
-                "cancel-front-office", task -> locked(task, frontOffice::cancel));
+                "project-stay", task -> stays.project(task));
     }
 
     List<Variable> ensureGuestProfile(TaskExecutionRequested task) {
@@ -182,6 +191,9 @@ public class TaskHandlers {
                     log.info("{} v{}: Opera already holds v{}{}, nothing to write", r.locator(), r.version(), written,
                             OperaReservations.cancelled(existing.get()) ? " (cancelled)" : "");
                     supersedeRefusals(r, written);
+                    // Opera had it already; whoever consumes Opera is told all the same — a merge in the MDM,
+                    // a backfill, projects the same version precisely to be read again.
+                    events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
                     return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.STALE.name()),
                             new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
                 }
@@ -196,6 +208,7 @@ public class TaskHandlers {
                         resolved.target(CodeType.PAYMENT_METHOD, payment.methodCode()), r.currency());
             }
             supersedeRefusals(r, r.version());
+            events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
             return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.DONE.name()),
                     new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
         } catch (PmsRejectedException e) {
@@ -323,6 +336,7 @@ public class TaskHandlers {
         }
         var reservationId = OperaReservations.id(existing.get());
         if (OperaReservations.cancelled(existing.get())) {
+            events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
             return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.STALE.name()),
                     new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
         }
@@ -356,6 +370,7 @@ public class TaskHandlers {
                             r.cancellationFee(), r.currency(), r.originalAmount())
                     : "Cancelled in the CRS (reason " + r.cancellationReasonCode() + ")");
             log.info("{} cancelled in {} ({})", r.locator(), hotel, reservationId);
+            events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
             return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.DONE.name()),
                     new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
         } catch (PmsRejectedException e) {

@@ -71,6 +71,14 @@ spec:
               value: "false"
             - name: ERP_URL
               value: "http://erp:8120"
+            # The pms-fo integrations: the front office they feed, how far ahead their window reaches
+            # (backfill and polling) and how often Opera is polled for what changed there.
+            - name: FRONT_OFFICE_URL
+              value: "http://front-office:8128"
+            - name: FO_HORIZON_DAYS
+              value: "60"
+            - name: FO_POLL
+              value: "60s"
             # The chain's connection to Opera: what a new integration starts from. OHIP UAT, from the
             # ec-opera Secret (deploy.sh, from credentials.env) — never in the repo.
             - name: OPERA_GATEWAY_URL

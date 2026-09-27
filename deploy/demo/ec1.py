@@ -206,7 +206,8 @@ def inbox(subject):
 
 def stay(locator):
     rows = psql("front_office", f"""
-        select id, status, check_in, check_out, room_type, board, pax, total, coalesce(room_number, '')
+        select id, status, check_in, check_out, room_type, board, pax, total, coalesce(room_number, ''),
+               coalesce(pms_reservation_id, ''), coalesce(pms_version, '')
           from stay where id = {q(locator)}""")
     return rows[0] if rows else None
 
@@ -245,8 +246,9 @@ def show(locator, hotel="MRU01", quiet=False):
         print(f"Opera      none under this locator ({out[:120]})")
     s = stay(locator)
     if s:
-        sid, status, ci, co, rt, board, pax, total, room_no = s
-        print(f"Front off. {status} {ci}..{co}  {rt} / {board}  pax {pax}  {total}  room {room_no or '-'}")
+        sid, status, ci, co, rt, board, pax, total, room_no, pms_id, pms_version = s
+        print(f"Front off. {status} {ci}..{co}  {rt} / {board}  pax {pax}  {total}  room {room_no or '-'}"
+              + (f"  from Opera {pms_id} as modified {pms_version}" if pms_id else "  (not from Opera)"))
     else:
         print("Front off. no stay")
     return running
@@ -311,6 +313,18 @@ def health():
         detail = f"{i['status']} with {i['pmsHotelCode']}" + (f", waiting for {i['waitingFor']}" if i.get("waitingFor") else "")
         return ("PASS" if i["status"] == "ACTIVE" else "INFO"), detail
 
+    def front_office_integration():
+        try:
+            i = get("integrations-service", "/integrations/front-office/XMAR")
+        except SystemExit as e:
+            if " 404 " in str(e):
+                return "INFO", "no pms-fo integration for XMAR (after zero.sh: flow 1 creates it)"
+            raise
+        detail = f"{i['status']} → front office {i.get('frontOfficeCode') or '?'}" \
+                 + (f", waiting for {i['waitingFor']}" if i.get("waitingFor") else "") \
+                 + (f"; polled {i['lastPollAt']}, cursor {i.get('pollCursor')}" if i.get("lastPollAt") else "")
+        return ("PASS" if i["status"] == "ACTIVE" else "INFO"), detail
+
     def dictionary():
         entries = get("mapping-service", "/entries")
         by = {}
@@ -343,7 +357,9 @@ def health():
     def rooms():
         free = psql("front_office", "select count(*) from room where occupancy = 'FREE'")[0][0]
         stays = psql("front_office", "select count(*) from stay")[0][0]
-        return "INFO", f"{free} free room(s), {stays} stay(s)"
+        from_opera = psql("front_office", "select count(*) from stay where pms_reservation_id is not null")[0][0]
+        catalogue = psql("front_office", "select count(*) from pms_catalogue")[0][0]
+        return "INFO", f"{free} free room(s), {stays} stay(s) ({from_opera} from Opera), {catalogue} PMS catalogue entries"
 
     check("Deployments", deployments)
     check("Engine", engine)
@@ -351,6 +367,7 @@ def health():
     check("Opera XMAR (GET)", opera_property)
     check("Salesforce token", salesforce)
     check("Integration MRU01", integration)
+    check("Integration XMAR → FO", front_office_integration)
     check("Dictionary", dictionary)
     check("Causes", open_causes)
     check("Opera outage", outage)

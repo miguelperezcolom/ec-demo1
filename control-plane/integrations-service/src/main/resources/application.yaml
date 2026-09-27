@@ -17,7 +17,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeTasks
+      definition: consumeTasks;consumePmsReservations
     stream:
       kafka:
         binder:
@@ -59,6 +59,13 @@ spring:
               sync: true
               configuration:
                 key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          frontOfficeCommands:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+                # The PMS's catalogue goes whole: some hundred KB with every room of a big property.
+                max.request.size: 5242880
       bindings:
         # IN: the engine's tasks for the integrations — the steps of «alta-integracion».
         consumeTasks-in-0:
@@ -88,6 +95,14 @@ spring:
           destination: partner-commands
         projectionRequests:
           destination: projection-requests
+        # OUT, through the outbox: the PMS's catalogue for the hotel's front office (pms-fo integration).
+        frontOfficeCommands:
+          destination: front-office-commands
+        # IN: the connector wrote a reservation into the PMS; a front office fed from that property
+        # projects it (pms-fo integration).
+        consumePmsReservations-in-0:
+          destination: pms-reservations
+          group: ec-demo1-integrations-pms-reservations
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/integrations}
@@ -130,6 +145,13 @@ integrations:
   backfill-per-tick: ${BACKFILL_PER_TICK:20}
   backfill-tick: ${BACKFILL_TICK:2s}
   activation-window-days: ${ACTIVATION_WINDOW_DAYS:30}
+  # The hotel's front office, fed from the PMS (pms-fo integrations): where a new one starts from.
+  front-office-url: ${FRONT_OFFICE_URL:http://localhost:8128}
+  front-office:
+    # How far ahead of today a front office is backfilled and its reservations polled for changes.
+    horizon-days: ${FO_HORIZON_DAYS:60}
+    # How often the PMS is asked what changed in it (OHIP's search has no «modified since»).
+    poll: ${FO_POLL:60s}
   mapping:
     # Whether the mapping gate asks the mapping agent on its own, or leaves a person a notice to ask it
     # from Mapping → Dictionary (the demo, where asking it is a step shown live).

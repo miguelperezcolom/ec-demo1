@@ -22,6 +22,14 @@ el otro sistema la ha aplicado.
 | `projection-requests` | integrations-service (backfill) | crs-integration-service (`consumeProjectionRequests`, grupo `ec-demo1-crs-integration-projections`) | proyectar una reserva por «Proyectar Reserva». El backfill escribe las órdenes de una página y mueve su cursor en la misma transacción. |
 | `customer-commands` | front-office (`command_outbox`) | customer-mdm-service (`consumeCustomerCommands`, grupo `ec-demo1-customer-mdm-commands`) | `propose-change` (un cambio del kárdex, para que Salesforce lo decida; su `commandId` es el id de la solicitud, `CR-FO-…`), `record-scanned-identity` (el documento escaneado de un pax: dato de confianza, ver abajo) |
 | `no-show-reports` | front-office (`command_outbox`) | crs-integration-service (`consumeNoShowReports`, grupo `ec-demo1-crs-integration-no-shows`) | `ReportNoShow`: nadie de la reserva ha llegado; arranca `registrar-no-show` una vez por reserva |
+| `front-office-commands` | integrations-service (outbox; `replace-catalogue`) y pms-integration (paso `project-stay` de `proyectar-estancia`; `write-stay`) | front-office (`FrontOfficeCommands`, grupo `ec-demo1-front-office-commands`, inbox `command_inbox`) | La integración pms-fo: el catálogo del PMS con el que el front office lee sus estancias, y cada reserva **tal como Opera la tiene** (creada, cambiada, cancelada, no show), ordenada por la última modificación de Opera. Clave: `propiedad/reserva de Opera` |
+
+## Eventos que van por Kafka
+
+| Topic | Emisor | Consumidores | Qué dice |
+|---|---|---|---|
+| `pms-reservations` | pms-integration (tras grabar o cancelar en Opera, también si Opera ya la tenía) | integrations-service (`consumePmsReservations`, grupo `ec-demo1-integrations-pms-reservations`) | `PmsReservationChanged`: una reserva se ha escrito en Opera. El conector no sabe quién la consume; la integración pms-fo de la propiedad, si está activa, arranca `proyectar-estancia` |
+| `customers` | customer-mdm-service | pms-integration **ya no**; front-office (`CustomerEvents`, grupo `ec-demo1-front-office-customers`) y crs-integration | El golden record del cliente cambió o dos clientes eran uno: el kárdex del front office lo toma directamente del MDM |
 
 - **El contrato es del receptor.** El formato de `mapping-commands`, `projection-requests`,
   `customer-commands` y `no-show-reports` está en `integration-model` (`command/MappingCommand`,
@@ -46,7 +54,12 @@ el otro sistema la ha aplicado.
   órdenes sobre un cliente van con su código como clave; las de una reserva, con `hotel/localizador`.
 - **Consecuencias en recepción.** El front office ya no espera al MDM ni al CRS. Un cambio del kárdex
   que no cambia nada lo aprueba el MDM al momento y la decisión llega por la vía de siempre
-  (`customers` → pms-integration → kárdex). Un no show sale con el aviso «Se comunica al CRS…»; si el
+  (`customers` → kárdex, que el front office consume directamente).
+- **El paso `project-stay` publica sin outbox.** pms-integration no tiene base de datos: el paso lee
+  Opera, publica `write-stay` con productor síncrono y solo entonces contesta al motor. Si Kafka no la
+  toma, el paso falla y el motor lo reintenta; repetirla no hace nada, porque el front office ordena
+  por la versión de Opera y deduplica por `commandId`. Lo mismo el evento `pms-reservations` en
+  `upsert-reservation` y `cancel-reservation`. Un no show sale con el aviso «Se comunica al CRS…»; si el
   CRS no la tiene o ya estaba cancelada, se registra en crs-integration y la estancia no cambia.
 - **Un documento escaneado es dato de confianza.** El MDM rellena lo que el cliente no tiene
   (documento, fecha de nacimiento, nacionalidad) y lo proyecta al contacto de Salesforce **sin Case**.
@@ -76,6 +89,14 @@ el otro sistema la ha aplicado.
 | `crsHotels` (`GET /catalog`) | crs-integration | Opciones y etiquetas del formulario. |
 | `future` (`GET /reservations/{h}/future`) | crs-integration | La página del backfill. Lectura: las órdenes de proyección van por Kafka. |
 
+### Lo que la integración pms-fo necesita saber ya (integrations-service → otros)
+
+| Llamada | Destino | Por qué síncrona |
+|---|---|---|
+| `GET /front-office/catalogue?hotelId` | pms-integration → Opera | El catálogo de la propiedad que se manda al front office (la orden va por `front-office-commands`). |
+| `GET /front-office/reservations?hotelId&from&to&scope&modifiedSince` | pms-integration → Opera | La lista del backfill y cada sondeo: qué reservas de la ventana cambiaron desde el cursor. Lectura: las proyecciones arrancan procesos por el outbox. |
+| `GET /api/pms-catalogue/summary` | front-office | La conectividad con el front office y la puerta del catálogo: si ya tiene el que se le mandó. |
+
 ### El resto del repositorio
 
 | De → a | Llamada | Clase | Por qué se queda |
@@ -85,6 +106,7 @@ el otro sistema la ha aplicado.
 | crs-integration → integrations | `GET /integrations/views` (caché 30 s) | consulta | Qué hoteles tienen integración, para no arrancar procesos que no van a ninguna parte. |
 | pms-integration → crs-integration, mapping, integrations, mdm | reserva, interlocutor, `/resolve`, `/partner-profiles`, conexión, cliente | consulta | Los pasos del conector leen lo que van a escribir en Opera. |
 | pms-integration → mdm | `POST /identities/resolve` | consulta con efecto | El paso necesita ya el `customerId` (si no lo hay, el MDM crea un provisional). |
+| pms-integration → mdm | `GET /customers?xref=OPERA:<perfil>`, `GET /customers/{id}` | consulta | `project-stay`: qué cliente es el perfil de Opera de la reserva, y su golden record. |
 | mapping → crs-integration, pms-integration, integrations | catálogos, reserva, interlocutor, integraciones | consulta / UI | Pantallas de diccionario, herramientas MCP del agente, paso `prepare`. |
 | mapping → ia-agent | `POST /ai/api/agent/chat` desde la pantalla | ida y vuelta de UI | La persona espera la propuesta en el diccionario. La petición de fondo del alta llega ahora por `mapping-commands`. |
 | customer-mdm → booking, front-office | reservas, estancias | consulta | La ficha del cliente. |
@@ -104,7 +126,6 @@ servidor a servidor.
 
 | De → a | Llamada | Qué falta |
 |---|---|---|
-| pms-integration → front-office | `PUT /api/guests/{id}/kardex`, `PUT /api/reservations/{loc}`, `POST …/cancellation` | El front office publica en Kafka pero aún no consume. Las tres son sobrescrituras idempotentes. La del kardex ya es un *relay* de `customers`: el front office podría suscribirse directamente. |
 | pms-integration → mapping | `POST /causes/wait` | pms-integration no tiene base de datos ni outbox. La registra el paso antes de contestar al motor, que la reintenta si falla. Moverla pide un outbox en el conector, o enviar a `mapping-commands` antes de la respuesta. |
-| pms-integration → customer-mdm | `PUT /customers/{id}/xrefs` | El MDM ya consume `customer-commands`, pero pms-integration no tiene outbox. Es de mejor esfuerzo e idempotente por clave. |
+| pms-integration → customer-mdm | `PUT /customers/{id}/xrefs` | El MDM ya consume `customer-commands`, pero pms-integration no tiene outbox. Es de mejor esfuerzo e idempotente por clave (el perfil de Opera en `ensure-guest-profile`; el huésped del front office en `project-stay`). |
 | ia-agent → ia-control-plane | `POST /internal/usage` | Telemetría de uso, *fire-and-forget* sin reintento: fuera de la PoC. |
