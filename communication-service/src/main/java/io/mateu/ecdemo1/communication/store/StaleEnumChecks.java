@@ -8,10 +8,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Hibernate froze {@link DeliveryStatus}'s values into a check constraint when the table was created,
- * and ddl-auto update never rewrites it: a database older than INBOX_ONLY refuses it. The enum checks
- * the value; the constraint goes — right after the schema is updated, before any consumer starts
- * writing notifications.
+ * Hibernate freezes an enum's values into a check constraint when it creates a table, and ddl-auto
+ * update never rewrites it: a database older than a value refuses it — INBOX_ONLY in
+ * notification.status once, INTEGRATION_NEEDS_ATTENTION in notification.type later, which silently
+ * dropped every onboarding notice. So none of them stays: every such constraint in this schema goes,
+ * right after the schema is updated and before any consumer writes, and the enums check the values.
  */
 @Component
 @DependsOn("entityManagerFactory")
@@ -23,7 +24,16 @@ public class StaleEnumChecks {
 
     @PostConstruct
     public void drop() {
-        jdbc.execute("alter table if exists notification drop constraint if exists notification_status_check");
-        log.info("notification.status is checked by its enum, not by a constraint frozen when the table was created");
+        // Hibernate's enum checks read "CHECK (((col)::text = ANY ((ARRAY['A'::character varying, ...])::text[])))".
+        var frozen = jdbc.queryForList("""
+                select c.conrelid::regclass::text as tbl, c.conname as name
+                from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+                where c.contype = 'c' and n.nspname = current_schema()
+                  and pg_get_constraintdef(c.oid) like '%= ANY%ARRAY[%'""");
+        for (var row : frozen) {
+            jdbc.execute("alter table %s drop constraint if exists %s".formatted(row.get("tbl"), row.get("name")));
+            log.info("{}.{} dropped: the enum checks its values, not a constraint frozen when the table was created",
+                    row.get("tbl"), row.get("name"));
+        }
     }
 }
