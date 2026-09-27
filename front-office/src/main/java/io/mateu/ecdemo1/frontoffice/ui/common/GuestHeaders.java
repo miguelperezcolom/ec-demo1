@@ -164,7 +164,8 @@ public final class GuestHeaders {
     var segs = route.replaceFirst("^/", "").split("/");
     for (int i = 0; i < segs.length; i++) {
       if (mount.equals(segs[i])) {
-        return i + 1 < segs.length && !segs[i + 1].isBlank() ? segs[i + 1] : null;
+        return i + 1 < segs.length && !segs[i + 1].isBlank()
+            ? io.mateu.ecdemo1.frontoffice.infra.crs.WalkInDesk.stayIdFor(segs[i + 1]) : null;
       }
     }
     return segs.length > 0 && !segs[0].isBlank() ? segs[0] : null;

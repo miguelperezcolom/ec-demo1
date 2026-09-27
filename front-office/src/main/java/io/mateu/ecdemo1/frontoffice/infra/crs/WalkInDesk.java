@@ -80,6 +80,17 @@ public class WalkInDesk {
     return instance == null || stayId == null ? Optional.empty() : instance.walkIns.of(stayId);
   }
 
+  /**
+   * The stay a route names: a walk-in keeps the id the desk gave it ({@code FO-…}), so the CRS
+   * locator other systems link it by is turned into that id; any other id is left as it is.
+   */
+  public static String stayIdFor(String id) {
+    if (instance == null || id == null || instance.stays.findById(id).isPresent()) {
+      return id;
+    }
+    return instance.walkIns.byLocator(id).map(WalkIn::stayId).orElse(id);
+  }
+
   // ── what the CRS offers, and what it costs ─────────────────────────────────────
 
   public record Option(String code, String name) {}
