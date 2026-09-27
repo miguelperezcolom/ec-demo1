@@ -274,6 +274,25 @@
 
   if (!customElements.get('ec-push-toggle')) customElements.define('ec-push-toggle', PushToggle);
 
+  // Redwood draws the user widget's popover itself (#mateuUserPopup) from plain rows — text through
+  // oj-bind-text and links — so the <ec-push-toggle> the widget sends never reaches its DOM (Mateu's
+  // Redwood renderer: no markup in a header widget). Here it is put in the popup when the popup is
+  // drawn; with Vaadin the widget's own element is there already and this finds nothing to do.
+  function intoRedwoodUserPopup() {
+    const content = document.querySelector('#mateuUserPopup .oj-popup-content > div');
+    if (content && !content.querySelector('ec-push-toggle')) {
+      const toggle = document.createElement('ec-push-toggle');
+      const logout = content.querySelector('a[href*="logout"]');
+      content.insertBefore(toggle, logout || null);
+    }
+  }
+  let scheduled = false;
+  new MutationObserver(() => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => { scheduled = false; intoRedwoodUserPopup(); });
+  }).observe(document.documentElement, { childList: true, subtree: true });
+
   window.ecPush = { state: () => state, enable, disable, test, refresh };
 
   (async () => {
