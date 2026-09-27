@@ -218,17 +218,28 @@ public class ReservasListing
         io.mateu.uidl.data.UICommand.dispatchEvent("reservas-seeded"));
   }
 
+  /** Un cliente sin reserva en el mostrador: el CRS pone el precio y hace la reserva. */
+  @io.mateu.uidl.annotations.ListToolbarButton(rowsSelectedRequired = false)
+  @Label("＋ Walk-in")
+  public void walkIn() {
+    // la lógica vive en handleAction (dispatch uniforme con "view")
+  }
+
   // ── clic de fila: abrir la reserva como página según su estado ───────────────
 
   @Override
   public boolean supportsAction(String actionId) {
-    return "view".equals(actionId) || "seedDemo".equals(actionId) || Listing.super.supportsAction(actionId);
+    return "view".equals(actionId) || "seedDemo".equals(actionId) || "walkIn".equals(actionId)
+        || Listing.super.supportsAction(actionId);
   }
 
   @Override
   public Object handleAction(String actionId, HttpRequest httpRequest) {
     if ("seedDemo".equals(actionId)) {
       return seedDemoReservas();
+    }
+    if ("walkIn".equals(actionId)) {
+      return URI.create("/walk-in");
     }
     if ("view".equals(actionId)) {
       var id = String.valueOf(httpRequest.runActionRq().parameters().get("id"));

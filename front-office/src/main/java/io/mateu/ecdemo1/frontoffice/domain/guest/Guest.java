@@ -79,6 +79,21 @@ public record Guest(
    * What a later reservation says of the guest fills what the cardex lacks; what the desk verified
    * — a document, contact data taken at check-in — is not overwritten by it.
    */
+  /**
+   * What the desk took down at the counter for a walk-in, onto the chain's customer the walk-in turned
+   * out to be: the document it saw — verified if it verified it —, and the contact it wrote, where it
+   * wrote one.
+   */
+  public Guest withDeskData(Guest desk) {
+    var deskDocument = desk.document() != null && !desk.document().isBlank();
+    return new Guest(
+        id, name, deskDocument ? desk.document() : document, deskDocument ? desk.documentVerified() : documentVerified,
+        desk.email() == null || desk.email().isBlank() ? email : desk.email(),
+        desk.phone() == null || desk.phone().isBlank() ? phone : desk.phone(),
+        tier, loyaltyPoints, stays, nights, yearsAsClient, complaints, hotels, lastStaySummary,
+        lastStayComplementaryInfo, preferences);
+  }
+
   public Guest withReservationData(String name, String document, String email, String phone) {
     return new Guest(
         id, name == null || name.isBlank() ? this.name : name,

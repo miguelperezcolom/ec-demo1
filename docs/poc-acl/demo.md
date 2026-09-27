@@ -229,6 +229,27 @@ Hace falta la equivalencia `NOS → NOSHOW` (motivo de cancelación, MRU01): des
 aprobarla en el alta, o la cancelación espera sin mapear en *Mapping → Dictionary*. Solo reservas que vienen del
 CRS.
 
+## 10 ter. Walk-in: el front office vende, el CRS reserva
+
+El CRS es el dueño de todas las reservas; el front office es un canal más (`WALKIN`).
+
+1. En el front office, *Reservas → ＋ Walk-in*: habitación, tarifa y régimen **del CRS** para MRU01,
+   fechas (llegada hoy), ocupación y titular con su documento.
+2. **Calcular precio**: el front office lo pregunta al CRS (`crs-integration-service` →
+   `POST /bookings/quote`), que lo calcula como si la hiciera, sin guardar nada. Si luego cambia algo
+   que afecta al precio, hay que volver a pedirlo.
+3. **Confirmar walk-in**: la estancia se abre **ya** con referencia propia `FO-XXXXXX` —se puede hacer
+   el check-in al momento— y se pide al CRS la reserva con esa referencia y **al precio dado**; si el
+   CRS ya no la cobra así, la rechaza y la estancia lo muestra. Si el CRS no responde, se reenvía sola.
+   La cabecera de la estancia dice «Walk-in · pendiente del CRS», y luego «Walk-in · CRS <localizador>».
+4. Baja como cualquier reserva (`proyectar-reserva`): a **Opera** y de vuelta al **front office**, que
+   la reconoce por la referencia y la escribe **sobre la misma estancia** (sin crear otra ni deshacer el
+   check-in): la cabecera pasa a «Walk-in · CRS <localizador> · Opera <reserva>» y el huésped pasa a ser
+   el cliente del MDM, con el documento que tomó recepción.
+
+Hace falta la equivalencia `WALKIN → WLK` (canal, MRU01), que el agente propone en el alta. El CRS no
+modela disponibilidad: el presupuesto es un precio, no una habitación bloqueada.
+
 ## 11. Quién hizo qué, y qué me espera
 
 - *Audit*: cada acción que decide algo sobre un hotel — alta, aprobar o retirar un mapeado, activar,

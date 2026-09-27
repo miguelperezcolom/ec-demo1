@@ -39,8 +39,14 @@ public class NoShows {
     if (crs == null) {
       return "Este front office no está conectado al CRS: el no show queda solo aquí.";
     }
+    // A walk-in is a booking of the CRS under another name: the one the CRS gave it.
+    var walkIn = WalkInDesk.of(stayId).orElse(null);
+    if (walkIn != null && walkIn.locator() == null) {
+      return "Este walk-in aún no está en el CRS: el no show queda solo aquí.";
+    }
+    var locator = walkIn == null ? stayId : walkIn.locator();
     try {
-      crs.post().uri("/no-shows").body(Map.of("hotelCode", hotel, "locator", stayId, "reportedBy", "front office " + hotel))
+      crs.post().uri("/no-shows").body(Map.of("hotelCode", hotel, "locator", locator, "reportedBy", "front office " + hotel))
           .retrieve().toBodilessEntity();
       log.info("{}: reported to the CRS as a no-show", stayId);
       return "Se comunica al CRS, que la cancela con su cargo de no show.";
