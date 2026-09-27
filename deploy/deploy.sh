@@ -259,7 +259,8 @@ echo "══ 5/6  Observability (Prometheus, Grafana, Loki, Tempo, Alloy) ══
 helm upgrade --install kps prometheus-community/kube-prometheus-stack \
   -n "$OBS_NS" -f deploy/observability/kube-prometheus-stack.yaml --timeout 15m
 helm upgrade --install loki grafana/loki -n "$OBS_NS" -f deploy/observability/loki.yaml --timeout 15m
-helm upgrade --install tempo grafana/tempo -n "$OBS_NS" -f deploy/observability/tempo.yaml --timeout 15m
+# Pinned: tempo.yaml carries a copy of this chart version's config template (max_attribute_bytes).
+helm upgrade --install tempo grafana/tempo --version 1.24.4 -n "$OBS_NS" -f deploy/observability/tempo.yaml --timeout 15m
 helm upgrade --install alloy grafana/alloy -n "$OBS_NS" -f deploy/observability/alloy.yaml --timeout 15m
 kubectl apply -f deploy/observability/servicemonitors.yaml
 

@@ -1,4 +1,10 @@
 nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+# Traces on a volume, as deployed: without this block a `deploy.sh` run would put Tempo back on an
+# emptyDir and lose every trace on its next restart.
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: hcloud-volumes
 tempo:
   # Grafana's Tempo datasource runs TraceQL with `rate() by(...)` for its service graph and RED
   # views, and those are computed by the metrics generator rather than read from the traces. With
