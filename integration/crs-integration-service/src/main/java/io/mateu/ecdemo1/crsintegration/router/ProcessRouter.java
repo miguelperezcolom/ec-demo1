@@ -43,6 +43,7 @@ public class ProcessRouter {
     final Outbox outbox;
     final CrsProperties properties;
     final Integrations integrations;
+    final io.mateu.ecdemo1.crsintegration.tracing.Traces traces;
 
     @Transactional
     public void route(IntegrationEvent event) {
@@ -71,6 +72,7 @@ public class ProcessRouter {
             case ReservationCancelled e -> reservation(variables, e.hotelCode(), e.locator());
             case PartnerChanged e -> variables.add(new Variable(ProcessVariables.PARTNER_CODE, e.partnerCode()));
         }
+        traces.tag("eventconductor.business-key", processKey);
         log.info("Starting {} for {}", definitionId, event.key());
         outbox.appendToEngine(new ProcessCreationRequested(definitionId, processKey, variables, null,
                 AuthorizationContext.SYSTEM));
@@ -120,7 +122,10 @@ public class ProcessRouter {
         return true;
     }
 
-    private static void reservation(List<Variable> variables, String hotelCode, String locator) {
+    private void reservation(List<Variable> variables, String hotelCode, String locator) {
+        // What a booking's trace is found by in Tempo, on the span that starts its process.
+        traces.tag("booking.locator", locator);
+        traces.tag("hotel.code", hotelCode);
         variables.add(new Variable(ProcessVariables.HOTEL_CODE, hotelCode));
         variables.add(new Variable(ProcessVariables.LOCATOR, locator));
     }
