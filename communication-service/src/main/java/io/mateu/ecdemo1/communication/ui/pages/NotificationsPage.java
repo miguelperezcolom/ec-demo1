@@ -42,9 +42,26 @@ public class NotificationsPage implements Listing<NotificationRow>, Searchable, 
         var rows = notifications.findAllByOrderByRequestedAtDesc().stream()
                 .filter(n -> (n.title + " " + n.hotelCode + " " + n.type).toLowerCase().contains(text))
                 .map(n -> new NotificationRow(n.id, when(n.requestedAt), String.valueOf(n.type), n.hotelCode,
-                        n.title, n.recipients, status(n)))
+                        shortTitle(n.title), n.recipients, status(n), detail(n)))
                 .toList();
         return Paging.page(rows, request);
+    }
+
+    static final int TITLE_LENGTH = 70;
+
+    /** A title that fits a column: cut at a word, with an ellipsis, when it is longer than that. */
+    static String shortTitle(String title) {
+        if (title == null || title.length() <= TITLE_LENGTH) {
+            return title;
+        }
+        var cut = title.lastIndexOf(' ', TITLE_LENGTH);
+        return title.substring(0, cut > TITLE_LENGTH / 2 ? cut : TITLE_LENGTH).strip() + "…";
+    }
+
+    /** The whole title and what the notification says. */
+    static String detail(Notification n) {
+        var body = n.body == null || n.body.isBlank() ? "" : "\n\n" + n.body;
+        return (n.title == null ? "" : n.title) + body;
     }
 
     static String when(Instant at) {
