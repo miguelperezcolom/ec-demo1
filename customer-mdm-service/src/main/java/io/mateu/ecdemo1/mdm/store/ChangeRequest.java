@@ -45,4 +45,7 @@ public class ChangeRequest {
     @Column(length = 1000)
     public String sendError;
     public Instant decidedAt;
+    /** Why Salesforce rejected it, if it said (the Case's Motivo). */
+    @Column(length = 500)
+    public String reason;
 }

@@ -43,6 +43,12 @@ public class SalesforceProjection {
      */
     @Transactional
     public boolean refresh(String customerId, String requestId, String decision) {
+        return refresh(customerId, requestId, decision, null);
+    }
+
+    /** As {@link #refresh(String, String, String)}, with why the change was rejected, if it was and Salesforce said. */
+    @Transactional
+    public boolean refresh(String customerId, String requestId, String decision, String reason) {
         var customer = customers.findById(customerId).orElse(null);
         while (customer != null && customer.aliasOf != null) {
             customer = customers.findById(customer.aliasOf).orElse(null);
@@ -68,7 +74,7 @@ public class SalesforceProjection {
         customers.save(customer);
         if (changed || requestId != null) {
             // Whoever holds a copy of the customer learns it from the customers topic.
-            events.changed(customer, changed, requestId, decision);
+            events.changed(customer, changed, requestId, decision, reason);
         }
         return changed;
     }

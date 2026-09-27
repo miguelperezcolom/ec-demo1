@@ -33,6 +33,25 @@ public record Guest(
     preferences = preferences == null ? List.of() : List.copyOf(preferences);
   }
 
+  /**
+   * Whether a document is one the desk made up to mark the identity as seen — a scan simulated
+   * ({@code ESC-…}) or a registration by hand without one ({@code MAN-…}) — and not the guest's.
+   */
+  public static boolean placeholderDocument(String document) {
+    return document != null && (document.startsWith("MAN-") || document.startsWith("ESC-"));
+  }
+
+  /** The value of one of the fields the chain's master keeps, by the kardex's name for it. */
+  public String valueOf(String field) {
+    return switch (field) {
+      case "nombre" -> name;
+      case "documento" -> document;
+      case "email" -> email;
+      case "teléfono" -> phone;
+      default -> null;
+    };
+  }
+
   /** Whether the front desk can skip the identity step of the check-in. */
   public boolean identityComplete() {
     return document != null && !document.isBlank() && documentVerified;
@@ -88,12 +107,6 @@ public record Guest(
         id, name == null || name.isBlank() ? this.name : name, document, documentVerified, email, phone,
         tier, loyaltyPoints, stays, nights, yearsAsClient, complaints, hotels, lastStaySummary,
         lastStayComplementaryInfo, preferences);
-  }
-
-  /** Whether the data the chain's master keeps — name, document, email, phone — differs from another's. */
-  public boolean masterDataDiffers(Guest other) {
-    return !java.util.Objects.equals(name, other.name) || !java.util.Objects.equals(document, other.document)
-        || !java.util.Objects.equals(email, other.email) || !java.util.Objects.equals(phone, other.phone);
   }
 
   /** Updates the contact data captured at the desk. */

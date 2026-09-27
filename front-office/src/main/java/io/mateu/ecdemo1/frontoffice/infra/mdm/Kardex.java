@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The cardex and the chain's master of customers. The desk's changes to a guest's data are kept here
+ * The kardex and the chain's master of customers. The desk's changes to a guest's data are kept here
  * at once and shown as pending, and sent to the MDM, which takes them to Salesforce — the master —
  * to be decided. What the master decides, and any change it makes, comes back through the MDM:
  * approved, the data stays; rejected, the master's comes back.
@@ -55,10 +55,14 @@ public class Kardex {
   }
 
   void onEdit(Guest before, Guest after) {
-    if (before == null || !after.masterDataDiffers(before) || !isChainCustomer(after.id())) {
+    if (before == null || !isChainCustomer(after.id())) {
       return;
     }
-    var change = KardexChange.pending(after.id(), describe(before, after), clock.instant());
+    var fields = fieldsChanged(before, after);
+    if (fields.isEmpty()) {
+      return;
+    }
+    var change = KardexChange.pending(after.id(), fields, clock.instant());
     changes.save(change);
     log.info("{}: {} — pending the master's approval", after.id(), change.changes());
     send(change);
@@ -88,14 +92,15 @@ public class Kardex {
       proposal.put("name", guest.name());
       proposal.put("email", guest.email());
       proposal.put("phone", guest.phone());
-      proposal.put("documentNumber", guest.document());
+      // A document the desk made up is not the guest's: the master's stays.
+      proposal.put("documentNumber", Guest.placeholderDocument(guest.document()) ? null : guest.document());
       proposal.put("origin", "front office " + hotel);
       var answer = mdm.post().uri("/customers/{id}/change-requests", guest.id()).body(proposal).retrieve()
           .body(java.util.Map.class);
       var sent = change.sent(answer == null || answer.get("id") == null ? null : String.valueOf(answer.get("id")));
       if (answer != null && "APPROVED".equals(answer.get("status"))) {
         // Nothing differs from what the master has: nothing to decide.
-        sent = sent.decided(KardexChange.KardexStatus.APPROVED, clock.instant());
+        sent = sent.decided(KardexChange.KardexStatus.APPROVED, null, clock.instant());
       }
       changes.save(sent);
       log.info("{}: change sent to the MDM as {}", guest.id(), sent.requestId());
@@ -104,14 +109,18 @@ public class Kardex {
     }
   }
 
-  /** The customer's data as the master has it, and — when it answers the desk's change — its decision. */
-  public record Update(String name, String email, String phone, String document, String requestId, String decision) {
+  /**
+   * The customer's data as the master has it, and — when it answers the desk's change — its decision,
+   * and why, if it rejected it and said.
+   */
+  public record Update(String name, String email, String phone, String document, String requestId, String decision,
+                       String reason) {
   }
 
   /**
    * What the MDM says of a guest. A decision on the pending change closes it: approved, the master's
    * data (the desk's, as approved); rejected, the master's as it was. Without a decision it is a change
-   * made in the master: it replaces the cardex's data — unless the desk has a change pending, which
+   * made in the master: it replaces the kardex's data — unless the desk has a change pending, which
    * stays on screen until it is decided.
    *
    * @return false if the front office does not have this guest
@@ -126,27 +135,45 @@ public class Kardex {
         && (current.requestId() == null || u.requestId().equals(current.requestId()));
     if (answersTheDesk) {
       var decision = "REJECTED".equals(u.decision()) ? KardexChange.KardexStatus.REJECTED : KardexChange.KardexStatus.APPROVED;
-      guests.save(guest.withMasterData(u.name(), u.document(), u.email(), u.phone()));
-      changes.save(current.decided(decision, clock.instant()));
+      guests.save(guest.withMasterData(u.name(), masterDocument(guest, u), u.email(), u.phone()));
+      changes.save(current.decided(decision, u.reason(), clock.instant()));
       log.info("{}: the master {} the desk's change", guestId, decision == KardexChange.KardexStatus.APPROVED ? "approved" : "rejected");
     } else if (current == null || !current.pending()) {
-      guests.save(guest.withMasterData(u.name(), u.document(), u.email(), u.phone()));
+      guests.save(guest.withMasterData(u.name(), masterDocument(guest, u), u.email(), u.phone()));
     }
     return true;
   }
 
-  static String describe(Guest before, Guest after) {
-    var changed = new ArrayList<String>();
-    diff(changed, "nombre", before.name(), after.name());
-    diff(changed, "documento", before.document(), after.document());
-    diff(changed, "email", before.email(), after.email());
-    diff(changed, "teléfono", before.phone(), after.phone());
-    return String.join(", ", changed);
+  /**
+   * The master has no document for the guest and the desk marked the identity as seen with one it
+   * made up: that one stays, since it is the desk's and not a document the master could hold.
+   */
+  static String masterDocument(Guest guest, Update u) {
+    return (u.document() == null || u.document().isBlank()) && Guest.placeholderDocument(guest.document())
+        ? guest.document() : u.document();
   }
 
-  static void diff(java.util.List<String> changed, String label, String a, String b) {
-    if (!Objects.equals(a, b)) {
-      changed.add(label + " " + (a == null ? "—" : a) + " → " + (b == null ? "—" : b));
+  /** What the desk changed of what the master keeps, field by field. A made-up document is no change. */
+  static java.util.List<KardexChange.FieldChange> fieldsChanged(Guest before, Guest after) {
+    var changed = new ArrayList<KardexChange.FieldChange>();
+    diff(changed, "nombre", before.name(), after.name());
+    diff(changed, "documento", masterValue(before.document()), masterValue(after.document()));
+    diff(changed, "email", before.email(), after.email());
+    diff(changed, "teléfono", before.phone(), after.phone());
+    return changed;
+  }
+
+  static String masterValue(String document) {
+    return Guest.placeholderDocument(document) ? null : document;
+  }
+
+  static void diff(java.util.List<KardexChange.FieldChange> changed, String field, String a, String b) {
+    if (!Objects.equals(blankAsNull(a), blankAsNull(b))) {
+      changed.add(new KardexChange.FieldChange(field, a, b));
     }
+  }
+
+  static String blankAsNull(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 }

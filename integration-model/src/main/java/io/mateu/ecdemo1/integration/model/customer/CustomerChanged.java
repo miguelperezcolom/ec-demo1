@@ -11,8 +11,9 @@ import java.util.List;
  *                        nothing has to be written again where the customer is
  * @param changeRequestId the change request this decides, if any
  * @param decision        how it was decided (APPROVED, REJECTED), if it decides one
+ * @param reason          why it was rejected, when Salesforce says
  */
 public record CustomerChanged(String eventId, Instant occurredAt, String customerId, long version, GoldenRecord data,
-                              boolean dataChanged, String changeRequestId, String decision,
+                              boolean dataChanged, String changeRequestId, String decision, String reason,
                               List<String> reservations) implements CustomerEvent {
 }

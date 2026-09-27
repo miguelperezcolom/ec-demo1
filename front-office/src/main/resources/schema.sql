@@ -149,3 +149,6 @@ create table if not exists guest_kardex (
     decided_at   timestamp,
     synced       boolean      not null
 );
+-- The change field by field (JSON) and why the master rejected it, if it said.
+alter table guest_kardex add column if not exists fields varchar(2000);
+alter table guest_kardex add column if not exists reason varchar(500);
