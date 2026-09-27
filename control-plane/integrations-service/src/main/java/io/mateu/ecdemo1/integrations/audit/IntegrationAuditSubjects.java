@@ -42,7 +42,7 @@ public class IntegrationAuditSubjects implements AuditSubjects {
     public String response(Object result) {
         if (result instanceof Integration i) {
             var last = i.history == null || i.history.isEmpty() ? null : i.history.get(i.history.size() - 1);
-            return (last == null ? "" : last.what() + " — ") + "status " + i.status;
+            return (last == null ? "" : last.what() + " — ") + "status " + i.getStatus();
         }
         if (result instanceof BackfillRun run) {
             return "Backfill " + run.id + " " + run.status;
