@@ -124,6 +124,16 @@ public class ShellHome implements WidgetSupplier {
     // now mounted by the control shell behind the ai-admin gate. See ControlShellHome.
 
     /**
+     * A booking's journey across the chain — CRS, integration, engine, mapping, MDM, Opera, front
+     * office, Salesforce — drawn from its traces by journey-service. Hidden from the bar: it is
+     * opened from a booking ("Ver recorrido"), from Clientes and from the front office's stay.
+     * Still declared, so /journey/bookings/{locator} resolves.
+     */
+    @Menu
+    @Hidden
+    RemoteMenu journey = new RemoteMenu("/_journey").withLabel("Recorrido");
+
+    /**
      * The inbox, hidden from the bar: the badge in the widgets below is the way in, and it says how
      * much is waiting on the way. Still declared, so a deep link or a reload on /inbox/... resolves.
      */

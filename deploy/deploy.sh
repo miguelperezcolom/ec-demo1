@@ -249,6 +249,7 @@ kubectl apply -f deploy/manifests/75-integrations.yaml
 kubectl apply -f deploy/manifests/76-customer-mdm.yaml
 kubectl apply -f deploy/manifests/77-front-office.yaml
 kubectl apply -f deploy/manifests/78-audit.yaml
+kubectl apply -f deploy/manifests/80-journey.yaml
 # The control console: its database first, then the service, then its shell.
 kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml

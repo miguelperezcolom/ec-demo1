@@ -104,6 +104,7 @@ class OtherSystemsTest {
   void aStayLinksToItsCrsBookingItsCustomersAndTheirSalesforceContacts() {
     assertThat(CrossLinks.of("RES9")).extracting(CrossLinks.Link::what, CrossLinks.Link::href).containsExactly(
         org.assertj.core.groups.Tuple.tuple("Reserva en el CRS", "https://ec1.example.test/booking/bookings/RES9"),
+        org.assertj.core.groups.Tuple.tuple("Recorrido de la reserva", "https://ec1.example.test/journey/bookings/RES9"),
         org.assertj.core.groups.Tuple.tuple("Titular · cliente", "https://ec1.example.test/customers/search/C-ANA"),
         org.assertj.core.groups.Tuple.tuple("Titular · Salesforce", "https://acme.lightning.force.com/lightning/r/Contact/003ANA/view"),
         org.assertj.core.groups.Tuple.tuple("Huésped 2 · cliente", "https://ec1.example.test/customers/search/C-LEO"),
@@ -119,7 +120,8 @@ class OtherSystemsTest {
 
   @Test
   void aStayTheMdmDoesNotKnowStillLinksToItsCrsBookingAndADemoStayToNothing() {
-    assertThat(CrossLinks.of("RES-UNKNOWN")).extracting(CrossLinks.Link::what).containsExactly("Reserva en el CRS");
+    assertThat(CrossLinks.of("RES-UNKNOWN")).extracting(CrossLinks.Link::what)
+        .containsExactly("Reserva en el CRS", "Recorrido de la reserva");
     assertThat(CrossLinks.of("demo-123-1")).isEmpty();
     assertThat(OtherSystems.of("demo-123-1")).isInstanceOf(Text.class);
   }

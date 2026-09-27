@@ -199,19 +199,20 @@ public class CustomerCard implements Identifiable {
                     Html.escape(r.role()),
                     Html.escape(b == null ? "Sin respuesta del CRS" : Estados.booking(b.status())),
                     Html.escape(String.join(" · ", opera)),
-                    stay == null ? "" : Html.link(stayLabel(stay), links.frontOfficeStay(stay.id()))));
+                    stay == null ? "" : Html.link(stayLabel(stay), links.frontOfficeStay(stay.id())),
+                    Html.link("Ver recorrido", Links.journey(r.locator()))));
         }
         // Stays the front office has and no CRS booking of the customer explains: shown all the same.
         for (var stay : stays.values()) {
             rows.add(List.of(Html.escape("—"), Html.escape("Front office"), Html.escape(Estados.day(stay.checkIn())),
                     Html.escape(Estados.day(stay.checkOut())), Html.escape(stay.role()), "", "",
-                    Html.link(stayLabel(stay), links.frontOfficeStay(stay.id()))));
+                    Html.link(stayLabel(stay), links.frontOfficeStay(stay.id())), ""));
         }
         if (rows.isEmpty()) {
             html.append(Html.muted(footprint.readsBookings() ? "No tiene reservas." : "No se leen las reservas del CRS desde aquí."));
         } else {
             html.append(Html.table(List.of("Reserva (CRS)", "Hotel", "Llegada", "Salida", "Papel", "Estado", "Opera",
-                    "Front office"), rows));
+                    "Front office", "Recorrido"), rows));
         }
 
         var cases = customers.changeRequestsOf(codes).stream()

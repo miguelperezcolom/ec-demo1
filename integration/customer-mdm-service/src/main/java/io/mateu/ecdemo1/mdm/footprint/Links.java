@@ -18,6 +18,8 @@ public class Links {
     public static final String CUSTOMERS_ROUTE = "/customers/search";
     /** Where the CRS's bookings are mounted on the data plane (booking's own @UI and menu). */
     public static final String BOOKINGS_ROUTE = "/booking/bookings";
+    /** Where a booking's journey is drawn on the data plane (journey-service's own @UI and menu). */
+    public static final String JOURNEY_ROUTE = "/journey/bookings";
 
     final String salesforce;
     final String frontOffice;
@@ -42,6 +44,11 @@ public class Links {
     /** A CRS booking on the data plane: a route of the same console, so relative. */
     public static String booking(String locator) {
         return BOOKINGS_ROUTE + "/" + encode(locator);
+    }
+
+    /** A CRS booking's journey across the chain on the data plane (journey-service, "Ver recorrido"). */
+    public static String journey(String locator) {
+        return JOURNEY_ROUTE + "/" + encode(locator);
     }
 
     /** A customer's page on the data plane (Clientes). */

@@ -67,7 +67,13 @@ public class CustomerController {
     @PostMapping("/identities/resolve")
     @Operation(summary = "The customers a reservation's passengers are: existing ones when certain, provisional ones otherwise. Idempotent per reservation and passenger")
     public List<ResolvedIdentity> resolve(@RequestBody IdentityRequest request) {
-        return resolution.resolve(request);
+        var resolved = resolution.resolve(request);
+        // How each passenger was recognised — NEW, EMAIL, DOCUMENT, RESERVATION, or SOURCE when this
+        // reservation had already been resolved — on the span, for the booking's journey
+        // (journey-service): "passenger:customer:how", as it was decided then.
+        io.opentelemetry.api.trace.Span.current().setAttribute("mdm.identities", String.join(",", resolved.stream()
+                .map(r -> r.passenger() + ":" + r.customerId() + ":" + r.matchedBy()).toList()));
+        return resolved;
     }
 
     @GetMapping("/customers/{id}")

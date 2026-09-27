@@ -25,6 +25,7 @@ import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.annotations.Toolbar;
+import io.mateu.uidl.data.UICommand;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.data.FormPosition;
 import io.mateu.uidl.data.Message;
@@ -189,6 +190,17 @@ public class BookingViewModel implements Identifiable {
         return cancellationForm.dialogFor(List.of(saved), BookingCrudOrchestrator.LIST_ROUTE + "/" + saved);
     }
 
+    /**
+     * The booking's journey across the chain — CRS, integration, engine, mapping, MDM, Opera, front
+     * office, Salesforce — hop by hop, from its traces: journey-service's screen, on this console.
+     */
+    @Toolbar
+    @Action
+    @Label("Ver recorrido")
+    public Object verRecorrido(HttpRequest httpRequest) {
+        return UICommand.navigateTo(OtherSystems.journey(requireSaved()));
+    }
+
     private String requireSaved() {
         if (id == null) {
             throw new IllegalStateException("Save the booking first");
@@ -208,7 +220,7 @@ public class BookingViewModel implements Identifiable {
     }
 
     Component otherSystems() {
-        return OtherSystems.of(pmsReservationId, id == null ? null : customerLinks.of(hotelCode, id).orElse(null));
+        return OtherSystems.of(id, pmsReservationId, id == null ? null : customerLinks.of(hotelCode, id).orElse(null));
     }
 
     @Override

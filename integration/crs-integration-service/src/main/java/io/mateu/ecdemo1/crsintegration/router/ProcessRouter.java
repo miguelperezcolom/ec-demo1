@@ -73,6 +73,10 @@ public class ProcessRouter {
             case PartnerChanged e -> variables.add(new Variable(ProcessVariables.PARTNER_CODE, e.partnerCode()));
         }
         traces.tag("eventconductor.business-key", processKey);
+        // What the booking's journey (journey-service) names this change by: created, modified or
+        // cancelled, and the CRS version it carries.
+        traces.tag("booking.event", typeOf(event));
+        traces.tag("booking.version", String.valueOf(event.version()));
         log.info("Starting {} for {}", definitionId, event.key());
         outbox.appendToEngine(new ProcessCreationRequested(definitionId, processKey, variables, null,
                 AuthorizationContext.SYSTEM));
@@ -96,6 +100,8 @@ public class ProcessRouter {
                 new Variable(ProcessVariables.EVENT_ID, origin),
                 new Variable(ProcessVariables.ORIGIN, origin)));
         reservation(variables, hotelCode, locator);
+        traces.tag("booking.event", "backfill");
+        traces.tag("eventconductor.business-key", processKey);
         outbox.appendToEngine(new ProcessCreationRequested(definitionId, processKey, variables, null,
                 AuthorizationContext.SYSTEM));
     }
@@ -117,6 +123,8 @@ public class ProcessRouter {
                 new Variable("bookingId", locator),
                 new Variable("reportedBy", reportedBy == null ? "front office" : reportedBy)));
         reservation(variables, hotelCode, locator);
+        traces.tag("booking.event", "no-show");
+        traces.tag("eventconductor.business-key", processKey);
         outbox.appendToEngine(new ProcessCreationRequested(definitionId, processKey, variables, null,
                 AuthorizationContext.SYSTEM));
         return true;

@@ -30,6 +30,7 @@
         <module>integration/pms-integration-service</module>
         <module>integration/mapping-service</module>
         <module>integration/customer-mdm-service</module>
+        <module>integration/journey-service</module>
         <!-- control-plane: who governs it -->
         <module>control-plane/integrations-service</module>
         <module>control-plane/audit-service</module>
