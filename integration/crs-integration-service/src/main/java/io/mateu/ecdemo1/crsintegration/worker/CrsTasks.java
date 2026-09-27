@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.crsintegration.worker;
 
-import io.mateu.ecdemo1.crsintegration.worker.runtime.LegacyTaskRefs;
 import io.mateu.ecdemo1.crsintegration.worker.runtime.Reasons;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import org.springframework.context.annotation.Bean;
@@ -30,18 +29,5 @@ public class CrsTasks {
     public TaskRegistration<TaskHandlers.PartnerProfile, Void> annotatePartnerProfileTask(TaskHandlers handlers) {
         return new TaskRegistration<>(ANNOTATE_PARTNER_PROFILE, 1, TOPIC, TaskHandlers.PartnerProfile.class,
                 Void.class, Reasons.asBefore(handlers::annotatePartnerProfile));
-    }
-
-    /**
-     * The contract a step answers to when its definition does not name one yet: every step of
-     * proyectar-reserva and proyectar-interlocutor today. Goes once those reference their tasks.
-     */
-    @Bean
-    public LegacyTaskRefs legacyTaskRefs() {
-        return (definitionId, stepId) -> switch (stepId) {
-            case ANNOTATE_PMS_REFERENCE -> ANNOTATE_PMS_REFERENCE + "@1";
-            case ANNOTATE_PARTNER_PROFILE -> ANNOTATE_PARTNER_PROFILE + "@1";
-            default -> null;
-        };
     }
 }

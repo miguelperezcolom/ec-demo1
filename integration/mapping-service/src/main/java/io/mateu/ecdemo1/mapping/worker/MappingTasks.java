@@ -1,7 +1,5 @@
 package io.mateu.ecdemo1.mapping.worker;
 
-import io.mateu.ecdemo1.integration.model.process.Definitions;
-import io.mateu.ecdemo1.mapping.worker.runtime.LegacyTaskRefs;
 import io.mateu.ecdemo1.mapping.worker.runtime.Reasons;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import org.springframework.context.annotation.Bean;
@@ -59,33 +57,5 @@ public class MappingTasks {
     public TaskRegistration<TaskHandlers.Projected, Void> resolveProjectionTask(TaskHandlers handlers) {
         return new TaskRegistration<>(RESOLVE_PROJECTION, 1, TOPIC, TaskHandlers.Projected.class, Void.class,
                 Reasons.asBefore(handlers::resolveProjection));
-    }
-
-    /**
-     * The contract a step answers to when its definition does not name one yet: every step of
-     * proyectar-reserva, proyectar-cancelacion and proyectar-interlocutor today. "prepare" is a step
-     * of each, and what it prepares depends on which. Goes once those reference their tasks.
-     */
-    @Bean
-    public LegacyTaskRefs legacyTaskRefs() {
-        return (definitionId, stepId) -> {
-            if (stepId == null) {
-                return null;
-            }
-            if (stepId.startsWith("relaunch")) {
-                return RELAUNCH_PROCESS + "@1";
-            }
-            return switch (stepId) {
-                case "prepare" -> definitionId == null ? null : switch (definitionId) {
-                    case Definitions.PROJECT_RESERVATION -> PREPARE_RESERVATION + "@1";
-                    case Definitions.PROJECT_CANCELLATION -> PREPARE_CANCELLATION + "@1";
-                    case Definitions.PROJECT_PARTNER -> PREPARE_PARTNER + "@1";
-                    default -> null;
-                };
-                case RECORD_PARTNER_PROFILE -> RECORD_PARTNER_PROFILE + "@1";
-                case RESOLVE_PROJECTION -> RESOLVE_PROJECTION + "@1";
-                default -> null;
-            };
-        };
     }
 }

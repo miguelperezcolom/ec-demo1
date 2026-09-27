@@ -7,7 +7,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeWorkerEvent;consumeLegacyTasks
+      definition: consumeWorkerEvent
     stream:
       kafka:
         binder:
@@ -18,11 +18,6 @@ spring:
           # what it tells the front office and the pms-fo integration goes on in it.
           enable-observation: true
         bindings:
-          # A group created at the end of the topic, not its beginning: it would otherwise run every
-          # task the topic ever held.
-          consumeLegacyTasks-in-0:
-            consumer:
-              start-offset: latest
           notifications:
             producer:
               sync: true
@@ -48,13 +43,6 @@ spring:
         consumeWorkerEvent-in-0:
           destination: pms-integration
           group: ec-demo1-pms-integration-worker
-        # IN: the same tasks, for the ones the engine dispatches with no contract — the steps of the
-        # proyectar-* definitions, which do not reference their tasks yet. It stamps the contract the
-        # step answers to and runs it through the same runtime; the rest it leaves to
-        # consumeWorkerEvent. Goes once those definitions name their tasks.
-        consumeLegacyTasks-in-0:
-          destination: pms-integration
-          group: ec-demo1-pms-integration-worker-legacy
         # OUT: replies to the engine, and the alarm when a write keeps failing.
         upstream:
           destination: upstream
@@ -126,6 +114,3 @@ logging:
   level:
     org.springframework.kafka: error
     org.springframework.cloud.stream: error
-    # Every task of proyectar-* reaches consumeWorkerEvent with no contract and is served by
-    # consumeLegacyTasks; the runtime would warn about each. Until those definitions name their tasks.
-    io.mateu.workflow.worker.api.TaskDispatcher: error

@@ -7,7 +7,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeCrsEvents;routeIntegrationEvents;consumeWorkerEvent;consumeLegacyTasks;consumeCustomerEvents;consumeProjectionRequests;consumeNoShowReports
+      definition: consumeCrsEvents;routeIntegrationEvents;consumeWorkerEvent;consumeCustomerEvents;consumeProjectionRequests;consumeNoShowReports
     stream:
       kafka:
         binder:
@@ -18,11 +18,6 @@ spring:
           # trace, and what the CRS publishes reaches the engine in the booking's.
           enable-observation: true
         bindings:
-          # A group created at the end of the topic, not its beginning: it would otherwise run every
-          # task the topic ever held.
-          consumeLegacyTasks-in-0:
-            consumer:
-              start-offset: latest
           # The outbox's bindings are synchronous, so a message is marked published only once the
           # broker acknowledged it, and keyed with a String.
           integrationEvents:
@@ -92,13 +87,6 @@ spring:
         consumeWorkerEvent-in-0:
           destination: crs-integration
           group: ec-demo1-crs-integration-worker
-        # IN: the same tasks, for the ones the engine dispatches with no contract — the steps of
-        # proyectar-reserva and proyectar-interlocutor, which do not reference their tasks yet. It
-        # stamps the contract the step answers to and runs it through the same runtime; the rest it
-        # leaves to consumeWorkerEvent. Goes once those definitions name their tasks.
-        consumeLegacyTasks-in-0:
-          destination: crs-integration
-          group: ec-demo1-crs-integration-worker-legacy
         # OUT: business events (outbox), process starts (outbox), and replies to the engine.
         integrationEvents:
           destination: integration-events
@@ -168,6 +156,3 @@ logging:
   level:
     org.springframework.kafka: error
     org.springframework.cloud.stream: error
-    # Every task of proyectar-* reaches consumeWorkerEvent with no contract and is served by
-    # consumeLegacyTasks; the runtime would warn about each. Until those definitions name their tasks.
-    io.mateu.workflow.worker.api.TaskDispatcher: error

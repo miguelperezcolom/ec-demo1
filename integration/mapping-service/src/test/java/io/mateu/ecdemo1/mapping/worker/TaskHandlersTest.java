@@ -9,7 +9,6 @@ import io.mateu.ecdemo1.mapping.config.MappingProperties;
 import io.mateu.ecdemo1.mapping.config.TolerantReader;
 import io.mateu.ecdemo1.mapping.prepare.Preparation;
 import io.mateu.ecdemo1.mapping.worker.runtime.ExactStrings;
-import io.mateu.ecdemo1.mapping.worker.runtime.WorkerRuntime;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import io.mateu.workflow.worker.api.Cancellations;
@@ -79,7 +78,6 @@ class TaskHandlersTest {
             tasks.resolveProjectionTask(handlers)));
     final TaskDispatcher dispatcher = new TaskDispatcher(registry, sink, Cancellations.NONE,
             new ExactStrings(new ObjectMapper()), false);
-    final WorkerRuntime.LegacyTasks legacy = new WorkerRuntime.LegacyTasks(dispatcher, tasks.legacyTaskRefs());
 
     static class RecordingSink implements TaskReplySink {
         final List<String> replies = new ArrayList<>();
@@ -111,27 +109,13 @@ class TaskHandlersTest {
     }
 
     @Test
-    void prepareAnswersToTheContractOfItsDefinition() {
-        var refs = tasks.legacyTaskRefs();
-        assertThat(refs.ref("proyectar-reserva", "prepare")).isEqualTo("prepare-reservation@1");
-        assertThat(refs.ref("proyectar-cancelacion", "prepare")).isEqualTo("prepare-cancellation@1");
-        assertThat(refs.ref("proyectar-interlocutor", "prepare")).isEqualTo("prepare-partner@1");
-        assertThat(refs.ref("alta-integracion", "prepare")).isNull();
-        assertThat(refs.ref("proyectar-reserva", "relaunch-write")).isEqualTo("relaunch-process@1");
-        assertThat(refs.ref("proyectar-reserva", "resolve-projection")).isEqualTo("resolve-projection@1");
-        assertThat(refs.ref("proyectar-interlocutor", "record-partner-profile")).isEqualTo("record-partner-profile@1");
-        assertThat(refs.ref("proyectar-reserva", "upsert-reservation")).isNull();
-    }
-
-    @Test
-    void aLegacyPrepareRunsAsItsDefinitionsContractWithTheProcessVariables() {
-        var taken = legacy.accept(task("proyectar-cancelacion", "prepare", "",
+    void thePrepareOfACancellationWaitsWithTheProcessVariables() {
+        dispatcher.dispatch(task("proyectar-cancelacion", "prepare", "prepare-cancellation@1",
                 new Variable("hotelCode", "PMI01"), new Variable("locator", "12E45"),
                 new Variable("processKey", "proyectar-cancelacion:PMI01/12E45:E-1"),
                 new Variable("definitionId", "proyectar-cancelacion"), new Variable("version", "2"),
-                new Variable("eventId", "E-1"), new Variable("prepareOutcome", "ignored")), null);
+                new Variable("eventId", "E-1"), new Variable("prepareOutcome", "ignored")));
 
-        assertThat(taken).isTrue();
         assertThat(sink.replies).containsExactly("COMPLETED [Variable[name=prepareOutcome, value=" + Outcome.values()[0].name() + "]]");
         assertThat(waits).singleElement().satisfies(wait -> {
             assertThat(wait.processKey()).isEqualTo("proyectar-cancelacion:PMI01/12E45:E-1");

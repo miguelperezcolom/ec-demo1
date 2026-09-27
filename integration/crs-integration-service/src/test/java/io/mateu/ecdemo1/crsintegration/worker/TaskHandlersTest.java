@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.crsintegration.commands.SystemCommands;
 import io.mateu.ecdemo1.crsintegration.outbox.Outbox;
 import io.mateu.ecdemo1.crsintegration.worker.runtime.ExactStrings;
-import io.mateu.ecdemo1.crsintegration.worker.runtime.WorkerRuntime;
 import io.mateu.workflow.worker.api.Cancellations;
 import io.mateu.workflow.worker.api.TaskDispatcher;
 import io.mateu.workflow.worker.api.TaskRegistry;
@@ -72,7 +71,6 @@ class TaskHandlersTest {
     final TaskDispatcher dispatcher = new TaskDispatcher(new TaskRegistry(List.of(
             tasks.annotatePmsReferenceTask(handlers), tasks.annotatePartnerProfileTask(handlers))),
             sink, Cancellations.NONE, new ExactStrings(new ObjectMapper()), false);
-    final WorkerRuntime.LegacyTasks legacy = new WorkerRuntime.LegacyTasks(dispatcher, tasks.legacyTaskRefs());
 
     /** What the runtime would answer the engine. */
     static class RecordingSink implements TaskReplySink {
@@ -146,20 +144,4 @@ class TaskHandlersTest {
         assertThat(outbox.written).containsExactly(new SystemCommands.AnnotatePmsReference("TE-1", "12E45", "0.50"));
     }
 
-    @Test
-    void aStepWhoseDefinitionNamesNoContractRunsAsTheContractItAnswersTo() {
-        var taken = legacy.accept(task("annotate-pms-reference", "",
-                new Variable("locator", "LOC1"), new Variable("pmsReservationId", "OPERA-77")), null);
-
-        assertThat(taken).isTrue();
-        assertThat(sink.replies).containsExactly("COMPLETED TE-1 []");
-    }
-
-    @Test
-    void theLegacyBridgeLeavesContractTasksAndOtherServicesStepsAlone() {
-        assertThat(legacy.accept(task("annotate-pms-reference", "annotate-pms-reference@1",
-                new Variable("locator", "LOC1"), new Variable("pmsReservationId", "OPERA-77")), null)).isFalse();
-        assertThat(legacy.accept(task("upsert-reservation", ""), null)).isFalse();
-        assertThat(sink.replies).isEmpty();
-    }
 }
