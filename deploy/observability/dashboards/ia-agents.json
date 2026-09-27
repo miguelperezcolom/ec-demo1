@@ -418,13 +418,7 @@
         "overrides": []
       },
       "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Value",
-            "desc": true
-          }
-        ]
+        "showHeader": true
       },
       "transformations": [
         {
@@ -547,7 +541,7 @@
     },
     {
       "type": "row",
-      "title": "Traces (Tempo)",
+      "title": "Traces (Tempo) — recent requests and tool calls",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -557,18 +551,18 @@
     },
     {
       "type": "table",
-      "title": "Recent ia-agent prompts",
+      "title": "Recent requests (one row per prompt — open the span to see the whole trace)",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
       },
       "gridPos": {
-        "h": 10,
+        "h": 12,
         "w": 24,
         "x": 0,
         "y": 61
       },
-      "description": "One row per prompt; open a trace ID to see the model round trips, each execute_tool span and the MCP servers and control-plane calls that trace. Attributes: gen_ai.agent.id, gen_ai.request.model, gen_ai.usage.*, spring.ai.tool.definition.name. No prompt or answer text is recorded.",
+      "description": "One row per prompt: the invoke_agent span. Duration is the whole prompt; tokens are the sum of every model round trip under it; tools is how many tool calls it made and which. The span ID links to the full trace — each chat <model> span (gen_ai.input.messages / gen_ai.output.messages) and each execute_tool span (arguments, result, MCP server). The prompt and answer columns are filled only when ia-agent runs with IA_CAPTURE_CONTENT=redacted or full; with none they are empty. The cells show the start of the text; hover or inspect a cell for all of it (up to 16 KB).",
       "targets": [
         {
           "refId": "A",
@@ -577,11 +571,181 @@
             "uid": "tempo"
           },
           "queryType": "traceql",
-          "query": "{resource.service.name=\"ia-agent\" && name=~\"invoke_agent.*\"}",
-          "limit": 20,
-          "tableType": "traces"
+          "query": "{resource.service.name=\"ia-agent\" && name=~\"invoke_agent.*\" && span.gen_ai.agent.id=~\"${agent:regex}\"} | select(span.gen_ai.agent.id, span.gen_ai.request.model, span.gen_ai.usage.input_tokens, span.gen_ai.usage.output_tokens, span.ia.tool.calls, span.ia.tools.called, span.ia.outcome, status, span.ia.user.message, span.ia.agent.response)",
+          "limit": 50,
+          "spss": 1,
+          "tableType": "spans"
         }
-      ]
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "traceService": true,
+              "traceName": true,
+              "service.name": true
+            },
+            "renameByName": {
+              "gen_ai.agent.id": "agent",
+              "gen_ai.request.model": "model",
+              "gen_ai.usage.input_tokens": "input tokens",
+              "gen_ai.usage.output_tokens": "output tokens",
+              "ia.tool.calls": "tool calls",
+              "ia.tools.called": "tools",
+              "ia.outcome": "outcome",
+              "ia.user.message": "prompt",
+              "ia.agent.response": "answer"
+            },
+            "indexByName": {}
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true,
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "answer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tools"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent tool calls",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 73
+      },
+      "description": "One row per tool call: the execute_tool span, with its duration, its outcome (and the span status), the agent that called it and where the tool lives — the MCP server (ia.mcp.server, the host) or the RAG source (ia.rag.id). The span ID links to the full trace. Arguments and result appear only with IA_CAPTURE_CONTENT=redacted or full.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ia-agent\" && name=~\"execute_tool.*\" && span.gen_ai.agent.id=~\"${agent:regex}\"} | select(span.gen_ai.tool.name, span.gen_ai.agent.id, span.ia.tool.source, span.ia.mcp.server, span.ia.tool.outcome, status, span.gen_ai.tool.call.arguments, span.gen_ai.tool.call.result)",
+          "limit": 50,
+          "spss": 20,
+          "tableType": "spans"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "traceService": true,
+              "traceName": true,
+              "service.name": true
+            },
+            "renameByName": {
+              "gen_ai.tool.name": "tool",
+              "gen_ai.agent.id": "agent",
+              "ia.tool.source": "source",
+              "ia.mcp.server": "MCP server",
+              "ia.tool.outcome": "outcome",
+              "gen_ai.tool.call.arguments": "arguments",
+              "gen_ai.tool.call.result": "result"
+            },
+            "indexByName": {}
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true,
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "arguments"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "result"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
     }
   ]
 }

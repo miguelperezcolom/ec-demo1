@@ -1,7 +1,9 @@
 package io.mateu.ecdemo1.iaagent.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mateu.ecdemo1.iaagent.observability.AgentObservability;
 import io.mateu.ecdemo1.iaagent.observability.TraceHeaders;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
@@ -66,11 +68,13 @@ public class RagToolFactory {
     private final ObjectMapper mapper = new ObjectMapper();
     private final String controlPlaneUrl;
     private final TraceHeaders traceHeaders;
+    private final ObservationRegistry observationRegistry;
 
     public RagToolFactory(@Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl,
-                          TraceHeaders traceHeaders) {
+                          TraceHeaders traceHeaders, ObservationRegistry observationRegistry) {
         this.controlPlaneUrl = controlPlaneUrl.replaceAll("/+$", "");
         this.traceHeaders = traceHeaders;
+        this.observationRegistry = observationRegistry;
     }
 
     public List<ToolCallback> toolsFor(List<AgentConfig.Rag> rags) {
@@ -124,6 +128,12 @@ public class RagToolFactory {
 
         @Override
         public String call(String toolInput, ToolContext toolContext) {
+            // The execute_tool span says where the tool came from — a RAG source, not an MCP server.
+            var current = observationRegistry.getCurrentObservation();
+            if (current != null && "spring.ai.tool".equals(current.getContext().getName())) {
+                current.highCardinalityKeyValue(AgentObservability.TOOL_SOURCE, "rag")
+                        .highCardinalityKeyValue(AgentObservability.RAG_ID, String.valueOf(rag.id()));
+            }
             String query;
             try {
                 var node = mapper.readTree(toolInput);

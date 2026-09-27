@@ -31,11 +31,15 @@ spring:
 
     # Observations of the model and its tools. The spans and the gen_ai.* metrics are on as soon
     # as the ObservationRegistry reaches the chat models — ChatClientRegistry passes it, since it
-    # builds them itself. What is switched off here, explicitly and on purpose, is CONTENT: a
-    # prompt, a completion and a tool's arguments and result all carry customer data (names,
-    # bookings, e-mails), and a trace backend is not where that is allowed to end up. The trace
-    # keeps the agent, the model, the tokens and each tool's name; turning any of these on is a
-    # decision about personal data, not about debugging.
+    # builds them itself.
+    #
+    # Spring AI's own CONTENT switches stay off whatever ia.observability.capture-content says, and
+    # that is not a contradiction. In 2.0.1, log-prompt / log-completion (chat and chat client) and
+    # include-error-logging only ever write to the LOG — Loki, not the span — and
+    # tools.observations.include-content does put a tool's arguments and result on the span, but
+    # raw: neither redacted nor truncated. The content that reaches a span goes through one place
+    # instead, ContentCapture, which applies the mode below to all of it: the user's message and
+    # the answer, the messages sent to the model and its reply, and each tool's arguments and result.
     chat:
       observations:
         log-prompt: false
@@ -55,6 +59,17 @@ ia:
   control-plane:
     url: ${IA_CONTROL_PLANE_URL:http://localhost:8110}
   agent-id: ${AGENT_ID:console-agent}
+  observability:
+    # What the traces keep of the conversation — see ContentCapture:
+    #   none      no content: tokens, durations, tools and outcomes only (the default)
+    #   redacted  the content, with e-mails, phones, cards, IBANs, DNI/NIE and passports masked
+    #   full      the content as it is
+    # Anything but none puts customer data in Tempo for as long as Tempo keeps traces.
+    capture-content: ${IA_CAPTURE_CONTENT:none}
+    # Per attribute, in characters; longer values are cut and say so. Tempo's distributor has its
+    # own limit (max_attribute_bytes, raised to match in deploy/observability/tempo.yaml) and
+    # truncates silently past it.
+    max-attribute-length: ${IA_CAPTURE_MAX_CHARS:16384}
 
 management:
   endpoints:

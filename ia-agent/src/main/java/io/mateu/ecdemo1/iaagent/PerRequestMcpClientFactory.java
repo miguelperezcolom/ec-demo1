@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iaagent;
 
+import io.mateu.ecdemo1.iaagent.observability.AgentObservability;
 import io.mateu.ecdemo1.iaagent.observability.TraceHeaders;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
@@ -112,12 +113,21 @@ public class PerRequestMcpClientFactory {
         long timeoutSecs = CONNECT_TIMEOUT.toSeconds() + 5;
         List<McpSyncClient> clients = new ArrayList<>();
         List<String> serverContexts = new ArrayList<>();
+        List<ToolCallback> rawCallbacks = new ArrayList<>();
 
         for (CompletableFuture<McpConnection> future : futures) {
             try {
                 McpConnection conn = future.get(timeoutSecs, TimeUnit.SECONDS);
                 if (conn != null) {
                     clients.add(conn.client());
+                    // One provider per server, rather than one over all of them, so each tool
+                    // still knows which server it came from when it is called — that server goes
+                    // on the tool's span. The list is the same either way: the combined provider
+                    // only walks the clients in this order.
+                    for (ToolCallback callback : new SyncMcpToolCallbackProvider(List.of(conn.client()))
+                            .getToolCallbacks()) {
+                        rawCallbacks.add(new ServerToolCallback(callback, conn.url()));
+                    }
                     if (conn.systemContext() != null) {
                         serverContexts.add(conn.systemContext());
                     }
@@ -127,14 +137,31 @@ public class PerRequestMcpClientFactory {
             }
         }
 
-        ToolCallback[] rawCallbacks = new SyncMcpToolCallbackProvider(clients).getToolCallbacks();
-        ToolCallback[] wrapped = wrapWithExecutor(dropDuplicateNames(rawCallbacks));
+        ToolCallback[] wrapped = wrapWithExecutor(dropDuplicateNames(rawCallbacks.toArray(ToolCallback[]::new)));
         log.info("Per-request MCP tools ready: {} tools from {}/{} servers",
                 wrapped.length, clients.size(), serverUrls.size());
         return new PerRequestTools(clients, wrapped, serverContexts, serverUrls.size());
     }
 
-    private record McpConnection(McpSyncClient client, String systemContext) {}
+    private record McpConnection(McpSyncClient client, String systemContext, String url) {}
+
+    /** A server's tool, and which server that is. Only a carrier: the call is the delegate's. */
+    private record ServerToolCallback(ToolCallback delegate, String url) implements ToolCallback {
+        @Override
+        public ToolDefinition getToolDefinition() {
+            return delegate.getToolDefinition();
+        }
+
+        @Override
+        public org.springframework.ai.tool.metadata.ToolMetadata getToolMetadata() {
+            return delegate.getToolMetadata();
+        }
+
+        @Override
+        public String call(String toolInput) {
+            return delegate.call(toolInput);
+        }
+    }
 
     private McpConnection connectToServer(String url, String authorizationHeader) {
         try {
@@ -164,7 +191,7 @@ public class PerRequestMcpClientFactory {
                     .build();
             client.initialize();
             log.debug("MCP client connected: {}", url);
-            return new McpConnection(client, readSystemContext(client, url));
+            return new McpConnection(client, readSystemContext(client, url), url);
         } catch (Exception e) {
             log.warn("Could not connect to MCP server {} — skipping: {}", url, e.getMessage());
             return null;
@@ -244,6 +271,8 @@ public class PerRequestMcpClientFactory {
     private ToolCallback[] wrapWithExecutor(ToolCallback[] callbacks) {
         return Arrays.stream(callbacks)
                 .map(cb -> (ToolCallback) new ToolCallback() {
+                    private final String serverUrl = cb instanceof ServerToolCallback s ? s.url() : null;
+
                     @Override
                     public ToolDefinition getToolDefinition() {
                         return cb.getToolDefinition();
@@ -252,7 +281,12 @@ public class PerRequestMcpClientFactory {
                     @Override
                     public String call(String toolInput) {
                         String toolName = cb.getToolDefinition().name();
-                        log.info("MCP tool call: {} input={}", toolName, toolInput);
+                        // Which tool, from where and how long at INFO; what went in and came
+                        // out at DEBUG only. The content belongs in the trace, where
+                        // IA_CAPTURE_CONTENT decides whether it is kept, redacted or left out.
+                        log.info("MCP tool call: {} ({})", toolName, serverUrl);
+                        log.debug("MCP tool call: {} input={}", toolName, toolInput);
+                        long started = System.nanoTime();
                         // The spring.ai.tool observation Spring AI opened around this call. The
                         // failures below are answered to the model as text rather than thrown, so
                         // this is the only place that can mark the tool's span and metric as the
@@ -260,10 +294,21 @@ public class PerRequestMcpClientFactory {
                         Observation current = observationRegistry.getCurrentObservation();
                         Observation toolCall = current != null
                                 && "spring.ai.tool".equals(current.getContext().getName()) ? current : null;
+                        if (toolCall != null) {
+                            // High cardinality: on the span, not a label of spring_ai_tool_seconds,
+                            // which the RAG tools share and could not fill in.
+                            toolCall.highCardinalityKeyValue(AgentObservability.TOOL_SOURCE, "mcp");
+                            if (serverUrl != null) {
+                                toolCall.highCardinalityKeyValue(AgentObservability.MCP_SERVER, clientNameFor(serverUrl))
+                                        .highCardinalityKeyValue(AgentObservability.MCP_SERVER_URL, serverUrl);
+                            }
+                        }
                         try {
                             String result = executor.submit(() -> inScope(current, () -> cb.call(toolInput)))
                                     .get(60, TimeUnit.SECONDS);
-                            log.info("MCP tool result: {} -> {}", toolName, result);
+                            log.info("MCP tool result: {} in {} ms, {} chars", toolName,
+                                    (System.nanoTime() - started) / 1_000_000, result == null ? 0 : result.length());
+                            log.debug("MCP tool result: {} -> {}", toolName, result);
                             return result;
                         } catch (ExecutionException e) {
                             String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();

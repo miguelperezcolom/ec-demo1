@@ -63,15 +63,24 @@ spec:
             - name: AGENT_ID
               value: console-agent
             # Traces to Tempo, like the engines'. One span per prompt (invoke_agent <agent>), one
-            # per model round trip and one per tool call, with the agent, the model, the tokens
-            # and the tool's name — never the prompt, the answer or a tool's arguments. The trace
-            # continues into the MCP servers and the control plane that trace.
+            # per model round trip (chat <model>) and one per tool call (execute_tool <tool>), with
+            # the agent, the model, the tokens, the durations and the tools. The trace continues
+            # into the MCP servers and the control plane that trace.
             - name: OTEL_SERVICE_NAME
               value: ia-agent
             - name: OTLP_TRACING_ENDPOINT
               value: http://tempo.observability.svc.cluster.local:4318/v1/traces
             - name: TRACING_SAMPLING
               value: "1.0"
+            # What the traces keep of the conversation: none | redacted | full (code default: none).
+            # `full` because this is a DEMO environment: the user's message and the answer, every
+            # message sent to the model and its reply, and each tool's arguments and result go
+            # into Tempo as they are — customer data (names, e-mails, phones, bookings) kept there
+            # for Tempo's retention (24h here) and readable by anyone with Grafana. For real data
+            # use `redacted`, which masks e-mails, phones, cards, IBANs, DNI/NIE and passports
+            # before export — names and addresses it cannot recognise — or `none`.
+            - name: IA_CAPTURE_CONTENT
+              value: full
           ports:
             - { name: http, containerPort: 8095 }
           securityContext:

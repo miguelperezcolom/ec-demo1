@@ -182,17 +182,49 @@ plane is for.
 `OTLP_TRACING_ENDPOINT`, `TRACING_SAMPLING`), and Grafana has an **IA agents** dashboard
 (`deploy/observability/dashboards/ia-agents.json`) next to **IA token usage**.
 
-- **One trace per prompt.** `invoke_agent <agent>` is the root, with `gen_ai.agent.id`, the
-  catalogue's LLM id and model, the tokens and an outcome (`success`, `refused`, `no_tools`,
-  `error`). Under it, Spring AI's own spans: `chat <model>` per round trip to the LLM (model, finish
-  reason, `gen_ai.usage.*`) and `execute_tool <tool>` per tool call. The MCP call carries the trace
-  headers, so a server that traces (the engines) adds its span to the same trace; so does the
-  control plane on resolve, RAG search and usage.
-- **No content.** Prompts, answers and tool arguments/results are customer data and stay out:
-  `spring.ai.chat.observations.log-prompt|log-completion`, `spring.ai.chat.client.observations.*`
-  and `spring.ai.tools.observations.include-content` are all `false` in `ia-agent`'s
-  application.yaml. The agent's own INFO logs are another matter — they still print the message
-  and the tool input/output into Loki.
+- **One trace per prompt.** `invoke_agent <agent>` is the root: its duration is the whole prompt,
+  and it carries `gen_ai.agent.id`, the catalogue's LLM id and model, an outcome (`ia.outcome`:
+  `success`, `refused`, `no_tools`, `error`) and the prompt's totals — `gen_ai.usage.input_tokens` /
+  `output_tokens` summed over every model round trip, `ia.model.calls`, `ia.tool.calls` and
+  `ia.tools.called`. Under it, `chat <model>` per round trip to the LLM (model, finish reason, its
+  own `gen_ai.usage.*`) and `execute_tool <tool>` per tool call (`gen_ai.tool.name`,
+  `gen_ai.tool.call.id`, `ia.tool.outcome` plus the span status, and where the tool lives:
+  `ia.tool.source` = `mcp` with `ia.mcp.server` / `ia.mcp.server.url`, or `rag` with `ia.rag.id`).
+  The MCP call carries the trace headers, so a server that traces (the engines) adds its span to
+  the same trace; so does the control plane on resolve, RAG search and usage.
+- **The conversation, in the trace — `IA_CAPTURE_CONTENT`** (`ia.observability.capture-content`).
+  What was said lives in Tempo, never in Loki:
+
+  | span | attributes |
+  |---|---|
+  | `invoke_agent` | `ia.user.message` (what the user wrote), `ia.agent.response` (the answer they got) |
+  | `chat <model>` | `gen_ai.system_instructions`, `gen_ai.input.messages` (user, assistant tool calls, tool results), `gen_ai.output.messages` — JSON in the OpenTelemetry GenAI conventions' shape |
+  | `execute_tool` | `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
+
+  Three modes. **`none`** — the default in the code: no content, only tokens, durations, tools and
+  outcomes. **`redacted`** — the content, with e-mails, phone numbers, card numbers (Luhn-checked),
+  IBANs, DNI/NIE and passport numbers replaced by `[email]`, `[phone]`, `[card]`, `[iban]`, `[dni]`,
+  `[nie]`, `[passport]` *before* export; booking and hotel codes, dates and amounts are left alone.
+  It cannot see names or addresses — it masks what has a recognisable shape. **`full`** — as it is.
+  Every value is cut at `IA_CAPTURE_MAX_CHARS` (16384) characters with a `…[truncated: N chars]`
+  note, and Tempo's `max_attribute_bytes` is raised to 65536 in `deploy/observability/tempo.yaml`
+  so Tempo (2 KB by default, silently) never cuts first.
+
+  > **Personal data.** Anything but `none` stores customer data — names, e-mails, phones, bookings —
+  > in Tempo for its retention (24h here), readable by anyone with Grafana. The manifest sets
+  > **`full`** because this is a demo; for real data use `redacted`, or `none`.
+
+  All content goes through one class, `ContentCapture`, which applies the mode and the limit.
+  Spring AI's own switches therefore stay off: in 2.0.1 `spring.ai.chat.observations.log-prompt` /
+  `log-completion`, `spring.ai.chat.client.observations.*` and `include-error-logging` only write to
+  the *log*, and `spring.ai.tools.observations.include-content` writes a tool's arguments and result
+  to the span unredacted and untruncated. The agent's INFO logs say what happened (session, message
+  length, tool, server, duration, result size); the message and tool input/output are at DEBUG.
+- **Where to look.** Grafana → **IA agents** → *Recent requests*: one row per prompt with agent,
+  model, duration, tokens, tool calls, outcome and — when captured — the start of the prompt and
+  the answer (inspect a cell for all of it); the span ID opens the whole trace. *Recent tool calls*:
+  tool, agent, source/MCP server, duration, outcome, arguments and result. Or Explore → Tempo with
+  TraceQL, e.g. `{resource.service.name="ia-agent" && span.ia.outcome != "success"}`.
 - **Metrics**, scraped from `/actuator/prometheus`: `ia_agent_prompt_seconds` (per prompt),
   `gen_ai_client_operation_seconds` and `gen_ai_client_token_usage_total` (per model call),
   `spring_ai_tool_seconds` (per tool, `spring_ai_tool_definition_name`), all labelled with

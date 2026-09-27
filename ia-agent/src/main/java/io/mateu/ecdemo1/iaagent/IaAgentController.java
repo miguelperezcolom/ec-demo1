@@ -7,6 +7,7 @@ import io.mateu.ecdemo1.iaagent.config.AgentResolver;
 import io.mateu.ecdemo1.iaagent.config.ChatClientRegistry;
 import io.mateu.ecdemo1.iaagent.config.RagToolFactory;
 import io.mateu.ecdemo1.iaagent.observability.AgentObservability;
+import io.mateu.ecdemo1.iaagent.observability.ContentCapture;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
@@ -46,6 +47,7 @@ public class IaAgentController {
     private final io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter;
     private final AgentResolver agentResolver;
     private final ObservationRegistry observationRegistry;
+    private final ContentCapture content;
 
     public IaAgentController(AgentConfigClient configClient,
                              ChatClientRegistry chatClients,
@@ -57,7 +59,8 @@ public class IaAgentController {
                              io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader jwtIdentityReader,
                              io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter,
                              AgentResolver agentResolver,
-                             ObservationRegistry observationRegistry) {
+                             ObservationRegistry observationRegistry,
+                             ContentCapture content) {
         this.configClient = configClient;
         this.chatClients = chatClients;
         this.mcpFactory = mcpFactory;
@@ -69,6 +72,7 @@ public class IaAgentController {
         this.usageReporter = usageReporter;
         this.agentResolver = agentResolver;
         this.observationRegistry = observationRegistry;
+        this.content = content;
     }
 
     // ── Observation ──────────────────────────────────────────────────────────
@@ -81,9 +85,14 @@ public class IaAgentController {
      * <p>Every low-cardinality key is set at the start, with a placeholder, and overwritten as it
      * becomes known: they are Prometheus labels, and a meter must carry the same ones on every
      * sample.
+     *
+     * <p>The tokens, model calls and tool calls it ends with are not set here: every model round
+     * trip and tool call under it adds itself up in {@link AgentObservability.PromptStats} as it
+     * stops, and {@link AgentObservability} writes the totals when this one does. The user's
+     * message goes on it only when {@link ContentCapture} records content.
      */
-    private Observation startPromptObservation(Observation parent, String sessionId) {
-        return Observation.createNotStarted(AgentObservability.PROMPT, observationRegistry)
+    private Observation startPromptObservation(Observation parent, String sessionId, String userMessage) {
+        var observation = Observation.createNotStarted(AgentObservability.PROMPT, observationRegistry)
                 .parentObservation(parent)
                 .contextualName("invoke_agent")
                 .lowCardinalityKeyValue(AgentObservability.OPERATION, "invoke_agent")
@@ -91,8 +100,21 @@ public class IaAgentController {
                 .lowCardinalityKeyValue(AgentObservability.LLM_ID, AgentObservability.UNRESOLVED)
                 .lowCardinalityKeyValue(AgentObservability.REQUEST_MODEL, AgentObservability.UNRESOLVED)
                 .lowCardinalityKeyValue(AgentObservability.OUTCOME, "error")
-                .highCardinalityKeyValue(AgentObservability.SESSION_ID, String.valueOf(sessionId))
-                .start();
+                .highCardinalityKeyValue(AgentObservability.SESSION_ID, String.valueOf(sessionId));
+        AgentObservability.attachStats(observation.getContext());
+        var captured = content.prepare(userMessage);
+        if (captured != null) {
+            observation.highCardinalityKeyValue(AgentObservability.USER_MESSAGE, captured);
+        }
+        return observation.start();
+    }
+
+    /** The answer as the user reads it — on the span only when content is recorded. */
+    private void tagResponse(Observation observation, String response) {
+        var captured = content.prepare(response);
+        if (captured != null) {
+            observation.highCardinalityKeyValue(AgentObservability.AGENT_RESPONSE, captured);
+        }
     }
 
     private static void tagAgent(Observation observation, AgentConfig config) {
@@ -110,11 +132,6 @@ public class IaAgentController {
         observation.highCardinalityKeyValue(AgentObservability.TOOLS_AVAILABLE, String.valueOf(toolCount))
                 .highCardinalityKeyValue(AgentObservability.MCP_SERVERS_EXPECTED, String.valueOf(tools.expectedServers()))
                 .highCardinalityKeyValue(AgentObservability.MCP_SERVERS_CONNECTED, String.valueOf(tools.connectedServers()));
-    }
-
-    private static void tagUsage(Observation observation, int inputTokens, int outputTokens) {
-        observation.highCardinalityKeyValue(AgentObservability.INPUT_TOKENS, String.valueOf(inputTokens))
-                .highCardinalityKeyValue(AgentObservability.OUTPUT_TOKENS, String.valueOf(outputTokens));
     }
 
     private static void outcome(Observation observation, String outcome) {
@@ -184,6 +201,10 @@ public class IaAgentController {
         return sb.toString();
     }
 
+    private static int length(String text) {
+        return text == null ? 0 : text.length();
+    }
+
     private ServerSentEvent<String> tokenEvent(int input, int output, int total) {
         return ServerSentEvent.<String>builder()
                 .data("{\"inputTokens\":" + input
@@ -225,7 +246,7 @@ public class IaAgentController {
                 objectMapper.readTree(json);
                 String ssePayload = "{\"event\":\"navigation-requested\",\"detail\":" + json + "}";
                 navEvents.add(ServerSentEvent.<String>builder().data(ssePayload).build());
-                log.info("Navigation requested: {}", json);
+                log.debug("Navigation requested: {}", json);
             } catch (Exception e) {
                 log.warn("Malformed NAVIGATE block, ignoring: {}", json);
             }
@@ -240,10 +261,14 @@ public class IaAgentController {
     public String chat(@RequestBody ChatRequest request,
                        @RequestHeader(value = "Authorization", required = false) String authorization) {
         String sessionId = request.sessionId();
-        log.info("Chat request session={}: '{}'", sessionId, request.message());
+        // What happened goes to the log; what was said goes to the trace, and only when
+        // IA_CAPTURE_CONTENT says so. The text itself is here at DEBUG, for a local run.
+        log.info("Chat request session={}: {} chars", sessionId, length(request.message()));
+        log.debug("Chat request session={}: '{}'", sessionId, request.message());
         menuContextStore.update(sessionId, request.menuContext());
 
-        var observation = startPromptObservation(observationRegistry.getCurrentObservation(), sessionId);
+        var observation = startPromptObservation(observationRegistry.getCurrentObservation(), sessionId,
+                request.message());
         try (var scope = observation.openScope()) {
             // Resolved before anything else: it decides the agent (by the caller's context), the
             // model, the credential, the prompt and which MCP servers to even open a connection to
@@ -262,6 +287,7 @@ public class IaAgentController {
                             + " configurados, 0 conectados) ni ninguna fuente RAG. No puedo "
                             + "responder sin acceso a las herramientas.";
                     log.warn("Chat aborted session={}: {}", sessionId, err);
+                    tagResponse(observation, err);
                     outcome(observation, "no_tools");
                     return err;
                 }
@@ -303,7 +329,7 @@ public class IaAgentController {
                 usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
                         inputTokens, outputTokens, totalTokens,
                         jwtIdentityReader.read(authorization), sessionId);
-                tagUsage(observation, inputTokens, outputTokens);
+                tagResponse(observation, result);
                 outcome(observation, "success");
                 return result;
             }
@@ -311,6 +337,7 @@ public class IaAgentController {
             // Not an error during the prompt — a misconfiguration. The message is written for
             // whoever can fix it, so it is returned as it is rather than wrapped in a class name.
             log.warn("Chat aborted session={}: {}", sessionId, e.getMessage());
+            tagResponse(observation, e.getMessage());
             outcome(observation, "refused");
             return e.getMessage();
         } catch (Exception e) {
@@ -343,7 +370,8 @@ public class IaAgentController {
     public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest request,
                                                 @RequestHeader(value = "Authorization", required = false) String authorization) {
         String sessionId = request.sessionId();
-        log.info("Stream request session={}: '{}'", sessionId, request.message());
+        log.info("Stream request session={}: {} chars", sessionId, length(request.message()));
+        log.debug("Stream request session={}: '{}'", sessionId, request.message());
 
         // Cache menu if provided
         menuContextStore.update(sessionId, request.menuContext());
@@ -356,10 +384,11 @@ public class IaAgentController {
 
         // Blocking LLM call on a dedicated thread; cache() so both subscribers share the result.
         Mono<LlmResult> resultMono = Mono.fromCallable(() -> {
-                    var observation = startPromptObservation(requestObservation, sessionId);
+                    var observation = startPromptObservation(requestObservation, sessionId, request.message());
                     try (var scope = observation.openScope()) {
                         return streamPrompt(observation, request, authorization, sessionId, history);
                     } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
+                        tagResponse(observation, e.getMessage());
                         outcome(observation, "refused");
                         throw e;
                     } catch (Exception e) {
@@ -424,6 +453,7 @@ public class IaAgentController {
                         + "ninguna fuente RAG. No puedo responder sin acceso a las "
                         + "herramientas.";
                 log.warn("Stream aborted session={}: no tools at all", sessionId);
+                tagResponse(observation, err);
                 outcome(observation, "no_tools");
                 return new LlmResult(err, 0, 0, 0);
             }
@@ -465,7 +495,7 @@ public class IaAgentController {
             usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
                     inputTokens, outputTokens, totalTokens,
                     jwtIdentityReader.read(authorization), sessionId);
-            tagUsage(observation, inputTokens, outputTokens);
+            tagResponse(observation, raw);
             outcome(observation, "success");
             int[] cumulative = conversationStore.getTotalTokens(sessionId);
             return new LlmResult(raw, cumulative[0], cumulative[1], cumulative[2]);
