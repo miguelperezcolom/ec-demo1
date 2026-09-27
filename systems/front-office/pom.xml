@@ -61,6 +61,12 @@
             <artifactId>redwood</artifactId>
             <version>${mateu.version}</version>
         </dependency>
+        <!-- The user widget, the same as the consoles'. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>ui-commons</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <!-- A resource server, as the consoles' shells: the browser logs in with Keycloak from the
              bootstrap page and the UI's calls carry the token. -->
         <dependency>

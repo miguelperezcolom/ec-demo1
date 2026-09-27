@@ -165,7 +165,7 @@ public class EntryViewModel implements Identifiable, VisibilitySupplier, Options
 
     /** The console's user, as their token names them; "console" when there is none. */
     static String user(HttpRequest httpRequest) {
-        return io.mateu.ecdemo1.mapping.ui.ConsoleUser.of(httpRequest);
+        return io.mateu.ecdemo1.uicommons.user.ConsoleUser.of(httpRequest);
     }
 
     /** A CRS code of the hotel that nothing translates yet: not an entry until it is saved. */

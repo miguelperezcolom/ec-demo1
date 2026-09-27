@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.apimcp;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.ApiMcpDto;
 import io.mateu.ecdemo1.iacp.application.usecases.apimcp.create.CreateApiMcpCommand;
 import io.mateu.ecdemo1.iacp.application.usecases.apimcp.create.CreateApiMcpUseCase;
@@ -23,7 +24,6 @@ import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,7 @@ import java.util.List;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class ApiMcpViewModel implements Identifiable {
+public class ApiMcpViewModel implements CatalogueEditor<ApiMcpDto> {
 
     @Section("API")
     @ReadOnly

@@ -221,7 +221,7 @@ public class IntegrationViewModel implements Identifiable {
 
     /** The console's user, as their token names them; "console" when there is none. */
     static String user(HttpRequest httpRequest) {
-        return io.mateu.ecdemo1.integrations.ui.ConsoleUser.of(httpRequest);
+        return io.mateu.ecdemo1.uicommons.user.ConsoleUser.of(httpRequest);
     }
 
     public IntegrationViewModel load(Integration i) {

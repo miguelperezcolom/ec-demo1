@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.rag;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.probe.ConnectionProbe;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.RagDto;
 import io.mateu.ecdemo1.iacp.application.out.repository.RagRepository;
@@ -23,7 +24,6 @@ import io.mateu.uidl.annotations.Notice;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
@@ -41,7 +41,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class RagViewModel implements Identifiable {
+public class RagViewModel implements CatalogueEditor<RagDto> {
 
     @Section("Source")
     @ReadOnly

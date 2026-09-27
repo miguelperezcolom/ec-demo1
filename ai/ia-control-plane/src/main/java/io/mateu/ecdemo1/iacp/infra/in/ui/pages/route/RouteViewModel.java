@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.route;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.RouteDto;
 import io.mateu.ecdemo1.iacp.application.usecases.route.create.CreateRouteCommand;
 import io.mateu.ecdemo1.iacp.application.usecases.route.create.CreateRouteUseCase;
@@ -10,7 +11,6 @@ import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class RouteViewModel implements Identifiable {
+public class RouteViewModel implements CatalogueEditor<RouteDto> {
 
     @Section("Route")
     @ReadOnly

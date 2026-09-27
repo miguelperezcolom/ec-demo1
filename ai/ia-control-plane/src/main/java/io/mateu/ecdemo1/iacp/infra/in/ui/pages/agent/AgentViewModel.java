@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.agent;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.AgentDto;
 import io.mateu.ecdemo1.iacp.application.usecases.agent.ResolveAgentConfigUseCase;
 import io.mateu.ecdemo1.iacp.application.usecases.agent.create.CreateAgentCommand;
@@ -14,7 +15,6 @@ import io.mateu.uidl.annotations.Multiline;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
@@ -34,7 +34,7 @@ import java.util.List;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class AgentViewModel implements Identifiable {
+public class AgentViewModel implements CatalogueEditor<AgentDto> {
 
     @Section("Agent")
     @ReadOnly

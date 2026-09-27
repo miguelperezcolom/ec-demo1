@@ -1,11 +1,11 @@
 package io.mateu.ecdemo1.users.infra.in.ui.pages.users;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.EditableOnlyWhenCreating;
 import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.ecdemo1.users.application.query.dto.UserDto;
 import io.mateu.ecdemo1.users.application.usecases.user.create.CreateUserCommand;
 import io.mateu.ecdemo1.users.application.usecases.user.create.CreateUserUseCase;
@@ -28,7 +28,7 @@ import java.util.List;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class UserViewModel implements Identifiable {
+public class UserViewModel implements CatalogueEditor<UserDto> {
     @EditableOnlyWhenCreating
             @NotEmpty
     String id;

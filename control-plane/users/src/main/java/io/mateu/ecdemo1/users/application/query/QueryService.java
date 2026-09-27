@@ -1,17 +1,10 @@
 package io.mateu.ecdemo1.users.application.query;
 
-import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Pageable;
+import io.mateu.ecdemo1.uicommons.crud.CatalogueQueries;
 
-import java.util.Optional;
-
-public interface QueryService<DtoType, RowType, IdType> {
-
-    ListingData<RowType> findAll(String searchText,
-                                 Object filters, Pageable pageable);
+/** The read side of a catalogue: its rows and one entry ({@link CatalogueQueries}, what the CRUDs read), and a label. */
+public interface QueryService<DtoType, RowType, IdType> extends CatalogueQueries<DtoType, RowType, IdType> {
 
     String getLabel(IdType id);
-
-    Optional<DtoType> getById(IdType id);
 
 }

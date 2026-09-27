@@ -1,7 +1,7 @@
 package io.mateu.ecdemo1.users.infra.out.persistence;
 
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.Pageable;
 import io.mateu.ecdemo1.users.application.query.RoleQueryService;
 import io.mateu.ecdemo1.users.application.query.dto.RoleDto;
@@ -36,12 +36,8 @@ public class RoleDBQueryService implements RoleQueryService {
     @Override
     public ListingData<RoleRow> findAll(String searchText,
                                         Object filters, Pageable pageable) {
-        var page = repository.findAllByNameContainingIgnoreCase(searchText, org.springframework.data.domain.Pageable
-                .ofSize(pageable.size())
-                .withPage(pageable.page())
-        );
-        return new ListingData(new Page(searchText, page.getSize(), page.getNumber(), page.getTotalElements(),
-                page.getContent().stream().map(this::toDomain).toList()));
+        var page = repository.findAllByNameContainingIgnoreCase(searchText, DbPaging.pageable(pageable));
+        return DbPaging.listing(searchText, page, this::toDomain);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.llm;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.LlmDto;
 import io.mateu.ecdemo1.iacp.application.usecases.llm.create.CreateLlmCommand;
 import io.mateu.ecdemo1.iacp.application.usecases.llm.create.CreateLlmUseCase;
@@ -17,7 +18,6 @@ import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
@@ -36,7 +36,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class LlmViewModel implements Identifiable {
+public class LlmViewModel implements CatalogueEditor<LlmDto> {
 
     @Section("Model")
     @Help("Referenced by agents and RAG sources. Cannot be changed once created.")
