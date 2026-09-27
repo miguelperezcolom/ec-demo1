@@ -21,6 +21,15 @@ public record CrsCatalog(List<Hotel> hotels,
                          List<Code> paymentMethods) {
 
     /**
+     * Rate plans are the one part of the catalog that grows while the CRS runs — the product team
+     * opens a new rate ({@link #addRatePlan}) — so their lists take additions; everything else is as
+     * the catalog was built.
+     */
+    public CrsCatalog {
+        ratePlans = new java.util.concurrent.CopyOnWriteArrayList<>(ratePlans);
+    }
+
+    /**
      * {@code codes} are the hotel's own rate plans, boards, channels, cancellation reasons and payment
      * methods, in place of the chain's; null, the hotel sells with the chain's.
      */
@@ -41,6 +50,11 @@ public record CrsCatalog(List<Hotel> hotels,
                         List<Channel> channels,
                         List<Code> cancellationReasons,
                         List<Code> paymentMethods) {
+
+        public Codes {
+            ratePlans = ratePlans instanceof java.util.concurrent.CopyOnWriteArrayList<RatePlan> growing
+                    ? growing : new java.util.concurrent.CopyOnWriteArrayList<>(ratePlans);
+        }
     }
 
     /** {@code basePrice} is one night of the room alone, before rate plan, board and weekday. */
@@ -49,6 +63,22 @@ public record CrsCatalog(List<Hotel> hotels,
 
     /** {@code factor} multiplies the room's base price: 0.90 is ten percent off. */
     public record RatePlan(String code, String name, BigDecimal factor) {
+
+        /** What a new rate plan must be: a code the channels can send, a name, a sensible factor. */
+        public static RatePlan valid(String code, String name, BigDecimal factor) {
+            if (code == null || !code.matches("[A-Z0-9][A-Z0-9_-]{1,19}")) {
+                throw new IllegalArgumentException(
+                        "A rate plan code is 2 to 20 capital letters, digits, '-' or '_': " + code);
+            }
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("Rate plan %s needs a name".formatted(code));
+            }
+            if (factor == null || factor.compareTo(new BigDecimal("0.10")) < 0 || factor.compareTo(new BigDecimal("3")) > 0) {
+                throw new IllegalArgumentException(
+                        "Rate plan %s: the factor on the room's price goes from 0.10 to 3, not %s".formatted(code, factor));
+            }
+            return new RatePlan(code, name.strip(), factor);
+        }
     }
 
     /** {@code supplementPerAdult} is per adult and night; children pay half, infants nothing. */
@@ -76,6 +106,31 @@ public record CrsCatalog(List<Hotel> hotels,
         var hotel = hotel(hotelCode);
         return hotel.roomType(code).orElseThrow(() -> unknown(
                 "room type of hotel " + hotelCode, code, hotel.roomTypes().stream().map(RoomType::code).toList()));
+    }
+
+    /**
+     * Opens a new rate plan in a hotel: one with codes of its own gets it among them; one that sells
+     * with the chain's gets it for the chain. From then on bookings can use it, and the catalog lists
+     * it — which is how the integration's mapping learns it has a new code without an equivalence.
+     *
+     * @return false if the hotel already sells it, exactly so (nothing changes); a different rate plan
+     *         with the same code is refused
+     */
+    public boolean addRatePlan(String hotelCode, RatePlan plan) {
+        var hotel = hotel(hotelCode);
+        var plans = hotel.codes() != null ? hotel.codes().ratePlans() : ratePlans;
+        synchronized (plans) {
+            var existing = plans.stream().filter(p -> p.code().equals(plan.code())).findFirst();
+            if (existing.isPresent()) {
+                if (existing.get().name().equals(plan.name()) && existing.get().factor().compareTo(plan.factor()) == 0) {
+                    return false;
+                }
+                throw new IllegalStateException("Hotel %s already sells rate plan %s as «%s» (factor %s)"
+                        .formatted(hotelCode, plan.code(), existing.get().name(), existing.get().factor()));
+            }
+            plans.add(plan);
+            return true;
+        }
     }
 
     public RatePlan ratePlan(String hotelCode, String code) {

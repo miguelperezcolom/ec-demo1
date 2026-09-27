@@ -29,7 +29,7 @@ set_opera_context "ECDEMO1-$(date -u +%m%d%H%M)"
 
 wipe() { local db=$1; shift; echo "truncate $(echo "$@" | tr ' ' ',') cascade;" | psql_in "$db" && echo "  $db: $*"; }
 echo "Emptying what the integration made"
-wipe booking booking_entity crs_booking outbox_message
+wipe booking booking_entity crs_booking catalog_rate_plan outbox_message
 wipe partners outbox_message
 wipe crs_integration inbox_entry outbox_message
 wipe integrations integration backfill_run outbox_message

@@ -223,6 +223,38 @@ class BookingApiTest {
         assertThat(read(id).get("status").asText()).isEqualTo("Cancelled");
     }
 
+    @Test
+    void aRatePlanOpenedInAHotelIsListedSellableAndKeptAndOpeningItAgainChangesNothing() throws Exception {
+        var plan = """
+                {"code":"STAFF-27","name":"Empleados de la cadena de vacaciones 2027","factor":0.5}""";
+        mvc.perform(post("/catalog/hotels/MRU01/rate-plans").contentType(MediaType.APPLICATION_JSON).content(plan))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/catalog/hotels/MRU01/rate-plans").contentType(MediaType.APPLICATION_JSON).content(plan))
+                .andExpect(status().isOk());
+        mvc.perform(post("/catalog/hotels/MRU01/rate-plans").contentType(MediaType.APPLICATION_JSON)
+                        .content(plan.replace("0.5", "0.6")))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/catalog/hotels/MRU01/rate-plans").contentType(MediaType.APPLICATION_JSON)
+                        .content(plan.replace("STAFF-27", "staff 27")))
+                .andExpect(status().isBadRequest());
+
+        var catalog = json(mvc.perform(get("/catalog")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var mru01 = java.util.stream.StreamSupport.stream(catalog.get("hotels").spliterator(), false)
+                .filter(h -> h.get("code").asText().equals("MRU01")).findFirst().orElseThrow();
+        assertThat(mru01.get("codes").get("ratePlans").findValuesAsText("code")).contains("STAFF-27", "DIRECTA");
+        assertThat(catalog.get("ratePlans").findValuesAsText("code")).doesNotContain("STAFF-27");
+        assertThat(jdbc.queryForObject("select name from catalog_rate_plan where hotel_code = 'MRU01' and code = 'STAFF-27'",
+                String.class)).isEqualTo("Empleados de la cadena de vacaciones 2027");
+
+        var id = createIn("MRU01", """
+                {"channelCode":"WEB","arrival":"2026-11-05","departure":"2026-11-07",
+                 "holder":{"firstName":"Ana","lastName":"García","email":"ana@example.com","nationality":"ES"},
+                 "rooms":[{"roomTypeCode":"JS-SEA","ratePlanCode":"STAFF-27","boardCode":"SOLO-ALOJAMIENTO","adults":2,
+                           "childrenAges":[],"guests":[{"firstName":"Ana","lastName":"García","type":"Adult"}]}]}""");
+        assertThat(read(id).get("rooms").get(0).get("ratePlanCode").asText()).isEqualTo("STAFF-27");
+    }
+
     String create(String request) throws Exception {
         var body = mvc.perform(post("/bookings").contentType(MediaType.APPLICATION_JSON).content(command(request)))
                 .andExpect(status().isCreated())
