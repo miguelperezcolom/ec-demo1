@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.mapping.dictionary;
 
+import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
+import io.mateu.ecdemo1.integration.model.integration.IntegrationView;
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.mapping.clients.IntegrationClients;
@@ -9,6 +11,7 @@ import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
@@ -57,6 +60,43 @@ public class Pending {
         var pmsHotel = integratedProperty(hotelCode)
                 .or(() -> dictionary.resolve(hotelCode, CodeType.HOTEL, hotelCode).map(t -> t.targetCode()));
         return clients.pmsCatalog(pmsHotel.orElse(null));
+    }
+
+    /** One code the PMS offers, and — for a chain-level entry — the properties that have it. */
+    public record PmsCode(String code, String description, List<String> properties) {
+    }
+
+    /**
+     * What an equivalence of this type can translate to: for a hotel, its property's codes of the
+     * type; for the chain, those of every integrated property — a chain-level equivalence is valid in
+     * all of them — each with the properties that have it, when not all of them do. HOTEL and
+     * PARTNER_TYPE are the PMS's own, the same whatever the property.
+     */
+    public List<PmsCode> pmsCodes(String hotelCode, CodeType type) {
+        if (type == null) {
+            return List.of();
+        }
+        if (hotelCode != null && !hotelCode.isBlank()) {
+            return pmsCatalog(hotelCode).stream().filter(c -> c.type() == type)
+                    .map(c -> new PmsCode(c.code(), c.description(), List.of())).distinct().toList();
+        }
+        if (type == CodeType.HOTEL || type == CodeType.PARTNER_TYPE) {
+            return clients.pmsCatalog(null).stream().filter(c -> c.type() == type)
+                    .map(c -> new PmsCode(c.code(), c.description(), List.of())).toList();
+        }
+        var properties = clients.integrations().stream()
+                .filter(i -> i.status() != IntegrationStatus.DECOMMISSIONED && i.pmsHotelCode() != null)
+                .map(IntegrationView::pmsHotelCode).distinct().toList();
+        var byCode = new LinkedHashMap<String, PmsCode>();
+        for (var property : properties) {
+            clients.pmsCatalog(property).stream().filter(c -> c.type() == type).forEach(c -> byCode.merge(c.code(),
+                    new PmsCode(c.code(), c.description(), List.of(property)),
+                    (a, b) -> new PmsCode(a.code(), a.description(),
+                            java.util.stream.Stream.concat(a.properties().stream(), b.properties().stream()).distinct().toList())));
+        }
+        return byCode.values().stream()
+                .map(c -> c.properties().size() == properties.size() ? new PmsCode(c.code(), c.description(), List.of()) : c)
+                .toList();
     }
 
     java.util.Optional<String> integratedProperty(String hotelCode) {
