@@ -105,6 +105,10 @@ integrations:
   backfill-per-tick: ${BACKFILL_PER_TICK:20}
   backfill-tick: ${BACKFILL_TICK:2s}
   activation-window-days: ${ACTIVATION_WINDOW_DAYS:30}
+  mapping:
+    # Whether the mapping gate asks the mapping agent on its own, or leaves a person a notice to ask it
+    # from Mapping → Dictionary (the demo, where asking it is a step shown live).
+    ask-agent: ${INTEGRATIONS_MAPPING_ASK_AGENT:true}
 
 springdoc:
   packages-to-scan: io.mateu.ecdemo1.integrations.rest

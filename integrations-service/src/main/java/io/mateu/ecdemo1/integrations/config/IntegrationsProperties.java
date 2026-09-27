@@ -31,7 +31,18 @@ import java.time.Duration;
 public record IntegrationsProperties(String crsIntegrationUrl, String pmsIntegrationUrl, String mappingUrl,
                                      String partnersUrl, String consoleUrl, String cryptoKey, Opera opera,
                                      Duration gateCheck, Duration recheck, int backfillPerTick, Duration backfillTick,
-                                     int activationWindowDays) {
+                                     int activationWindowDays, Mapping mapping) {
+
+    /**
+     * @param askAgent whether the mapping gate asks the mapping agent for a proposal on its own (true),
+     *                 or leaves a person a notice to ask it from Mapping → Dictionary (false — the demo,
+     *                 where asking it is a step shown live)
+     */
+    public record Mapping(Boolean askAgent) {
+        public Mapping {
+            if (askAgent == null) askAgent = true;
+        }
+    }
 
     /** How to reach the chain's Opera tenant. The secret comes from a Secret, never from a file. */
     public record Opera(String gatewayUrl, String appKey, String clientId, String clientSecret, String enterpriseId) {
@@ -39,6 +50,7 @@ public record IntegrationsProperties(String crsIntegrationUrl, String pmsIntegra
 
     public IntegrationsProperties {
         if (opera == null) opera = new Opera(null, null, null, null, null);
+        if (mapping == null) mapping = new Mapping(true);
         if (consoleUrl == null) consoleUrl = "";
         if (gateCheck == null) gateCheck = Duration.ofSeconds(5);
         if (recheck == null) recheck = Duration.ofSeconds(30);
