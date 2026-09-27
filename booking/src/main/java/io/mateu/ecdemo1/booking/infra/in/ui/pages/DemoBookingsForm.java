@@ -6,14 +6,7 @@ import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookin
 import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentUseCase;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.ecdemo1.booking.domain.services.RoomPricing;
-import io.mateu.uidl.annotations.Label;
-import io.mateu.uidl.annotations.ReadOnly;
-import io.mateu.uidl.annotations.Title;
-import io.mateu.uidl.annotations.Toolbar;
-import io.mateu.uidl.data.Dialog;
 import io.mateu.uidl.data.Message;
-import io.mateu.uidl.data.ModelViewComponent;
-import io.mateu.uidl.data.UICommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
@@ -26,32 +19,19 @@ import java.util.Locale;
 import java.util.Random;
 
 /**
- * Creates ten demo bookings for MRU01, after asking: the hotel is integrated with Opera, so each one
- * may land in a real PMS. Opened in a dialog from the bookings list. The bookings are made with
+ * Creates ten demo bookings for MRU01 — the bookings list asks first, since the hotel may be
+ * integrated with Opera and each one then lands in a real PMS. The bookings are made with
  * {@link DemoBookingGenerator} and created through the same use cases as the wizard's, one at a time:
  * one the CRS refuses is reported and does not stop the rest.
  */
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-@Title("Demo bookings")
 public class DemoBookingsForm {
 
     static final int COUNT = 10;
     static final String OPERA_WARNING =
             "Si MRU01 tiene la integración activa, cada reserva se escribirá también en Opera (XMAR).";
-
-    @ReadOnly
-    @Label("What")
-    String what;
-
-    @ReadOnly
-    @Label("Opera")
-    String warning;
-
-    /** The same seed on the same day gives the same bookings; empty, a different batch each time. */
-    @Label("Seed (optional)")
-    Long seed;
 
     final CreateBookingUseCase createBookingUseCase;
     final RegisterPaymentUseCase registerPaymentUseCase;
@@ -60,32 +40,12 @@ public class DemoBookingsForm {
     final PartnerDirectory partnerDirectory;
     final Clock clock;
 
-    Dialog dialog() {
-        what = "%d bookings for %s — %s, arriving in the next 2 to 8 weeks, some through tour operators and online agencies"
-                .formatted(COUNT, DemoBookingGenerator.HOTEL, catalog.hotel(DemoBookingGenerator.HOTEL).name());
-        warning = OPERA_WARNING;
-        return Dialog.builder()
-                .headerTitle("+ %d reservas demo".formatted(COUNT))
-                .width("34rem")
-                .content(new ModelViewComponent(this))
-                .build();
-    }
-
-    @Toolbar
-    @Label("Create them")
-    public Object createThem() {
-        var outcome = create();
-        return List.of(outcome.message(), UICommand.closeModal(),
-                UICommand.navigateTo(BookingCrudOrchestrator.LIST_ROUTE));
-    }
-
-    @Toolbar
-    @Label("Not now")
-    public UICommand notNow() {
-        return UICommand.closeModal();
-    }
-
+    /** A different batch each time; a seed gives the same bookings on the same day (tests). */
     Outcome create() {
+        return create(null);
+    }
+
+    Outcome create(Long seed) {
         var notes = new ArrayList<String>();
         List<PartnerDirectory.TradingPartner> partners;
         try {

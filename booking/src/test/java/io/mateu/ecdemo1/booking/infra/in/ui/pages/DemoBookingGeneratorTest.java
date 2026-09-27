@@ -135,9 +135,8 @@ class DemoBookingGeneratorTest {
         PartnerDirectory directory = () -> PARTNERS;
         var form = new DemoBookingsForm(create, pay, catalog, pricing, directory,
                 Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC));
-        form.seed = 1L;
 
-        var outcome = form.create();
+        var outcome = form.create(1L);
 
         assertThat(created).hasSize(10);
         assertThat(outcome.created()).hasSize(9).doesNotContain("B-3");
