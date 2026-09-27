@@ -96,8 +96,10 @@ public class HabitacionStep implements WizardStep {
         var selected =
             habitacionSeleccionada != null ? habitacionSeleccionada : stay.roomNumber();
         var floor =
-            FrontOffice.room(selected).map(Room::floor).map(String::valueOf)
-                .orElse(selected.length() >= 2 ? selected.substring(0, 2) : selected);
+            // a stay the integration wrote has no room yet: nothing picked, nothing to name
+            selected == null || selected.isBlank() ? null
+                : FrontOffice.room(selected).map(Room::floor).map(String::valueOf)
+                    .orElseGet(() -> selected.length() >= 2 ? selected.substring(0, 2) : selected);
         return HorizontalLayout.builder()
             .spacing(true)
             .wrap(true)
@@ -109,7 +111,8 @@ public class HabitacionStep implements WizardStep {
                         .style("flex: 1 1 340px; min-width: 320px;")
                         .tag("HABITACIÓN ASIGNADA")
                         .title(stay.roomType())
-                        .subtitle("Hab. " + selected + " · Planta " + floor)
+                        .subtitle(floor == null ? "Sin habitación asignada — elige una arriba"
+                            : "Hab. " + selected + " · Planta " + floor)
                         .features(List.of("42 m²", "Vista mar lateral", "Cama King", "Balcón"))
                         .current(true)
                         .currentLabel("✓ Incluida en tu reserva")

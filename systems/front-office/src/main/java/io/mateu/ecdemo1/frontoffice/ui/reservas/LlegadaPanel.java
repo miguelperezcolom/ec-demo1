@@ -85,7 +85,8 @@ final class LlegadaPanel {
             "Credenciales creadas y entregadas",
             ops.wifi(), "Crear", "opWifi", "vaadin:wifi"),
         new Op("llave", "🔑", "Llave / pulsera",
-            "Grabar la llave o pulsera de la Hab " + stay.roomNumber(),
+            habitacionLista ? "Grabar la llave o pulsera de la Hab " + stay.roomNumber()
+                : "Grabar la llave o pulsera — primero, asignar la habitación",
             "Llave / pulsera grabada",
             ops.llave(), "Grabar", "opLlave", "vaadin:key"),
         new Op("firma", "✍️", "Firma del registro",

@@ -138,7 +138,9 @@ public class CheckInWizard extends Wizard {
         habitacion.getHabitacionSeleccionada() != null
             ? habitacion.getHabitacionSeleccionada()
             : stay.roomNumber();
-    confirmar.setHabitacionAsignada(room + " — " + roomTypeOf(room, stay.roomType()));
+    confirmar.setHabitacionAsignada(room == null || room.isBlank()
+        ? "Sin asignar — " + stay.roomType()
+        : room + " — " + roomTypeOf(room, stay.roomType()));
     confirmar.setEstancia(GuestHeaders.stayDates(stay));
     confirmar.setRegimen(stay.board());
     confirmar.setTotalEstancia(stay.total().doubleValue() + extras.getExtrasTotal());
