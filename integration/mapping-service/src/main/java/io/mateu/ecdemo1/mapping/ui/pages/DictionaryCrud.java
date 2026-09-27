@@ -8,8 +8,8 @@ import io.mateu.ecdemo1.mapping.dictionary.Pending;
 import io.mateu.ecdemo1.mapping.proposals.AgentProposals;
 import io.mateu.ecdemo1.mapping.store.EntryStatus;
 import io.mateu.ecdemo1.mapping.store.MappingEntry;
-import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
-import io.mateu.ecdemo1.mapping.ui.Paging;
+import io.mateu.ecdemo1.mapping.queries.DictionaryQueries;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.ListToolbarButton;
 import io.mateu.uidl.annotations.Title;
@@ -17,6 +17,7 @@ import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.data.ButtonStyle;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Message;
+import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -29,10 +30,11 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -55,27 +57,57 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
     static final String UNMAPPED = "unmapped-";
 
     final EntryViewModel viewModel;
-    final MappingEntryRepository entries;
+    final DictionaryQueries queries;
     final Pending pending;
     final Dictionary dictionary;
     final AgentProposals agent;
 
+    /**
+     * Entries are filtered, ordered and paged by the database ({@link DictionaryQueries}). The
+     * unmapped codes are not entries: they are the CRS catalog (a remote API) minus what the
+     * dictionary resolves, so they are built and filtered in memory — deliberately, and only once an
+     * integration is chosen — and they go first, before the entries. A page that starts among them
+     * takes the rest of its rows from the database, from where they end.
+     */
     @Override
     public ListingData<EntryRow> search(SearchRequest request, HttpRequest httpRequest) {
         var filters = filters(request);
         var hotel = filters == null || blank(filters.integration) ? null : filters.integration;
+        var type = filters == null ? null : filters.type;
+        var states = filters == null || filters.status == null || filters.status.isEmpty() ? null : filters.status;
         var text = request.searchText() == null ? "" : request.searchText().toLowerCase();
-        var rows = Stream.concat(unmapped(hotel), entries.findAll().stream()
-                        .filter(e -> hotel == null || e.hotelCode == null || e.hotelCode.equals(hotel))
-                        .sorted(Comparator.comparing((MappingEntry e) -> order(e.status))
-                                .thenComparing(e -> e.type).thenComparing(e -> e.sourceCode))
-                        .map(DictionaryCrud::row))
-                .filter(r -> filters == null || filters.type == null || filters.type.name().equals(r.type()))
-                .filter(r -> filters == null || filters.status == null || filters.status.isEmpty()
-                        || filters.status.stream().anyMatch(s -> label(s).equals(r.status().message())))
-                .filter(r -> (r.type() + " " + r.crsCode() + " " + nonNull(r.pmsCode()) + " " + r.scope()).toLowerCase().contains(text))
-                .toList();
-        return Paging.page(rows, request);
+        var filter = new DictionaryQueries.Filter(hotel, type, entryStatuses(states), text);
+        var unmapped = states != null && !states.contains(DictionaryFilters.State.UNMAPPED) ? List.<EntryRow>of()
+                : unmapped(hotel)
+                        .filter(r -> type == null || type.name().equals(r.type()))
+                        .filter(r -> (r.type() + " " + r.crsCode() + " " + nonNull(r.pmsCode()) + " " + r.scope()).toLowerCase().contains(text))
+                        .toList();
+        if (unmapped.isEmpty()) {
+            return DbPaging.page(request, p -> queries.page(filter, p), DictionaryCrud::row);
+        }
+        var pageable = DbPaging.pageable(request);
+        var size = pageable.getPageSize();
+        var total = unmapped.size() + queries.count(filter);
+        var number = pageable.getPageNumber();
+        if (number > 0 && (long) number * size >= total) {
+            number = (int) ((total - 1) / size);   // a narrower search can leave the old page past the end
+        }
+        long from = (long) number * size;
+        var rows = new ArrayList<>(unmapped.subList((int) Math.min(from, unmapped.size()), (int) Math.min(from + size, unmapped.size())));
+        if (rows.size() < size) {
+            queries.window(filter, Math.max(0, from - unmapped.size()), size - rows.size()).stream()
+                    .map(DictionaryCrud::row).forEach(rows::add);
+        }
+        return new ListingData<>(new Page<>(request.searchText(), size, number, total, List.copyOf(rows)));
+    }
+
+    /** The entry states the filter asks for; null, any; empty, none (only UNMAPPED was asked for). */
+    static Set<EntryStatus> entryStatuses(Set<DictionaryFilters.State> states) {
+        if (states == null) {
+            return null;
+        }
+        return states.stream().filter(s -> s != DictionaryFilters.State.UNMAPPED)
+                .map(s -> EntryStatus.valueOf(s.name())).collect(Collectors.toSet());
     }
 
     /**
@@ -102,8 +134,8 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
     }
 
     static EntryRow row(MappingEntry e) {
-        return new EntryRow(e.id, e.type.name(), e.scope(), e.sourceCode, e.targetCode, e.entryVersion, status(e.status),
-                e.proposedBy, e.decidedBy);
+        return new EntryRow(e.getId(), e.getType().name(), e.scope(), e.getSourceCode(), e.getTargetCode(),
+                e.getEntryVersion(), status(e.getStatus()), e.getProposedBy(), e.getDecidedBy());
     }
 
     static Status status(EntryStatus status) {
@@ -170,10 +202,7 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
 
     /** The proposals the listing shows for these filters — the hotel's own and the chain's, as search() does. */
     List<EntryRow> proposalsShown(String hotel, String type) {
-        return entries.findAll().stream()
-                .filter(e -> e.status == EntryStatus.PROPOSED)
-                .filter(e -> hotel == null || e.hotelCode == null || e.hotelCode.equals(hotel))
-                .filter(e -> type == null || type.equals(e.type.name()))
+        return queries.proposals(hotel, type == null ? null : CodeType.valueOf(type)).stream()
                 .map(DictionaryCrud::row)
                 .toList();
     }
@@ -245,7 +274,7 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
                     .split("\\|", 3);
             return viewModel.loadUnmapped(parts[0], CodeType.valueOf(parts[1]), parts[2]);
         }
-        return viewModel.load(entries.findById(id).orElseThrow(() -> new NoSuchElementException("No mapping entry " + id)));
+        return viewModel.load(queries.entry(id).orElseThrow(() -> new NoSuchElementException("No mapping entry " + id)));
     }
 
     @Override

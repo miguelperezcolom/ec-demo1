@@ -5,7 +5,6 @@ import io.mateu.ecdemo1.mapping.dictionary.Dictionary;
 import io.mateu.ecdemo1.mapping.dictionary.Pending;
 import io.mateu.ecdemo1.mapping.store.EntryStatus;
 import io.mateu.ecdemo1.mapping.store.MappingEntry;
-import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.EditableOnlyWhenCreating;
@@ -113,7 +112,6 @@ public class EntryViewModel implements Identifiable, VisibilitySupplier, Options
     List<PmsCodeRow> pmsCodes = List.of();
 
     final Dictionary dictionary;
-    final MappingEntryRepository entries;
     final Pending pending;
 
     /** What the PMS offers for the type (and for MARKET), read once per request; never part of the state. */
@@ -207,23 +205,24 @@ public class EntryViewModel implements Identifiable, VisibilitySupplier, Options
     }
 
     public EntryViewModel load(MappingEntry e) {
-        status = DictionaryCrud.status(e.status);
-        type = e.type;
-        hotelCode = e.hotelCode;
-        crsCode = e.sourceCode;
-        pmsCode = e.targetCode;
-        marketCode = e.type == CodeType.CHANNEL && e.attributes != null ? e.attributes.get(MARKET_CODE) : null;
-        attributes = e.attributes == null ? List.of()
-                : e.attributes.entrySet().stream()
-                        .filter(a -> e.type != CodeType.CHANNEL || !MARKET_CODE.equals(a.getKey()))
+        var attrs = e.getAttributes();
+        status = DictionaryCrud.status(e.getStatus());
+        type = e.getType();
+        hotelCode = e.getHotelCode();
+        crsCode = e.getSourceCode();
+        pmsCode = e.getTargetCode();
+        marketCode = e.getType() == CodeType.CHANNEL && attrs != null ? attrs.get(MARKET_CODE) : null;
+        attributes = attrs == null ? List.of()
+                : attrs.entrySet().stream()
+                        .filter(a -> e.getType() != CodeType.CHANNEL || !MARKET_CODE.equals(a.getKey()))
                         .map(a -> new AttributeRow(a.getKey(), a.getValue())).toList();
-        id = e.id;
-        version = e.entryVersion;
-        proposedBy = e.proposedBy;
-        confidence = e.confidence;
-        rationale = e.rationale;
-        decided = e.decidedBy == null ? "" : e.decidedBy + " at " + e.decidedAt;
-        pmsCodes = e.status == EntryStatus.PROPOSED ? offered(e.hotelCode, e.type) : List.of();
+        id = e.getId();
+        version = e.getEntryVersion();
+        proposedBy = e.getProposedBy();
+        confidence = e.getConfidence();
+        rationale = e.getRationale();
+        decided = e.getDecidedBy() == null ? "" : e.getDecidedBy() + " at " + e.getDecidedAt();
+        pmsCodes = e.getStatus() == EntryStatus.PROPOSED ? offered(e.getHotelCode(), e.getType()) : List.of();
         return this;
     }
 

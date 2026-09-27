@@ -194,10 +194,10 @@ class MappingTest {
         var other = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "DUP01", "DUPX", "YDUP", Map.of(), null, null), "agent");
 
         assertThat(again.getId()).isEqualTo(first.getId());
-        assertThat(again.confidence).isEqualTo(0.9);
-        assertThat(again.rationale).isEqualTo("second");
+        assertThat(again.getConfidence()).isEqualTo(0.9);
+        assertThat(again.getRationale()).isEqualTo("second");
         assertThat(other.getId()).isNotEqualTo(first.getId());
-        assertThat(entries.findAll()).filteredOn(e -> "DUPX".equals(e.sourceCode)).hasSize(2);
+        assertThat(entries.findAll()).filteredOn(e -> "DUPX".equals(e.getSourceCode())).hasSize(2);
     }
 
     @Test
@@ -209,8 +209,8 @@ class MappingTest {
 
         define(CodeType.RATE_PLAN, null, "NRF", "NONREF2", Map.of());
         assertThat(dictionary.resolve("PMI01", CodeType.RATE_PLAN, "NRF")).get().extracting(t -> t.targetCode()).isEqualTo("NONREF2");
-        assertThat(entries.findAll()).filteredOn(e -> e.sourceCode.equals("NRF") && e.hotelCode == null)
-                .extracting(e -> e.status + "@" + e.entryVersion)
+        assertThat(entries.findAll()).filteredOn(e -> e.getSourceCode().equals("NRF") && e.getHotelCode() == null)
+                .extracting(e -> e.getStatus() + "@" + e.getEntryVersion())
                 .containsExactlyInAnyOrder("SUPERSEDED@1", "APPROVED@2");
     }
 
@@ -242,9 +242,9 @@ class MappingTest {
         dictionary.approve(proposal.getId(), "Miguel");
         assertThat(dictionary.resolve("PMI01", CodeType.PAYMENT_METHOD, "AMEX")).get().extracting(t -> t.targetCode()).isEqualTo("AX");
         assertThat(entries.findById(proposal.getId())).get().satisfies(e -> {
-            assertThat(e.status).isEqualTo(EntryStatus.APPROVED);
-            assertThat(e.proposedBy).isEqualTo("agent");
-            assertThat(e.decidedBy).isEqualTo("Miguel");
+            assertThat(e.getStatus()).isEqualTo(EntryStatus.APPROVED);
+            assertThat(e.getProposedBy()).isEqualTo("agent");
+            assertThat(e.getDecidedBy()).isEqualTo("Miguel");
         });
     }
 
@@ -259,9 +259,9 @@ class MappingTest {
         jdbc.update("delete from outbox_message where binding = 'resolutions'");
         var entry = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "RES01", "RESX", "XRES", Map.of(), null, null), "agent");
         entries.findByStatusOrderByCreatedAtDesc(io.mateu.ecdemo1.mapping.store.EntryStatus.PROPOSED).stream()
-                .filter(e -> !e.id.equals(entry.id)).forEach(e -> dictionary.reject(e.id, "cleanup"));
+                .filter(e -> !e.getId().equals(entry.getId())).forEach(e -> dictionary.reject(e.getId(), "cleanup"));
         jdbc.update("delete from outbox_message where binding = 'resolutions'");
-        dictionary.approve(entry.id, "Ana García");
+        dictionary.approve(entry.getId(), "Ana García");
 
         var subjects = jdbc.queryForList("select message_key from outbox_message where binding = 'resolutions' order by seq", String.class);
         // The approval resolves the cause of the code, if there was one, and it was the last proposal.
@@ -278,13 +278,13 @@ class MappingTest {
         assertThat(dictionary.resolve("WDR01", CodeType.BOARD, "WX")).isPresent();
         jdbc.update("delete from outbox_message where binding = 'audit'");
 
-        var withdrawn = dictionary.withdraw(entry.id, "Luis Pons");
+        var withdrawn = dictionary.withdraw(entry.getId(), "Luis Pons");
 
-        assertThat(withdrawn.status).isEqualTo(io.mateu.ecdemo1.mapping.store.EntryStatus.WITHDRAWN);
-        assertThat(withdrawn.decidedBy).isEqualTo("Luis Pons");
+        assertThat(withdrawn.getStatus()).isEqualTo(io.mateu.ecdemo1.mapping.store.EntryStatus.WITHDRAWN);
+        assertThat(withdrawn.getDecidedBy()).isEqualTo("Luis Pons");
         assertThat(dictionary.resolve("WDR01", CodeType.BOARD, "WX")).isEmpty();
         // Only what is in force can be withdrawn — and the refusal is audited too.
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dictionary.withdraw(entry.id, "Luis Pons"))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dictionary.withdraw(entry.getId(), "Luis Pons"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("WITHDRAWN");
         var audited = jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class);
         assertThat(audited).hasSize(2).allMatch(p -> p.contains("\"action\":\"Withdraw mapping\""));
@@ -296,8 +296,8 @@ class MappingTest {
     void mappingDecisionsAreAuditedAndARefusalToo() throws Exception {
         jdbc.update("delete from outbox_message where binding = 'audit'");
         var entry = dictionary.propose(new Dictionary.Proposal(CodeType.ROOM_TYPE, "AUD01", "AUDX", "XAUD", Map.of(), null, null), "agent");
-        dictionary.approve(entry.id, "Ana García");
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dictionary.reject(entry.id, "Luis"))
+        dictionary.approve(entry.getId(), "Ana García");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dictionary.reject(entry.getId(), "Luis"))
                 .isInstanceOf(IllegalStateException.class);
 
         var audited = new java.util.ArrayList<io.mateu.ecdemo1.integration.model.audit.AuditedAction>();
@@ -349,8 +349,8 @@ class MappingTest {
     }
 
     void approveProposalFor(CodeType type, String code) {
-        entries.findAll().stream().filter(e -> e.type == type && e.sourceCode.equals(code) && e.status == EntryStatus.PROPOSED)
-                .forEach(e -> dictionary.approve(e.id, "t"));
+        entries.findAll().stream().filter(e -> e.getType() == type && e.getSourceCode().equals(code) && e.getStatus() == EntryStatus.PROPOSED)
+                .forEach(e -> dictionary.approve(e.getId(), "t"));
     }
 
     void define(CodeType type, String hotel, String code, String target, Map<String, String> attributes) {

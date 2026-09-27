@@ -108,7 +108,7 @@ public class Pending {
     }
 
     static boolean matches(MappingEntry p, CodeEntry e, String hotelCode) {
-        return p.type == e.type() && p.sourceCode.equals(e.code())
-                && (p.hotelCode == null || p.hotelCode.equals(hotelCode));
+        return p.getType() == e.type() && p.getSourceCode().equals(e.code())
+                && (p.getHotelCode() == null || p.getHotelCode().equals(hotelCode));
     }
 }

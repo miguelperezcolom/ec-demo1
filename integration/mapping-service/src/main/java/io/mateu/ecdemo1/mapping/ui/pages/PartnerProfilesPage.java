@@ -1,7 +1,7 @@
 package io.mateu.ecdemo1.mapping.ui.pages;
 
-import io.mateu.ecdemo1.mapping.ui.Paging;
-import io.mateu.ecdemo1.mapping.store.PartnerProfileRepository;
+import io.mateu.ecdemo1.mapping.queries.PartnerProfileQueries;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
@@ -21,18 +21,14 @@ import org.springframework.stereotype.Service;
 @Title("Partners in the PMS")
 public class PartnerProfilesPage implements Listing<PartnerProfileRow>, io.mateu.uidl.interfaces.Searchable, TriggersSupplier {
 
-    final PartnerProfileRepository profiles;
+    final PartnerProfileQueries profiles;
 
+    /** Filtered, ordered by partner and paged by the database. */
     @Override
     public ListingData<PartnerProfileRow> search(SearchRequest request, HttpRequest httpRequest) {
-        var text = request.searchText() == null ? "" : request.searchText().trim().toLowerCase();
-        var rows = profiles.findAll().stream()
-                .filter(p -> text.isEmpty() || (p.partnerCode + " " + p.profileType + " " + p.pmsProfileId).toLowerCase().contains(text))
-                .sorted(java.util.Comparator.comparing(p -> String.valueOf(p.partnerCode)))
-                .map(p -> new PartnerProfileRow(p.partnerCode, p.profileType, p.pmsProfileId, p.projectedVersion,
-                        String.valueOf(p.updatedAt)))
-                .toList();
-        return Paging.page(rows, request);
+        return DbPaging.page(request, pageable -> profiles.page(request.searchText(), pageable),
+                p -> new PartnerProfileRow(p.partnerCode, p.profileType, p.pmsProfileId, p.projectedVersion,
+                        String.valueOf(p.updatedAt)));
     }
 
     /**
