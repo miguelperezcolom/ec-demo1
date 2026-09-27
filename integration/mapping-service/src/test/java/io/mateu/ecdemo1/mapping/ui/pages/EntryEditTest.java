@@ -12,7 +12,6 @@ import io.mateu.ecdemo1.mapping.config.MappingProperties;
 import io.mateu.ecdemo1.mapping.config.TolerantReader;
 import io.mateu.ecdemo1.mapping.dictionary.Dictionary;
 import io.mateu.ecdemo1.mapping.dictionary.Pending;
-import io.mateu.ecdemo1.mapping.store.EntryStatus;
 import io.mateu.ecdemo1.mapping.store.MappingEntry;
 import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
 import io.mateu.uidl.data.FieldStereotype;
@@ -21,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -75,9 +75,8 @@ class EntryEditTest {
         @Override
         public MappingEntry define(Proposal proposal, String author) {
             defined.set(proposal);
-            var e = new MappingEntry();
-            e.id = "new-version";
-            return e;
+            return MappingEntry.proposed("new-version", proposal.type(), proposal.hotelCode(), proposal.sourceCode(),
+                    proposal.targetCode(), proposal.attributes(), author, null, null, Instant.EPOCH);
         }
     };
 
@@ -87,19 +86,18 @@ class EntryEditTest {
     final Pending pending = new Pending(clients, dictionary, entries);
 
     EntryViewModel viewModel() {
-        return new EntryViewModel(dictionary, entries, pending);
+        return new EntryViewModel(dictionary, pending);
     }
 
     static MappingEntry channel() {
-        var e = new MappingEntry();
-        e.id = "e1";
-        e.type = CodeType.CHANNEL;
-        e.hotelCode = "MRU01";
-        e.sourceCode = "TTOO";
-        e.targetCode = "WEB";
-        e.attributes = Map.of("marketCode", "TOUR");
-        e.status = EntryStatus.APPROVED;
-        e.entryVersion = 2;
+        return approved(CodeType.CHANNEL, "MRU01", "WEB");
+    }
+
+    /** Version 2 of TTOO, in force. */
+    static MappingEntry approved(CodeType type, String hotel, String target) {
+        var e = MappingEntry.proposed("e1", type, hotel, "TTOO", target, Map.of("marketCode", "TOUR"), "agent", null, null,
+                Instant.EPOCH);
+        e.approve(1, "Ana", Instant.EPOCH);
         return e;
     }
 
@@ -161,9 +159,7 @@ class EntryEditTest {
 
     @Test
     void theCodeInForceStaysAmongTheOptionsEvenIfThePmsNoLongerHasIt() {
-        var e = channel();
-        e.type = CodeType.RATE_PLAN;
-        e.targetCode = "OLD";
+        var e = approved(CodeType.RATE_PLAN, "MRU01", "OLD");
         var vm = viewModel().load(e);
         assertThat(vm.options("pmsCode", null)).extracting(Option::value).containsExactly("OLD", "406484DIRXM", "RACK");
         assertThat(vm.options("pmsCode", null).getFirst().label()).isEqualTo("OLD — not in the PMS catalog");
@@ -171,10 +167,7 @@ class EntryEditTest {
 
     @Test
     void aChainLevelEntryIsOfferedEveryPropertysCodesSayingWhichHaveThem() {
-        var e = channel();
-        e.type = CodeType.RATE_PLAN;
-        e.hotelCode = null;
-        e.targetCode = "RACK";
+        var e = approved(CodeType.RATE_PLAN, null, "RACK");
         var vm = viewModel().load(e);
         assertThat(vm.options("pmsCode", null)).extracting(Option::value, Option::label).containsExactly(
                 org.assertj.core.groups.Tuple.tuple("406484DIRXM", "406484DIRXM — DIRECTOS XMU A26 (only XMAR)"),

@@ -3,7 +3,7 @@ package io.mateu.ecdemo1.mapping.ui.pages;
 import io.mateu.ecdemo1.mapping.causes.Causes;
 import io.mateu.ecdemo1.mapping.store.CauseRecord;
 import io.mateu.ecdemo1.mapping.store.CauseStatus;
-import io.mateu.ecdemo1.mapping.store.WaiterRepository;
+import io.mateu.ecdemo1.mapping.queries.CauseQueries;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
@@ -56,7 +56,7 @@ public class CauseViewModel implements Identifiable {
     List<WaitingRow> waiting;
 
     final Causes causes;
-    final WaiterRepository waiters;
+    final CauseQueries queries;
 
     @Toolbar
     @Action(confirmationRequired = true, confirmationTitle = "Resolve this cause?",
@@ -75,7 +75,7 @@ public class CauseViewModel implements Identifiable {
         hotel = cause.hotelCode;
         openedAt = String.valueOf(cause.openedAt);
         resolved = cause.resolvedAt == null ? "" : cause.resolvedAt + " by " + cause.resolvedBy;
-        waiting = waiters.waitingOn(cause.causeKey).stream()
+        waiting = queries.processesWaitingOn(cause.causeKey).stream()
                 .map(w -> new WaitingRow(w.processKey, w.definitionId, w.subject, String.valueOf(w.createdAt)))
                 .toList();
         return this;

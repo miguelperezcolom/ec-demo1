@@ -1,10 +1,8 @@
 package io.mateu.ecdemo1.mapping.ui.pages;
 
-import io.mateu.ecdemo1.mapping.ui.Paging;
-import io.mateu.ecdemo1.mapping.store.CauseRecord;
-import io.mateu.ecdemo1.mapping.store.CauseRecordRepository;
+import io.mateu.ecdemo1.mapping.queries.CauseQueries;
 import io.mateu.ecdemo1.mapping.store.CauseStatus;
-import io.mateu.ecdemo1.mapping.store.WaiterRepository;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
@@ -21,7 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.NoSuchElementException;
 
 /**
@@ -36,27 +33,21 @@ public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<Caus
 
     static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
 
-    final CauseRecordRepository causes;
-    final WaiterRepository waiters;
+    final CauseQueries causes;
     final ObjectProvider<CauseViewModel> detail;
 
+    /** Filtered by the cause's key, ordered (open first, oldest first) and paged by the database. */
     @Override
     public ListingData<CauseRow> search(SearchRequest request, HttpRequest httpRequest) {
-        var text = request.searchText() == null ? "" : request.searchText().toLowerCase();
-        var rows = causes.findAll().stream()
-                .filter(c -> c.causeKey.toLowerCase().contains(text))
-                .sorted(Comparator.comparing((CauseRecord c) -> c.status == CauseStatus.OPEN ? 0 : 1)
-                        .thenComparing(c -> c.openedAt))
-                .map(c -> new CauseRow(c.causeKey, c.type.name(), c.hotelCode, waiters.countWaitingOn(c.causeKey),
-                        c.openedAt == null ? "" : WHEN.format(c.openedAt), c.openings,
-                        c.status == CauseStatus.OPEN ? new Status(StatusType.WARNING, "Open")
-                                : new Status(StatusType.SUCCESS, "Resolved")))
-                .toList();
-        return Paging.page(rows, request);
+        return DbPaging.page(request, p -> causes.page(request.searchText(), p), c -> new CauseRow(c.causeKey,
+                c.type.name(), c.hotelCode, causes.waitingOn(c.causeKey),
+                c.openedAt == null ? "" : WHEN.format(c.openedAt), c.openings,
+                c.status == CauseStatus.OPEN ? new Status(StatusType.WARNING, "Open")
+                        : new Status(StatusType.SUCCESS, "Resolved")));
     }
 
     @Override
     public CauseViewModel view(String key, HttpRequest httpRequest) {
-        return detail.getObject().load(causes.findById(key).orElseThrow(() -> new NoSuchElementException("No cause " + key)));
+        return detail.getObject().load(causes.cause(key).orElseThrow(() -> new NoSuchElementException("No cause " + key)));
     }
 }

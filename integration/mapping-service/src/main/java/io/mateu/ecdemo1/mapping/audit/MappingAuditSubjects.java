@@ -30,13 +30,13 @@ public class MappingAuditSubjects implements AuditSubjects {
     @Override
     public String hotel(Map<String, Object> parameters, Object result) {
         if (result instanceof MappingEntry entry) {
-            return entry.hotelCode;
+            return entry.getHotelCode();
         }
         if (parameters.get("proposal") instanceof Dictionary.Proposal proposal) {
             return proposal.hotelCode();
         }
         if (parameters.get("entryId") instanceof String id) {
-            return entries.findById(id).map(e -> e.hotelCode).orElse(null);
+            return entries.findById(id).map(MappingEntry::getHotelCode).orElse(null);
         }
         if (parameters.get("causeKey") instanceof String key) {
             return causes.findById(key).map(c -> c.hotelCode).orElse(null);
@@ -50,8 +50,8 @@ public class MappingAuditSubjects implements AuditSubjects {
     @Override
     public String response(Object result) {
         if (result instanceof MappingEntry e) {
-            return "%s %s → %s: %s%s".formatted(e.type, e.sourceCode, e.targetCode, e.status,
-                    e.entryVersion > 0 ? " (v" + e.entryVersion + ")" : "");
+            return "%s %s → %s: %s%s".formatted(e.getType(), e.getSourceCode(), e.getTargetCode(), e.getStatus(),
+                    e.getEntryVersion() > 0 ? " (v" + e.getEntryVersion() + ")" : "");
         }
         return "Done";
     }

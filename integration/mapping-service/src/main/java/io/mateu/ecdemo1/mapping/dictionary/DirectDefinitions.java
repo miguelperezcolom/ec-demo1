@@ -29,10 +29,10 @@ public class DirectDefinitions {
             // In force already — the property's own, or the chain's it inherits: that is the answer, and
             // nothing new is entered. Looking only at the property's made an inherited one a 404.
             return entries.findAllByOrderByTypeAscSourceCodeAscEntryVersionDesc().stream()
-                    .filter(e -> e.type == proposal.type() && e.sourceCode.equals(proposal.sourceCode())
-                            && (Objects.equals(e.hotelCode, proposal.hotelCode()) || e.hotelCode == null)
-                            && e.status == EntryStatus.APPROVED)
-                    .sorted(Comparator.comparing(e -> e.hotelCode == null ? 1 : 0))
+                    .filter(e -> e.getType() == proposal.type() && e.getSourceCode().equals(proposal.sourceCode())
+                            && (Objects.equals(e.getHotelCode(), proposal.hotelCode()) || e.getHotelCode() == null)
+                            && e.getStatus() == EntryStatus.APPROVED)
+                    .sorted(Comparator.comparing(e -> e.getHotelCode() == null ? 1 : 0))
                     .findFirst().orElseThrow();
         }
         return dictionary.define(proposal, by);

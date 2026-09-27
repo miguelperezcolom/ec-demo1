@@ -7,6 +7,9 @@ import io.mateu.ecdemo1.mapping.causes.Causes;
 import io.mateu.ecdemo1.mapping.store.EntryStatus;
 import io.mateu.ecdemo1.mapping.store.MappingEntry;
 import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
+import io.mateu.ecdemo1.mapping.store.MappingSchema;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -66,29 +69,15 @@ public class Dictionary {
     @Audited("Propose mapping")
     @Transactional
     public MappingEntry propose(Proposal proposal, String proposedBy) {
-        if (proposal.type() == null || blank(proposal.sourceCode()) || blank(proposal.targetCode())) {
-            throw new IllegalArgumentException("A proposal needs a type, a CRS code and a PMS code");
-        }
-        var hotelCode = proposal.type() == CodeType.HOTEL || blank(proposal.hotelCode()) ? null : proposal.hotelCode();
-        var waiting = entries.pendingProposal(proposal.type(), hotelCode, proposal.sourceCode(), proposal.targetCode());
+        var entry = MappingEntry.proposed(UUID.randomUUID().toString(), proposal.type(), proposal.hotelCode(),
+                proposal.sourceCode(), proposal.targetCode(), proposal.attributes(), proposedBy, proposal.confidence(),
+                proposal.rationale(), clock.instant());
+        var waiting = entries.pendingProposal(entry.getType(), entry.getHotelCode(), entry.getSourceCode(), entry.getTargetCode());
         if (!waiting.isEmpty()) {
             var same = waiting.getFirst();
-            if (proposal.confidence() != null) same.confidence = proposal.confidence();
-            if (!blank(proposal.rationale())) same.rationale = proposal.rationale();
+            same.proposedAgain(proposal.confidence(), proposal.rationale());
             return entries.save(same);
         }
-        var entry = new MappingEntry();
-        entry.id = UUID.randomUUID().toString();
-        entry.type = proposal.type();
-        entry.hotelCode = hotelCode;
-        entry.sourceCode = proposal.sourceCode();
-        entry.targetCode = proposal.targetCode();
-        entry.attributes = proposal.attributes();
-        entry.status = EntryStatus.PROPOSED;
-        entry.proposedBy = proposedBy;
-        entry.confidence = proposal.confidence();
-        entry.rationale = proposal.rationale();
-        entry.createdAt = clock.instant();
         return entries.save(entry);
     }
 
@@ -99,26 +88,42 @@ public class Dictionary {
      *
      * <p>A chain-level approval can affect every property at once, which is why it is a person's
      * decision and why it is recorded with their name.
+     *
+     * <p>One version in force per code and scope, even when two people approve at once. The entry and
+     * the version in force are locked ({@code select … for update}), so a second decision on either
+     * waits and then sees the first one's result; and the database refuses a second APPROVED for the
+     * same code and scope ({@link MappingSchema#ONE_APPROVED_INDEX}) — the case with no version in
+     * force yet, where there is no row to lock. The one that loses gets a
+     * {@link ConcurrentDecisionException} and changes nothing.
+     *
+     * <p>The causes the approval removes are resolved in the same transaction, on purpose: the
+     * waiting processes are released through the outbox, and an approval committed without them would
+     * leave those processes waiting for an equivalence that is already in force.
      */
     @Audited("Approve mapping")
     @Transactional
     public MappingEntry approve(String entryId, String approvedBy) {
-        var entry = entries.findById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
-        if (entry.status != EntryStatus.PROPOSED) {
-            throw new IllegalStateException("Only a proposed entry can be approved; this one is " + entry.status);
+        var entry = entries.lockById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
+        entry.checkApprovable();   // before anything else is touched
+        try {
+            entries.lockApprovedInScope(entry.getType(), entry.getHotelCode(), entry.getSourceCode()).ifPresent(previous -> {
+                previous.supersede();
+                entries.saveAndFlush(previous);   // out of force before the new one comes in: the index is checked row by row
+            });
+            entry.approve(entries.lastVersion(entry.getType(), entry.getHotelCode(), entry.getSourceCode()),
+                    approvedBy, clock.instant());
+            entries.saveAndFlush(entry);
+        } catch (DataIntegrityViolationException | PessimisticLockingFailureException e) {
+            if (e instanceof DataIntegrityViolationException && !oneApprovedRefused(e)) {
+                throw e;
+            }
+            log.info("{} → {} not approved by {}: another version was approved at the same moment",
+                    entry.describe(), entry.getTargetCode(), approvedBy);
+            throw new ConcurrentDecisionException(entry, e);
         }
-        entries.approvedInScope(entry.type, entry.hotelCode, entry.sourceCode).ifPresent(previous -> {
-            previous.status = EntryStatus.SUPERSEDED;
-            entries.saveAndFlush(previous);
-        });
-        entry.entryVersion = entries.lastVersion(entry.type, entry.hotelCode, entry.sourceCode) + 1;
-        entry.status = EntryStatus.APPROVED;
-        entry.decidedBy = approvedBy;
-        entry.decidedAt = clock.instant();
-        entries.save(entry);
-        log.info("{} {} → {} approved for {} by {} (v{})", entry.type, entry.sourceCode, entry.targetCode,
-                entry.scope(), approvedBy, entry.entryVersion);
-        causes.mappingApproved(entry.type, entry.hotelCode, entry.sourceCode, approvedBy);
+        log.info("{} {} → {} approved for {} by {} (v{})", entry.getType(), entry.getSourceCode(), entry.getTargetCode(),
+                entry.scope(), approvedBy, entry.getEntryVersion());
+        causes.mappingApproved(entry.getType(), entry.getHotelCode(), entry.getSourceCode(), approvedBy);
         noProposalLeft(approvedBy);
         return entry;
     }
@@ -126,13 +131,8 @@ public class Dictionary {
     @Audited("Reject mapping")
     @Transactional
     public MappingEntry reject(String entryId, String rejectedBy) {
-        var entry = entries.findById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
-        if (entry.status != EntryStatus.PROPOSED) {
-            throw new IllegalStateException("Only a proposed entry can be rejected; this one is " + entry.status);
-        }
-        entry.status = EntryStatus.REJECTED;
-        entry.decidedBy = rejectedBy;
-        entry.decidedAt = clock.instant();
+        var entry = entries.lockById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
+        entry.reject(rejectedBy, clock.instant());
         entries.save(entry);
         noProposalLeft(rejectedBy);
         return entry;
@@ -147,15 +147,10 @@ public class Dictionary {
     @Audited("Withdraw mapping")
     @Transactional
     public MappingEntry withdraw(String entryId, String withdrawnBy) {
-        var entry = entries.findById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
-        if (entry.status != EntryStatus.APPROVED) {
-            throw new IllegalStateException("Only an equivalence in force can be withdrawn; this one is " + entry.status);
-        }
-        entry.status = EntryStatus.WITHDRAWN;
-        entry.decidedBy = withdrawnBy;
-        entry.decidedAt = clock.instant();
-        log.info("{} {} → {} withdrawn for {} by {} (v{})", entry.type, entry.sourceCode, entry.targetCode,
-                entry.scope(), withdrawnBy, entry.entryVersion);
+        var entry = entries.lockById(entryId).orElseThrow(() -> new NoSuchElementException("No mapping entry " + entryId));
+        entry.withdraw(withdrawnBy, clock.instant());
+        log.info("{} {} → {} withdrawn for {} by {} (v{})", entry.getType(), entry.getSourceCode(), entry.getTargetCode(),
+                entry.scope(), withdrawnBy, entry.getEntryVersion());
         return entries.save(entry);
     }
 
@@ -163,18 +158,25 @@ public class Dictionary {
     @Audited("Define mapping")
     @Transactional
     public MappingEntry define(Proposal proposal, String author) {
-        return approve(propose(proposal, author).id, author);
+        return approve(propose(proposal, author).getId(), author);
+    }
+
+    /** Whether it is the index of one APPROVED per code and scope that refused the write. */
+    static boolean oneApprovedRefused(Throwable e) {
+        for (var t = e; t != null; t = t.getCause()) {
+            if (String.valueOf(t.getMessage()).contains(MappingSchema.ONE_APPROVED_INDEX)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The last proposal decided: the notifications asking to review them are done with. */
     void noProposalLeft(String by) {
         entries.flush();
-        if (entries.findByStatusOrderByCreatedAtDesc(EntryStatus.PROPOSED).isEmpty()) {
+        if (!entries.existsByStatus(EntryStatus.PROPOSED)) {
             outbox.appendResolution(io.mateu.ecdemo1.mapping.proposals.ProposalAnnouncer.SUBJECT, by);
         }
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.isBlank();
-    }
 }
