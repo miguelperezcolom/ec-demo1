@@ -62,9 +62,17 @@ class KardexTest {
   @Autowired GuestRepository guests;
 
   static String kardex(String name, String email, String requestId, String decision) {
+    return kardex(name, email, "12345678Z", requestId, decision, null);
+  }
+
+  static String kardex(String name, String email, String document, String requestId, String decision, String reason) {
     return """
-        {"name":"%s","email":"%s","phone":null,"document":"12345678Z","requestId":%s,"decision":%s}"""
-        .formatted(name, email, requestId == null ? "null" : "\"" + requestId + "\"", decision == null ? "null" : "\"" + decision + "\"");
+        {"name":"%s","email":"%s","phone":null,"document":%s,"requestId":%s,"decision":%s,"reason":%s}"""
+        .formatted(name, email, json(document), json(requestId), json(decision), json(reason));
+  }
+
+  static String json(String value) {
+    return value == null ? "null" : "\"" + value + "\"";
   }
 
   Guest edit(String id, String name, String email) {
@@ -87,6 +95,7 @@ class KardexTest {
     var change = Kardex.of("C-KX1").orElseThrow();
     assertThat(change.status()).isEqualTo(KardexChange.KardexStatus.PENDING);
     assertThat(change.changes()).contains("email ana@example.com → ana.maria@example.com");
+    assertThat(change.fields()).extracting(KardexChange.FieldChange::field).containsExactly("nombre", "email");
     assertThat(sent).singleElement().asString().startsWith("POST /customers/C-KX1/change-requests")
         .contains("\"email\":\"ana.maria@example.com\"").contains("\"name\":\"Ana María García\"");
     var requestId = change.requestId();
@@ -97,11 +106,15 @@ class KardexTest {
         .content(kardex("Ana García", "ana@example.com", null, null))).andExpect(status().isNoContent());
     assertThat(guests.findById("C-KX1").orElseThrow().email()).isEqualTo("ana.maria@example.com");
 
-    // Approved: the master's data — the desk's, as approved — and the cardex says so.
+    // Approved: the master's data — the desk's, as approved — and the kardex says so.
     mvc.perform(put("/api/guests/C-KX1/kardex").contentType(MediaType.APPLICATION_JSON)
         .content(kardex("Ana María García", "ana.maria@example.com", requestId, "APPROVED"))).andExpect(status().isNoContent());
-    assertThat(Kardex.of("C-KX1").orElseThrow().status()).isEqualTo(KardexChange.KardexStatus.APPROVED);
+    var approved = Kardex.of("C-KX1").orElseThrow();
+    assertThat(approved.status()).isEqualTo(KardexChange.KardexStatus.APPROVED);
     assertThat(guests.findById("C-KX1").orElseThrow().name()).isEqualTo("Ana María García");
+    // Approved, the data just stays: no mark on the guest.
+    assertThat(approved.marked()).isFalse();
+    assertThat(approved.lines(guests.findById("C-KX1").orElseThrow())).isEmpty();
   }
 
   @Test
@@ -112,10 +125,17 @@ class KardexTest {
     var requestId = Kardex.of("C-KX2").orElseThrow().requestId();
 
     mvc.perform(put("/api/guests/C-KX2/kardex").contentType(MediaType.APPLICATION_JSON)
-        .content(kardex("Leo Pons", "leo@example.com", requestId, "REJECTED"))).andExpect(status().isNoContent());
+        .content(kardex("Leo Pons", "leo@example.com", "X1234567L", requestId, "REJECTED", "No es su email")))
+        .andExpect(status().isNoContent());
 
-    assertThat(guests.findById("C-KX2").orElseThrow().email()).isEqualTo("leo@example.com");
-    assertThat(Kardex.of("C-KX2").orElseThrow().status()).isEqualTo(KardexChange.KardexStatus.REJECTED);
+    var guest = guests.findById("C-KX2").orElseThrow();
+    assertThat(guest.email()).isEqualTo("leo@example.com");
+    var rejected = Kardex.of("C-KX2").orElseThrow();
+    assertThat(rejected.status()).isEqualTo(KardexChange.KardexStatus.REJECTED);
+    assertThat(rejected.reason()).isEqualTo("No es su email");
+    // The field says what was proposed, what stays — the master's — and why.
+    assertThat(rejected.lines(guest)).containsExactly(
+        "Email: leo.nuevo@example.com rechazado — se queda leo@example.com", "Motivo: No es su email");
   }
 
   @Test
@@ -128,5 +148,39 @@ class KardexTest {
 
     mvc.perform(put("/api/guests/C-NOBODY/kardex").contentType(MediaType.APPLICATION_JSON)
         .content(kardex("X", "x@example.com", null, null))).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void aDocumentTheDeskMadeUpIsNotProposedAndSurvivesTheMastersEmptyOne() throws Exception {
+    guests.save(Guest.fromReservation("C-KX3", "Eva Ruiz", null, "eva@example.com", "+34 600000001"));
+    sent.clear();
+
+    // Registered by hand without a document: the desk marks the identity with a made-up one.
+    var before = guests.findById("C-KX3").orElseThrow();
+    var after = before.verifyIdentity("MAN-C-KX3").updateContact("eva@example.com", "+34 600000002");
+    guests.save(after);
+    Kardex.edited(before, after);
+
+    var change = Kardex.of("C-KX3").orElseThrow();
+    assertThat(change.fields()).singleElement().extracting(KardexChange.FieldChange::field).isEqualTo("teléfono");
+    assertThat(sent).singleElement().asString().contains("\"documentNumber\":null").doesNotContain("MAN-");
+
+    mvc.perform(put("/api/guests/C-KX3/kardex").contentType(MediaType.APPLICATION_JSON)
+        .content(kardex("Eva Ruiz", "eva@example.com", null, change.requestId(), "APPROVED", null)))
+        .andExpect(status().isNoContent());
+    assertThat(guests.findById("C-KX3").orElseThrow().document()).isEqualTo("MAN-C-KX3");
+  }
+
+  @Test
+  void onlyADocumentMadeUpIsNoChangeForTheMaster() {
+    guests.save(Guest.fromReservation("C-KX4", "Iker Sanz", null, "iker@example.com", null));
+    sent.clear();
+    var before = guests.findById("C-KX4").orElseThrow();
+    var after = before.verifyIdentity("ESC-C-KX4");
+    guests.save(after);
+    Kardex.edited(before, after);
+
+    assertThat(sent).isEmpty();
+    assertThat(Kardex.of("C-KX4")).isEmpty();
   }
 }

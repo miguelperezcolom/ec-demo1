@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Where the chain's MDM tells the cardex how a guest is: Salesforce is the master of the customer's data. */
+/** Where the chain's MDM tells the kardex how a guest is: Salesforce is the master of the customer's data. */
 @RestController
 @RequestMapping("/api/guests")
 public class GuestsApi {
@@ -41,16 +41,17 @@ public class GuestsApi {
         .toList();
   }
 
-  /** A guest of the cardex, and how its last change to the master's data stands. */
+  /** A guest of the kardex, and how its last change to the master's data stands. */
   public record GuestView(String id, String name, String document, String email, String phone, String kardexStatus,
-      String kardexChanges) {}
+      String kardexChanges, String kardexReason) {}
 
   @org.springframework.web.bind.annotation.GetMapping("/{id}")
   public ResponseEntity<GuestView> guest(@PathVariable String id) {
     return guests.findById(id).map(g -> {
       var change = Kardex.of(id).orElse(null);
       return ResponseEntity.ok(new GuestView(g.id(), g.name(), g.document(), g.email(), g.phone(),
-          change == null ? null : change.status().name(), change == null ? null : change.changes()));
+          change == null ? null : change.status().name(), change == null ? null : change.changes(),
+          change == null ? null : change.reason()));
     }).orElse(ResponseEntity.notFound().build());
   }
 

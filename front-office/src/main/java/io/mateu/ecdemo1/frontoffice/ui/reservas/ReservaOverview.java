@@ -251,10 +251,15 @@ public class ReservaOverview
     var guest = FrontOffice.stayView(stayId).guest();
     var ops = FrontOffice.checkInOps().of(stay.id());
     var items = new ArrayList<StatusItem>();
-    items.add(paxItem(1, guest.name(),
+    // El titular lleva, campo a campo, lo que recepción cambió y el maestro de clientes
+    // (Salesforce) aún no ha aprobado — o ha rechazado. Aprobado, el dato se queda sin marca.
+    var kardex = io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.of(guest.id())
+        .filter(io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange::marked)
+        .orElse(null);
+    items.add(conKardex(paxItem(1, guest.name(),
         guest.document() != null && !guest.document().isBlank()
             ? "Doc " + guest.document() + " · Adulto" : "Adulto",
-        guest.identityComplete(), ops.isNoShow(1)));
+        guest.identityComplete(), ops.isNoShow(1)), ops.isNoShow(1) ? null : kardex, guest));
     var companions = stay.companions();
     for (int i = 0; i < companions.size(); i++) {
       var companion = companions.get(i);
@@ -273,18 +278,6 @@ public class ReservaOverview
     contenido.add(
         StatusList.builder().items(items).compact(true).frameless(true)
             .style("width: 100%;").build());
-    // El kárdex del titular frente al maestro de clientes (Salesforce): lo último que cambió
-    // recepción y cómo lo ha decidido.
-    io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.of(guest.id()).ifPresent(change -> contenido.add(
-        Text.builder()
-            .text("Kárdex: " + change.label() + " · " + change.changes())
-            .style("margin: 0; font-size: .85rem; padding: .25rem .5rem; border-radius: 4px; "
-                + switch (change.status()) {
-                  case PENDING -> "background: #fff4e5; color: #8a5300;";
-                  case APPROVED -> "background: #e8f5e9; color: #1b5e20;";
-                  case REJECTED -> "background: #fdecea; color: #8a1c1c;";
-                })
-            .build()));
     return VerticalLayout.builder()
         .style("width: 100%; gap: .5rem;")
         .content(contenido)
@@ -761,13 +754,40 @@ public class ReservaOverview
    */
   private Component formularioPax() {
     var campos = new ArrayList<Component>();
+    // el titular: encima de los campos, cada campo que recepción cambió y cómo lo tiene
+    // Salesforce (pendiente, o rechazado con su motivo)
+    if (paxSeleccionado <= 1) {
+      var guest = FrontOffice.stayView(stayId).guest();
+      io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.of(guest.id())
+          .filter(io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange::marked)
+          .ifPresent(kardex -> campos.add(StatusList.builder()
+              .items(camposEnSalesforce(kardex, guest)).compact(true).frameless(true)
+              .style("width: 100%;").build()));
+    }
     campos.add(campoPax("paxDocumento", "Documento"));
     campos.add(campoPax("paxNombre", "Nombre"));
     campos.add(campoPax("paxEmail", "Email"));
     campos.add(campoPax("paxTelefono", "Teléfono"));
-    campos.add(Button.builder().label("Guardar cardex").actionId("guardarPax")
+    campos.add(Button.builder().label("Guardar kárdex").actionId("guardarPax")
         .buttonStyle(io.mateu.uidl.data.ButtonStyle.primary).build());
     return VerticalLayout.builder().content(campos).style("width: 100%; gap: .5rem;").build();
+  }
+
+  /** Un item por campo cambiado: el dato, y su estado en Salesforce. */
+  static List<StatusItem> camposEnSalesforce(io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange kardex,
+      io.mateu.ecdemo1.frontoffice.domain.guest.Guest guest) {
+    return kardex.shownFor(guest).stream()
+        .map(f -> StatusItem.builder()
+            .id(f.field())
+            .title(f.label())
+            .description(kardex.pending()
+                ? f.after()
+                : "Propuesto " + f.after() + " — se queda " + guest.valueOf(f.field()))
+            .status(kardex.pending() ? "Pendiente de Salesforce" : "Rechazado")
+            .statusColor(kardex.pending() ? "warning" : "error")
+            .lines(kardex.pending() || kardex.reason() == null ? List.of() : List.of("Motivo: " + kardex.reason()))
+            .build())
+        .toList();
   }
 
   private Component campoPax(String id, String label) {
@@ -1175,7 +1195,7 @@ public class ReservaOverview
         paxTelefono = null;
         // cierra el drawer emitiendo el evento al que está suscrita la página (refresco del rail)
         yield List.of(
-            new Message("Cardex registrado — " + nombre),
+            new Message("Kárdex registrado — " + nombre),
             UICommand.closeModal("cardex-guardado"));
       }
       case "refrescarReserva" -> this;
@@ -1469,7 +1489,7 @@ public class ReservaOverview
         .avatar(initials(title))
         .title(title)
         .description(noShow ? "No se ha presentado" : description)
-        .status(noShow ? "No show" : complete ? "Cardex OK" : "Sin cardex")
+        .status(noShow ? "No show" : complete ? "Kárdex OK" : "Sin kárdex")
         .statusColor(noShow ? "error" : complete ? "success" : "warning")
         .actionLabel(noShow ? null : (complete ? "Reescanear" : "Escanear"))
         .actionId(noShow ? null : "escanearPax")
@@ -1480,6 +1500,28 @@ public class ReservaOverview
         .actionLabel3(noShow ? "Revertir" : "No show")
         .actionId3("noShowPax")
         .actionIcon3(noShow ? "vaadin:rotate-left" : "vaadin:ban")
+        .build();
+  }
+
+  /**
+   * El pax con el estado de su kárdex frente a Salesforce: la marca del pax dice que hay un cambio
+   * pendiente o rechazado, y cada campo cambiado va en su línea.
+   */
+  static StatusItem conKardex(StatusItem item,
+      io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange kardex,
+      io.mateu.ecdemo1.frontoffice.domain.guest.Guest guest) {
+    if (kardex == null) {
+      return item;
+    }
+    return StatusItem.builder()
+        .id(item.id()).icon(item.icon()).avatar(item.avatar()).title(item.title())
+        .description(item.description())
+        .actionLabel(item.actionLabel()).actionId(item.actionId()).actionIcon(item.actionIcon())
+        .actionLabel2(item.actionLabel2()).actionId2(item.actionId2()).actionIcon2(item.actionIcon2())
+        .actionLabel3(item.actionLabel3()).actionId3(item.actionId3()).actionIcon3(item.actionIcon3())
+        .status(kardex.label())
+        .statusColor(kardex.pending() ? "warning" : "error")
+        .lines(kardex.lines(guest))
         .build();
   }
 

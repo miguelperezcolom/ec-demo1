@@ -182,21 +182,25 @@ Dónde vive cada dato: **Salesforce es el maestro** del cliente; el **MDM** est�
 de los datos de Salesforce); el **front office** y **Opera** reciben esa proyección.
 
 1. En el front office (detalle de la reserva o check-in) se cambian los datos del titular. El kárdex
-   los guarda al momento y la reserva muestra **«Kárdex: Pendiente de aprobación»** con lo que cambia.
+   los guarda al momento y el titular, en el carril de huéspedes, lleva la marca **«Pendiente de
+   Salesforce»** y una línea por campo cambiado («Teléfono: … — pendiente de Salesforce»); el
+   formulario del kárdex los lista igual encima de los campos. Un documento inventado por recepción
+   (`MAN-…`, `ESC-…`) no se propone.
 2. El front office lo manda al MDM, que abre en Salesforce un **Case «Cambio de datos de cliente»**
    sobre el contacto, con los datos propuestos (sección *Cambio de datos de cliente (MDM)*).
 3. En Salesforce se pone **Decisión** en *Aprobada* (se pueden corregir los datos antes) o
-   *Rechazada* (con motivo). Un flow aplica lo aprobado al contacto y anuncia la decisión.
-4. Baja sola: el MDM actualiza su proyección; el front office pasa el kárdex a **Aprobado** (o
-   **Rechazado**, y vuelven los datos del maestro); Opera reescribe el perfil del huésped de las
-   reservas del cliente **en su sitio**: el email y el teléfono cambian en la misma entrada, no se
-   añade uno nuevo al lado.
+   *Rechazada* (con **Motivo**). Un flow aplica lo aprobado al contacto y anuncia la decisión.
+4. Baja sola: el MDM actualiza su proyección. Aprobado, el front office deja el dato **sin marca**
+   (se queda); rechazado, vuelven los datos del maestro y el titular lleva **«Rechazado en
+   Salesforce»**, con lo propuesto, lo que se queda y el motivo del Case. Opera reescribe el perfil
+   del huésped de las reservas del cliente **en su sitio**: el email y el teléfono cambian en la
+   misma entrada, no se añade uno nuevo al lado.
 
 Cualquier cambio hecho a mano en el contacto de Salesforce baja igual. Qué enseñar en cada sitio:
 
 | Dónde | Qué se ve |
 | :---- | :-------- |
-| Front office — la reserva del titular | «Kárdex: Pendiente de aprobación · email … → …», y después Aprobado o Rechazado |
+| Front office — la reserva del titular | «Pendiente de Salesforce» y una línea por campo; después sin marca (aprobado) o «Rechazado en Salesforce» con el motivo |
 | Salesforce — el Case sobre el contacto | Los datos propuestos, qué cambia, de dónde viene; *Decisión* |
 | Consola — *Customers* | El cliente con sus xref (Salesforce, front office, perfiles de Opera) y sus solicitudes de cambio |
 | Opera | El perfil del huésped con el dato nuevo, en la misma entrada |
