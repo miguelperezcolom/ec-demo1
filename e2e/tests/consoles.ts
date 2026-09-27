@@ -78,12 +78,6 @@ const controlScreens = [
     { menu: 'Audit', entry: 'Audited actions', route: '/audit/actions' },
 ]
 
-/**
- * The inbox as a menu entry — only in the Redwood shells, whose renderer does not draw the header
- * widgets yet: there the badge that replaced this entry is not shown, so the entry stays.
- */
-export const inboxScreen = { menu: 'Inbox', entry: 'Pending', route: '/inbox/pending' }
-
 export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
@@ -94,8 +88,8 @@ export const CONSOLES: Console[] = [
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP', 'Inbox'],
-        screens: [...dataScreens, inboxScreen],
+        menus: ['Admin', 'Call center', 'ERP'],
+        screens: dataScreens,
     },
     {
         name: 'control · vaadin', plane: 'control', renderer: 'vaadin',
@@ -106,8 +100,8 @@ export const CONSOLES: Console[] = [
     {
         name: 'control · redwood', plane: 'control', renderer: 'redwood',
         host: host('RW_CONTROL_HOST', 'rw-console.ec1.mateu.io'),
-        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications', 'Audit', 'Inbox'],
-        screens: [...controlScreens, inboxScreen],
+        menus: ['IA', 'Usuarios', 'Workflow', 'Forms', 'Integrations', 'Mapping', 'Customers', 'Notifications', 'Audit'],
+        screens: controlScreens,
     },
 ]
 

@@ -4,6 +4,7 @@ import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Logo;
+import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.uidl.annotations.PageTemplate;
 import io.mateu.uidl.annotations.PageTitle;
@@ -148,11 +149,12 @@ public class ControlShellHome implements WidgetSupplier {
     RemoteMenu audit = new RemoteMenu("/_audit").withLabel("Audit");
 
     /**
-     * What waits for me. Still on the bar here, unlike the Vaadin shell: the Redwood renderer does not
-     * draw the header widgets yet, so the badge that replaces this entry there is not shown here.
+     * The inbox, hidden from the bar: the badge in the widgets below is the way in, and it says how
+     * much is waiting on the way. Still declared, so a deep link or a reload on /inbox/... resolves.
      */
     @Menu
-    RemoteMenu inbox = new RemoteMenu("/_inbox").withLabel("Inbox");
+    @Hidden
+    RemoteMenu inbox = new RemoteMenu("/_inbox");
 
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
@@ -176,8 +178,9 @@ public class ControlShellHome implements WidgetSupplier {
                                 .build(),
                         Popover.builder()
                         .wrapped(Text.builder()
-                                .text("Hola, " + claims.get("name"))
-                                .style("margin-right: 20px;")
+                                .text("<vaadin-icon icon=\"vaadin:user\" style=\"display: var(--mateu-header-narrow-only, none); width: 1em; height: 1em; vertical-align: -0.125em;\"></vaadin-icon>"
+                                        + "<span style=\"display: var(--mateu-header-wide-only, inline)\">Hola, " + claims.get("name") + "</span>")
+                                .style("margin-right: 20px; cursor: pointer;") // it opens the popover: who, and Logout
                                 .build())
                         .content(VerticalLayout.builder()
                                 .content(List.of(

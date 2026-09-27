@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { CONSOLES, inboxScreen, signIn, menuLabels, screenRendered } from './consoles'
+import { CONSOLES, signIn, menuLabels, screenRendered } from './consoles'
 
 /**
  * Every screen of every console, on both planes and through both renderers.
@@ -46,7 +46,6 @@ for (const console_ of CONSOLES) {
         // The inbox has no entry on the bar: the badge in the top bar is the way in. Its menu is
         // still declared, hidden, so a reload on the inbox resolves too — both are checked here.
         test('the inbox badge opens the inbox', async ({ page }) => {
-            test.skip(console_.renderer === 'redwood', 'Redwood does not draw the header widgets yet; its inbox is a menu entry')
             await signIn(page, console_)
             const badge = page.locator('a', { hasText: /Inbox/ }).first()
             await expect(badge, `${console_.name} shows no inbox badge`).toBeVisible({ timeout: 60_000 })
@@ -90,13 +89,10 @@ for (const console_ of CONSOLES) {
  * between them stopped being the pom.
  */
 test('both renderers of a plane offer the same screens', async () => {
-    // The one difference allowed, and on purpose: Redwood reaches the inbox from a menu entry,
-    // because it draws no header widgets for the badge Vaadin has instead.
-    const redwoodOnly = (route: string) => route === inboxScreen.route
     for (const plane of ['data', 'control'] as const) {
         const [vaadin, redwood] = CONSOLES.filter(c => c.plane === plane)
-        expect(redwood.screens.map(s => s.route).filter(r => !redwoodOnly(r)).sort())
+        expect(redwood.screens.map(s => s.route).sort())
             .toEqual(vaadin.screens.map(s => s.route).sort())
-        expect(redwood.menus.filter(m => m !== inboxScreen.menu).sort()).toEqual(vaadin.menus.slice().sort())
+        expect(redwood.menus.slice().sort()).toEqual(vaadin.menus.slice().sort())
     }
 })
