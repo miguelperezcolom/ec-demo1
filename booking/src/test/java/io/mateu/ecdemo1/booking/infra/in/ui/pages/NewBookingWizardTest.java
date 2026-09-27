@@ -57,7 +57,7 @@ class NewBookingWizardTest {
     }
 
     static RoomViewModel room() {
-        return new RoomViewModel(null, "DBL", "BAR", "AD", 2, null, null);
+        return new RoomViewModel(null, "JS-SEA", "DIRECTA", "DESAYUNO", 2, null, null);
     }
 
     static GuestViewModel guest(int roomLine) {
@@ -92,6 +92,16 @@ class NewBookingWizardTest {
     }
 
     @Test
+    void theChannelIsOneOfTheHotels() {
+        // CC is the chain's call center; MRU01 has its own channels.
+        wizard.stay = stay("CC", null, ARRIVAL, ARRIVAL.plusDays(3));
+        assertThat(wizard.problemLeaving("stay")).contains("does not sell through channel CC").contains("CALLCENTER");
+
+        wizard.stay = stay("CALLCENTER", null, ARRIVAL, ARRIVAL.plusDays(3));
+        assertThat(wizard.problemLeaving("stay")).isNull();
+    }
+
+    @Test
     void aBookingHasARoomAtLeast() {
         wizard.roomsStep = new RoomsStep(List.of());
         assertThat(wizard.problemLeaving("roomsStep")).isEqualTo("Add at least one room");
@@ -116,7 +126,7 @@ class NewBookingWizardTest {
         var summary = wizard.summarise();
 
         assertThat(summary.booking()).startsWith("Riu Demo Mauricio");
-        assertThat(summary.roomsSummary()).isEqualTo("1. DBL · BAR · AD · 2 adult(s)");
+        assertThat(summary.roomsSummary()).isEqualTo("1. JS-SEA · DIRECTA · DESAYUNO · 2 adult(s)");
         assertThat(summary.guestsSummary()).isEqualTo("Room 1: Ana García (Adult)");
         assertThat(summary.paymentsSummary()).isEqualTo("None");
     }

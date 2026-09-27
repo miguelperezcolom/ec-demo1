@@ -20,9 +20,10 @@ public class CancelBookingUseCase {
 
     @Transactional
     public void handle(CancelBookingCommand command) {
-        var reason = catalog.cancellationReason(command.reasonCode());
         var booking = repository.findByIdForUpdate(new BookingId(command.id()))
                 .orElseThrow(() -> new NoSuchElementException("Booking not found: " + command.id()));
+        // A hotel may cancel with reasons of its own: checked against the booking's hotel.
+        var reason = catalog.cancellationReason(booking.getHotelCode(), command.reasonCode());
         booking.cancel(reason.code(), clock.instant());
         repository.save(booking);
     }

@@ -1,0 +1,249 @@
+{
+  "hotel": {
+    "code": "MRU01",
+    "name": "Riu Demo Mauricio",
+    "currency": "EUR"
+  },
+  "roomTypes": [
+    {
+      "code": "STD-KING",
+      "name": "Estándar con cama king",
+      "maxOccupancy": 2,
+      "basePrice": 150
+    },
+    {
+      "code": "DBL-GARDEN",
+      "name": "Doble con balcón y vista jardín",
+      "maxOccupancy": 3,
+      "basePrice": 170
+    },
+    {
+      "code": "DBL-POOL",
+      "name": "Doble con balcón y vista piscina",
+      "maxOccupancy": 3,
+      "basePrice": 185
+    },
+    {
+      "code": "DBL-SIDESEA",
+      "name": "Doble con balcón y vista lateral al mar",
+      "maxOccupancy": 3,
+      "basePrice": 195
+    },
+    {
+      "code": "JS-STD",
+      "name": "Junior suite estándar con balcón",
+      "maxOccupancy": 3,
+      "basePrice": 220
+    },
+    {
+      "code": "JS-STD-KING",
+      "name": "Junior suite estándar con balcón, cama king",
+      "maxOccupancy": 3,
+      "basePrice": 225
+    },
+    {
+      "code": "JS-STD-SPECIAL",
+      "name": "Junior suite estándar especial",
+      "maxOccupancy": 3,
+      "basePrice": 235
+    },
+    {
+      "code": "JS-ACCESSIBLE",
+      "name": "Junior suite adaptada (movilidad reducida)",
+      "maxOccupancy": 3,
+      "basePrice": 220
+    },
+    {
+      "code": "JS-SIDESEA-KING",
+      "name": "Junior suite vista lateral al mar, cama king",
+      "maxOccupancy": 3,
+      "basePrice": 240
+    },
+    {
+      "code": "JS-SIDESEA",
+      "name": "Junior suite con balcón y vista lateral al mar",
+      "maxOccupancy": 3,
+      "basePrice": 245
+    },
+    {
+      "code": "JS-SEA",
+      "name": "Junior suite con balcón y vista al mar",
+      "maxOccupancy": 3,
+      "basePrice": 270
+    },
+    {
+      "code": "JS-SEA-KING",
+      "name": "Junior suite con balcón y vista al mar, cama king",
+      "maxOccupancy": 3,
+      "basePrice": 275
+    },
+    {
+      "code": "FAMILY",
+      "name": "Habitación familiar",
+      "maxOccupancy": 5,
+      "basePrice": 260
+    },
+    {
+      "code": "JS-SWIMOUT",
+      "name": "Junior suite deluxe con salida a la piscina (swim-out)",
+      "maxOccupancy": 3,
+      "basePrice": 320
+    },
+    {
+      "code": "SUITE-SWIMUP",
+      "name": "Suite con acceso directo a la piscina (swim-up)",
+      "maxOccupancy": 3,
+      "basePrice": 380
+    }
+  ],
+  "ratePlans": [
+    {
+      "code": "DIRECTA",
+      "name": "Venta directa 2026 (web y call center)",
+      "factor": 1.0
+    },
+    {
+      "code": "FLEX-LOCAL",
+      "name": "Flexible Riu Class residentes locales 2026",
+      "factor": 0.95
+    },
+    {
+      "code": "EXPEDIA-AD",
+      "name": "Expedia con desayuno",
+      "factor": 0.92
+    },
+    {
+      "code": "AGRO-MAYOR",
+      "name": "Mayorista AGRO",
+      "factor": 0.85
+    },
+    {
+      "code": "AGENCIAS-LOCALES",
+      "name": "Agencias de viaje locales 2026",
+      "factor": 0.88
+    },
+    {
+      "code": "TUI-NL",
+      "name": "Contrato TUI Países Bajos 2026",
+      "factor": 0.8
+    },
+    {
+      "code": "TUI-FR",
+      "name": "Contrato TUI Francia 2026",
+      "factor": 0.8
+    },
+    {
+      "code": "DMC-MAURICIO",
+      "name": "Contrato receptivo DMC Mauricio (EUR) 2026",
+      "factor": 0.82
+    }
+  ],
+  "boards": [
+    {
+      "code": "SOLO-ALOJAMIENTO",
+      "name": "Solo alojamiento",
+      "supplementPerAdult": 0.0
+    },
+    {
+      "code": "DESAYUNO",
+      "name": "Alojamiento y desayuno",
+      "supplementPerAdult": 18.0
+    },
+    {
+      "code": "COMIDAS",
+      "name": "Pensión con comidas, sin bebidas",
+      "supplementPerAdult": 55.0
+    },
+    {
+      "code": "TODO-INCLUIDO",
+      "name": "Todo incluido",
+      "supplementPerAdult": 95.0
+    }
+  ],
+  "channels": [
+    {
+      "code": "WEB",
+      "name": "Web del hotel",
+      "requiresPartner": false
+    },
+    {
+      "code": "CALLCENTER",
+      "name": "Central de reservas (call center)",
+      "requiresPartner": false
+    },
+    {
+      "code": "TELEFONO",
+      "name": "Llamada directa al hotel",
+      "requiresPartner": false
+    },
+    {
+      "code": "EMAIL",
+      "name": "Petición por correo electrónico",
+      "requiresPartner": false
+    },
+    {
+      "code": "WALKIN",
+      "name": "Cliente sin reserva en recepción (walk-in)",
+      "requiresPartner": false
+    },
+    {
+      "code": "GRUPOS",
+      "name": "Ventas de grupos",
+      "requiresPartner": false
+    },
+    {
+      "code": "TTOO",
+      "name": "Turoperador (contrato negociado)",
+      "requiresPartner": true
+    },
+    {
+      "code": "OTA",
+      "name": "Agencia de viajes online",
+      "requiresPartner": true
+    }
+  ],
+  "cancellationReasons": [
+    {
+      "code": "IMPAGO",
+      "name": "Impago"
+    },
+    {
+      "code": "DUPLICADA",
+      "name": "Reserva duplicada"
+    },
+    {
+      "code": "CANCELA-TTOO",
+      "name": "Cancelada por el turoperador"
+    },
+    {
+      "code": "OTR",
+      "name": "Otros motivos"
+    },
+    {
+      "code": "NOS",
+      "name": "No show"
+    }
+  ],
+  "paymentMethods": [
+    {
+      "code": "VISA",
+      "name": "Tarjeta Visa"
+    },
+    {
+      "code": "VISA-MANUAL",
+      "name": "Tarjeta Visa tecleada a mano"
+    },
+    {
+      "code": "MASTERCARD",
+      "name": "Tarjeta Mastercard"
+    },
+    {
+      "code": "TRANSFERENCIA",
+      "name": "Transferencia bancaria"
+    },
+    {
+      "code": "EFECTIVO",
+      "name": "Efectivo"
+    }
+  ]
+}

@@ -20,9 +20,10 @@ import java.util.stream.Collectors;
  * Options and labels for every field that takes a code from the CRS catalog, told apart by the
  * field's name.
  *
- * <p>Room types are offered across all hotels at once: the lookup does not know which hotel the
- * form has picked, and the same code — DBL, JSU — means the same kind of room in each. Whether the
- * hotel actually has it is checked when the booking is saved.
+ * <p>Codes are offered across all hotels at once — room types, and the rate plans, boards, channels,
+ * reasons and methods of a hotel that has its own (MRU01's, imported from its Opera property's): the
+ * lookup does not know which hotel the form has picked. Whether the hotel actually has the code is
+ * checked when the booking is saved.
  */
 @Service
 @RequiredArgsConstructor
@@ -62,7 +63,7 @@ public class CatalogLookup implements LookupOptionsSupplier, LookupLabelSupplier
             return map(catalog.hotels(), CrsCatalog.Hotel::code, CrsCatalog.Hotel::name);
         }
         if (field.endsWith("channelCode")) {
-            return map(catalog.channels(), CrsCatalog.Channel::code, CrsCatalog.Channel::name);
+            return map(catalog.acrossHotels(CrsCatalog.Codes::channels, CrsCatalog.Channel::code), CrsCatalog.Channel::code, CrsCatalog.Channel::name);
         }
         if (field.endsWith("roomTypeCode")) {
             return map(catalog.hotels().stream().flatMap(h -> h.roomTypes().stream())
@@ -71,16 +72,16 @@ public class CatalogLookup implements LookupOptionsSupplier, LookupLabelSupplier
                     CrsCatalog.RoomType::code, CrsCatalog.RoomType::name);
         }
         if (field.endsWith("ratePlanCode")) {
-            return map(catalog.ratePlans(), CrsCatalog.RatePlan::code, CrsCatalog.RatePlan::name);
+            return map(catalog.acrossHotels(CrsCatalog.Codes::ratePlans, CrsCatalog.RatePlan::code), CrsCatalog.RatePlan::code, CrsCatalog.RatePlan::name);
         }
         if (field.endsWith("boardCode")) {
-            return map(catalog.boards(), CrsCatalog.Board::code, CrsCatalog.Board::name);
+            return map(catalog.acrossHotels(CrsCatalog.Codes::boards, CrsCatalog.Board::code), CrsCatalog.Board::code, CrsCatalog.Board::name);
         }
         if (field.endsWith("cancellationReasonCode")) {
-            return map(catalog.cancellationReasons(), CrsCatalog.Code::code, CrsCatalog.Code::name);
+            return map(catalog.acrossHotels(CrsCatalog.Codes::cancellationReasons, CrsCatalog.Code::code), CrsCatalog.Code::code, CrsCatalog.Code::name);
         }
         if (field.endsWith("methodCode")) {
-            return map(catalog.paymentMethods(), CrsCatalog.Code::code, CrsCatalog.Code::name);
+            return map(catalog.acrossHotels(CrsCatalog.Codes::paymentMethods, CrsCatalog.Code::code), CrsCatalog.Code::code, CrsCatalog.Code::name);
         }
         throw new IllegalArgumentException("No catalog for field " + field);
     }

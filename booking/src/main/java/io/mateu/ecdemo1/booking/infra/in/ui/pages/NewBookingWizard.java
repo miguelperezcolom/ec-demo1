@@ -93,7 +93,15 @@ public class NewBookingWizard extends Wizard {
                 if (stay.arrival() != null && stay.departure() != null && !stay.departure().isAfter(stay.arrival())) {
                     yield "The departure has to be after the arrival";
                 }
-                var channel = catalog.channels().stream().filter(c -> c.code().equals(stay.channelCode())).findFirst();
+                // The hotel's channels: a hotel may have its own, and the lookup offers every hotel's.
+                var known = stay.hotelCode() != null
+                        && catalog.hotels().stream().anyMatch(h -> h.code().equals(stay.hotelCode()));
+                var channels = known ? catalog.codes(stay.hotelCode()).channels() : catalog.channels();
+                var channel = channels.stream().filter(c -> c.code().equals(stay.channelCode())).findFirst();
+                if (known && stay.channelCode() != null && channel.isEmpty()) {
+                    yield "Hotel %s does not sell through channel %s: it sells through %s".formatted(stay.hotelCode(),
+                            stay.channelCode(), channels.stream().map(CrsCatalog.Channel::code).collect(Collectors.joining(", ")));
+                }
                 if (channel.isPresent() && channel.get().requiresPartner()
                         && (stay.partnerCode() == null || stay.partnerCode().isBlank())) {
                     yield "Channel %s sells through a partner: give the partner's code".formatted(channel.get().name());

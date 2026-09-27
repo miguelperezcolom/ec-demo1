@@ -64,17 +64,27 @@ class DemoBookingGeneratorTest {
                     assertThat(room.adults()).isBetween(1, 3);
                     assertThat(room.guests()).hasSize(room.adults() + room.childrenAges().size());
                 });
-                var channel = catalog.channel(request.channelCode());
-                assertThat(channel.code()).isIn("WEB", "CC", "TTOO", "OTA");
+                var channel = catalog.channel("MRU01", request.channelCode());
+                assertThat(channel.code()).isIn("WEB", "CALLCENTER", "TTOO", "OTA");
                 if (channel.requiresPartner()) {
                     assertThat(request.partnerCode()).isIn(PARTNERS.stream().map(TradingPartner::code).toList())
                             .isNotEqualTo("04410248");
                 } else {
                     assertThat(request.partnerCode()).isNull();
                 }
-                if ("TTOO".equals(channel.code())) {
-                    assertThat(request.rooms()).allSatisfy(r -> assertThat(r.ratePlanCode()).isEqualTo("TTOO"));
-                }
+                // MRU01's own plans: a contract for a tour operator, an online agency's for OTA, direct otherwise.
+                var ratePlans = switch (channel.code()) {
+                    case "TTOO" -> List.of("TUI-NL", "TUI-FR", "DMC-MAURICIO", "AGENCIAS-LOCALES");
+                    case "OTA" -> List.of("EXPEDIA-AD", "AGRO-MAYOR");
+                    default -> List.of("DIRECTA", "FLEX-LOCAL");
+                };
+                assertThat(request.rooms()).allSatisfy(r -> {
+                    assertThat(r.ratePlanCode()).isIn(ratePlans);
+                    assertThat(r.boardCode()).isIn("SOLO-ALOJAMIENTO", "DESAYUNO", "COMIDAS", "TODO-INCLUIDO");
+                    if ("EXPEDIA-AD".equals(r.ratePlanCode())) {
+                        assertThat(r.boardCode()).isEqualTo("DESAYUNO");
+                    }
+                });
                 if ("OTA".equals(channel.code())) {
                     assertThat(request.partnerCode()).isEqualTo("04900666");
                 }
@@ -83,12 +93,12 @@ class DemoBookingGeneratorTest {
                 }
                 booking.payments().forEach(p -> {
                     assertThat(channel.requiresPartner()).isFalse();
-                    assertThat(catalog.paymentMethod(p.methodCode())).isNotNull();
+                    assertThat(catalog.paymentMethod("MRU01", p.methodCode())).isNotNull();
                     assertThat(p.amount()).isPositive().isLessThanOrEqualTo(accepted.total());
                 });
             }
             assertThat(bookings).extracting(b -> b.request().channelCode())
-                    .contains("WEB", "CC", "TTOO", "OTA");
+                    .contains("WEB", "CALLCENTER", "TTOO", "OTA");
             assertThat(bookings).anySatisfy(b -> assertThat(b.payments()).isNotEmpty());
             assertThat(bookings).anySatisfy(b -> assertThat(b.request().rooms())
                     .anySatisfy(r -> assertThat(r.guests()).anySatisfy(g -> assertThat(g.type()).isEqualTo(GuestType.Child))));
@@ -106,7 +116,7 @@ class DemoBookingGeneratorTest {
         var bookings = generator(7, List.of()).generate(10);
 
         assertThat(bookings).allSatisfy(b -> {
-            assertThat(catalog.channel(b.request().channelCode()).requiresPartner()).isFalse();
+            assertThat(catalog.channel("MRU01", b.request().channelCode()).requiresPartner()).isFalse();
             assertThat(b.request().partnerCode()).isNull();
         });
     }
