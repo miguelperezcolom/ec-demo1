@@ -18,8 +18,7 @@ import io.mateu.ecdemo1.integrations.clients.Services;
 import io.mateu.ecdemo1.integrations.config.IntegrationsProperties;
 import io.mateu.ecdemo1.integrations.crypto.SecretBox;
 import io.mateu.ecdemo1.integrations.outbox.Outbox;
-import io.mateu.ecdemo1.integrations.outbox.RemoteCall;
-import io.mateu.ecdemo1.integrations.outbox.RemoteCalls;
+import io.mateu.ecdemo1.integrations.outbox.Commands;
 import io.mateu.ecdemo1.integrations.store.BackfillRun;
 import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
 import io.mateu.ecdemo1.integrations.store.Integration;
@@ -60,9 +59,10 @@ import java.util.stream.Collectors;
  * integration, asks the other services what it needs to know — outside any transaction — and then
  * saves what it decided in one short transaction ({@link Writes}), which the integration's version
  * guards: if it changed meanwhile, nothing is saved and the action is refused, to be tried again.
- * What is to be asked of other services after deciding — the mapping, the master of partners — is
- * written to the {@link RemoteCalls} outbox in that same transaction, and sent once it commits: a
- * decision rolled back asks nothing of anyone. The integration's status changes only through its
+ * What is to be asked of other services after deciding — the mapping, the master of partners, the
+ * CRS adapter — is a command written to the outbox in that same transaction ({@link Commands}) and
+ * published to Kafka once it commits: a decision rolled back asks nothing of anyone. Other services
+ * are called over HTTP only to be asked something the decision needs now — queries. The integration's status changes only through its
  * {@link IntegrationTransition state machine}.
  */
 @Service
@@ -96,7 +96,7 @@ public class Integrations {
     final Services services;
     final SecretBox secrets;
     final Outbox outbox;
-    final RemoteCalls remoteCalls;
+    final Commands commands;
     final Writes writes;
     final IntegrationsProperties properties;
     final Clock clock;
@@ -249,7 +249,7 @@ public class Integrations {
             var i = find(id);
             i.apply(IntegrationTransition.RESUME);
             i.record(clock.instant(), by, "Resumed");
-            remoteCalls.enqueue(new RemoteCall.ResolveCause(Cause.integrationInactive(i.crsHotelCode).key(), by));
+            commands.resolveCauseIfOpen(Cause.integrationInactive(i.crsHotelCode).key(), by);
             return integrations.save(i);
         });
     }
@@ -343,8 +343,8 @@ public class Integrations {
                         properties.consoleUrl() + "/mapping/dictionary?integration=" + x.crsHotelCode);
                 x.record(clock.instant(), "onboarding", "Waiting for a person to map the %d pending code(s)".formatted(pending));
             } else if (pending > 0) {
-                // Sent once this is saved, and again until the mapping takes it.
-                remoteCalls.enqueue(new RemoteCall.RequestAgentProposal(x.crsHotelCode));
+                // Published once this is saved; the mapping takes it once.
+                commands.requestAgentProposal(x.crsHotelCode);
                 x.record(clock.instant(), "onboarding", "Asked the mapping agent for a proposal of the %d pending code(s)"
                         .formatted(pending));
             }
@@ -368,7 +368,7 @@ public class Integrations {
             if (!x.is(IntegrationStatus.SYNCING_PARTNERS)) {
                 transition(x, IntegrationTransition.SYNC_PARTNERS, "Syncing the partners of the hotel's future reservations");
             }
-            missing.forEach(code -> remoteCalls.enqueue(new RemoteCall.ResyncPartner(code)));
+            missing.forEach(commands::resyncPartner);
             x.partnersMissing = missing;
             x.record(clock.instant(), "onboarding", missing.isEmpty() ? "Every partner is already a PMS profile"
                     : "Announced again for projection: " + String.join(", ", missing));
@@ -441,8 +441,7 @@ public class Integrations {
             }
             i.gate = null;
             if (i.is(IntegrationStatus.ACTIVE)) {
-                remoteCalls.enqueue(new RemoteCall.ResolveCause(Cause.integrationInactive(i.crsHotelCode).key(),
-                        "integration " + i.crsHotelCode));
+                commands.resolveCauseIfOpen(Cause.integrationInactive(i.crsHotelCode).key(), "integration " + i.crsHotelCode);
             }
             return integrations.save(i);
         });
@@ -532,10 +531,10 @@ public class Integrations {
         i.connectivityMessage = check.message();
         i.connectivityCheckedAt = clock.instant();
         if (check.ok()) {
-            remoteCalls.enqueue(new RemoteCall.DefineHotel(i.crsHotelCode, i.pmsHotelCode, "integration " + i.crsHotelCode));
+            commands.defineHotel(i.crsHotelCode, i.pmsHotelCode, "integration " + i.crsHotelCode);
             // Which profile type each partner type is in OPERA: the tenant's own types, so entered
             // rather than left pending for a person — creating a partner's profile needs it.
-            remoteCalls.enqueue(new RemoteCall.DefinePartnerTypes("integration " + i.crsHotelCode));
+            commands.definePartnerTypes("integration " + i.crsHotelCode);
             if (i.is(IntegrationStatus.CONNECTIVITY_FAILED)) {
                 transition(i, IntegrationTransition.CONNECTIVITY_RESTORED, "Connection verified: " + check.message());
             } else {
@@ -585,76 +584,68 @@ public class Integrations {
      * none is ever created in Opera again. Their codes are Opera's CorporateIds, which is what the chain
      * knows a partner by. Nothing is written to Opera. Idempotent.
      *
-     * <p>The import is what other services do, asked one by one outside any transaction; the
-     * integration only records how it went, afterwards, on the integration as it is then.
+     * <p>Opera's partners and the ERP's are read first, outside any transaction — to tell what is new
+     * and what changes, which is what the person is told. What to do about them goes as commands to the
+     * ERP and the mapping, written in the transaction that records the import: the ERP creates or
+     * updates each one — keeping what only it knows — and the gates see the profiles once they are in.
      */
     @Audited("Import partners")
     public Integration importPartners(String id, String by) {
         var i = find(id);
-        var summary = importPartners(i, by);
-        var missing = i.is(IntegrationStatus.SYNCING_PARTNERS) ? missingPartners(i) : null;
+        var plan = planImport(i);
         return writes.write(() -> {
             var now = find(id);
-            if (missing != null && now.is(IntegrationStatus.SYNCING_PARTNERS)) {
-                now.partnersMissing = missing;
+            commands.definePartnerTypes(by);
+            for (var p : plan.partners()) {
+                commands.importPartner(p.code(), erpType(p.profileType()), p.name(), p.pmsProfileId(), p.profileType());
+                commands.recordPartnerProfile(p.code(), p.pmsProfileId(), p.profileType());
             }
-            now.record(clock.instant(), by, summary);
+            now.record(clock.instant(), by, plan.summary(i.pmsHotelCode));
             return integrations.save(now);
         });
     }
 
-    String importPartners(Integration i, String by) {
-        services.definePartnerTypes(by);
+    /** What an import brings: Opera's partners but the ambiguous ones, and how many are new or change in the ERP. */
+    record ImportPlan(List<PmsPartner> partners, int created, int updated, int unchanged, List<String> ambiguous) {
+        String summary(String pmsHotelCode) {
+            return "Partners imported from Opera %s: %d new, %d updated, %d unchanged%s".formatted(pmsHotelCode, created, updated,
+                    unchanged, ambiguous.isEmpty() ? "" : "; left out, on more than one Opera profile: " + String.join(", ", ambiguous));
+        }
+    }
+
+    ImportPlan planImport(Integration i) {
         int created = 0, updated = 0, unchanged = 0;
         var fromOpera = services.pmsPartners(i.pmsHotelCode);
         // A code on more than one profile is nobody in particular: which one a reservation means cannot
         // be told, so none of them is imported, and it is said — it is Opera's data to fix.
         var ambiguous = fromOpera.stream().collect(Collectors.groupingBy(PmsPartner::code, Collectors.counting()))
                 .entrySet().stream().filter(e -> e.getValue() > 1).map(Map.Entry::getKey).sorted().toList();
+        var partners = new ArrayList<PmsPartner>();
         for (var p : fromOpera) {
             if (ambiguous.contains(p.code())) {
                 continue;
             }
-            var type = switch (p.profileType()) {
-                case "Agent" -> "TravelAgent";
-                case "Company" -> "Company";
-                default -> "OnlineAgency";
-            };
+            partners.add(p);
+            var type = erpType(p.profileType());
             var current = services.erpPartner(p.code());
             if (current.isEmpty()) {
-                services.createPartner(p.code(), details(type, p.name(), null));
                 created++;
             } else if (!type.equals(current.get().path("type").asText()) || !p.name().equals(current.get().path("name").asText())) {
-                services.updatePartner(p.code(), details(type, p.name(), current.get()));
                 updated++;
             } else {
                 unchanged++;
             }
-            services.recordErpPmsProfile(p.code(), p.pmsProfileId(), p.profileType());
-            services.recordPartnerProfile(p.code(), p.pmsProfileId(), p.profileType());
         }
-        return "Partners imported from Opera %s: %d new, %d updated, %d unchanged%s".formatted(i.pmsHotelCode, created, updated,
-                unchanged, ambiguous.isEmpty() ? "" : "; left out, on more than one Opera profile: " + String.join(", ", ambiguous));
+        return new ImportPlan(partners, created, updated, unchanged, ambiguous);
     }
 
-    /** The ERP's details for an imported partner: Opera's name and type, and what the ERP already knew of the rest. */
-    static Map<String, Object> details(String type, String name, com.fasterxml.jackson.databind.JsonNode current) {
-        var details = new java.util.HashMap<String, Object>();
-        details.put("type", type);
-        details.put("name", name);
-        // Opera does not say who pays the stay; the guest at the desk until the ERP says otherwise.
-        details.put("billingMode", current == null ? "Front" : current.path("billingMode").asText("Front"));
-        if (current != null) {
-            for (var field : List.of("taxId", "email", "phone")) {
-                if (!current.path(field).isNull() && !current.path(field).isMissingNode()) {
-                    details.put(field, current.path(field).asText());
-                }
-            }
-            if (current.path("address").isObject()) {
-                details.put("address", current.path("address"));
-            }
-        }
-        return details;
+    /** The ERP's partner type for an Opera profile type. */
+    static String erpType(String profileType) {
+        return switch (profileType) {
+            case "Agent" -> "TravelAgent";
+            case "Company" -> "Company";
+            default -> "OnlineAgency";
+        };
     }
 
     /** The partners the hotel's future reservations reference that are not PMS profiles yet. */

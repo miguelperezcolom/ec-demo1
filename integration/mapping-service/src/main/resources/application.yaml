@@ -17,7 +17,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeTasks
+      definition: consumeTasks;consumeMappingCommands
     stream:
       kafka:
         binder:
@@ -49,6 +49,16 @@ spring:
         consumeTasks-in-0:
           destination: mapping
           group: ec-demo1-mapping-worker
+        # IN: what other services ask of the mapping without waiting — the integrations service's
+        # equivalences, the agent's proposal, causes to resolve, partners' PMS profiles. Taken once
+        # each (inbox); retried until it goes.
+        consumeMappingCommands-in-0:
+          destination: mapping-commands
+          group: ec-demo1-mapping-commands
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
         # OUT: replies to the engine; and, through the outbox, the messages that resume waiting
         # processes, the starts of their successors, and notifications.
         upstream:

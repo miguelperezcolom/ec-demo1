@@ -7,7 +7,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks;consumeCustomerEvents
+      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks;consumeCustomerEvents;consumeProjectionRequests
     stream:
       kafka:
         binder:
@@ -22,6 +22,16 @@ spring:
               configuration:
                 key.serializer: org.apache.kafka.common.serialization.StringSerializer
           outboxUpstream:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          bookingCommands:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          partnerCommands:
             producer:
               sync: true
               configuration:
@@ -47,6 +57,15 @@ spring:
             max-attempts: 1000
             back-off-initial-interval: 1000
             back-off-max-interval: 60000
+        # IN: the reservations the integrations service's backfill asks to project — a command, through
+        # its outbox, never HTTP. Retried until it goes; the router's inbox takes each once.
+        consumeProjectionRequests-in-0:
+          destination: projection-requests
+          group: ec-demo1-crs-integration-projections
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
         # IN: the engine's tasks for this adapter — the steps whose definition says topic
         # crs-integration. A group of its own, like every binding here.
         consumeTasks-in-0:
@@ -59,6 +78,12 @@ spring:
           destination: upstream
         upstream:
           destination: upstream
+        # OUT, through the outbox: what the steps write back to the systems this adapter fronts — the
+        # PMS reference to the CRS, a partner's PMS profile to the ERP. Commands, never HTTP.
+        bookingCommands:
+          destination: booking-commands
+        partnerCommands:
+          destination: partner-commands
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/crs_integration}

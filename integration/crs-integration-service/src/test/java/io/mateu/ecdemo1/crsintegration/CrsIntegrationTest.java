@@ -227,8 +227,13 @@ class CrsIntegrationTest {
         var replies = consume("upstream", r -> r.value().contains("TE-1"), 1, 15);
         assertThat(replies).singleElement().satisfies(r -> assertThat(json(r.value()).get("status").asText())
                 .isEqualTo("COMPLETED"));
-        assertThat(writes).anySatisfy(w -> assertThat(w).startsWith("PUT /bookings/LOC1/pms-reference")
-                .contains("OPERA-77"));
+        // Not written over HTTP: a command for the CRS, through the outbox, keyed by the booking.
+        assertThat(writes).noneSatisfy(w -> assertThat(w).contains("pms-reference"));
+        assertThat(consume("booking-commands", r -> r.value().contains("TE-1"), 1, 15)).singleElement().satisfies(r -> {
+            assertThat(r.key()).isEqualTo("LOC1");
+            assertThat(json(r.value()).get("type").asText()).isEqualTo("annotate-pms-reference");
+            assertThat(json(r.value()).get("pmsReservationId").asText()).isEqualTo("OPERA-77");
+        });
     }
 
     @Test
@@ -267,6 +272,17 @@ class CrsIntegrationTest {
             assertThat(variables(start)).containsEntry("origin", "backfill:R1").containsEntry("locator", "LOC1")
                     .doesNotContainKey("version");
         });
+    }
+
+    @Test
+    void theBackfillsProjectionRequestsArriveOverKafkaAndStartTheProcessOnce() {
+        for (int i = 0; i < 2; i++) {
+            send("projection-requests", "PMI01/LOC2", """
+                    {"commandId":"C-%d","hotelCode":"PMI01","locator":"LOC2","origin":"backfill:R2"}""".formatted(i));
+        }
+        var starts = consume("upstream", r -> r.value().contains("backfill:R2"), 2, 20);
+        assertThat(starts).singleElement().satisfies(r -> assertThat(json(r.value()).get("businessKey").asText())
+                .isEqualTo("proyectar-reserva:PMI01/LOC2:backfill:R2"));
     }
 
     @Test

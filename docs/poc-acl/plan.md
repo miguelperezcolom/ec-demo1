@@ -61,6 +61,10 @@ lleve los datos del golden record y no solo su código.
   sale del despliegue de ec1 —menús, gateway y manifiesto—. Queda solo como doble de la batería
   punta a punta local (`e2e/poc-acl-local`), que inyecta fallos y agota cupo, cosas que no se hacen
   contra el tenant.
+- **Entre servicios, órdenes por Kafka; HTTP solo para consultar.** Una orden a otro servicio sale
+  por el outbox del emisor y la consume un consumidor idempotente con inbox. HTTP síncrono queda para
+  consultas y pantallas que esperan la respuesta. Qué va por dónde y lo que aún falta mover:
+  [llamadas-sincronas.md](llamadas-sincronas.md).
 - **La suspensión por causa, sin ciclos en el grafo.** El motor no admite ciclos, así que «volver a
   Preparar» se hace así:
   1. `Preparar` devuelve las carencias y `mapping-service` registra cada una como causa, con los

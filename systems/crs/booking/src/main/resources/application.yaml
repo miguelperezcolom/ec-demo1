@@ -17,11 +17,11 @@ spring:
 
   cloud:
     function:
-      # This service is a worker and nothing else: it consumes tasks and answers them. The engine
+      # It consumes the tasks the engine gives it and the commands other services send it. The engine
       # runs in the orchestrator pod, so consumeOutbox and consumeUpstream do not belong here —
       # naming them left two phantom bindings, one of them sharing a consumer group with the
       # engine's own.
-      definition: consumeWorkerEvent
+      definition: consumeWorkerEvent;consumeBookingCommands
     stream:
       kafka:
         binder:
@@ -55,6 +55,15 @@ spring:
         consumeWorkerEvent-in-0:
           destination: booking
           group: ec-demo1-booking
+        # IN: what other services ask of the CRS without waiting — the integration writing back where a
+        # booking landed in the PMS. Taken once each (inbox); retried until it goes.
+        consumeBookingCommands-in-0:
+          destination: booking-commands
+          group: ec-demo1-booking-commands
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
         # OUT, via StreamBridge: the replies back to the engine.
         upstream:
           destination: upstream
