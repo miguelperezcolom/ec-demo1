@@ -10,7 +10,10 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.UI;
 import org.springframework.stereotype.Service;
 
-/** The customer MDM's screens, federated into the control console (HLA: services bring their own UI). */
+/**
+ * The customer MDM's technical screens, federated into the control console (HLA: services bring their
+ * own UI). Its business face — Clientes — is a second @UI, for the data plane: see CustomersHome.
+ */
 @UI("/_mdm")
 @Title("")
 @FavIcon("/images/riu.svg")

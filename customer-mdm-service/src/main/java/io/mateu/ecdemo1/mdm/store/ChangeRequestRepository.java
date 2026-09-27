@@ -9,4 +9,8 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, St
     List<ChangeRequest> findByStatusOrderByRequestedAtAsc(String status);
 
     List<ChangeRequest> findByCustomerIdOrderByRequestedAtDesc(String customerId);
+
+    List<ChangeRequest> findByCustomerIdInOrderByRequestedAtDesc(java.util.Collection<String> customerIds);
+
+    List<ChangeRequest> findAllByOrderByRequestedAtDesc();
 }

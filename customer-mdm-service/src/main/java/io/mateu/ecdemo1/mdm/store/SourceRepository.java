@@ -9,4 +9,7 @@ public interface SourceRepository extends JpaRepository<Source, String> {
     List<Source> findByCustomerIdOrderByFirstSeenAsc(String customerId);
 
     long countByCustomerId(String customerId);
+
+    /** The passengers of one reservation, holder first. */
+    List<Source> findByHotelCodeAndLocatorOrderByPassengerAsc(String hotelCode, String locator);
 }
