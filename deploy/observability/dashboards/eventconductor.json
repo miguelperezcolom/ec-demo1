@@ -481,5 +481,14 @@
         }
       ]
     }
+  ],
+  "links": [
+    {
+      "title": "Booking traces",
+      "type": "link",
+      "url": "/d/booking-traces",
+      "icon": "external link",
+      "tooltip": "Find a booking's trace in Tempo by its locator"
+    }
   ]
 }

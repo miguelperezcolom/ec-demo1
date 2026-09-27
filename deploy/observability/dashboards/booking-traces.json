@@ -1,0 +1,146 @@
+{
+  "uid": "booking-traces",
+  "title": "Booking traces",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "",
+  "tags": [
+    "ec-demo1",
+    "tracing"
+  ],
+  "links": [
+    {
+      "title": "EventConductor",
+      "type": "link",
+      "url": "/d/eventconductor",
+      "icon": "dashboard"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "booking",
+        "label": "Booking (locator)",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        },
+        "description": "The booking's locator, as the CRS gave it. A regex: .* lists every booking traced in the range."
+      },
+      {
+        "type": "textbox",
+        "name": "hotel",
+        "label": "Hotel",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "How a booking is traced",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "A booking's trace starts where the CRS creates it (booking: the REST call, the screen or the MCP tool) and runs through its outbox to **crs-integration**, which starts the process in the **orchestrator** with the same trace; every task the engine dispatches — **mapping**, **crs-integration**, pms-integration — runs inside it.\n\nThe entry span carries `booking.id`, `booking.locator` and `hotel.code`; crs-integration's routing span carries `booking.locator`, `hotel.code` and `eventconductor.business-key` (the process key). Search below by locator, open the trace ID for the whole waterfall, or query Tempo in Explore: `{ span.booking.locator = \"<locator>\" }`."
+      }
+    },
+    {
+      "type": "table",
+      "title": "Bookings traced (one row per trace — open the trace ID for the whole waterfall)",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "limit": 50,
+          "spss": 3,
+          "tableType": "traces",
+          "query": "{ (span.booking.locator =~ \"${booking}\" || span.booking.id =~ \"${booking}\") && span.hotel.code =~ \"${hotel}\" }"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "inspect": true,
+            "filterable": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "type": "table",
+      "title": "What the booking's trace went through (its spans, by service)",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "description": "Every span of the traces whose entry matches the booking above: which services took part and how long each took.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "limit": 20,
+          "spss": 100,
+          "tableType": "spans",
+          "query": "{ span.booking.locator =~ \"${booking}\" || span.booking.id =~ \"${booking}\" } >> { } | select(resource.service.name, name, span.eventconductor.step.id, span.eventconductor.process.id)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "inspect": true,
+            "filterable": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ]
+}
