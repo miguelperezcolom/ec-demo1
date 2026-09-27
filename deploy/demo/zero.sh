@@ -13,6 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./common.sh
+salesforce_env
 
 echo "Stopping the services and the engine"
 for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=0 >/dev/null; done

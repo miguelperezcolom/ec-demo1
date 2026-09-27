@@ -17,3 +17,15 @@ pg_pod() { kubectl -n $NS get pod -o name | grep eventconductor-postgres | head 
 psql_in() { kubectl -n $NS exec -i "$(pg_pod)" -- sh -c "psql -U \"\$POSTGRES_USER\" -v ON_ERROR_STOP=1 -q -d $1"; }
 # one value, or one column
 psql_value() { kubectl -n $NS exec "$(pg_pod)" -- sh -c "psql -U \"\$POSTGRES_USER\" -Atc \"$2\" -d $1"; }
+
+# Salesforce's client credentials, for the scripts that touch the org. Taken from the environment when
+# set, else from the cluster's ec-salesforce secret — the one the MDM uses — so a reset does not stop
+# half-way, with the services already down, for want of three exports.
+salesforce_env() {
+  local key
+  for key in SF_DOMAIN SF_CLIENT_ID SF_CLIENT_SECRET; do
+    if [ -z "${!key:-}" ]; then
+      export "$key=$(kubectl -n "$NS" get secret ec-salesforce -o jsonpath="{.data.$key}" | base64 -d)"
+    fi
+  done
+}
