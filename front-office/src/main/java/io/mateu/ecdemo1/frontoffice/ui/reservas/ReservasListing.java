@@ -161,6 +161,9 @@ public class ReservasListing
 
   /** Crea ~10 reservas de demo repartidas entre llegadas, en casa y salidas. */
   @io.mateu.uidl.annotations.ListToolbarButton(rowsSelectedRequired = false)
+  // detrás del walk-in: Redwood solo despacha la primera acción de la cabecera (las secundarias
+  // llegan por su id y la cadena de Mateu las busca por su etiqueta), y el walk-in es la de recepción
+  @io.mateu.uidl.annotations.Toolbar(order = 1)
   @Label("＋ 10 reservas demo")
   public void seedDemo() {
     // la lógica vive en handleAction (dispatch uniforme con "view")

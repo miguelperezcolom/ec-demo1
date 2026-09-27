@@ -106,6 +106,15 @@ class WalkInTest {
   }
 
   @Test
+  void theFormStartsOnWhatTheCrsOffersFirstSoTheUsualCaseNeedsNoCodes() {
+    var form = new io.mateu.ecdemo1.frontoffice.ui.walkin.WalkInForm();
+
+    assertThat(form.getHabitacion()).isEqualTo("STD-KING");
+    assertThat(form.getTarifa()).isEqualTo("DIRECTA");
+    assertThat(form.getRegimen()).isEqualTo("DESAYUNO");
+  }
+
+  @Test
   void theDeskOpensTheStayAtOnceAndTheBookingThatComesBackIsThatStay() throws Exception {
     assertThat(desk.offer().roomTypes()).extracting(WalkInDesk.Option::code).containsExactly("STD-KING");
     var quote = desk.quote(request());
@@ -117,6 +126,10 @@ class WalkInTest {
     assertThat(reference).matches("FO-[A-Z2-9]{6}");
     assertThat(walkIn.status()).isEqualTo(WalkInStatus.BOOKED);
     assertThat(walkIn.locator()).isEqualTo("CRS123");
+    // the other systems link it by the CRS locator: its page answers to that too
+    assertThat(WalkInDesk.stayIdFor("CRS123")).isEqualTo(reference);
+    assertThat(WalkInDesk.stayIdFor(reference)).isEqualTo(reference);
+    assertThat(WalkInDesk.stayIdFor("NOPE42")).isEqualTo("NOPE42");
     assertThat(booked).singleElement().asString()
         .contains("\"reference\":\"" + reference + "\"").contains("\"expectedTotal\":412").contains("X1234567");
     var stay = stays.findById(reference).orElseThrow();
