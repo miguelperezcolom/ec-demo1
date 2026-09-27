@@ -13,6 +13,9 @@ import io.mateu.workflow.worker.api.WorkerProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -35,17 +38,26 @@ import java.util.function.Consumer;
 public class WorkerRuntime {
 
     /**
-     * worker-api falls back to an ObjectMapper of its own when it sees none, and it looks before the
-     * one this application gets (not Boot's: a library's, and Boot's backs off) is registered — two
-     * mappers, and every injection of one fails. Its fallback is taken out of the running when there
-     * is another.
+     * worker-api registers an ObjectMapper of its own — a bare {@code new ObjectMapper()} — when it
+     * finds none, and it is evaluated before Boot's JacksonAutoConfiguration: so either Boot's backs
+     * off and the whole app gets a mapper with no JavaTimeModule (a LocalDate no longer reads), or a
+     * library defines its own later and there are two. Here it is only a fallback: with another
+     * mapper it stops being a candidate; alone, it becomes the one Boot would have built.
      */
     @Bean
     public static BeanFactoryPostProcessor workerApiObjectMapperOnlyAsFallback() {
         return beanFactory -> {
-            if (beanFactory.containsBeanDefinition("workerApiObjectMapper")
-                    && beanFactory.getBeanNamesForType(ObjectMapper.class, true, false).length > 1) {
+            if (!beanFactory.containsBeanDefinition("workerApiObjectMapper")) {
+                return;
+            }
+            if (beanFactory.getBeanNamesForType(ObjectMapper.class, true, false).length > 1) {
                 beanFactory.getBeanDefinition("workerApiObjectMapper").setAutowireCandidate(false);
+            } else if (beanFactory instanceof BeanDefinitionRegistry registry) {
+                var asBoot = new RootBeanDefinition(ObjectMapper.class,
+                        () -> beanFactory.getBean(Jackson2ObjectMapperBuilder.class).createXmlMapper(false).build());
+                asBoot.setPrimary(true);
+                registry.removeBeanDefinition("workerApiObjectMapper");
+                registry.registerBeanDefinition("workerApiObjectMapper", asBoot);
             }
         };
     }
