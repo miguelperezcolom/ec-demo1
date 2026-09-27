@@ -46,7 +46,7 @@ class SecondApprovalLosesTest {
             resolved.add(type + " " + code + " " + hotelCode + " by " + approvedBy);
         }
     };
-    final Outbox outbox = new Outbox(null, null, null) {
+    final Outbox outbox = new Outbox(null, null, null, null) {
         @Override
         public void appendResolution(String subject, String by) {
         }

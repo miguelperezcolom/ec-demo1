@@ -28,9 +28,18 @@ public class IntegrationClients {
     final RestClient integrations;
 
     public IntegrationClients(MappingProperties properties, TolerantReader reader) {
-        this.crs = client(properties.crsIntegrationUrl(), reader);
-        this.pms = client(properties.pmsIntegrationUrl(), reader);
-        this.integrations = client(properties.integrationsUrl(), reader);
+        this(properties, reader, RestClient.builder());
+    }
+
+    /**
+     * Built from Boot's builder, which observes every call: the adapters' spans join the trace of the
+     * step that asked, and the call carries its traceparent.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    public IntegrationClients(MappingProperties properties, TolerantReader reader, RestClient.Builder builder) {
+        this.crs = client(builder.clone(), properties.crsIntegrationUrl(), reader);
+        this.pms = client(builder.clone(), properties.pmsIntegrationUrl(), reader);
+        this.integrations = client(builder.clone(), properties.integrationsUrl(), reader);
     }
 
     public Reservation reservation(String hotelCode, String locator) {
@@ -69,8 +78,8 @@ public class IntegrationClients {
         }
     }
 
-    private static RestClient client(String baseUrl, TolerantReader reader) {
-        return RestClient.builder()
+    private static RestClient client(RestClient.Builder builder, String baseUrl, TolerantReader reader) {
+        return builder
                 .baseUrl(baseUrl)
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);

@@ -1,4 +1,4 @@
-package io.mateu.ecdemo1.crsintegration.worker.runtime;
+package io.mateu.ecdemo1.mapping.worker.runtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.workflow.ddd.DomainEvent;
@@ -50,8 +50,8 @@ public class WorkerRuntime {
     }
 
     /**
-     * Named apart from worker-kafka's own {@code taskDispatcher} (bean overriding is off) and primary,
-     * so {@code consumeWorkerEvent} and {@link LegacyTasks} both run through this one.
+     * Named apart from worker-kafka's own taskDispatcher (bean overriding is off) and primary, so
+     * consumeWorkerEvent and LegacyTasks both run through this one.
      */
     @Bean
     @Primary
