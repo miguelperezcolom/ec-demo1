@@ -80,9 +80,10 @@ public class PendingConfirmations {
     return """
         PENDIENTE DE CONFIRMACIÓN — token %s
         %s
-        Muéstrale este resumen a la persona y pregúntale si lo confirma. Nada se ha hecho todavía: solo \
-        cuando responda que sí, llama a confirmAction con el token %s. Si dice que no, cancelAction."""
-        .formatted(token, summary, token);
+        Muéstrale este resumen a la persona, con la referencia %s, y pregúntale si lo confirma. Nada se ha \
+        hecho todavía: solo cuando responda que sí, llama a confirmAction con el token %s (si no lo tienes a \
+        mano, listPendingActions). Si dice que no, cancelAction."""
+        .formatted(token, summary, token, token);
   }
 
   /** Carries out a prepared operation the person confirmed, and audits it. */
@@ -116,6 +117,23 @@ public class PendingConfirmations {
       record(prepared, by, false, why);
       return "Error: no se ha podido hacer — " + why;
     }
+  }
+
+  /** An operation waiting for the person's yes, as the agent is shown it. */
+  public record PendingView(String token, String action, String summary, Instant preparedAt) {}
+
+  /**
+   * What the person calling has prepared and not confirmed yet, newest first — so the agent finds the
+   * token in the turn the person says yes, when the conversation it remembers may not carry it.
+   */
+  public java.util.List<PendingView> pendingForCaller() {
+    purgeExpired();
+    var person = caller.person();
+    return pending.values().stream()
+        .filter(p -> person == null || p.person() == null || person.equals(p.person()))
+        .sorted(java.util.Comparator.comparing(Prepared::at).reversed())
+        .map(p -> new PendingView(p.token(), p.action(), p.summary(), p.at()))
+        .toList();
   }
 
   /** Forgets a prepared operation the person did not want. */
