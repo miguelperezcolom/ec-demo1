@@ -88,6 +88,28 @@ public class WalkInForm implements OptionsSupplier, StereotypeSupplier {
   @Label("Precio")
   String precio = "Pulsa «Calcular precio»: lo pone el CRS.";
 
+  /**
+   * La habitación, la tarifa y el régimen empiezan en lo primero que ofrece el CRS: Redwood pinta
+   * los campos de un formulario de página como texto, sin desplegable, y así recepción no tiene que
+   * saberse los códigos para el caso corriente. Sin CRS, se quedan vacíos.
+   */
+  public WalkInForm() {
+    try {
+      var offer = WalkInDesk.desk() == null ? null : WalkInDesk.desk().offer();
+      if (offer != null) {
+        habitacion = first(offer.roomTypes());
+        tarifa = first(offer.ratePlans());
+        regimen = first(offer.boards());
+      }
+    } catch (RuntimeException e) {
+      // sin catálogo del CRS el formulario se abre igual; «Calcular precio» dirá qué falla
+    }
+  }
+
+  static String first(List<WalkInDesk.Option> options) {
+    return options == null || options.isEmpty() ? null : options.get(0).code();
+  }
+
   /** Lo que el CRS dijo, y de qué: si algo cambia después, hay que volver a preguntar. */
   @Hidden BigDecimal presupuesto;
 
