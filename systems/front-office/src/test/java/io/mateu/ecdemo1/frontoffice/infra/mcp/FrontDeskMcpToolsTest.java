@@ -179,6 +179,25 @@ class FrontDeskMcpToolsTest {
   }
 
   @Test
+  void inTheNextMessageThePendingOperationAndItsTokenAreThereToBeFound() {
+    var stayId = inHouse(LocalDate.now().plusDays(1));
+    var token = token(tools.prepareLateCheckOut(stayId));
+
+    caller.turn = "turn-" + SEQ.incrementAndGet(); // "sí" — and the agent no longer has the token
+    assertThat(tools.listPendingActions()).anySatisfy(p -> {
+      assertThat(p.token()).isEqualTo(token);
+      assertThat(p.action()).isEqualTo("Late check-out");
+      assertThat(p.summary()).contains(stayId);
+    });
+    caller.person = "luis";
+    assertThat(tools.listPendingActions()).noneMatch(p -> p.token().equals(token));
+
+    caller.person = "ana";
+    assertThat(tools.confirmAction(token)).startsWith("Hecho.");
+    assertThat(tools.listPendingActions()).noneMatch(p -> p.token().equals(token));
+  }
+
+  @Test
   void whatOnePersonPreparedAnotherCannotConfirm() {
     var stayId = inHouse(LocalDate.now().plusDays(1));
     var token = token(tools.prepareLateCheckOut(stayId));

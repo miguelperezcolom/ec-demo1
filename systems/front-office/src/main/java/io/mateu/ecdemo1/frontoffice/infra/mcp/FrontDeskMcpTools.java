@@ -97,7 +97,8 @@ public class FrontDeskMcpTools {
           kárdex. Ninguna se hace directamente: la herramienta prepare… la comprueba y devuelve un resumen con un
           token. Enséñale el resumen a la persona y pregúntale si lo confirma; solo cuando responda que sí, en su
           siguiente mensaje, llama a confirmAction con ese token. Si dice que no, cancelAction. Nunca confirmes
-          en el mismo mensaje en que preparas: el servidor lo rechaza.
+          en el mismo mensaje en que preparas: el servidor lo rechaza. Si al confirmar no tienes el token,
+          listPendingActions da las operaciones pendientes de esa persona.
         - Un no show de toda la reserva se comunica al CRS; un walk-in reserva en el CRS; los cambios de nombre,
           documento o contacto del titular se proponen al maestro de clientes (Salesforce). Dilo en el resumen.
         """;
@@ -528,9 +529,16 @@ public class FrontDeskMcpTools {
   }
 
   @Tool(description = "Carry out an operation a prepare… tool prepared — ONLY after the person has read its summary and "
-      + "said yes, in a later message. Refused if called in the same message the operation was prepared in")
+      + "said yes, in a later message. Refused if called in the same message the operation was prepared in. "
+      + "Without the token at hand, take it from listPendingActions — never make one up")
   public String confirmAction(@ToolParam(description = "The token the prepare… tool returned") String token) {
     return confirmations.confirm(token);
+  }
+
+  @Tool(description = "The operations prepared for the person calling that still wait for their yes, newest first, "
+      + "with their tokens and summaries. Use it to find the token when the person confirms")
+  public List<PendingConfirmations.PendingView> listPendingActions() {
+    return confirmations.pendingForCaller();
   }
 
   @Tool(description = "Drop an operation a prepare… tool prepared, when the person does not want it")
