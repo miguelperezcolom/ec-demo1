@@ -396,8 +396,9 @@ noviembre, solo alojamiento) esperando a las 17:55:41; propuesta del agente en 1
 - **Quién se entera de qué, y por dónde**: lo decide **una sola tabla**, *Notifications → Recipients*.
   Cada destinatario dice **a quién** (usuarios de Keycloak y/o roles, o una dirección de email),
   **qué** (tipos de aviso — ninguno, todos —, si también las tareas, y un hotel — vacío, todos) y **por
-  dónde**: la **bandeja** de sus personas, la **notificación push** de sus navegadores (la consola ofrece
-  «Enable notifications» la primera vez; un clic abre la pantalla que lo resuelve), **email** o los
+  dónde**: la **bandeja** de sus personas, la **notificación push** de sus navegadores en las consolas
+  (*Browser (Web Push)*; un clic en la notificación abre la pantalla que lo resuelve) o en **recepción**
+  (*Browser at the front desk*: los navegadores del front office), **email** o los
   **espacios de Google Chat** que nombra. Cada aviso llega a todos los destinatarios activos que lo
   quieren, una vez por persona, navegador, dirección y espacio; **urgente** es lo que alguien pidió por
   email. No queda nada de esto en la configuración del despliegue.
@@ -406,6 +407,32 @@ noviembre, solo alojamiento) esperando a las 17:55:41; propuesta del agente en 1
   (Opera rechaza una escritura, un reintento que no acaba). Qué enseñar: crear uno para un hotel — p. ej.
   el rol de recepción de MRU01 solo con sus causas, por push — y ver que un aviso de ese hotel le llega
   y uno de otro, no.
+
+### Avisos en el navegador (Web Push)
+
+Cada persona los activa **en cada navegador** — y en cada consola: son orígenes distintos —, y lo que
+recibe lo deciden los destinatarios de arriba.
+
+- **Activarlos**: la primera vez, abajo a la izquierda aparece «¿Avisos en este navegador? **Activar
+  avisos**» (✕ lo descarta para siempre en ese navegador). Siempre están en el **menú de usuario**
+  («Hola, …» arriba a la derecha): la línea **Avisos** dice el estado de este navegador — *activados*,
+  *desactivados*, *bloqueados por el navegador* (se desbloquean en el candado de la barra de
+  direcciones, y se recarga) o *no disponibles* — con **Activar avisos**, **Desactivar** y **Enviarme
+  una prueba**.
+- **Probar**: *Enviarme una prueba* manda, al momento, una notificación «Prueba de avisos» a ese
+  navegador (solo al tuyo; no pasa por la bandeja ni por los destinatarios). Desde el chat del plano de
+  control, la herramienta `sendTestPush` del MCP de comunicación la manda a **todos** los navegadores de
+  un usuario (p. ej. «mándale una prueba de avisos a demo»). Un aviso de verdad llega a la vez que entra
+  en la bandeja (≈5 s).
+- **Qué llega a quién**: *Integration administrators* (rol `ai-admin`, bandeja y push) lleva todos los
+  avisos de la integración a los navegadores de las **consolas** de quien tenga ese rol — `demo` lo
+  tiene. A **recepción** (front office) **no llega nada hoy**: ningún destinatario usa *Browser at the
+  front desk*. El navegador del front office es un canal aparte para que la misma persona, con las dos
+  cosas abiertas, no reciba todo dos veces, y para que al mostrador solo le llegue lo que alguien decida
+  que es suyo (p. ej. un destinatario *PMS_REJECTED* de MRU01 por *Browser at the front desk*).
+- **Para la demo**: en el Chrome de la demo, entrar en `console.ec1.mateu.io`, *Activar avisos* →
+  *Permitir*, y *Enviarme una prueba*. macOS: Chrome necesita permiso de notificaciones en *Ajustes del
+  Sistema → Notificaciones → Google Chrome*, y *No molestar* apagado; si no, Chrome la acepta y no se ve.
 
 ## 12. Casos de negocio propuestos *(pendientes de decidir)*
 

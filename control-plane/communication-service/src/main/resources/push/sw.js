@@ -1,5 +1,9 @@
 // The consoles' service worker: shows what the inbox pushes, and a click opens the screen that
-// resolves it — in the console tab already open on that page if there is one.
+// resolves it — in the console tab already open on that page if there is one. A new version takes
+// over at once: it holds no state, and a push for the old one is the same push.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+
 self.addEventListener('push', event => {
   let data = {};
   try {

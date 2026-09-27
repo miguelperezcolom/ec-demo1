@@ -24,6 +24,25 @@ class PlanTest {
     }
 
     @Test
+    void theFrontDeskIsToldOnlyByTheRecipientsThatPushToIt() {
+        var admins = recipient(EnumSet.of(Channel.INBOX, Channel.WEB_PUSH), null, "ai-admin", null, null, null);
+        var desk = recipient(EnumSet.of(Channel.FRONT_DESK_PUSH), "maria", "front-desk", null, "PMS_REJECTED", "MRU01");
+
+        var cause = Plan.of(List.of(admins, desk), "CAUSE_OPENED", "MRU01", 0);
+        assertThat(cause.deskUsers()).isEmpty();
+        assertThat(cause.deskRoles()).isEmpty();
+
+        var rejected = Plan.of(List.of(admins, desk), "PMS_REJECTED", "MRU01", 0);
+        assertThat(rejected.deskUsers()).containsExactly("maria");
+        assertThat(rejected.deskRoles()).containsExactly("front-desk");
+        // Pushing to the desk is not pushing to the consoles, nor putting it in an inbox.
+        assertThat(rejected.pushRoles()).containsExactly("ai-admin");
+        assertThat(rejected.inboxUsers()).isEmpty();
+
+        assertThat(Plan.of(List.of(admins, desk), "PMS_REJECTED", "PMI01", 0).deskRoles()).isEmpty();
+    }
+
+    @Test
     void eachChannelReachesItsOwnPeople() {
         var admins = recipient(EnumSet.of(Channel.INBOX, Channel.WEB_PUSH), null, "ai-admin", null, null, null);
         var ana = recipient(EnumSet.of(Channel.WEB_PUSH), "ana", null, null, null, null);

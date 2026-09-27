@@ -126,9 +126,15 @@ public class Announcements {
         announcements.save(a);
     }
 
-    /** Whether this browser is told: its person is one a recipient pushes to, or a task is in their inbox. */
+    /**
+     * Whether this browser is told: its person is one a recipient pushes to, or a task is in their
+     * inbox. A browser at the front desk only by the recipients that push to the desk.
+     */
     static boolean pushed(InboxItem item, Plan plan, PushSubscription s) {
         var roles = Recipient.split(s.roles);
+        if (s.atFrontDesk()) {
+            return (s.username != null && plan.deskUsers().contains(s.username)) || roles.stream().anyMatch(plan.deskRoles()::contains);
+        }
         if ((s.username != null && plan.pushUsers().contains(s.username)) || roles.stream().anyMatch(plan.pushRoles()::contains)) {
             return true;
         }

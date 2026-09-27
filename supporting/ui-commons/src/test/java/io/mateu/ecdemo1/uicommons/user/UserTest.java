@@ -52,6 +52,10 @@ class UserTest {
         assertThat(alone).singleElement().isInstanceOf(Popover.class);
         var popover = (Popover) alone.get(0);
         assertThat(((Text) popover.wrapped()).text()).contains("Hola, Ana Pérez");
+        // This browser's notifications, between who it is and Logout: drawn by the push script's element.
+        assertThat(((io.mateu.uidl.data.VerticalLayout) popover.content()).content())
+                .anySatisfy(c -> assertThat(c).isInstanceOfSatisfying(Text.class,
+                        t -> assertThat(t.text()).isEqualTo("<ec-push-toggle></ec-push-toggle>")));
 
         assertThat(UserWidget.withInboxBadge(request(Map.of("Authorization", ANA))))
                 .singleElement().isInstanceOf(HorizontalLayout.class);

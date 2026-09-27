@@ -79,6 +79,8 @@ communication:
     public-key: ${VAPID_PUBLIC_KEY:}
     private-key: ${VAPID_PRIVATE_KEY:}
     subject: ${VAPID_SUBJECT:mailto:integration@ec1.mateu.io}
+    # The front office's host: its browsers are the front desk's (FRONT_DESK_PUSH), not the consoles'.
+    front-desk-hosts: ${FRONT_OFFICE_HOST:front.ec1.mateu.io}
 
 management:
   endpoints:

@@ -22,6 +22,11 @@ import java.util.Map;
  * it. {@code window.logout()} is defined by the bootstrap page Mateu writes for
  * {@code @KeycloakSecured}. The name is escaped: it goes into markup.
  *
+ * <p>The popover also says whether this browser receives notifications (Web Push), and turns them on
+ * or off: {@code <ec-push-toggle>}, a custom element that the inbox's push script
+ * ({@code /_inbox/push/push.js}, loaded by every shell with {@code @Script}) defines. Where that
+ * script is not loaded the element stays undefined and draws nothing.
+ *
  * <p>Anonymous calls get no widget: the bootstrap page is about to redirect to Keycloak, so there
  * is no one to greet yet.
  */
@@ -29,6 +34,9 @@ public final class UserWidget {
 
     /** The icon a narrow header keeps; the popover still has who and Logout. */
     static final String NARROW_ICON = "<vaadin-icon icon=\"vaadin:user\" style=\"display: var(--mateu-header-narrow-only, none); width: 1em; height: 1em; vertical-align: -0.125em;\"></vaadin-icon>";
+
+    /** Web Push for this browser: its state, and Activar / Desactivar / Enviarme una prueba. */
+    static final String PUSH_TOGGLE = "<ec-push-toggle></ec-push-toggle>";
 
     private UserWidget() {
     }
@@ -58,7 +66,7 @@ public final class UserWidget {
                 .orElse(List.of());
     }
 
-    /** "Hola, name", opening the email and Logout. */
+    /** "Hola, name", opening the email, this browser's notifications and Logout. */
     public static Popover popover(Map<String, Object> claims) {
         return Popover.builder()
                 .wrapped(Text.builder()
@@ -69,6 +77,7 @@ public final class UserWidget {
                 .content(VerticalLayout.builder()
                         .content(List.of(
                                 new Text("Email: " + claims.get("email")),
+                                new Text(PUSH_TOGGLE),
                                 new Anchor("Logout", "javascript: window.logout();")))
                         .spacing(true)
                         .padding(true)

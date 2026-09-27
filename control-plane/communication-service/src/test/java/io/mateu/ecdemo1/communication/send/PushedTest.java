@@ -32,6 +32,29 @@ class PushedTest {
     }
 
     @Test
+    void aBrowserAtTheFrontDeskIsToldOnlyWhatIsPushedToTheDesk() {
+        var item = new InboxItem();
+        item.kind = InboxItem.Kind.ACTION.name();
+        var desk = browser("demo", "ai-admin,user");
+        desk.app = PushSubscription.FRONT_DESK;
+        // The consoles' recipients push to ai-admin: the same person's browser at the desk is not told.
+        var consoles = new Plan(Set.of(), Set.of(), Set.of("demo"), Set.of("ai-admin"), Set.of(), Set.of(), true);
+        assertThat(Announcements.pushed(item, consoles, desk)).isFalse();
+        assertThat(Announcements.pushed(item, consoles, browser("demo", "ai-admin,user"))).isTrue();
+
+        var toTheDesk = new Plan(Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), true, Set.of(), Set.of("user"));
+        assertThat(Announcements.pushed(item, toTheDesk, desk)).isTrue();
+        assertThat(Announcements.pushed(item, toTheDesk, browser("demo", "ai-admin,user"))).isFalse();
+
+        // Nor a task: the desk has no inbox.
+        var task = new InboxItem();
+        task.kind = InboxItem.Kind.TASK.name();
+        task.roles = "user";
+        var nobody = new Plan(Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), false);
+        assertThat(Announcements.pushed(task, nobody, desk)).isFalse();
+    }
+
+    @Test
     void aTaskIsPushedToThePeopleWhoseInboxItIsIn() {
         var task = new InboxItem();
         task.kind = InboxItem.Kind.TASK.name();

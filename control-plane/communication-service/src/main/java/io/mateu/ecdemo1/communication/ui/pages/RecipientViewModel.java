@@ -69,6 +69,9 @@ public class RecipientViewModel implements Identifiable {
     boolean byInbox = true;
     @Label("Browser (Web Push)")
     boolean byWebPush;
+    @Label("Browser at the front desk (Web Push)")
+    @Help("The front office's browsers of these users or roles")
+    boolean byFrontDeskPush;
     @Label("E-mail")
     boolean byEmail;
     @Label("Google Chat")
@@ -83,6 +86,7 @@ public class RecipientViewModel implements Identifiable {
         var channels = EnumSet.noneOf(Channel.class);
         if (byInbox) channels.add(Channel.INBOX);
         if (byWebPush) channels.add(Channel.WEB_PUSH);
+        if (byFrontDeskPush) channels.add(Channel.FRONT_DESK_PUSH);
         if (byEmail) channels.add(Channel.EMAIL);
         if (byGoogleChat) channels.add(Channel.GOOGLE_CHAT);
         var types = new ArrayList<NotificationType>();
@@ -114,6 +118,7 @@ public class RecipientViewModel implements Identifiable {
         var channels = r.channelSet();
         byInbox = channels.contains(Channel.INBOX);
         byWebPush = channels.contains(Channel.WEB_PUSH);
+        byFrontDeskPush = channels.contains(Channel.FRONT_DESK_PUSH);
         byEmail = channels.contains(Channel.EMAIL);
         byGoogleChat = channels.contains(Channel.GOOGLE_CHAT);
         chatSpaces = r.chatSpaces;
