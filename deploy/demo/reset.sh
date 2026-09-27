@@ -12,6 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./common.sh
+salesforce_env
 [ -f "$BASELINE/taken-at" ] || { echo "No baseline in $BASELINE: take one with snapshot.sh"; exit 1; }
 echo "Resetting ec1's demo to the baseline of $(cat "$BASELINE/taken-at")"
 
