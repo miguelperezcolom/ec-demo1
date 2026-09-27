@@ -134,9 +134,25 @@ public class ChangeRequests {
         var approved = "Aprobada".equalsIgnoreCase(decision) || "APPROVED".equalsIgnoreCase(decision);
         r.status = (approved ? ChangeRequest.Status.APPROVED : ChangeRequest.Status.REJECTED).name();
         r.decidedAt = clock.instant();
+        if (!approved) {
+            r.reason = reasonOf(r.id);
+        }
         requests.save(r);
-        log.info("{} {} in Salesforce ({})", r.id, r.status, how);
-        projection.refresh(r.customerId, r.id, r.status);
+        log.info("{} {} in Salesforce ({}){}", r.id, r.status, how, r.reason == null ? "" : ": " + r.reason);
+        projection.refresh(r.customerId, r.id, r.status, r.reason);
+    }
+
+    /** Why Salesforce rejected it: the hotel shows it next to the data that came back. Without it, it is still rejected. */
+    String reasonOf(String requestId) {
+        if (!salesforce.enabled()) {
+            return null;
+        }
+        try {
+            return salesforce.reason(requestId).orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("{}: could not read why it was rejected ({})", requestId, e.getMessage());
+            return null;
+        }
     }
 
     public ChangeRequest get(String id) {

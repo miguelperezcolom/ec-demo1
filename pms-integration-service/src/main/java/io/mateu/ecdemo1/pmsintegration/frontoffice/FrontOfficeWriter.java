@@ -93,7 +93,7 @@ public class FrontOfficeWriter {
         }
     }
 
-    /** The kardex the front office takes: its data as the MDM holds it, and the decision it answers, if any. */
+    /** The kardex the front office takes: its data as the MDM holds it, and the decision it answers — and why — if any. */
     public static Map<String, Object> kardexOf(CustomerEvent event) {
         var d = event.data();
         var kardex = new java.util.HashMap<String, Object>();
@@ -104,6 +104,7 @@ public class FrontOfficeWriter {
         if (event instanceof CustomerChanged c) {
             kardex.put("requestId", c.changeRequestId());
             kardex.put("decision", c.decision());
+            kardex.put("reason", c.reason());
         }
         return kardex;
     }

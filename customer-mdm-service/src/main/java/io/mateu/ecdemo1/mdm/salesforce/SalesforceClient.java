@@ -159,6 +159,15 @@ public class SalesforceClient {
         return decided;
     }
 
+    /** Why a change request was rejected, as its Case says (Motivo), if it says. */
+    public Optional<String> reason(String requestId) {
+        return queryAll("SELECT Motivo__c FROM Case WHERE MdmRequestId__c = '%s'".formatted(literal(requestId))).stream()
+                .map(c -> c.path("Motivo__c"))
+                .filter(m -> !m.isMissingNode() && !m.isNull() && !m.asText().isBlank())
+                .map(m -> m.asText().trim())
+                .findFirst();
+    }
+
     /** The contact that carries this MDM id, as Salesforce has it now. */
     public Optional<JsonNode> contactByMdmId(String mdmId) {
         return queryAll(("SELECT Id, IsDeleted, MasterRecordId, MDM_Id__c, FirstName, LastName, Email, Phone, Birthdate, "

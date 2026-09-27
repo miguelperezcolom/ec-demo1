@@ -24,9 +24,9 @@ public class CustomerEvents {
     final Clock clock;
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void changed(Customer c, boolean dataChanged, String changeRequestId, String decision) {
+    public void changed(Customer c, boolean dataChanged, String changeRequestId, String decision, String reason) {
         outbox.append(new CustomerChanged(UUID.randomUUID().toString(), clock.instant(), c.id, c.version, golden(c),
-                dataChanged, changeRequestId, decision, reservations(c.id)));
+                dataChanged, changeRequestId, decision, reason, reservations(c.id)));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

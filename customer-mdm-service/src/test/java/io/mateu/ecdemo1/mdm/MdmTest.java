@@ -75,6 +75,8 @@ class MdmTest {
     /** The Cases opened for change requests, by request id, and how each one was decided. */
     static final Map<String, String> cases = new ConcurrentHashMap<>();
     static final Map<String, String> decisions = new ConcurrentHashMap<>();
+    /** Why a Case was rejected (Motivo), by request id. */
+    static final Map<String, String> reasons = new ConcurrentHashMap<>();
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) throws IOException {
@@ -105,7 +107,8 @@ class MdmTest {
             } else if (path.equals("/services/data/v67.0/queryAll") && URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8).contains("FROM Case")) {
                 var soql = URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8);
                 var records = decisions.entrySet().stream().filter(e -> soql.contains("'" + e.getKey() + "'"))
-                        .map(e -> "{\"MdmRequestId__c\":\"" + e.getKey() + "\",\"Decision__c\":\"" + e.getValue() + "\"}").toList();
+                        .map(e -> "{\"MdmRequestId__c\":\"" + e.getKey() + "\",\"Decision__c\":\"" + e.getValue() + "\",\"Motivo__c\":"
+                                + (reasons.containsKey(e.getKey()) ? "\"" + reasons.get(e.getKey()) + "\"" : "null") + "}").toList();
                 body = "{\"done\":true,\"records\":[" + String.join(",", records) + "]}";
             } else if (path.equals("/services/data/v67.0/queryAll") && URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8).contains("WHERE MDM_Id__c = '")) {
                 var soql = URLDecoder.decode(query.substring(2), StandardCharsets.UTF_8);
@@ -278,9 +281,12 @@ class MdmTest {
                 {"phone":"+34 600 000 000","origin":"front office MRU01 · luis"}""")).path("id").asText();
         changeRequests.send();
         decisions.put(rejected, "Rechazada");
+        reasons.put(rejected, "El teléfono no es suyo");
         salesforceInbox.poll();
+        // With why, as the Case says: the front office shows it next to the data that came back.
         assertThat(changes(ana)).anyMatch(e -> "REJECTED".equals(e.decision()) && rejected.equals(e.changeRequestId())
-                && !e.dataChanged());
+                && !e.dataChanged() && "El teléfono no es suyo".equals(e.reason()));
+        assertThat(changeRequests.get(rejected).reason).isEqualTo("El teléfono no es suyo");
         assertThat(customers.findById(ana).orElseThrow().phone).isNull();
     }
 
