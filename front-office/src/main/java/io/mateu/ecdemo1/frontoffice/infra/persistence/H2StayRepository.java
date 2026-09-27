@@ -31,6 +31,14 @@ class H2StayRepository implements StayRepository {
   }
 
   @Override
+  public List<Stay> findByPerson(String customerId) {
+    var ids = crud.idsOfPerson(customerId);
+    return ids.isEmpty() ? List.of() : crud.findAllById(ids).stream()
+        .sorted(java.util.Comparator.comparing(Stay::checkIn).reversed())
+        .toList();
+  }
+
+  @Override
   public List<Stay> findArrivals() {
     return crud.findByStatusOrderByCheckInAsc(StayStatus.ARRIVING);
   }
