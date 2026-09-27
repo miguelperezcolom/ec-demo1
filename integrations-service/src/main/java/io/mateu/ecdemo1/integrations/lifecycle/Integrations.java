@@ -288,7 +288,8 @@ public class Integrations {
     }
 
     /**
-     * «Mapeado»: asks the mapping agent for a proposal of whatever is pending, and waits. The gate
+     * «Mapeado»: asks the mapping agent for a proposal of whatever is pending — or, with
+     * {@code integrations.mapping.ask-agent} off, leaves a person a notice to ask it — and waits. The gate
      * opens when a person has approved every equivalence the hotel needs — or when a person says to
      * go on regardless ({@link #approveMapping}).
      */
@@ -299,7 +300,15 @@ public class Integrations {
         if (i.status != IntegrationStatus.MAPPING_PENDING) {
             transition(i, IntegrationStatus.MAPPING_PENDING, "Waiting for the mapping: %d code(s) pending".formatted(i.pendingMappings));
         }
-        if (i.pendingMappings > 0) {
+        if (i.pendingMappings > 0 && !properties.mapping().askAgent()) {
+            // A person asks the agent: the notice says what is missing and where to map it; it closes
+            // on its own when the integration leaves the gate (transition() resolves it).
+            notifyAttention(i, "Hotel %s has %d code(s) without an equivalent in the PMS".formatted(i.crsHotelCode, i.pendingMappings),
+                    "Map them in Mapping → Dictionary, choosing the integration — or ask the mapping agent for a proposal there"
+                            + " and approve it.",
+                    properties.consoleUrl() + "/mapping/dictionary");
+            i.record(clock.instant(), "onboarding", "Waiting for a person to map the %d pending code(s)".formatted(i.pendingMappings));
+        } else if (i.pendingMappings > 0) {
             try {
                 services.requestAgentProposal(i.crsHotelCode);
                 i.record(clock.instant(), "onboarding", "Asked the mapping agent for a proposal of the %d pending code(s)"
@@ -646,9 +655,13 @@ public class Integrations {
     }
 
     void notifyAttention(Integration i, String title, String body) {
+        notifyAttention(i, title, body, properties.consoleUrl() + "/integrations/integrations/" + i.id);
+    }
+
+    void notifyAttention(Integration i, String title, String body, String link) {
         outbox.appendNotification(new NotificationRequested(UUID.randomUUID().toString(),
                 NotificationType.INTEGRATION_NEEDS_ATTENTION, i.crsHotelCode, "integration/" + i.crsHotelCode, title, body,
-                properties.consoleUrl() + "/integrations/integrations/" + i.id,
+                link,
                 "integration:" + i.id + ":" + i.status + ":" + clock.millis(), clock.instant()));
     }
 

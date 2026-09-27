@@ -46,7 +46,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: integrations-service
-          image: miguelperezcolom/ec-demo1-integrations-service:0.21.5
+          image: miguelperezcolom/ec-demo1-integrations-service:0.21.6
           env:
             - name: SERVER_PORT
               value: "8126"
@@ -66,6 +66,9 @@ spec:
               value: "http://pms-integration-service:8123"
             - name: MAPPING_URL
               value: "http://mapping-service:8122"
+            # The demo asks the mapping agent live, from Mapping → Dictionary: the gate leaves a notice instead.
+            - name: INTEGRATIONS_MAPPING_ASK_AGENT
+              value: "false"
             - name: PARTNERS_URL
               value: "http://partners:8120"
             # The chain's connection to Opera: what a new integration starts from. OHIP UAT, from the
