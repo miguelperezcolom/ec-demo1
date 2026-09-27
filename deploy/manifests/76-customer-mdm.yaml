@@ -3,7 +3,7 @@
 # before writing the guest profile — with Salesforce as its cleaning engine and stewardship surface:
 # it projects customers there as contacts, and hears merges back as ClienteConsolidado__e through
 # the Pub/Sub API (outbound gRPC to api.pubsub.salesforce.com:7443). Screens at /_mdm on the control
-# console. Without the ec-salesforce Secret it still resolves identities; cleaning just waits.
+# console, and its business face — Clientes — at /_customers on the data plane. Without the ec-salesforce Secret it still resolves identities; cleaning just waits.
 # What it decides about a customer — a changed golden record, a merge — it publishes on the
 # `customers` topic and calls no one: pms-integration takes it to the front office's kardex and
 # crs-integration projects the customer's reservations again for Opera.
@@ -49,7 +49,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: customer-mdm-service
-          image: miguelperezcolom/ec-demo1-customer-mdm-service:0.23.2
+          image: miguelperezcolom/ec-demo1-customer-mdm-service:0.24.0
           env:
             - name: SERVER_PORT
               value: "8127"
@@ -72,6 +72,16 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-salesforce, key: SF_CLIENT_ID, optional: true } }
             - name: SF_CLIENT_SECRET
               valueFrom: { secretKeyRef: { name: ec-salesforce, key: SF_CLIENT_SECRET, optional: true } }
+            # Clientes (the data plane's screens, /_customers): a customer's reservations are read
+            # from the CRS and its stays from the front office — both read-only — and the front
+            # office's public host is where a person opens a stay. Salesforce's Lightning URL is
+            # derived from SF_DOMAIN.
+            - name: BOOKING_URL
+              value: "http://booking:8108"
+            - name: FRONT_OFFICE_URL
+              value: "http://front-office:8128"
+            - name: FRONT_OFFICE_PUBLIC_URL
+              value: "https://front.ec1.mateu.io"
           ports:
             - { name: http, containerPort: 8127 }
           securityContext:

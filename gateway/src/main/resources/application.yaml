@@ -81,6 +81,15 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_partners/**
 
+        # Clientes: the customer master's business face — finding a customer, and its data, systems,
+        # reservations and change requests — served by the MDM under a second @UI of its own, on the
+        # data plane's hosts. Its technical screens stay on the control hosts, under /_mdm.
+        - id: customers
+          uri: ${CUSTOMER_MDM_URL:http://customer-mdm-service:8127}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_customers/**
+
         - id: content
           uri: ${CONTENT_URL:http://content:8104}
           predicates:

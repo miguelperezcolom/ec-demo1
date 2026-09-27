@@ -15,10 +15,30 @@ public class GuestsApi {
 
   final Kardex kardex;
   final io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository guests;
+  final io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository stays;
 
-  public GuestsApi(Kardex kardex, io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository guests) {
+  public GuestsApi(Kardex kardex, io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository guests,
+      io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository stays) {
     this.kardex = kardex;
     this.guests = guests;
+    this.stays = stays;
+  }
+
+  /**
+   * A stay a person is in, for the chain's customer master: its id is the CRS locator.
+   *
+   * @param role HOLDER — the guest the stay belongs to — or COMPANION
+   */
+  public record StayView(String id, String role, java.time.LocalDate checkIn, java.time.LocalDate checkOut,
+      String room, String roomType, String status) {}
+
+  /** The stays of a person by the chain's customer code, latest first; empty if the hotel never had them. */
+  @org.springframework.web.bind.annotation.GetMapping("/{id}/stays")
+  public java.util.List<StayView> stays(@PathVariable String id) {
+    return stays.findByPerson(id).stream()
+        .map(s -> new StayView(s.id(), id.equals(s.guestId()) ? "HOLDER" : "COMPANION", s.checkIn(), s.checkOut(),
+            s.roomNumber(), s.roomType(), s.status().name()))
+        .toList();
   }
 
   /** A guest of the cardex, and how its last change to the master's data stands. */

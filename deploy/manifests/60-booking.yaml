@@ -54,7 +54,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: booking
-          image: miguelperezcolom/ec-demo1-booking:0.26.1
+          image: miguelperezcolom/ec-demo1-booking:0.27.0
           env:
             - name: SERVER_PORT
               value: "8108"
@@ -73,6 +73,10 @@ spec:
             # The ERP's master of partners, read by "+ 10 demo bookings" for the TTOO/OTA channels.
             - name: PARTNERS_URL
               value: "http://partners:8120"
+            # The customer MDM: who a booking's people are in Clientes, Salesforce, Opera and the
+            # front office, for the booking's page to link to. Read-only, and only for showing.
+            - name: CUSTOMER_MDM_URL
+              value: "http://customer-mdm-service:8127"
           ports:
             - { name: http, containerPort: 8108 }
           securityContext:

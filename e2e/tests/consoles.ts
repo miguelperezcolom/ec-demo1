@@ -62,6 +62,10 @@ const dataScreens: Screen[] = [
     // The CRS -> Opera integration PoC (docs/poc-acl): the partners master. The Opera double is no
     // longer deployed: the integration writes to the chain's real tenant.
     { menu: 'ERP', entry: 'Partners', route: '/partners/partners' },
+    // The customer master's business face, served by the MDM under /_customers. Read-only; its
+    // technical screens (golden records, consolidations) are on the control plane.
+    { menu: 'Clientes', entry: 'Buscar clientes', route: '/customers/search', title: 'Clientes' },
+    { menu: 'Clientes', entry: 'Solicitudes de cambio', route: '/customers/changes' },
 ]
 
 /**
@@ -102,13 +106,13 @@ export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
         host: host('CONSOLE_HOST', 'ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP'],
+        menus: ['Admin', 'Call center', 'ERP', 'Clientes'],
         screens: dataScreens,
     },
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP'],
+        menus: ['Admin', 'Call center', 'ERP', 'Clientes'],
         screens: dataScreens,
     },
     {

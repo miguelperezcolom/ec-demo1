@@ -62,6 +62,15 @@ mdm:
     subscribe: ${SF_SUBSCRIBE:true}
   projection-tick: ${PROJECTION_TICK:5s}
   poll: ${CONSOLIDATION_POLL:60s}
+  # Where a customer's reservations are read from, for the data plane's Clientes screens, and where a
+  # person opens each system. Read-only; a system that does not answer leaves its part empty.
+  links:
+    booking-url: ${BOOKING_URL:http://localhost:8108}
+    front-office-url: ${FRONT_OFFICE_URL:}
+    front-office-public-url: ${FRONT_OFFICE_PUBLIC_URL:https://front.ec1.mateu.io}
+    # Blank: derived from SF_DOMAIN (acme.my.salesforce.com is opened as acme.lightning.force.com).
+    salesforce-url: ${SF_LIGHTNING_URL:}
+    timeout: ${LINKS_TIMEOUT:3s}
 
 springdoc:
   packages-to-scan: io.mateu.ecdemo1.mdm.rest

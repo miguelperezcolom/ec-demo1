@@ -12,10 +12,14 @@ import io.mateu.ecdemo1.booking.application.usecases.booking.update.UpdateBookin
 import io.mateu.ecdemo1.booking.application.usecases.booking.update.UpdateBookingUseCase;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.Holder;
 import io.mateu.ecdemo1.booking.infra.in.ui.suppliers.CatalogLookup;
+import io.mateu.ecdemo1.booking.infra.out.mdm.CustomerLinks;
+import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.DetailFormCustomisation;
 import io.mateu.uidl.annotations.HiddenInCreate;
+import io.mateu.uidl.annotations.HiddenInEditor;
+import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
@@ -40,6 +44,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
 
 /**
  * The booking form. Rooms are numbered in the order they are listed; guests name the line of their
@@ -136,12 +141,24 @@ public class BookingViewModel implements Identifiable {
     @HiddenInCreate
     String updated;
 
+    /**
+     * Where the booking and its people are in the chain's other systems — Opera, the front office,
+     * Clientes, Salesforce — as links. Only on the booking's page: nothing to link before it exists.
+     */
+    @Section("In other systems")
+    @HiddenInCreate
+    @HiddenInEditor
+    @Label("")
+    @Colspan(2)
+    Callable<Component> otherSystems = this::otherSystems;
+
     final CreateBookingUseCase createBookingUseCase;
     final UpdateBookingUseCase updateBookingUseCase;
     final ConfirmBookingUseCase confirmBookingUseCase;
     final BookingCancellationForm cancellationForm;
     final RegisterPaymentUseCase registerPaymentUseCase;
     final BookingQueryService queryService;
+    final CustomerLinks customerLinks;
 
     public String create(HttpRequest httpRequest) {
         var newId = createBookingUseCase.handle(new CreateBookingCommand(hotelCode, request()));
@@ -189,6 +206,10 @@ public class BookingViewModel implements Identifiable {
         return BookingRequests.of(channelCode, partnerCode, externalReference, arrival, departure,
                 new Holder(holderFirstName, holderLastName, holderEmail, holderPhone, holderNationality),
                 rooms, guests, comments);
+    }
+
+    Component otherSystems() {
+        return OtherSystems.of(pmsReservationId, id == null ? null : customerLinks.of(hotelCode, id).orElse(null));
     }
 
     @Override

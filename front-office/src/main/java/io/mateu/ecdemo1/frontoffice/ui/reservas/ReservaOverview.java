@@ -231,6 +231,13 @@ public class ReservaOverview
             .build();
       };
 
+  // ── la estancia en los otros sistemas de la cadena: el cliente en Clientes, su contacto en
+  // Salesforce, su perfil de Opera y la reserva del CRS — enlaces, en todos los estados ─────────
+  @Section("En otros sistemas")
+  @Label("")
+  Callable<Component> otrosSistemas =
+      () -> io.mateu.ecdemo1.frontoffice.ui.common.OtherSystems.of(stayId);
+
   private Component huespedesRail(Stay stay) {
     return huespedesRail(stay, true);
   }

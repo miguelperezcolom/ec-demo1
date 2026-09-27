@@ -339,6 +339,7 @@ engine definitions (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelac
 | `pms-integration-service` | — | **The connector**: every call to OHIP, with the version guard in a UDF and idempotent writes |
 | `opera-mock` | — | An OHIP double with validation, availability and injectable faults, for the local end-to-end suite only (`e2e/poc-acl-local`). Not deployed: ec1 works against the chain's OHIP tenant |
 | `communication-service` | `/_communication` | Who hears of what, and where: the recipients table routes every notification to inboxes, browsers (Web Push), e-mail and Google Chat; the inbox and its badge |
+| `customer-mdm-service` | `/_customers` · `/_mdm` | The customer master (golden record, identity resolution; Salesforce cleans and decides). Two `@UI`s: **Clientes** on the data plane (`/_customers`: find a customer; its data, where it is known, its reservations in the CRS and the front office, its change requests — read-only, with links to each system) and its technical screens on the control console (`/_mdm`: golden records, consolidations) |
 | `integrations-service` | `/_integrations` | One integration per hotel: its Opera connection (secret sealed) and its onboarding, gate by gate, to activation. Until then the hotel's reservations wait |
 
 **Nothing writes to a real Opera tenant.** Real OHIP credentials, when there are any, go to

@@ -10,6 +10,9 @@ public interface StayRepository {
 
   List<Stay> findAll();
 
+  /** The stays a person is in — its guest or a companion in the room — by the chain's customer code, latest first. */
+  List<Stay> findByPerson(String customerId);
+
   /** Today's check-in queue: arriving stays, earliest check-in first. */
   List<Stay> findArrivals();
 
