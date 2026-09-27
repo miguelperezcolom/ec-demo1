@@ -47,10 +47,7 @@ public class OperaCatalog {
                 }
             }
         }
-        for (var r : ohip.get(hotelId, "/rtp/v1/hotels/{h}/ratePlans", hotelId).body().path("ratePlans")) {
-            entries.add(entry(CodeType.RATE_PLAN, hotelId, r.path("ratePlanCode").asText(),
-                    text(r.path("primaryDetails").path("description"))));
-        }
+        entries.addAll(ratePlans(hotelId));
         entries.add(entry(CodeType.BOARD, hotelId, "NONE", "No package: room only"));
         // hotelId, not hotelIds: a real tenant answers 400 «Hotel Code is required» to the latter.
         for (var group : ohip.get(hotelId, "/rtp/v1/packages?hotelId={h}&limit=200", hotelId).body()
@@ -74,12 +71,41 @@ public class OperaCatalog {
         return entries;
     }
 
+    /**
+     * The property's rate plans with their names. The hotel's own list ({@code /rtp/v1/hotels/{h}/ratePlans})
+     * answers, on a real tenant, codes with no description at all — and a code like 406484DIRXM says nothing
+     * to whoever maps it. The rate plan search by hotel does carry each one's description (checked against
+     * OHIP UAT, 2026-09-27: the same 78 plans of XMAR, each with «DIRECTOS XMU A26» and the like), a page at
+     * a time: it answers the offset to ask next while it has more.
+     */
+    List<CodeEntry> ratePlans(String hotelId) {
+        var plans = new ArrayList<CodeEntry>();
+        var offset = 0;
+        for (var page = 0; page < MAX_PAGES; page++) {
+            var list = ohip.get(hotelId, "/rtp/v1/ratePlans?hotelId={h}&limit={l}&offset={o}", hotelId, PAGE, offset)
+                    .body().path("ratePlanShortInfoList");
+            for (var r : list.path("ratePlanShortInfo")) {
+                plans.add(entry(CodeType.RATE_PLAN, hotelId, r.path("ratePlanCode").asText(),
+                        text(r.path("primaryDetails").path("description"))));
+            }
+            var next = list.path("offset").asInt(offset + PAGE);
+            if (!list.path("hasMore").asBoolean(false) || next <= offset) {
+                break;
+            }
+            offset = next;
+        }
+        return plans;
+    }
+
+    static final int PAGE = 200;
+    static final int MAX_PAGES = 20;
+
     static CodeEntry entry(CodeType type, String hotelId, String code, String description) {
         return new CodeEntry(type, hotelId, code, description);
     }
 
     /** A description in OPERA is either plain text or a translatable object with a default text. */
     static String text(JsonNode node) {
-        return node.isTextual() ? node.asText() : node.path("defaultText").asText();
+        return (node.isTextual() ? node.asText() : node.path("defaultText").asText()).strip();
     }
 }

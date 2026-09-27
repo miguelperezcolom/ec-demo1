@@ -60,6 +60,26 @@ public class ConfigController {
     }
 
     /**
+     * The rate plan search, as a real tenant answers it (checked against OHIP UAT, 2026-09-27): short infos
+     * that, unlike the hotel's own list, carry each plan's description — a page at a time, with the offset
+     * to ask next.
+     */
+    @GetMapping("/rtp/v1/ratePlans")
+    public Map<String, Object> searchRatePlans(@RequestParam(required = false) String hotelId,
+                                               @RequestParam(defaultValue = "200") int limit,
+                                               @RequestParam(defaultValue = "0") int offset) {
+        if (hotelId == null || hotelId.isBlank()) {
+            throw OperaError.badRequest("OPERAWS-PAR10015", "Hotel Code is required");
+        }
+        var all = property(hotelId).ratePlans();
+        var page = all.stream().skip(offset).limit(limit).map(r -> Map.of("ratePlanCode", r.code(), "hotelId", hotelId,
+                "primaryDetails", Map.of("description", text(r.description())))).toList();
+        var next = offset + page.size();
+        return Map.of("ratePlanShortInfoList", Map.of("ratePlanShortInfo", page, "hasMore", next < all.size(),
+                "totalResults", all.size(), "offset", next, "limit", limit));
+    }
+
+    /**
      * As a real tenant answers it: the hotel in the {@code hotelId} query parameter — without it,
      * 400 «Hotel Code is required» — and the codes nested in a list of short infos.
      */
