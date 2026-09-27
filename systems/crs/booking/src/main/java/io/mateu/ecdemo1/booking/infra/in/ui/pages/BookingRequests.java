@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.booking.infra.in.ui.pages;
 
 import io.mateu.ecdemo1.booking.application.usecases.booking.BookingRequest;
+import io.mateu.ecdemo1.booking.application.usecases.booking.PaymentRequest;
 import io.mateu.ecdemo1.booking.application.usecases.booking.RoomRequest;
 import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentCommand;
 import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentUseCase;
@@ -59,14 +60,20 @@ final class BookingRequests {
                 .orElse(null);
     }
 
-    /** Registers the payments not registered yet: those with no id. A registered one cannot change. */
-    static void registerNewPayments(RegisterPaymentUseCase useCase, String bookingId, List<PaymentViewModel> payments) {
+    /** The payments not registered yet: those with no id. A registered one cannot change. */
+    static List<PaymentRequest> newPayments(List<PaymentViewModel> payments) {
         if (payments == null) {
-            return;
+            return List.of();
         }
-        payments.stream().filter(p -> p.paymentId() == null || p.paymentId().isBlank()).forEach(p ->
-                useCase.handle(new RegisterPaymentCommand(
-                        bookingId, p.type(), p.methodCode(), p.amount(), p.date(), p.reference())));
+        return payments.stream().filter(p -> p.paymentId() == null || p.paymentId().isBlank())
+                .map(p -> new PaymentRequest(p.type(), p.methodCode(), p.amount(), p.date(), p.reference()))
+                .toList();
+    }
+
+    /** Registers the payments not registered yet on a booking that already exists. */
+    static void registerNewPayments(RegisterPaymentUseCase useCase, String bookingId, List<PaymentViewModel> payments) {
+        newPayments(payments).forEach(p -> useCase.handle(new RegisterPaymentCommand(
+                bookingId, p.type(), p.methodCode(), p.amount(), p.date(), p.reference())));
     }
 
     private BookingRequests() {

@@ -119,15 +119,22 @@ class BookingApiTest {
     }
 
     @Test
-    void creatingABookingRequestsItsPaymentVerificationThroughTheOutbox() throws Exception {
-        var id = create(REQUEST);
+    void aBookingMadeWithItsPaymentsIsOneEventAndIsBornConfirmed() throws Exception {
+        var body = mvc.perform(post("/bookings").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"hotelCode":"PMI01","booking":%s,
+                         "payments":[{"type":"Deposit","methodCode":"VISA","amount":100},
+                                     {"type":"Prepayment","methodCode":"VISA","amount":50}]}""".formatted(REQUEST)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        var id = json(body).get("id").asText();
 
-        var requests = consume("upstream", null, 50).stream()
-                .map(r -> json(r.value()))
-                .filter(e -> e.toString().contains("verify-payment-for-" + id))
-                .toList();
-        assertThat(requests).singleElement()
-                .satisfies(e -> assertThat(e.get("type").asText()).isEqualTo("process-creation-requested"));
+        var booking = read(id);
+        assertThat(booking.get("status").asText()).isEqualTo("Confirmed");
+        assertThat(booking.get("version").asLong()).isEqualTo(1);
+        assertThat(booking.get("payments")).hasSize(2);
+        assertThat(consume("crs-bookings", id, 2)).map(r -> json(r.value()))
+                .extracting(e -> e.get("type").asText() + "@" + e.get("version").asLong())
+                .containsExactly("booking-created@1");
     }
 
     @Test
@@ -188,7 +195,7 @@ class BookingApiTest {
 
         transactions.executeWithoutResult(tx -> {
             var fresh = repository.findByIdForUpdate(new BookingId(id)).orElseThrow();
-            fresh.confirm(Instant.now());
+            fresh.update(Fixtures.terms(3), Instant.now());
             repository.save(fresh);
         });
 
@@ -199,10 +206,10 @@ class BookingApiTest {
     }
 
     @Test
-    void theSagaStepConfirmsTheBookingAndAnswersTheEngine() throws Exception {
+    void theNoShowStepCancelsTheBookingAndAnswersTheEngine() throws Exception {
         var id = create(REQUEST);
         var task = new io.mateu.workflow.dtos.events.integration.TaskExecutionRequested("TE-" + id, "PROC-" + id,
-                "verify-booking-payment", "confirm-booking", "",
+                "registrar-no-show", "register-no-show", "",
                 List.of(new io.mateu.workflow.dtos.Variable("bookingId", id)));
         try (var producer = new org.apache.kafka.clients.producer.KafkaProducer<String, String>(Map.of(
                 org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers()),
@@ -213,7 +220,7 @@ class BookingApiTest {
 
         var replies = consume("upstream", null, 60).stream().filter(r -> r.value().contains("TE-" + id)).toList();
         assertThat(replies).singleElement().satisfies(r -> assertThat(json(r.value()).get("status").asText()).isEqualTo("COMPLETED"));
-        assertThat(read(id).get("status").asText()).isEqualTo("Confirmed");
+        assertThat(read(id).get("status").asText()).isEqualTo("Cancelled");
     }
 
     String create(String request) throws Exception {

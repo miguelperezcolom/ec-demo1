@@ -46,7 +46,8 @@ public class BookingMcpTools implements McpSystemContext {
                   los conoces; los canales TTOO y OTA exigen partnerCode.
                 - Una modificación sustituye las condiciones completas: envía la reserva entera, no solo
                   lo que cambia.
-                - Estados: Pending (pendiente de pago), Confirmed, Cancelled. Una reserva cancelada no se
+                - Estados: Confirmed (una reserva nace confirmada), Cancelled; Pending sólo lo tienen
+                  reservas antiguas, y se confirman con confirmBooking. Una reserva cancelada no se
                   puede modificar ni confirmar.
                 - Cada cambio incrementa la versión de la reserva.
                 """;
@@ -92,7 +93,7 @@ public class BookingMcpTools implements McpSystemContext {
         return bookingQueryService.getById(id).orElseThrow(() -> new java.util.NoSuchElementException("Booking not found: " + id));
     }
 
-    @Tool(description = "Create a booking in a hotel. Returns its id. It starts Pending until payment is verified")
+    @Tool(description = "Create a booking in a hotel. Returns its id. It is confirmed as it is made")
     public String createBooking(@ToolParam(description = "CRS hotel code, e.g. PMI01") String hotelCode,
                                 BookingRequest booking) {
         log.info("MCP createBooking hotel={}", hotelCode);
@@ -110,7 +111,7 @@ public class BookingMcpTools implements McpSystemContext {
         });
     }
 
-    @Tool(description = "Confirm a pending booking")
+    @Tool(description = "Confirm a booking left pending: only old ones can be, a new booking is born confirmed")
     public String confirmBooking(String id) {
         log.info("MCP confirmBooking {}", id);
         return attempt(() -> {

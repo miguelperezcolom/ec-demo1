@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RoomPricingTest {
 
-    final CrsCatalog catalog = CrsCatalog.standard();
+    final CrsCatalog catalog = io.mateu.ecdemo1.booking.infra.out.catalog.ImportedCatalogs.standardCatalog();
     final RoomPricing pricing = new RoomPricing();
 
     @Test

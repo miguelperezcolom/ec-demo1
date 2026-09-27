@@ -69,7 +69,7 @@ Salesforce (enlaces), y el perfil de Opera.
 | Customers | El maestro de clientes, lo técnico: golden records, su estado de proyección y las consolidaciones que llegan de Salesforce (la cara de negocio está en Clientes, en el plano de datos) |
 | Notifications | Lo que se ha comunicado y a quién; **destinatarios**: quién se entera de qué y por dónde (§11) |
 | Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
-| Workflow / Forms | Las definiciones de proceso: los seis de la PoC (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show`, `verify-booking-payment`); formularios, hoy ninguno |
+| Workflow / Forms | Las definiciones de proceso: los cinco de la PoC (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show`); formularios, hoy ninguno |
 | IA | El agente de mapeado y los MCP de cada servicio |
 | Usuarios | Quién puede hacer qué |
 
@@ -158,6 +158,8 @@ retenidos.
 Una reserva nueva de MRU01 por su *Central de reservas* (canal `CALLCENTER`; o por el chat del agente,
 *«Crea 3 reservas en MRU01…»*, o con *Demo bookings* en la lista de reservas):
 
+- En el motor: **un** `proyectar-reserva` por reserva. El CRS la crea confirmada y con sus cobros en
+  un solo cambio (versión 1, un `booking-created`); cada cambio posterior es otro.
 - En Opera (XMAR): la reserva con los códigos traducidos, tarifa fija por noche, el perfil del
   huésped, el del interlocutor cuando lo hay, y la versión del CRS en el UDF.
 - **Cómo encontrarlas en Opera**: todas las que escribe la integración llevan **Custom Reference =

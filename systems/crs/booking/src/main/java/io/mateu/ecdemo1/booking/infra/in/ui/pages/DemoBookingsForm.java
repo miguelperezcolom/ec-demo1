@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.booking.infra.in.ui.pages;
 import io.mateu.ecdemo1.booking.application.out.partners.PartnerDirectory;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingCommand;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingUseCase;
-import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentUseCase;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.ecdemo1.booking.domain.services.RoomPricing;
 import io.mateu.uidl.data.Message;
@@ -34,7 +33,6 @@ public class DemoBookingsForm {
             "Si MRU01 tiene la integración activa, cada reserva se escribirá también en Opera (XMAR).";
 
     final CreateBookingUseCase createBookingUseCase;
-    final RegisterPaymentUseCase registerPaymentUseCase;
     final CrsCatalog catalog;
     final RoomPricing pricing;
     final PartnerDirectory partnerDirectory;
@@ -62,18 +60,11 @@ public class DemoBookingsForm {
         var bookings = generator.generate(COUNT);
         for (int i = 0; i < bookings.size(); i++) {
             var booking = bookings.get(i);
-            String id;
             try {
-                id = createBookingUseCase.handle(new CreateBookingCommand(booking.hotelCode(), booking.request()));
-                created.add(id);
+                created.add(createBookingUseCase.handle(new CreateBookingCommand(booking.hotelCode(), booking.request(),
+                        null, BookingRequests.newPayments(booking.payments()))));
             } catch (RuntimeException e) {
                 failed.add("#%d %s (%s)".formatted(i + 1, booking.request().holder().fullName(), e.getMessage()));
-                continue;
-            }
-            try {
-                BookingRequests.registerNewPayments(registerPaymentUseCase, id, booking.payments());
-            } catch (RuntimeException e) {
-                notes.add("%s was created without its payment (%s)".formatted(id, e.getMessage()));
             }
         }
         return new Outcome(created, failed, notes);

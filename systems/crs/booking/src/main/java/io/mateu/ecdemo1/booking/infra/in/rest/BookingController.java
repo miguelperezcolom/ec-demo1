@@ -99,7 +99,8 @@ public class BookingController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a booking in a hotel. The CRS prices each room night by night")
+    @Operation(summary = "Create a booking in a hotel, confirmed, with the payments collected as it was made — one change, "
+            + "one event. The CRS prices each room night by night")
     public Created create(@RequestBody CreateBookingCommand command) {
         return new Created(createBookingUseCase.handle(command));
     }
@@ -118,7 +119,7 @@ public class BookingController {
     }
 
     @PostMapping("/{id}/confirm")
-    @Operation(summary = "Confirm a pending booking")
+    @Operation(summary = "Confirm a booking left pending: only those made before bookings were born confirmed")
     public void confirm(@PathVariable String id) {
         confirmBookingUseCase.handle(new ConfirmBookingCommand(id));
     }

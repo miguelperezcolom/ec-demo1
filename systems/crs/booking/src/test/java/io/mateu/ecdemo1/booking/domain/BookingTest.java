@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.booking.domain;
 
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.Booking;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.NoShowPolicy;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingCancelled;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingChange;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingCreated;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,11 +29,17 @@ class BookingTest {
         return Booking.create(new BookingId("B1"), "PMI01", "EUR", Fixtures.terms(3), NOW);
     }
 
+    /** A booking stored pending, before bookings were born confirmed. */
+    Booking pending() {
+        return new Booking(new BookingId("B0"), "PMI01", "EUR", Fixtures.terms(3), List.of(), BookingStatus.Pending,
+                null, null, NOW, NOW, 1);
+    }
+
     @Test
-    void creationStartsPendingAtVersionOneAndAnnouncesIt() {
+    void creationIsConfirmedAtVersionOneAndAnnouncesIt() {
         var booking = created();
 
-        assertThat(booking.getStatus()).isEqualTo(BookingStatus.Pending);
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.Confirmed);
         assertThat(booking.getVersion()).isEqualTo(1);
         assertThat(booking.popEvents()).singleElement().isInstanceOfSatisfying(BookingCreated.class, e -> {
             assertThat(e.bookingId()).isEqualTo("B1");
@@ -42,21 +50,59 @@ class BookingTest {
     }
 
     @Test
+    void thePaymentsMadeWithTheBookingArePartOfItsCreation() {
+        var booking = Booking.create(new BookingId("B1"), "PMI01", "EUR", Fixtures.terms(3),
+                List.of(payment("P1"), payment("P2")), null, NOW);
+
+        assertThat(booking.paidAmount()).isEqualByComparingTo("200");
+        assertThat(booking.getVersion()).isEqualTo(1);
+        assertThat(booking.popEvents()).singleElement().isInstanceOf(BookingCreated.class);
+    }
+
+    @Test
+    void aBookingIsNotCreatedTwiceWithTheSamePayment() {
+        assertThatThrownBy(() -> Booking.create(new BookingId("B1"), "PMI01", "EUR", Fixtures.terms(3),
+                List.of(payment("P1"), payment("P1")), null, NOW)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aBookingIsMadeAtTheQuotedPriceOrNotAtAll() {
+        var total = Fixtures.terms(3).total();
+
+        assertThat(Booking.create(new BookingId("B1"), "PMI01", "EUR", Fixtures.terms(3), List.of(), total, NOW)
+                .totalAmount()).isEqualByComparingTo(total);
+        assertThatThrownBy(() -> Booking.create(new BookingId("B1"), "PMI01", "EUR", Fixtures.terms(3), List.of(),
+                new BigDecimal("1.00"), NOW))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("The price changed: quoted 1.00 EUR, the CRS prices it at %s EUR now", total.toPlainString());
+    }
+
+    @Test
     void everyChangeBumpsTheVersionByOneAndAnnouncesTheNewOne() {
         var booking = created();
         booking.update(Fixtures.terms(4), NOW);
         booking.registerPayment(payment("P1"), NOW);
-        booking.confirm(NOW);
         booking.cancel("CLI", NOW);
 
-        assertThat(booking.popEvents()).map(e -> ((BookingEvent) e).version()).containsExactly(1L, 2L, 3L, 4L, 5L);
-        assertThat(booking.getVersion()).isEqualTo(5);
+        assertThat(booking.popEvents()).map(e -> ((BookingEvent) e).version()).containsExactly(1L, 2L, 3L, 4L);
+        assertThat(booking.getVersion()).isEqualTo(4);
+    }
+
+    @Test
+    void aPendingBookingIsConfirmedAsAChange() {
+        var booking = pending();
+        booking.confirm(NOW);
+
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.Confirmed);
+        assertThat(booking.popEvents()).singleElement().isInstanceOfSatisfying(BookingModified.class, e -> {
+            assertThat(e.version()).isEqualTo(2);
+            assertThat(e.change()).isEqualTo(BookingChange.Confirmed);
+        });
     }
 
     @Test
     void modificationsSayWhatKindOfChangeTheyWere() {
-        var booking = created();
-        booking.popEvents();
+        var booking = pending();
         booking.update(Fixtures.terms(4), NOW);
         booking.registerPayment(payment("P1"), NOW);
         booking.confirm(NOW);
@@ -83,7 +129,7 @@ class BookingTest {
         var original = booking.totalAmount();
         booking.popEvents();
 
-        booking.noShow(25, NOW);
+        booking.noShow(new NoShowPolicy(25), NOW);
 
         assertThat(booking.getStatus()).isEqualTo(BookingStatus.Cancelled);
         assertThat(booking.getCancellation().reasonCode()).isEqualTo(Booking.NO_SHOW);
@@ -95,14 +141,21 @@ class BookingTest {
 
         // Told twice, one no-show: no second fee, no second event.
         var version = booking.getVersion();
-        booking.noShow(25, NOW);
+        booking.noShow(new NoShowPolicy(25), NOW);
         assertThat(booking.getVersion()).isEqualTo(version);
         assertThat(booking.popEvents()).isEmpty();
     }
 
     @Test
+    void aNoShowFeeIsAShareOfThePrice() {
+        assertThatThrownBy(() -> new NoShowPolicy(101)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new NoShowPolicy(-1)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new NoShowPolicy(25).feeFor(new BigDecimal("450.00"))).isEqualByComparingTo("112.50");
+    }
+
+    @Test
     void repeatingAConfirmationOrACancellationIsNotAChange() {
-        var booking = created();
+        var booking = pending();
         booking.confirm(NOW);
         booking.confirm(NOW);
         booking.cancel("CLI", NOW);
@@ -141,6 +194,17 @@ class BookingTest {
         assertThat(booking.getPmsReference().reservationId()).isEqualTo("OPERA-123");
         assertThat(booking.getVersion()).isEqualTo(1);
         assertThat(booking.popEvents()).isEmpty();
+    }
+
+    @Test
+    void aBookingInThePmsCannotBeDeleted() {
+        var booking = created();
+        booking.requireDeletable();
+
+        booking.annotatePmsReference("OPERA-123", NOW);
+
+        assertThatThrownBy(booking::requireDeletable).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cancel it instead");
     }
 
     @Test

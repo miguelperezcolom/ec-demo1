@@ -6,8 +6,6 @@ import io.mateu.ecdemo1.booking.application.usecases.booking.cancel.CancelBookin
 import io.mateu.ecdemo1.booking.application.usecases.booking.cancel.CancelBookingUseCase;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingCommand;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingUseCase;
-import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentCommand;
-import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentUseCase;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingStatus;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.GuestType;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.PaymentType;
@@ -34,22 +32,14 @@ class NewBookingWizardTest {
     static final LocalDate ARRIVAL = LocalDate.of(2026, 11, 2);
 
     final List<CreateBookingCommand> created = new ArrayList<>();
-    final List<RegisterPaymentCommand> paid = new ArrayList<>();
-    final CreateBookingUseCase create = new CreateBookingUseCase(null, null, null, null, null, null) {
+    final CreateBookingUseCase create = new CreateBookingUseCase(null, null, null, null, null) {
         @Override
         public String handle(CreateBookingCommand command) {
             created.add(command);
             return "B-1";
         }
     };
-    final RegisterPaymentUseCase pay = new RegisterPaymentUseCase(null, null, null) {
-        @Override
-        public String handle(RegisterPaymentCommand command) {
-            paid.add(command);
-            return "P-1";
-        }
-    };
-    final NewBookingWizard wizard = new NewBookingWizard(create, pay, CrsCatalog.standard());
+    final NewBookingWizard wizard = new NewBookingWizard(create, io.mateu.ecdemo1.booking.infra.out.catalog.ImportedCatalogs.standardCatalog());
 
     static StayStep stay(String channel, String partner, LocalDate arrival, LocalDate departure) {
         return new StayStep("MRU01", channel, partner, null, arrival, departure,
@@ -132,7 +122,7 @@ class NewBookingWizardTest {
     }
 
     @Test
-    void creatingGoesThroughTheUseCasesAndOpensTheBooking() {
+    void creatingMakesTheBookingWithItsPaymentsAndOpensIt() {
         wizard.stay = stay("WEB", null, ARRIVAL, ARRIVAL.plusDays(3));
         wizard.roomsStep = new RoomsStep(List.of(room()));
         wizard.guestsStep = new GuestsStep(List.of(guest(1)));
@@ -145,8 +135,10 @@ class NewBookingWizardTest {
             assertThat(command.hotelCode()).isEqualTo("MRU01");
             assertThat(command.booking().rooms()).singleElement()
                     .satisfies(r -> assertThat(r.guests()).hasSize(1));
+            // The payment goes with the creation: one transaction, one event, one projection.
+            assertThat(command.payments()).singleElement()
+                    .satisfies(p -> assertThat(p.amount()).isEqualByComparingTo("100"));
         });
-        assertThat(paid).singleElement().satisfies(payment -> assertThat(payment.id()).isEqualTo("B-1"));
         assertThat(result).last().isEqualTo(UICommand.navigateTo("/booking/bookings/B-1"));
     }
 
