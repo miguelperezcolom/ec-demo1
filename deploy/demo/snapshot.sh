@@ -5,7 +5,8 @@
 #   deploy/demo/snapshot.sh            # into ~/.local/share/ec-demo1/demo-baseline
 #
 # Opera and Salesforce are not in it: Opera is never touched by a reset; Salesforce is put back from
-# the MDM's baseline (see reset.sh).
+# the MDM's baseline (see reset.sh). What is in it of Opera's is the context the baseline's reservations
+# were written under (common.sh, opera_context): a reset puts it back, so they are found again.
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./common.sh
@@ -18,6 +19,8 @@ done
 tables=$(for t in $ENGINE_TABLES; do printf -- "-t %s " "$t"; done)
 kubectl -n $NS exec "$P" -- sh -c "pg_dump -U \"\$POSTGRES_USER\" --data-only --no-owner --no-privileges $tables -d $ENGINE_DB" > "$TMP/$ENGINE_DB.sql"
 echo "  $ENGINE_DB (state tables): $(du -h "$TMP/$ENGINE_DB.sql" | cut -f1)"
+opera_context > "$TMP/opera-context"
+echo "  Opera context: $(cat "$TMP/opera-context")"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$TMP/taken-at"
 rm -rf "$BASELINE" && mv "$TMP" "$BASELINE"
 echo "Baseline saved in $BASELINE ($(cat "$BASELINE/taken-at"))"

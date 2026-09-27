@@ -52,7 +52,9 @@ spring:
 # — gateway, application key, client, secret, enterprise — is each hotel's integration's, read from
 # integrations-service; nothing about a tenant is configuration here.
 ohip:
-  external-system-code: ${OPERA_EXTERNAL_SYSTEM:RIUCRS}
+  # The context of the CRS locator in a reservation's external references. In ec1 it comes from the
+  # ec-demo-run ConfigMap, a new one each time the demo is put back to zero (deploy/demo/zero.sh).
+  external-system-code: ${OPERA_EXTERNAL_SYSTEM:ECDEMO1}
   # OPERA names its UDFs UDFN01…UDFN40: which one carries the CRS version is the tenant's to say.
   version-udf: ${OPERA_VERSION_UDF:CRS_VERSION}
   pay-at-hotel-method: ${OPERA_PAY_AT_HOTEL_METHOD:CA}

@@ -150,7 +150,8 @@ conector, que ahora trae el nombre de cada tarifa) y queda versionado en
 
 *Relaunch backfill* en la integración: proyecta todas las reservas futuras del hotel; las que Opera
 ya tiene en esa versión **no se escriben** (ni la reserva, ni el perfil del huésped), las que no, se
-crean. Probado en XMAR: 3 reservas creadas, 2 intactas, ninguna duplicada al reanudar los procesos
+crean. «Ya tiene» es: encuentra el localizador del CRS como referencia externa **bajo el contexto de
+la ejecución** (el de `ec-demo-run`); lo escrito bajo el de una ejecución anterior no se ve. Probado en XMAR: 3 reservas creadas, 2 intactas, ninguna duplicada al reanudar los procesos
 retenidos.
 
 ## 8. Una reserva de punta a punta
@@ -164,9 +165,10 @@ Una reserva nueva de MRU01 por su *Central de reservas* (canal `CALLCENTER`; o p
   huésped, el del interlocutor cuando lo hay, y la versión del CRS en el UDF.
 - **Cómo encontrarlas en Opera**: todas las que escribe la integración llevan **Custom Reference =
   `EC-DEMO1`** — en la búsqueda avanzada de reservas, ese filtro las lista todas. Una concreta, por el
-  localizador del CRS en *Conf / Cxl / External*: va como referencia externa con el contexto
-  **`ECDEMO1`** (no `CRS`, que es el del CRS real de este tenant). Las escritas antes del 2026-09-25 no
-  llevan ninguna de las dos cosas.
+  localizador del CRS en *Conf / Cxl / External*: va como referencia externa con el **contexto de la
+  ejecución** — `ECDEMO1`, o `ECDEMO1-<MMddHHmm>` desde que `zero.sh` estrena uno en cada puesta a cero
+  (ver [Resetear la demo](#resetear-la-demo)); nunca `CRS`, que es el del CRS real de este tenant. Las
+  escritas antes del 2026-09-25 no llevan ninguna de las dos cosas.
 - En el front office: la estancia, con su titular.
 - En el CRS: dónde ha quedado en Opera.
 - En *Customers*: los pasajeros resueltos contra el maestro de clientes.
@@ -309,6 +311,22 @@ localizador y por CorporateId), y durante la demo solo se modifica **lo que se c
 reserva nueva de MRU01, y el cambio de datos sobre **su** titular), nunca lo de la línea base. Cada
 demo deja en XMAR una reserva y un perfil de huésped.
 
+**Un contexto de Opera por ejecución.** El localizador del CRS va en Opera como referencia externa
+bajo un contexto nuestro, y por él se busca la reserva antes de escribirla. Como Opera no se limpia,
+tras poner ec1 a cero un localizador nuevo (aleatorio) podría repetir uno antiguo y la integración
+**actualizaría la reserva vieja**. Por eso cada `zero.sh` estrena un contexto, `ECDEMO1-<MMddHHmm>`
+(UTC; 16 caracteres, mayúsculas, dígitos y guion: OHIP admite hasta 80 y OPERA busca por el contexto
+exacto, sin distinguir mayúsculas), y lo deja en el ConfigMap **`ec-demo-run`** (clave
+`OPERA_EXTERNAL_SYSTEM`) antes de arrancar los servicios; `pms-integration-service` lo lee de ahí
+(`envFrom`, opcional) y, sin ConfigMap, usa `ECDEMO1`. La línea base se escribió bajo el contexto de su
+momento: `snapshot.sh` lo guarda con ella (`opera-context`) y `reset.sh` lo repone, así que tras un
+reset se siguen encontrando sus reservas (una línea base sin ese fichero es de `ECDEMO1`). El contexto
+en curso: `kubectl -n ec-demo1 get cm ec-demo-run -o jsonpath='{.data.OPERA_EXTERNAL_SYSTEM}'`. No
+afecta a los perfiles: los de interlocutor se encuentran por su **CorporateId** y los de huésped a
+través de su reserva (el tenant no admite referencias externas en perfiles, `OPERA_PROFILE_REFERENCES=false`),
+así que una ejecución nueva reencuentra los interlocutores que ya estaban; cada reserva nueva lleva su
+perfil de huésped nuevo.
+
 Las bases de datos ya no se pierden al mover un pod: el PostgreSQL del motor está en un volumen desde
 el 2026-09-25 (antes, en un `emptyDir`, se perdieron el 24 al actualizar el motor con el chart
 equivocado — `deploy/chart/eventconductor/VENDORED.md`). Solo las pierde borrar su PVC.
@@ -342,7 +360,7 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
       reservas futuras de MRU01** por `CALLCENTER` (con algún interlocutor): el CRS está vacío, y sin
       ellas el contraste, los interlocutores y el backfill no tienen nada que llevar. Mientras no haya
       integración se quedan en el CRS, sin proceso; el backfill las trae.
-- [ ] Con la primera reserva escrita, comprobar en Opera que acepta el contexto **`ECDEMO1`** en la
+- [x] Con la primera reserva escrita, comprobar en Opera que acepta el contexto **`ECDEMO1`** en la
       referencia externa (no es un sistema externo del catálogo de OPERA; si lo rechaza, el proceso
       se para con la causa «rechazada por el PMS» y se vuelve a `CRS`) y que el filtro **Custom
       Reference = `EC-DEMO1`** la encuentra.
@@ -365,12 +383,20 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
       desplegado; las pantallas, 67/67.
 - [x] Menos nodos: de 7 a 3 (ec1 entero en un cx53 de hel1, la observabilidad en el suyo, y uno de
       sistema del clúster); fuera `swapi`, una app vieja y su balanceador.
-- Datos de prueba que quedan en XMAR de antes de poner ec1 a cero (Opera no se limpia): reservas
-  39481284, 39481745, 39481775, 39481943, 39481944, 39482155 (y dos canceladas, y las `E2E-<fecha>`
-  de cada `npm run demo`, canceladas como no show), con la referencia en el contexto `CRS` y sin Custom
-  Reference; perfiles de interlocutor 20538292 y 20538322 (ECDEMO0001/0002), que el alta volverá a
-  encontrar por su CorporateId; el perfil de huésped 20538296 conserva un email antiguo como
-  secundario (la API de Opera no permite borrarlo).
+- **Datos de prueba que quedan en XMAR, por contexto** (Opera no se limpia; todos los contextos de la
+  integración, con Custom Reference `EC-DEMO1` salvo los de `CRS`):
+  - `ECDEMO1` (hasta que un `zero.sh` estrene contexto): las 14 reservas del alta de MRU01 del
+    2026-09-27 — 39484567, 39484568, 39484573–39484581, 39484593, 39484597 y 39484582 (cancelada,
+    no show) —, localizadores TEX39V, BVJJR6, V5M48N, HTJFGX, FEH9WH, 7YCUWJ, FVJ43M, TZFX5P, GB5STT,
+    WKCBR5, DM95Z8, KF6HFC, M46BRN y KTQVZJ, cada una con su perfil de huésped.
+  - `ECDEMO1-<MMddHHmm>`: lo que escriba cada ejecución desde su `zero.sh` (sus reservas y sus perfiles
+    de huésped); ampliar esta lista al estrenarlo.
+  - `CRS`, de antes de poner ec1 a cero: reservas 39481284, 39481745, 39481775, 39481943, 39481944,
+    39482155 (y dos canceladas, y las `E2E-<fecha>` de cada `npm run demo`, canceladas como no show),
+    sin Custom Reference.
+  - Sin contexto, comunes a todas las ejecuciones: los perfiles de interlocutor 20538292 y 20538322
+    (ECDEMO0001/0002), que cada alta vuelve a encontrar por su CorporateId; el perfil de huésped
+    20538296 conserva un email antiguo como secundario (la API de Opera no permite borrarlo).
 - En Opera, lo que necesita un administrador de OPERA: la interfaz de las referencias externas de
   perfil (OPERAWS-GEN01187) y un cajero para los depósitos (FOF00094). Sin eso, los perfiles van
   sin referencia externa y los depósitos no se apuntan al folio.

@@ -29,3 +29,20 @@ salesforce_env() {
     fi
   done
 }
+
+# The context the CRS locator goes under in Opera, in the ec-demo-run ConfigMap pms-integration takes its
+# environment from. Opera is never cleaned: each run to zero writes under a context of its own, so a new
+# locator that happens to repeat an old one does not find — and update — an old run's reservation.
+# Without the ConfigMap the service uses ECDEMO1, the context of everything written before there was one.
+OPERA_CONTEXT_DEFAULT=ECDEMO1
+opera_context() {
+  local ctx
+  ctx=$(kubectl -n "$NS" get configmap ec-demo-run -o jsonpath='{.data.OPERA_EXTERNAL_SYSTEM}' 2>/dev/null || true)
+  echo "${ctx:-$OPERA_CONTEXT_DEFAULT}"
+}
+# Sets it; takes effect when pms-integration-service starts.
+set_opera_context() {
+  kubectl -n "$NS" create configmap ec-demo-run --from-literal=OPERA_EXTERNAL_SYSTEM="$1" \
+    --dry-run=client -o yaml | kubectl -n "$NS" apply -f - >/dev/null
+  echo "  Opera context: $1"
+}

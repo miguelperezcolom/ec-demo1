@@ -65,11 +65,13 @@ spec:
               value: "10m"
             # OHIP UAT: reservations carry the CRS's locator under a context of our own. Not "CRS":
             # the tenant's real CRS writes its references under it, and ours would mix with theirs.
-            # ECDEMO1 is not one of OPERA's catalogued external systems — a reservation's references
-            # take any context; a profile's would not (see OPERA_PROFILE_REFERENCES). The CRS version
-            # goes in a numeric UDF named as OPERA names them.
-            - name: OPERA_EXTERNAL_SYSTEM
-              value: "ECDEMO1"
+            # The context (OPERA_EXTERNAL_SYSTEM) is not here but in the ec-demo-run ConfigMap (envFrom,
+            # below): deploy/demo/zero.sh sets a new one each run, ECDEMO1-<MMddHHmm>, since Opera is
+            # never cleaned; reset.sh puts back the baseline's. Without it the service uses ECDEMO1. It
+            # must not be set here too: an env entry wins over envFrom. ECDEMO1… is not one of OPERA's
+            # catalogued external systems — a reservation's references take any context; a profile's
+            # would not (see OPERA_PROFILE_REFERENCES). The CRS version goes in a numeric UDF named as
+            # OPERA names them.
             - name: OPERA_VERSION_UDF
               value: "UDFN01"
             - name: OPERA_PAY_AT_HOTEL_METHOD
@@ -91,6 +93,10 @@ spec:
               value: "http://front-office:8128"
             - name: FRONT_OFFICE_HOTELS
               value: "MRU01"
+          # The demo run's Opera context (OPERA_EXTERNAL_SYSTEM), set by deploy/demo/zero.sh and
+          # reset.sh — not by this manifest, which would put it back on every apply.
+          envFrom:
+            - configMapRef: { name: ec-demo-run, optional: true }
           ports:
             - { name: http, containerPort: 8123 }
           securityContext:

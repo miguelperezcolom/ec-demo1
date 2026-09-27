@@ -5,8 +5,12 @@
 #   - what is set up, not integrated, stays: the ERP's partners, the front office's rooms and
 #     catalogs, the process definitions, content, users and Keycloak;
 #   - Salesforce loses every contact and the MDM's change-request Cases.
-# Opera is not touched: the integration finds what it wrote there by locator and by external id, so
-# walking the onboarding again writes nothing twice.
+# Opera is not touched, and never cleaned: what earlier runs wrote stays there. So each run gets a
+# context of its own for the CRS locator in the reservations' external references — ECDEMO1-<MMddHHmm>,
+# UTC, in the ec-demo-run ConfigMap — and a new random locator that repeats an old one does not find,
+# and update, an old run's reservation. Within a run the integration still finds what it wrote by
+# locator (under the run's context), so walking the onboarding again writes no reservation twice.
+# Partners are found by their CorporateId and guest profiles through their reservation: no context.
 #
 # The demo's baseline is left alone, but reset.sh would bring the old state back: take a new one
 # with snapshot.sh once the onboarding has been walked again.
@@ -19,6 +23,9 @@ echo "Stopping the services and the engine"
 for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=0 >/dev/null; done
 for d in $SERVICES; do kubectl -n $NS wait --for=delete pod -l app=$d --timeout=180s >/dev/null 2>&1 || true; done
 sleep 5
+
+echo "A new Opera context for this run"
+set_opera_context "ECDEMO1-$(date -u +%m%d%H%M)"
 
 wipe() { local db=$1; shift; echo "truncate $(echo "$@" | tr ' ' ',') cascade;" | psql_in "$db" && echo "  $db: $*"; }
 echo "Emptying what the integration made"
