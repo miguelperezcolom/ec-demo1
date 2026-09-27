@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.pmsintegration.worker;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationType;
 import io.mateu.ecdemo1.pmsintegration.config.PmsIntegrationProperties;
-import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.function.StreamBridge;
@@ -36,25 +35,25 @@ public class RetryWatch {
     final Clock clock;
     final Map<String, Failing> failing = new ConcurrentHashMap<>();
 
-    public void failed(TaskExecutionRequested task, String hotelCode, String subject, String reason) {
-        var key = task.processId() + "/" + task.stepId();
+    public void failed(String processId, String stepId, String hotelCode, String subject, String reason) {
+        var key = processId + "/" + stepId;
         var now = clock.instant();
         var state = failing.merge(key, new Failing(now, false, subject), (old, fresh) -> old);
         if (!state.alerted() && state.since().plus(properties.alertAfter()).isBefore(now)) {
             failing.put(key, new Failing(state.since(), true, subject));
             var sent = streamBridge.send("notifications", new NotificationRequested(UUID.randomUUID().toString(),
                     NotificationType.RETRYING_TOO_LONG, hotelCode, subject,
-                    ("project-stay".equals(task.stepId()) ? "Projecting %s to the front office keeps failing"
+                    ("project-stay".equals(stepId) ? "Projecting %s to the front office keeps failing"
                             : "Writing %s to the PMS keeps failing").formatted(subject),
                     "Step %s has been failing since %s and is still being retried. Last error: %s"
-                            .formatted(task.stepId(), state.since(), reason),
+                            .formatted(stepId, state.since(), reason),
                     null, "retrying:" + key, now));
             log.warn("{} failing since {}: alert {}", key, state.since(), sent ? "sent" : "NOT sent");
         }
     }
 
-    public void succeeded(TaskExecutionRequested task) {
-        var state = failing.remove(task.processId() + "/" + task.stepId());
+    public void succeeded(String processId, String stepId) {
+        var state = failing.remove(processId + "/" + stepId);
         if (state != null && state.alerted() && state.subject() != null) {
             // It was alerted as failing; it went through: the alert is done with.
             streamBridge.send("notificationResolutions", new io.mateu.ecdemo1.integration.model.notification.NotificationResolved(

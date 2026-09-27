@@ -21,8 +21,10 @@ import io.mateu.ecdemo1.pmsintegration.ohip.OperaProfiles;
 import io.mateu.ecdemo1.pmsintegration.ohip.OperaReservations;
 import io.mateu.ecdemo1.pmsintegration.ohip.PmsRejectedException;
 import io.mateu.ecdemo1.pmsintegration.write.ReservationPayload;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.mateu.workflow.dtos.Variable;
-import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
+import io.mateu.workflow.worker.api.TaskContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,12 +32,12 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
- * The steps that write to Opera, by step id. Each reads what it acts on again — the process carries
+ * The steps that write to Opera, one per task contract (ec-definitions, definitions/tasks; registered
+ * in {@link PmsTasks}). Each reads what it acts on again — the process carries
  * references only — and each is idempotent: it looks before it creates, and it writes state, not
  * increments, so running it twice leaves Opera as running it once.
  *
@@ -60,33 +62,60 @@ public class TaskHandlers {
     final io.mateu.ecdemo1.pmsintegration.frontoffice.PmsEvents events;
 
     /**
-     * The steps of earlier versions of «proyectar-reserva» and «proyectar-cancelacion», which wrote the
-     * front office from here. The front office hangs from Opera now (pms-fo); a process started on an
-     * earlier version still reaches them, and they end it: nothing is written.
+     * The input of the reservation steps ({@code ensure-guest-profile}, {@code upsert-reservation},
+     * {@code cancel-reservation}): the reservation, and what a successor is started with should the
+     * step have to wait (the mapping keeps only its relaunch variables). A task carries every variable
+     * of its process; the rest are not its.
      */
-    static final List<String> RETIRED_STEPS = List.of("write-front-office", "cancel-front-office");
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ReservationTask(String definitionId, String processKey, String hotelCode, String locator,
+                                  String version, String eventId, String origin, String guestProfileId) {
 
-    public Map<String, Function<TaskExecutionRequested, List<Variable>>> handlers() {
-        return Map.of(
-                RETIRED_STEPS.get(0), task -> List.of(),
-                RETIRED_STEPS.get(1), task -> List.of(),
-                "ensure-guest-profile", this::ensureGuestProfile,
-                "upsert-reservation", task -> locked(task, this::upsertReservation),
-                "cancel-reservation", task -> locked(task, this::cancelReservation),
-                "ensure-partner-profile", this::ensurePartnerProfile,
-                "project-stay", task -> stays.project(task));
+        List<Variable> variables() {
+            return relaunch(definitionId, processKey, hotelCode, locator, null, version, eventId, origin);
+        }
     }
 
-    List<Variable> ensureGuestProfile(TaskExecutionRequested task) {
-        var r = reservation(task);
-        var hotel = resolveHotel(task, r);
+    /** {@code ensure-partner-profile@1}'s input. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PartnerTask(String definitionId, String processKey, String partnerCode, String version,
+                              String eventId, String origin) {
+
+        List<Variable> variables() {
+            return relaunch(definitionId, processKey, null, null, partnerCode, version, eventId, origin);
+        }
+    }
+
+    /** {@code project-stay@1}'s input: the Opera reservation, by property and id. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record StayTask(String pmsHotelCode, String pmsReservationId) {
+    }
+
+    /** {@code ensure-guest-profile@1}'s output. What is not known is not written. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record GuestProfile(String profileOutcome, String guestProfileId, String customerId) {
+    }
+
+    /** {@code upsert-reservation@1}'s and {@code cancel-reservation@1}'s output. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record Write(String writeOutcome, String pmsReservationId) {
+    }
+
+    /** {@code ensure-partner-profile@1}'s output. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record PartnerProfiled(String profileOutcome, String pmsProfileIds, String pmsProfileType) {
+    }
+
+    public GuestProfile ensureGuestProfile(ReservationTask input, TaskContext task) {
+        var r = reservation(task, input);
+        var hotel = resolveHotel(task, input, r);
         if (hotel == null) {
-            return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
+            return new GuestProfile(Outcome.WAIT.name(), null, null);
         }
         var customerId = holderCustomer(r);
         try {
             var existing = reservations.byLocator(hotel, r.locator());
-            if (existing.isPresent() && !rewritesTheGuest(task)
+            if (existing.isPresent() && !rewritesTheGuest(input)
                     && (reservations.writtenVersion(existing.get()) >= r.version() || OperaReservations.cancelled(existing.get()))) {
                 // Opera already holds this version: the reservation will not be written, and neither is
                 // its guest. A merge in the MDM is the exception — it projects the same version again
@@ -94,12 +123,7 @@ public class TaskHandlers {
                 var id = OperaReservations.guestProfileId(existing.get());
                 if (id.isPresent()) {
                     log.info("{} v{}: Opera already holds it; guest profile {} left as it is", r.locator(), r.version(), id.get());
-                    var variables = new ArrayList<>(List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
-                            new Variable(ProcessVariables.GUEST_PROFILE_ID, id.get())));
-                    if (customerId != null) {
-                        variables.add(new Variable(ProcessVariables.CUSTOMER_ID, customerId));
-                    }
-                    return variables;
+                    return new GuestProfile(Outcome.OK.name(), id.get(), customerId);
                 }
             }
             var known = ohipProperties.profileReferences() ? null
@@ -114,14 +138,10 @@ public class TaskHandlers {
             }
             log.info("Guest profile {} {} for {} (customer {})", ensured.profileId(), ensured.created() ? "created" : "updated",
                     r.locator(), customerId);
-            var variables = new ArrayList<>(List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, Outcome.OK.name()),
-                    new Variable(ProcessVariables.GUEST_PROFILE_ID, ensured.profileId())));
-            if (customerId != null) {
-                variables.add(new Variable(ProcessVariables.CUSTOMER_ID, customerId));
-            }
-            return variables;
+            return new GuestProfile(Outcome.OK.name(), ensured.profileId(), customerId);
         } catch (PmsRejectedException e) {
-            return rejected(task, r, "guest profile of " + r.locator(), e, ProcessVariables.PROFILE_OUTCOME);
+            rejected(task, input, r, "guest profile of " + r.locator(), e);
+            return new GuestProfile(Outcome.WAIT.name(), null, null);
         }
     }
 
@@ -159,8 +179,12 @@ public class TaskHandlers {
      * version or a newer one, write nothing. The read-compare-write is serialised per reservation
      * ({@link ReservationLocks}): OHIP has no conditional write to make it atomic.
      */
-    List<Variable> upsertReservation(TaskExecutionRequested task) {
-        var r = reservation(task);
+    public Write upsertReservation(ReservationTask input, TaskContext task) {
+        return locked(input, () -> writeReservation(input, task));
+    }
+
+    Write writeReservation(ReservationTask input, TaskContext task) {
+        var r = reservation(task, input);
         var codes = codesOf(r);
         var resolved = integration.resolve(r.hotelCode(), new ArrayList<>(codes));
         var partner = r.partnerCode() == null ? null : integration.partner(r.partnerCode());
@@ -171,12 +195,12 @@ public class TaskHandlers {
         }
         if (!missing.isEmpty()) {
             // Approved when the reservation was prepared, gone since: wait again, as preparing would.
-            await(task, r, missing);
-            return outcome(ProcessVariables.WRITE_OUTCOME, Outcome.WAIT);
+            await(input, r, missing);
+            return new Write(Outcome.WAIT.name(), null);
         }
         var hotel = resolved.target(CodeType.HOTEL, r.hotelCode());
         try {
-            var body = payload.build(r, resolved, hotel, var(task, ProcessVariables.GUEST_PROFILE_ID), partner,
+            var body = payload.build(r, resolved, hotel, required(task, ProcessVariables.GUEST_PROFILE_ID, input.guestProfileId()), partner,
                     partnerProfile == null ? null : partnerProfile.pmsProfileId(),
                     partnerProfile == null ? null : partnerProfile.profileType());
             var existing = reservations.byLocator(hotel, r.locator());
@@ -194,8 +218,7 @@ public class TaskHandlers {
                     // Opera had it already; whoever consumes Opera is told all the same — a merge in the MDM,
                     // a backfill, projects the same version precisely to be read again.
                     events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
-                    return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.STALE.name()),
-                            new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
+                    return new Write(Outcome.STALE.name(), reservationId);
                 }
                 reservations.update(hotel, reservationId, body);
                 log.info("{} v{} -> v{} updated in {} ({})", r.locator(), written, r.version(), hotel, reservationId);
@@ -209,10 +232,10 @@ public class TaskHandlers {
             }
             supersedeRefusals(r, r.version());
             events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
-            return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.DONE.name()),
-                    new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
+            return new Write(Outcome.DONE.name(), reservationId);
         } catch (PmsRejectedException e) {
-            return rejected(task, r, "reservation " + r.locator(), e, ProcessVariables.WRITE_OUTCOME);
+            rejected(task, input, r, "reservation " + r.locator(), e);
+            return new Write(Outcome.WAIT.name(), null);
         }
     }
 
@@ -316,8 +339,12 @@ public class TaskHandlers {
      * Cancels in Opera. A reservation Opera does not have yet is not skipped: the cancellation waits
      * for it to be projected, so the PMS keeps the record and a penalty would have a folio (R37).
      */
-    List<Variable> cancelReservation(TaskExecutionRequested task) {
-        var r = reservation(task);
+    public Write cancelReservation(ReservationTask input, TaskContext task) {
+        return locked(input, () -> writeCancellation(input, task));
+    }
+
+    Write writeCancellation(ReservationTask input, TaskContext task) {
+        var r = reservation(task, input);
         var codes = new ArrayList<CodeRef>();
         codes.add(new CodeRef(CodeType.HOTEL, r.hotelCode()));
         if (r.cancellationReasonCode() != null) {
@@ -325,20 +352,19 @@ public class TaskHandlers {
         }
         var resolved = integration.resolve(r.hotelCode(), codes);
         if (!resolved.missing().isEmpty()) {
-            await(task, r, resolved.missing());
-            return outcome(ProcessVariables.WRITE_OUTCOME, Outcome.WAIT);
+            await(input, r, resolved.missing());
+            return new Write(Outcome.WAIT.name(), null);
         }
         var hotel = resolved.target(CodeType.HOTEL, r.hotelCode());
         var existing = reservations.byLocator(hotel, r.locator());
         if (existing.isEmpty()) {
-            await(task, r, List.of(Cause.notYetProjected(r.hotelCode(), r.locator())));
-            return outcome(ProcessVariables.WRITE_OUTCOME, Outcome.WAIT);
+            await(input, r, List.of(Cause.notYetProjected(r.hotelCode(), r.locator())));
+            return new Write(Outcome.WAIT.name(), null);
         }
         var reservationId = OperaReservations.id(existing.get());
         if (OperaReservations.cancelled(existing.get())) {
             events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
-            return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.STALE.name()),
-                    new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
+            return new Write(Outcome.STALE.name(), reservationId);
         }
         try {
             if (r.noShow() && r.cancellationFee() != null) {
@@ -348,8 +374,8 @@ public class TaskHandlers {
                 all.add(new CodeRef(CodeType.CANCELLATION_REASON, r.cancellationReasonCode()));
                 var full = integration.resolve(r.hotelCode(), all);
                 if (!full.missing().isEmpty()) {
-                    await(task, r, full.missing());
-                    return outcome(ProcessVariables.WRITE_OUTCOME, Outcome.WAIT);
+                    await(input, r, full.missing());
+                    return new Write(Outcome.WAIT.name(), null);
                 }
                 var partner = r.partnerCode() == null ? null : integration.partner(r.partnerCode());
                 var partnerProfile = r.partnerCode() == null ? null : integration.partnerProfile(r.partnerCode()).orElse(null);
@@ -371,10 +397,10 @@ public class TaskHandlers {
                     : "Cancelled in the CRS (reason " + r.cancellationReasonCode() + ")");
             log.info("{} cancelled in {} ({})", r.locator(), hotel, reservationId);
             events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
-            return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.DONE.name()),
-                    new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
+            return new Write(Outcome.DONE.name(), reservationId);
         } catch (PmsRejectedException e) {
-            return rejected(task, r, "cancellation of " + r.locator(), e, ProcessVariables.WRITE_OUTCOME);
+            rejected(task, input, r, "cancellation of " + r.locator(), e);
+            return new Write(Outcome.WAIT.name(), null);
         }
     }
 
@@ -385,17 +411,18 @@ public class TaskHandlers {
      * if it does not, the profile is created. Whichever it is, the next step writes it back to the ERP,
      * so it is never created twice.
      */
-    List<Variable> ensurePartnerProfile(TaskExecutionRequested task) {
-        var partner = integration.partner(var(task, ProcessVariables.PARTNER_CODE));
+    public PartnerProfiled ensurePartnerProfile(PartnerTask input, TaskContext task) {
+        var partner = integration.partner(required(task, ProcessVariables.PARTNER_CODE, input.partnerCode()));
         if (partner.pmsProfileId() != null && !partner.pmsProfileId().isBlank()) {
             log.info("Partner {} is already profile {} in Opera, as the ERP records", partner.code(), partner.pmsProfileId());
             return profiled(Outcome.STALE, partner.pmsProfileId(), partner.pmsProfileType());
         }
         var resolved = integration.resolve(null, List.of(new CodeRef(CodeType.PARTNER_TYPE, partner.type().name())));
         if (!resolved.missing().isEmpty()) {
-            integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID), null,
-                    partner.code(), task.variables(), resolved.missing());
-            return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
+            integration.await(required(task, ProcessVariables.PROCESS_KEY, input.processKey()),
+                    required(task, ProcessVariables.DEFINITION_ID, input.definitionId()), null,
+                    partner.code(), input.variables(), resolved.missing());
+            return new PartnerProfiled(Outcome.WAIT.name(), null, null);
         }
         var profileType = resolved.target(CodeType.PARTNER_TYPE, partner.type().name());
         var hotel = anyHotel();
@@ -417,30 +444,35 @@ public class TaskHandlers {
                     ensured.created() ? ", created in Opera" : "");
             return profiled(Outcome.OK, ensured.profileId(), profileType);
         } catch (PmsRejectedException e) {
-            integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID), null,
-                    partner.code(), task.variables(), List.of(Cause.pmsRejectedPartner(partner.code(), e.getMessage())));
-            return outcome(ProcessVariables.PROFILE_OUTCOME, Outcome.WAIT);
+            integration.await(required(task, ProcessVariables.PROCESS_KEY, input.processKey()),
+                    required(task, ProcessVariables.DEFINITION_ID, input.definitionId()), null,
+                    partner.code(), input.variables(), List.of(Cause.pmsRejectedPartner(partner.code(), e.getMessage())));
+            return new PartnerProfiled(Outcome.WAIT.name(), null, null);
         }
     }
 
-    static List<Variable> profiled(Outcome outcome, String profileId, String profileType) {
-        return List.of(new Variable(ProcessVariables.PROFILE_OUTCOME, outcome.name()),
-                new Variable(ProcessVariables.PMS_PROFILE_IDS, profileId),
-                new Variable("pmsProfileType", profileType == null ? "" : profileType));
+    static PartnerProfiled profiled(Outcome outcome, String profileId, String profileType) {
+        return new PartnerProfiled(outcome.name(), profileId, profileType == null ? "" : profileType);
+    }
+
+    /** «Proyectar estancia»: the Opera reservation, as Opera holds it now, into the front office. */
+    public Void projectStay(StayTask input, TaskContext task) {
+        stays.project(required(task, ProcessVariables.PMS_HOTEL_CODE, input.pmsHotelCode()),
+                required(task, ProcessVariables.PMS_RESERVATION_ID, input.pmsReservationId()));
+        return null;
+    }
+
+    /** Serialised per reservation: the read of the version Opera holds and the write that follows. */
+    <T> T locked(ReservationTask input, Supplier<T> step) {
+        return locks.withLock(input.hotelCode(), input.locator(), step);
     }
 
     /**
      * The hotel a chain-level call is made "from". OHIP demands a hotel header even on the profiles
-     * API, where the profile belongs to no hotel.
-     */
-    List<Variable> locked(TaskExecutionRequested task, Function<TaskExecutionRequested, List<Variable>> step) {
-        return locks.withLock(var(task, ProcessVariables.HOTEL_CODE), var(task, ProcessVariables.LOCATOR), () -> step.apply(task));
-    }
-
-    /**
-     * Any property whose connection has been verified: profiles are the chain's, and every hotel of
-     * the chain lives in the same Opera environment (R24). None yet is transient — the partner is
-     * projected once the first integration is past its connectivity check.
+     * API, where the profile belongs to no hotel. Any property whose connection has been verified:
+     * profiles are the chain's, and every hotel of the chain lives in the same Opera environment (R24).
+     * None yet is transient — the partner is projected once the first integration is past its
+     * connectivity check.
      */
     String anyHotel() {
         return connections.integrations().stream()
@@ -453,38 +485,36 @@ public class TaskHandlers {
     }
 
     /** The PMS hotel of the reservation, or null having registered that its equivalence is missing. */
-    String resolveHotel(TaskExecutionRequested task, Reservation r) {
+    String resolveHotel(TaskContext task, ReservationTask input, Reservation r) {
         var resolved = integration.resolve(r.hotelCode(), List.of(new CodeRef(CodeType.HOTEL, r.hotelCode())));
         if (!resolved.missing().isEmpty()) {
-            await(task, r, resolved.missing());
+            await(input, r, resolved.missing());
             return null;
         }
         return resolved.target(CodeType.HOTEL, r.hotelCode());
     }
 
-    List<Variable> rejected(TaskExecutionRequested task, Reservation r, String what, PmsRejectedException e, String outcomeVariable) {
+    /** Opera refused: the process waits on the refusal, a cause a person resolves (or a newer version supersedes). */
+    void rejected(TaskContext task, ReservationTask input, Reservation r, String what, PmsRejectedException e) {
         log.warn("Opera refused the {}: {} ({})", what, e.getMessage(), e.errorCode());
-        await(task, r, List.of(Cause.pmsRejectedReservation(r.hotelCode(), r.locator(), task.stepId(),
+        await(input, r, List.of(Cause.pmsRejectedReservation(r.hotelCode(), r.locator(), task.stepId(),
                 "%s — %s".formatted(e.getMessage(), e.errorCode()))));
-        return outcome(outcomeVariable, Outcome.WAIT);
     }
 
-    void await(TaskExecutionRequested task, Reservation r, List<Cause> causes) {
-        integration.await(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID),
-                r.hotelCode(), r.locator(), task.variables(), causes);
+    void await(ReservationTask input, Reservation r, List<Cause> causes) {
+        integration.await(input.processKey(), input.definitionId(), r.hotelCode(), r.locator(), input.variables(), causes);
     }
 
-    Reservation reservation(TaskExecutionRequested task) {
-        return integration.reservation(var(task, ProcessVariables.HOTEL_CODE), var(task, ProcessVariables.LOCATOR));
-    }
-
-    static List<Variable> outcome(String variable, Outcome outcome) {
-        return List.of(new Variable(variable, outcome.name()));
+    Reservation reservation(TaskContext task, ReservationTask input) {
+        required(task, ProcessVariables.PROCESS_KEY, input.processKey());
+        required(task, ProcessVariables.DEFINITION_ID, input.definitionId());
+        return integration.reservation(required(task, ProcessVariables.HOTEL_CODE, input.hotelCode()),
+                required(task, ProcessVariables.LOCATOR, input.locator()));
     }
 
     /** Whether this projection exists to rewrite the guest: a merge or a change of the customer in the MDM. */
-    static boolean rewritesTheGuest(TaskExecutionRequested task) {
-        return origin(task).startsWith("mdm-");
+    static boolean rewritesTheGuest(ReservationTask input) {
+        return input.origin() != null && input.origin().startsWith("mdm-");
     }
 
     /** The master's data, and the reservation's where the master has none. */
@@ -503,14 +533,31 @@ public class TaskHandlers {
         return value == null || value.isBlank() ? otherwise : value;
     }
 
-    static String origin(TaskExecutionRequested task) {
-        return task.variables().stream().filter(v -> ProcessVariables.ORIGIN.equals(v.name())).map(Variable::value)
-                .filter(v -> v != null).findFirst().orElse("");
+    static String required(TaskContext task, String name, String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Step %s needs the variable %s".formatted(task.stepId(), name));
+        }
+        return value;
     }
 
-    static String var(TaskExecutionRequested task, String name) {
-        return task.variables().stream().filter(v -> name.equals(v.name())).map(Variable::value)
-                .filter(v -> v != null && !v.isBlank()).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Step %s needs the variable %s".formatted(task.stepId(), name)));
+    /** What a successor is started with, as the process has it: the mapping keeps its relaunch variables. */
+    static List<Variable> relaunch(String definitionId, String processKey, String hotelCode, String locator,
+                                   String partnerCode, String version, String eventId, String origin) {
+        var variables = new ArrayList<Variable>();
+        add(variables, ProcessVariables.DEFINITION_ID, definitionId);
+        add(variables, ProcessVariables.PROCESS_KEY, processKey);
+        add(variables, ProcessVariables.HOTEL_CODE, hotelCode);
+        add(variables, ProcessVariables.LOCATOR, locator);
+        add(variables, ProcessVariables.PARTNER_CODE, partnerCode);
+        add(variables, ProcessVariables.VERSION, version);
+        add(variables, ProcessVariables.EVENT_ID, eventId);
+        add(variables, ProcessVariables.ORIGIN, origin);
+        return variables;
+    }
+
+    static void add(List<Variable> variables, String name, String value) {
+        if (value != null) {
+            variables.add(new Variable(name, value));
+        }
     }
 }

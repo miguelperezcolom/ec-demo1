@@ -5,7 +5,9 @@ import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
@@ -30,9 +32,10 @@ public class FrontOfficeCommands implements DisposableBean {
   final PmsStays stays;
   final ConcurrentMessageListenerContainer<String, byte[]> container;
 
-  public FrontOfficeCommands(PmsStays stays, @Value("${frontoffice.kafka-brokers}") String brokers) {
+  public FrontOfficeCommands(PmsStays stays, @Value("${frontoffice.kafka-brokers}") String brokers,
+      ObjectProvider<ObservationRegistry> observations) {
     this.stays = stays;
-    this.container = KafkaListeners.start(brokers, FrontOfficeCommand.TOPIC, GROUP, this::take);
+    this.container = KafkaListeners.start(brokers, FrontOfficeCommand.TOPIC, GROUP, observations.getIfAvailable(), this::take);
   }
 
   void take(ConsumerRecord<String, byte[]> record) {

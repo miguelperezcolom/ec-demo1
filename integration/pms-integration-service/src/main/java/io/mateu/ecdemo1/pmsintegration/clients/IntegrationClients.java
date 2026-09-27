@@ -51,9 +51,18 @@ public class IntegrationClients {
     final RestClient mdm;
 
     public IntegrationClients(PmsIntegrationProperties properties, TolerantReader reader) {
-        this.crs = client(properties.crsIntegrationUrl(), reader);
-        this.mapping = client(properties.mappingUrl(), reader);
-        this.mdm = client(properties.customerMdmUrl(), reader);
+        this(properties, reader, RestClient.builder());
+    }
+
+    /**
+     * Built from Boot's builder, which observes every call: the CRS adapter's, the mapping's and the
+     * MDM's spans join the trace of the step that asked, and each call carries its traceparent.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    public IntegrationClients(PmsIntegrationProperties properties, TolerantReader reader, RestClient.Builder builder) {
+        this.crs = client(builder.clone(), properties.crsIntegrationUrl(), reader);
+        this.mapping = client(builder.clone(), properties.mappingUrl(), reader);
+        this.mdm = client(builder.clone(), properties.customerMdmUrl(), reader);
     }
 
     public Reservation reservation(String hotelCode, String locator) {
@@ -157,8 +166,8 @@ public class IntegrationClients {
                        List<Cause> causes) {
     }
 
-    private static RestClient client(String baseUrl, TolerantReader reader) {
-        return RestClient.builder()
+    private static RestClient client(RestClient.Builder builder, String baseUrl, TolerantReader reader) {
+        return builder
                 .baseUrl(baseUrl)
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);

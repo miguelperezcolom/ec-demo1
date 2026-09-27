@@ -102,6 +102,13 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <!-- Traces, to the Tempo the engine exports to (Boot 4's OpenTelemetry starter: Micrometer's
+             observations as OpenTelemetry spans, shipped over OTLP). Taking a stay from
+             front-office-commands joins the trace of the booking that wrote it into Opera. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-opentelemetry</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>

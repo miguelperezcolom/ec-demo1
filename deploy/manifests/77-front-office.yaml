@@ -42,6 +42,14 @@ spec:
         - name: front-office
           image: miguelperezcolom/ec-demo1-front-office:0.34.0
           env:
+            # Traces to Tempo: taking a stay from front-office-commands joins the trace of the booking
+            # that wrote it into Opera.
+            - name: OTEL_SERVICE_NAME
+              value: front-office
+            - name: OTLP_TRACING_ENDPOINT
+              value: http://tempo.observability.svc.cluster.local:4318/v1/traces
+            - name: TRACING_SAMPLING
+              value: "1.0"
             - name: SERVER_PORT
               value: "8128"
             # The chain's MDM: the desk's changes to a guest go there, to be decided in Salesforce.

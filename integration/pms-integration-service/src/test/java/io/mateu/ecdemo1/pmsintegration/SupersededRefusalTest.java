@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.pmsintegration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integration.model.mapping.Translation;
-import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
 import io.mateu.ecdemo1.integration.model.reservation.GuestType;
 import io.mateu.ecdemo1.integration.model.reservation.Person;
 import io.mateu.ecdemo1.integration.model.reservation.Reservation;
@@ -16,8 +15,7 @@ import io.mateu.ecdemo1.pmsintegration.worker.ReservationLocks;
 import io.mateu.ecdemo1.pmsintegration.worker.TaskHandlers;
 import io.mateu.ecdemo1.pmsintegration.frontoffice.PmsEvents;
 import io.mateu.ecdemo1.pmsintegration.write.ReservationPayload;
-import io.mateu.workflow.dtos.Variable;
-import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
+import io.mateu.workflow.worker.api.TaskContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -72,14 +70,34 @@ class SupersededRefusalTest {
                 List.of(), new BigDecimal("1090"), null, null);
     }
 
-    static TaskExecutionRequested upsert() {
-        return new TaskExecutionRequested("t", "p", "proyectar-reserva", "upsert-reservation", "pms-integration",
-                List.of(new Variable(ProcessVariables.HOTEL_CODE, "MRU01"), new Variable(ProcessVariables.LOCATOR, "ZMPBEY"),
-                        new Variable(ProcessVariables.GUEST_PROFILE_ID, "20600001")));
-    }
+    static final TaskContext TASK = new TaskContext() {
+        public String taskExecutionId() {
+            return "t";
+        }
 
-    List<Variable> run() {
-        return handlers.handlers().get("upsert-reservation").apply(upsert());
+        public String processId() {
+            return "p";
+        }
+
+        public String workflowDefinitionId() {
+            return "proyectar-reserva";
+        }
+
+        public String stepId() {
+            return "upsert-reservation";
+        }
+
+        public boolean isCancelled() {
+            return false;
+        }
+
+        public void progress(String message) {
+        }
+    };
+
+    TaskHandlers.Write run() {
+        return handlers.upsertReservation(new TaskHandlers.ReservationTask("proyectar-reserva",
+                "proyectar-reserva:MRU01/ZMPBEY:e1", "MRU01", "ZMPBEY", "3", "e1", null, "20600001"), TASK);
     }
 
     @Test
@@ -89,7 +107,7 @@ class SupersededRefusalTest {
         when(reservations.byLocator("XMAR", "ZMPBEY")).thenReturn(Optional.of(existing));
         when(reservations.writtenVersion(existing)).thenReturn(1L);
 
-        assertThat(run()).contains(new Variable(ProcessVariables.WRITE_OUTCOME, "DONE"));
+        assertThat(run().writeOutcome()).isEqualTo("DONE");
 
         verify(reservations).update(eq("XMAR"), any(), any());
         verify(integration).resolveCauseIfOpen(UPSERT_REFUSAL, "pms-integration: v3 is in Opera");
@@ -105,7 +123,7 @@ class SupersededRefusalTest {
         when(reservations.byLocator("XMAR", "ZMPBEY")).thenReturn(Optional.of(existing));
         when(reservations.writtenVersion(existing)).thenReturn(3L);
 
-        assertThat(run()).contains(new Variable(ProcessVariables.WRITE_OUTCOME, "STALE"));
+        assertThat(run().writeOutcome()).isEqualTo("STALE");
 
         verify(reservations, never()).update(any(), any(), any());
         verify(integration).resolveCauseIfOpen(UPSERT_REFUSAL, "pms-integration: v3 is in Opera");
@@ -120,7 +138,6 @@ class SupersededRefusalTest {
         when(reservations.create(eq("XMAR"), any())).thenReturn("39484599");
         doThrow(new IllegalStateException("mapping down")).when(integration).resolveCauseIfOpen(anyString(), anyString());
 
-        assertThat(run()).contains(new Variable(ProcessVariables.WRITE_OUTCOME, "DONE"),
-                new Variable(ProcessVariables.PMS_RESERVATION_ID, "39484599"));
+        assertThat(run()).isEqualTo(new TaskHandlers.Write("DONE", "39484599"));
     }
 }

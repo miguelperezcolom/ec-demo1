@@ -46,6 +46,15 @@ spec:
         - name: pms-integration-service
           image: miguelperezcolom/ec-demo1-pms-integration-service:0.30.0
           env:
+            # Traces to Tempo, the one the engine exports to: a booking's trace runs from the CRS through
+            # the orchestrator to this service's steps, its calls to the MDM and to Opera, and on to the
+            # front office (docs: deploy/observability, "Trazas de una reserva").
+            - name: OTEL_SERVICE_NAME
+              value: pms-integration
+            - name: OTLP_TRACING_ENDPOINT
+              value: http://tempo.observability.svc.cluster.local:4318/v1/traces
+            - name: TRACING_SAMPLING
+              value: "1.0"
             - name: SERVER_PORT
               value: "8123"
             - name: KAFKA_BROKERS

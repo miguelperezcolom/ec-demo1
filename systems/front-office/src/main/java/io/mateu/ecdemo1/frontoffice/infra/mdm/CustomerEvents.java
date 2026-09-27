@@ -6,7 +6,9 @@ import io.mateu.ecdemo1.integration.model.customer.CustomerEvent;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
@@ -33,9 +35,10 @@ public class CustomerEvents implements DisposableBean {
   final Kardex kardex;
   final ConcurrentMessageListenerContainer<String, byte[]> container;
 
-  public CustomerEvents(Kardex kardex, @Value("${frontoffice.kafka-brokers}") String brokers) {
+  public CustomerEvents(Kardex kardex, @Value("${frontoffice.kafka-brokers}") String brokers,
+      ObjectProvider<ObservationRegistry> observations) {
     this.kardex = kardex;
-    this.container = KafkaListeners.start(brokers, TOPIC, GROUP, this::take);
+    this.container = KafkaListeners.start(brokers, TOPIC, GROUP, observations.getIfAvailable(), this::take);
   }
 
   void take(ConsumerRecord<String, byte[]> record) {
