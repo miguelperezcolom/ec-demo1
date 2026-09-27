@@ -179,9 +179,12 @@ class FrontOfficeIntegrationsTest {
         }
     }
 
+    /** Registered without saying a scope: it gets the default, only what the chain's integration wrote. */
     String register() {
-        return lifecycle.register(new FrontOfficeIntegrations.Registration("XMAR", "MRU01", "Riu Demo Mar", null,
-                FrontOfficeIntegration.Scope.ALL, null), "ana").id;
+        var i = lifecycle.register(new FrontOfficeIntegrations.Registration("XMAR", "MRU01", "Riu Demo Mar", null,
+                null, null), "ana");
+        assertThat(i.scope).isEqualTo(FrontOfficeIntegration.Scope.CHAIN);
+        return i.id;
     }
 
     FrontOfficeIntegration integration(String id) {
@@ -227,7 +230,7 @@ class FrontOfficeIntegrationsTest {
         lifecycle.stepStartBackfill(id);
         assertThat(integration(id).getStatus()).isEqualTo(FoIntegrationStatus.BACKFILLING);
         assertThat(calls).anyMatch(c -> c.startsWith("GET /front-office/reservations?hotelId=XMAR&from=" + TODAY
-                + "&to=" + TODAY.plusDays(30) + "&scope=ALL") && !c.contains("modifiedSince"));
+                + "&to=" + TODAY.plusDays(30) + "&scope=CHAIN") && !c.contains("modifiedSince"));
         backfill.tick();
         assertThat(stayKeys()).hasSize(2);
         assertThat(lifecycle.gateOpen(integration(id))).isFalse();

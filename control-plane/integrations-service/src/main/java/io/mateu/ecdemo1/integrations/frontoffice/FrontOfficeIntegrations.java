@@ -110,7 +110,7 @@ public class FrontOfficeIntegrations {
             i.frontOfficeCode = r.frontOfficeCode().trim();
             i.name = r.name();
             i.frontOfficeUrl = blankOr(r.frontOfficeUrl(), properties.frontOfficeUrl());
-            i.scope = r.scope() == null ? FrontOfficeIntegration.Scope.ALL : r.scope();
+            i.scope = r.scope() == null ? FrontOfficeIntegration.Scope.DEFAULT : r.scope();
             i.horizonDays = r.horizonDays() == null || r.horizonDays() <= 0 ? properties.frontOffice().horizonDays()
                     : r.horizonDays();
             i.begin();

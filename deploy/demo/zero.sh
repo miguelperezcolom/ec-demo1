@@ -12,6 +12,8 @@
 # and update, an old run's reservation. Within a run the integration still finds what it wrote by
 # locator (under the run's context), so walking the onboarding again writes no reservation twice.
 # Partners are found by their CorporateId and guest profiles through their reservation: no context.
+# The run's reservations also carry it as Opera's «Custom Reference» (OPERA_CUSTOM_REFERENCE, same
+# ConfigMap): a pms-fo integration of the default scope, CHAIN, brings to the front office only those.
 #
 # The demo's baseline is left alone, but reset.sh would bring the old state back: take a new one
 # with snapshot.sh once the onboarding has been walked again.

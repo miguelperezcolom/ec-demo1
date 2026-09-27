@@ -35,10 +35,19 @@ public class FrontOfficeIntegration {
 
     /** Which reservations of the property reach the front office. */
     public enum Scope {
-        /** Every reservation of the property, wherever it was made. */
+        /**
+         * Every reservation of the property, wherever it was made. In a shared tenant — OHIP's UAT — that
+         * brings in other people's reservations, real guests included: asked for, never the default.
+         */
         ALL,
-        /** Only those the chain's integration wrote: Opera's «Custom Reference». */
-        CHAIN
+        /**
+         * Only those the chain's integration wrote: Opera's «Custom Reference», the one pms-integration
+         * stamps on every reservation it writes (its {@code OPERA_CUSTOM_REFERENCE}). The default.
+         */
+        CHAIN;
+
+        /** What a registration that does not say gets. */
+        public static final Scope DEFAULT = CHAIN;
     }
 
     @Id

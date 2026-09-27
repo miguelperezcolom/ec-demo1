@@ -127,9 +127,12 @@ se cierra solo cuando la integración la pasa.
 
 Las reservas van en cadena **CRS → PMS → front office**: el front office no recibe lo que se mandó a
 Opera, sino lo que **Opera tiene**. Es otra integración, *Integrations → PMS → Front office → New*:
-propiedad de Opera (XMAR), el front office (MRU01), ámbito (`ALL`: todas las reservas de la propiedad,
-también las nacidas en Opera; `CHAIN`: solo las que escribió la integración) y horizonte (60 días). Al
-guardarla arranca `alta-integracion-fo`:
+propiedad de Opera (XMAR), el front office (MRU01), ámbito y horizonte (60 días). El ámbito, por
+defecto, es `CHAIN` — **solo las nuestras**: las reservas que escribió la integración crs-pms, las que
+llevan en la «Custom Reference» de Opera la de la ejecución de la demo (`EC-DEMO1` en la línea base;
+tras un `zero.sh`, la del contexto nuevo, `ECDEMO1-<MMddHHmm>`, en el ConfigMap `ec-demo-run`). `ALL`
+trae todas las reservas de la propiedad, también las nacidas en Opera. Al guardarla arranca
+`alta-integracion-fo`:
 
 1. **Conexión**: Opera legible y el front office responde.
 2. **Catálogo**: el de la propiedad — 15 tipos de habitación, 78 tarifas, 25 paquetes, 367
@@ -146,9 +149,10 @@ reservas de la ventana y se proyectan las modificadas desde el cursor). En *Admi
 `proyectar-estancia` lleva en la clave la reserva de Opera y su modificación (`…:2026-09-28T00:44:46`)
 o el evento (`…:evt-…`).
 
-**Ojo, volumen**: con `ALL`, el front office de MRU01 pasa a tener todas las reservas reales de XMAR en
-la ventana (841 procesos, 814 estancias nuevas `OP-…` el 2026-09-27), con sus huéspedes tal como están en
-el UAT de Opera. Para enseñar solo las de la demo, una integración `CHAIN`.
+**No `ALL` en la demo**: el UAT de Opera es compartido, y con `ALL` el front office de MRU01 pasa a tener
+todas las reservas de XMAR en la ventana — el 2026-09-27, 814 estancias `OP-…` con huéspedes reales de
+otros, con sus datos de contacto, a la vista con demo/demo. El ámbito no se cambia después de dar de alta
+la integración: otro ámbito es otra integración (dar de baja la actual y dar de alta otra).
 
 **Ojo, nombres de Opera**: el front office enseña las palabras de Opera — «Standard King», «Suite
 Junior Standard Balcón», «Pensión Todo Incluido» —, pero el paquete `BRKFST` de XMAR se describe en
