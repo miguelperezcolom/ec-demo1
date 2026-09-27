@@ -15,9 +15,10 @@ public class ErpHome {
 
     /**
      * "ERP": the master of partners is the ERP's role in this PoC (HLA R38), and that is what it is
-     * called on the console. The field name stays, because the routes hang from it.
+     * called on the console. The routes hang from the field's name, and the shells' menu entry is
+     * named the same ({@code RemoteMenu erp}), so a partner is at /erp/partners/...
      */
     @Menu
     @Label("ERP")
-    PartnersMenu partners;
+    PartnersMenu erp;
 }
