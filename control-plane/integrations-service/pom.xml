@@ -104,6 +104,12 @@
             <artifactId>mvc-core</artifactId>
             <version>${mateu.version}</version>
         </dependency>
+        <!-- What the UIs share: paging, the signed-in user, link tables, the catalogue CRUD base. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>ui-commons</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu</groupId>
             <artifactId>vaadin-lit</artifactId>

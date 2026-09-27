@@ -79,14 +79,15 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `control-plane/grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | **`consoles/`** | **What people see** |
 | `consoles/gateway/` | Spring Cloud Gateway — routes the consoles and enforces the token |
-| `consoles/shell/`, `consoles/shell-redwood/` | The data plane's shell, rendered by Vaadin and by Redwood (`io.mateu:redwood` in place of `io.mateu:vaadin-lit`, and nothing else changed) |
-| `consoles/control-shell/`, `consoles/control-shell-redwood/` | The control console's shell, on `console.ec1.mateu.io` and `rw-console.ec1.mateu.io`, behind the `ai-admin` role |
+| `consoles/shell/` | The data plane's shell, rendered by Vaadin (default build) and by Redwood (`-Predwood`: `io.mateu:redwood` in place of `io.mateu:vaadin-lit`, and nothing else changed) |
+| `consoles/control-shell/` | The control console's shell, on `console.ec1.mateu.io` and `rw-console.ec1.mateu.io` (the `-Predwood` build), behind the `ai-admin` role |
 | **`ai/`** | **The agents** |
 | `ai/ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
 | `ai/ia-control-plane/` | The catalogues the agent is configured from: LLMs and their credentials, MCP servers, APIs offered as MCP servers, RAG sources, and the agents that compose them |
 | `ai/api-mcp/` | Serves the catalogued APIs as MCP servers, one endpoint per entry. Owns no data and no screens |
 | **`supporting/`** | |
 | `supporting/content/` | Content, labels and content types — a CRUD and nothing else |
+| `supporting/ui-commons/` | What the UIs share, a library with no image: paging (in the database, and in memory for rows that are not in one), the signed-in user widget of the consoles and the front office, the "other systems" link tables, and the base class of the catalogue CRUDs |
 | **the rest** | |
 | `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
@@ -668,9 +669,12 @@ Four consoles, two planes, two renderers:
 | **the product** | `ec1.mateu.io` | `rw.ec1.mateu.io` |
 | **the platform** | `console.ec1.mateu.io` | `rw-console.ec1.mateu.io` |
 
-`shell-redwood` and `control-shell-redwood` are copies of the two shells with **one line changed**
-in each pom — `io.mateu:redwood` where the original has `io.mateu:vaadin-lit`. Nothing else about
-them is renderer-aware.
+The Redwood consoles are the same two shell modules built with **`-Predwood`**: that Maven profile
+puts `io.mateu:redwood` on the classpath where the default build has `io.mateu:vaadin-lit` (and
+sets the port and a " · Redwood" in the tab's title). Nothing else about them is renderer-aware.
+One module, two images — `ec-demo1-shell` and `ec-demo1-shell-redwood`, `ec-demo1-control-shell`
+and `ec-demo1-control-shell-redwood` — and `deploy/build-images.sh` builds both, each with a
+`clean package` of its own.
 
 That works because a `RemoteMenu` carries **UIDL, not HTML**. The orchestrator, the forms engine
 and the demo services answer with a description of a screen, and whichever renderer the shell

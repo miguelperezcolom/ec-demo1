@@ -1,6 +1,6 @@
 package io.mateu.ecdemo1.operamock.ui.pages;
 
-import io.mateu.ecdemo1.operamock.ui.Paging;
+import io.mateu.ecdemo1.uicommons.paging.Paging;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.mateu.ecdemo1.operamock.store.OperaStore;
 import io.mateu.uidl.annotations.Title;

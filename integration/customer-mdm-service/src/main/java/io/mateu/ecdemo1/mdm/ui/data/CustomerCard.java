@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.mdm.ui.data;
 
 import io.mateu.ecdemo1.mdm.footprint.Footprint;
+import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.ecdemo1.mdm.footprint.Links;
 import io.mateu.ecdemo1.mdm.store.ChangeRequestRepository;
 import io.mateu.ecdemo1.mdm.store.Customer;

@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.shell.infra.in.ui;
 
+import io.mateu.ecdemo1.uicommons.user.UserWidget;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.AI;
 import io.mateu.uidl.annotations.FavIcon;
@@ -15,22 +16,12 @@ import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
 import io.mateu.uidl.annotations.WelcomeBanner;
-import io.mateu.uidl.data.Anchor;
-import io.mateu.uidl.data.HorizontalLayout;
-import io.mateu.uidl.data.MicroFrontend;
-import io.mateu.uidl.data.Popover;
 import io.mateu.uidl.data.RemoteMenu;
-import io.mateu.uidl.data.Text;
-import io.mateu.uidl.data.VerticalLayout;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.WidgetSupplier;
 
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
-
-import static io.mateu.core.infra.JsonSerializer.fromJson;
 
 /**
  * The one page a user ever loads.
@@ -45,12 +36,23 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
  * <p>The Keycloak URL is baked in at compile time: Mateu writes {@code @KeycloakSecured} into
  * the generated bootstrap page, so it cannot be an environment variable yet. Changing the
  * deployment's hostname means rebuilding this image.
+ *
+ * <p><b>Two renderers, one class.</b> The same module builds the Vaadin console (ec-demo1-shell) and,
+ * with {@code -Predwood}, the Redwood one (ec-demo1-shell-redwood): {@code io.mateu:redwood} in
+ * place of {@code io.mateu:vaadin-lit}, and nothing else about it is renderer-aware. That is the
+ * point being demonstrated — a {@link RemoteMenu} carries UIDL rather than HTML, so the
+ * orchestrator, the forms engine and the demo services render through whichever renderer the shell
+ * loaded, with no change on any of them. The two run BESIDE each other, because side by side
+ * against one cluster is the demonstration. No Keycloak client for the Redwood one:
+ * {@code @KeycloakSecured} names the Keycloak URL, not this app's host, so the demo client serves
+ * both — its redirect URIs list both hosts.
  */
 @UI("")
 // Which plane this console is, next to the logo: the data plane is what the business uses, the
 // control plane what governs the platform.
 @Title("Data plane")
-@PageTitle("Data plane")
+// The renderer in the tab's title: the Redwood build of this same class says so (Renderer).
+@PageTitle("Data plane" + Renderer.TITLE_SUFFIX)
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
 // Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
 // what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
@@ -139,46 +141,12 @@ public class ShellHome implements WidgetSupplier {
     @Menu
     AdminMenu admin;
 
+    /**
+     * The inbox badge and who is signed in — the widget every console shares (ui-commons). Nothing
+     * for an anonymous call: the bootstrap page is about to redirect to Keycloak.
+     */
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
-        var widgets = new ArrayList<Component>();
-
-        var authorization = httpRequest.getHeaderValue("Authorization");
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            // Anonymous: the bootstrap page is about to redirect to Keycloak, so there is no
-            // identity to greet and no task list to show yet.
-            return widgets;
-        }
-
-        var claims = fromJson(new String(Base64.getUrlDecoder()
-                .decode(authorization.substring("Bearer ".length()).split("\\.")[1])));
-
-        widgets.add(HorizontalLayout.builder()
-                .content(List.of(
-                        // What waits for the signed-in user — the notifications and the forms engine's
-                        // tasks of their roles — so the first thing on screen is work waiting for them.
-                        MicroFrontend.builder()
-                                .baseUrl("/_inbox")
-                                .route("/badge")
-                                .build(),
-                        // On a narrow screen the header keeps only an icon: the popover still has who and Logout.
-                        Popover.builder()
-                                .wrapped(Text.builder()
-                                        .text("<vaadin-icon icon=\"vaadin:user\" style=\"display: var(--mateu-header-narrow-only, none); width: 1em; height: 1em; vertical-align: -0.125em;\"></vaadin-icon>"
-                                                + "<span style=\"display: var(--mateu-header-wide-only, inline)\">Hola, " + claims.get("name") + "</span>")
-                                        .style("margin-right: 20px; cursor: pointer;") // it opens the popover: who, and Logout
-                                        .build())
-                                .content(VerticalLayout.builder()
-                                        .content(List.of(
-                                                new Text("Email: " + claims.get("email")),
-                                                new Anchor("Logout", "javascript: window.logout();")))
-                                        .spacing(true)
-                                        .padding(true)
-                                        .build())
-                                .build()))
-                .style("align-items: flex-end;")
-                .build());
-
-        return widgets;
+        return UserWidget.withInboxBadge(httpRequest);
     }
 }

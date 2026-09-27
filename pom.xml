@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   The whole repository in one build: `mvn -DskipTests package` from here builds every module, the
-  libraries (integration-model, grpc-interface) first, since the reactor orders them by dependency.
+  libraries (integration-model, grpc-interface, ui-commons) first, since the reactor orders them by dependency.
 
   An aggregator and nothing else: no module has this as its parent, and each still builds on its own
   from its folder (deploy/build-images.sh does it module by module). The modules are grouped by
@@ -38,15 +38,15 @@
         <module>control-plane/users</module>
         <!-- consoles: what people see -->
         <module>consoles/gateway</module>
+        <!-- each shell builds its Vaadin image by default and its Redwood one with -Predwood -->
         <module>consoles/shell</module>
-        <module>consoles/shell-redwood</module>
         <module>consoles/control-shell</module>
-        <module>consoles/control-shell-redwood</module>
         <!-- ai: the agents -->
         <module>ai/ia-agent</module>
         <module>ai/ia-control-plane</module>
         <module>ai/api-mcp</module>
         <!-- supporting -->
         <module>supporting/content</module>
+        <module>supporting/ui-commons</module>
     </modules>
 </project>

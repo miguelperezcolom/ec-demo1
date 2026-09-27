@@ -1,8 +1,8 @@
 package io.mateu.ecdemo1.users.infra.in.ui.pages.usergroups;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.uidl.annotations.EditableOnlyWhenCreating;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.ecdemo1.users.application.query.dto.UserGroupDto;
 import io.mateu.ecdemo1.users.application.usecases.usergroup.create.CreateUserGroupCommand;
 import io.mateu.ecdemo1.users.application.usecases.usergroup.create.CreateUserGroupUseCase;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class UserGroupViewModel implements Identifiable {
+public class UserGroupViewModel implements CatalogueEditor<UserGroupDto> {
     @EditableOnlyWhenCreating
             @NotEmpty
     String id;

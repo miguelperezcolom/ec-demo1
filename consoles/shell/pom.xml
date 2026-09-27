@@ -21,7 +21,27 @@
         <!-- Pinned rather than floating: this is the version the reference deployment was built
              and verified against. -->
         <mateu.version>3.0-alpha.370</mateu.version>
+        <!-- The renderer, and what goes with it. One module, two images: this default builds
+             ec-demo1-shell (Vaadin); `-Predwood` builds ec-demo1-shell-redwood from the same
+             sources, with io.mateu:redwood in place of io.mateu:vaadin-lit — the only difference
+             there ever was between the two, back when they were two copied modules. Build each with
+             `clean package`: see deploy/build-images.sh for why a stale target/ is a wrong image. -->
+        <mateu.renderer>vaadin-lit</mateu.renderer>
+        <console.port>8101</console.port>
+        <console.title.suffix></console.title.suffix>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>redwood</id>
+            <properties>
+                <mateu.renderer>redwood</mateu.renderer>
+                <console.port>8102</console.port>
+                <!-- \u0020, not a space: Maven trims property values, and this one goes into a Java string. -->
+                <console.title.suffix>\u0020· Redwood</console.title.suffix>
+            </properties>
+        </profile>
+    </profiles>
 
     <dependencies>
         <dependency>
@@ -42,13 +62,19 @@
         </dependency>
         <dependency>
             <groupId>io.mateu</groupId>
-            <artifactId>vaadin-lit</artifactId>
+            <artifactId>${mateu.renderer}</artifactId>
             <version>${mateu.version}</version>
         </dependency>
         <dependency>
             <groupId>io.mateu</groupId>
             <artifactId>annotation-processor-mvc</artifactId>
             <version>${mateu.version}</version>
+        </dependency>
+        <!-- The user widget, shared with the other console and the front office. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>ui-commons</artifactId>
+            <version>0.1.0</version>
         </dependency>
 
         <!-- Health probes and the Prometheus endpoint the pod annotation points Prometheus at.
@@ -72,6 +98,49 @@
 
     <build>
         <plugins>
+            <!-- src/main/java-templates, filtered: what differs between the renderers' builds and
+                 has to be a compile-time constant — the page title's suffix, which an annotation
+                 carries. Spring Boot's parent sets the delimiter to @…@. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>java-templates</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/generated-sources/java-templates</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/java-templates</directory>
+                                    <filtering>true</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>java-templates</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/java-templates</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

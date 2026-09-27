@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.mcp;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.probe.ConnectionProbe;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.McpDto;
 import io.mateu.ecdemo1.iacp.application.out.repository.McpRepository;
@@ -18,7 +19,6 @@ import io.mateu.uidl.annotations.Multiline;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class McpViewModel implements Identifiable {
+public class McpViewModel implements CatalogueEditor<McpDto> {
 
     @Section("Server")
     @ReadOnly

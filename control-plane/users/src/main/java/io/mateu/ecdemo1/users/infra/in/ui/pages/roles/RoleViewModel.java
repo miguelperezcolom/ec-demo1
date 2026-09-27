@@ -1,9 +1,9 @@
 package io.mateu.ecdemo1.users.infra.in.ui.pages.roles;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.uidl.annotations.*;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.ecdemo1.users.application.query.dto.RoleDto;
 import io.mateu.ecdemo1.users.application.usecases.role.create.CreateRoleCommand;
 import io.mateu.ecdemo1.users.application.usecases.role.create.CreateRoleUseCase;
@@ -23,7 +23,7 @@ import java.util.List;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class RoleViewModel implements Identifiable {
+public class RoleViewModel implements CatalogueEditor<RoleDto> {
     @EditableOnlyWhenCreating
     @NotEmpty
     String id;

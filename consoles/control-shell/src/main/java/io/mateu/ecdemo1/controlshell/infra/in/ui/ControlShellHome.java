@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.controlshell.infra.in.ui;
 
+import io.mateu.ecdemo1.uicommons.user.UserWidget;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
@@ -14,22 +15,12 @@ import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
 import io.mateu.uidl.annotations.WelcomeBanner;
-import io.mateu.uidl.data.Anchor;
-import io.mateu.uidl.data.MicroFrontend;
-import io.mateu.uidl.data.HorizontalLayout;
-import io.mateu.uidl.data.Popover;
 import io.mateu.uidl.data.RemoteMenu;
-import io.mateu.uidl.data.Text;
-import io.mateu.uidl.data.VerticalLayout;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.WidgetSupplier;
 
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
-
-import static io.mateu.core.infra.JsonSerializer.fromJson;
 
 /**
  * The control console — a second shell, on a host of its own.
@@ -41,12 +32,16 @@ import static io.mateu.core.infra.JsonSerializer.fromJson;
  *
  * <p>Like the demo shell, the Keycloak URL is compiled in — Mateu writes {@code @KeycloakSecured}
  * into the generated bootstrap page — so changing the hostname means rebuilding this image.
+ *
+ * <p>Built twice, like the demo shell: the default build is ec-demo1-control-shell (Vaadin),
+ * {@code -Predwood} is ec-demo1-control-shell-redwood. See ShellHome for why.
  */
 @UI("")
 // Which plane this console is, next to the logo: the data plane is what the business uses, the
 // control plane what governs the platform.
 @Title("Control plane")
-@PageTitle("Control plane")
+// The renderer in the tab's title: the Redwood build of this same class says so (Renderer).
+@PageTitle("Control plane" + Renderer.TITLE_SUFFIX)
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "control-plane")
 // Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
 // what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
@@ -150,43 +145,12 @@ public class ControlShellHome implements WidgetSupplier {
     @Hidden
     RemoteMenu inbox = new RemoteMenu("/_inbox");
 
+    /**
+     * The inbox badge and who is signed in — the widget every console shares (ui-commons). Nothing
+     * for an anonymous call: the bootstrap page is about to redirect to Keycloak.
+     */
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
-        var widgets = new ArrayList<Component>();
-
-        var authorization = httpRequest.getHeaderValue("Authorization");
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            // Anonymous: the bootstrap page is about to redirect to Keycloak.
-            return widgets;
-        }
-
-        var claims = fromJson(new String(Base64.getUrlDecoder()
-                .decode(authorization.substring("Bearer ".length()).split("\\.")[1])));
-
-        widgets.add(HorizontalLayout.builder()
-                .content(List.of(
-                        // What waits for the signed-in user: the notifications and tasks of their roles.
-                        MicroFrontend.builder()
-                                .baseUrl("/_inbox")
-                                .route("/badge")
-                                .build(),
-                        Popover.builder()
-                        .wrapped(Text.builder()
-                                .text("<vaadin-icon icon=\"vaadin:user\" style=\"display: var(--mateu-header-narrow-only, none); width: 1em; height: 1em; vertical-align: -0.125em;\"></vaadin-icon>"
-                                                + "<span style=\"display: var(--mateu-header-wide-only, inline)\">Hola, " + claims.get("name") + "</span>")
-                                .style("margin-right: 20px; cursor: pointer;") // it opens the popover: who, and Logout
-                                .build())
-                        .content(VerticalLayout.builder()
-                                .content(List.of(
-                                        new Text("Email: " + claims.get("email")),
-                                        new Anchor("Logout", "javascript: window.logout();")))
-                                .spacing(true)
-                                .padding(true)
-                                .build())
-                        .build()))
-                .style("align-items: flex-end;")
-                .build());
-
-        return widgets;
+        return UserWidget.withInboxBadge(httpRequest);
     }
 }

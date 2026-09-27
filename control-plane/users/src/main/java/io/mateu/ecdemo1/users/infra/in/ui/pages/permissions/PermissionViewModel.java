@@ -1,9 +1,9 @@
 package io.mateu.ecdemo1.users.infra.in.ui.pages.permissions;
 
+import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.ecdemo1.users.application.query.dto.PermissionDto;
 import io.mateu.ecdemo1.users.application.usecases.permission.create.CreatePermissionCommand;
 import io.mateu.ecdemo1.users.application.usecases.permission.create.CreatePermissionUseCase;
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class PermissionViewModel implements Identifiable {
+public class PermissionViewModel implements CatalogueEditor<PermissionDto> {
     @HiddenInCreate
     @ReadOnly
     String id;

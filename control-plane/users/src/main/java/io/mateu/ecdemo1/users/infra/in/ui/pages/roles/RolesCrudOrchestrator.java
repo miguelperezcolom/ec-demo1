@@ -1,69 +1,40 @@
 package io.mateu.ecdemo1.users.infra.in.ui.pages.roles;
 
-import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
-import io.mateu.uidl.annotations.Title;
-import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.NoFilters;
-import io.mateu.uidl.data.SearchRequest;
-import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.ecdemo1.uicommons.crud.CatalogueCrud;
 import io.mateu.ecdemo1.users.application.query.RoleQueryService;
+import io.mateu.ecdemo1.users.application.query.dto.RoleDto;
 import io.mateu.ecdemo1.users.application.query.dto.RoleRow;
 import io.mateu.ecdemo1.users.application.usecases.role.delete.DeleteRoleCommand;
 import io.mateu.ecdemo1.users.application.usecases.role.delete.DeleteRoleUseCase;
+import io.mateu.uidl.annotations.Title;
+import io.mateu.uidl.data.NoFilters;
+import io.mateu.uidl.interfaces.HttpRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/** The CRUD of this catalogue: listing, form and queries in {@link CatalogueCrud}; deleting here. */
 @Service
 @RequiredArgsConstructor
 @Scope("prototype")
 @Title("Roles")
-public class RolesCrudOrchestrator extends Crud<
-        RoleViewModel,
-        RoleViewModel,
-        RoleViewModel,
-        NoFilters,
-        RoleRow,
-        String
-        > {
+public class RolesCrudOrchestrator extends CatalogueCrud<
+        RoleViewModel, RoleViewModel, RoleViewModel, NoFilters, RoleRow, String, RoleDto> {
 
     final RoleViewModel viewModel;
     final DeleteRoleUseCase deleteRoleUseCase;
     final RoleQueryService queryService;
 
     @Override
-    public ListingData<RoleRow> search(SearchRequest request, HttpRequest httpRequest) {
-        return queryService.findAll(request.searchText(), filters(request), request.pageable());
-    }
-
-    @Override
-    public RoleViewModel view(String id, HttpRequest httpRequest) {
-        return viewModel.load(queryService.getById(id).orElseThrow());
-    }
-
-    @Override
-    public RoleViewModel edit(String id, HttpRequest httpRequest) {
-        return viewModel.load(queryService.getById(id).orElseThrow());
-    }
-
-    @Override
-    public RoleViewModel creationForm(HttpRequest httpRequest) {
+    protected RoleViewModel editor() {
         return viewModel;
     }
 
     @Override
-    public String save(HttpRequest httpRequest) {
-        var editor = httpRequest.getComponentState(RoleViewModel.class);
-        editor.save(httpRequest);
-        return editor.id();
-    }
-
-    @Override
-    public String create(HttpRequest httpRequest) {
-        var form = httpRequest.getComponentState(RoleViewModel.class);
-        return form.create(httpRequest);
+    protected RoleQueryService queries() {
+        return queryService;
     }
 
     @Override

@@ -1,5 +1,6 @@
 server:
-  port: 8101
+  # 8101/8111 for Vaadin, 8102/8112 for Redwood: the renderer profile sets it (pom.xml).
+  port: "@console.port@"
 
 spring:
   application:
