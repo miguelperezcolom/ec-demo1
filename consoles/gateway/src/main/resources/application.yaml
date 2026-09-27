@@ -144,6 +144,26 @@ spring:
           filters:
             - SetStatus=404
 
+        # Its MCP server (/sse, /mcp/**) is the reception agent's, reached inside the cluster by
+        # ia-agent: not from here either.
+        - id: front-office-mcp-not-public
+          uri: no://op
+          predicates:
+            - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/sse,/mcp/**
+          filters:
+            - SetStatus=404
+
+        # Its chat: the same path as the consoles' (Mateu's @AI client posts to /ai/api/agent/stream),
+        # to an ia-agent of its own whose agent is the reception one (AGENT_ID) — the front office's
+        # routes do not share a prefix a routing rule could key on, and its host is what says the
+        # question comes from the front desk.
+        - id: front-office-agent
+          uri: ${IA_AGENT_FRONT_OFFICE_URL:http://ia-agent-front-office:8095}
+          predicates:
+            - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/ai/**
+
         - id: front-office
           uri: ${FRONT_OFFICE_URL:http://front-office:8128}
           predicates:

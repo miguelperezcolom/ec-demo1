@@ -63,6 +63,9 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
             - name: DB_POOL_SIZE
               value: "6"
+            # The reception agent's actions are audited: to the `audit` topic, from an outbox.
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
             - name: KEYCLOAK_ISSUER_URI
               value: https://auth.ec1.mateu.io/realms/ec-demo1
             - name: KEYCLOAK_JWKS_URI

@@ -177,3 +177,12 @@ create table if not exists check_in_ops (
     extras      boolean     not null,
     no_show_pax varchar(100)
 );
+
+-- What the reception agent did here, as AuditedActions (HLA F016) still to be relayed to the audit
+-- service's topic: written after each action, sent — and marked — by AuditRelay.
+create table if not exists audit_outbox (
+    action_id    varchar(64)   primary key,
+    payload      varchar(8000) not null,
+    created_at   timestamp     not null,
+    published_at timestamp
+);
