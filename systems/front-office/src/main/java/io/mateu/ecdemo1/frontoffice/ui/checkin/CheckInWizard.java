@@ -1,7 +1,10 @@
 package io.mateu.ecdemo1.frontoffice.ui.checkin;
 
 import io.mateu.core.infra.declarative.orchestrators.wizard.Wizard;
-import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
+import io.mateu.ecdemo1.frontoffice.application.CheckInService;
+import io.mateu.ecdemo1.frontoffice.application.StayQueries;
+import io.mateu.ecdemo1.frontoffice.domain.room.Room;
+import io.mateu.ecdemo1.frontoffice.domain.room.RoomRepository;
 import io.mateu.ecdemo1.frontoffice.ui.common.GuestHeaders;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.*;
@@ -15,6 +18,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import reactor.core.publisher.Flux;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 /**
@@ -28,9 +33,15 @@ import reactor.core.publisher.Mono;
  * and actions for the wizard's lifetime. The wizard itself only seeds the steps once per stay
  * ({@link #populate()}), keeps the Confirmar summary derived from the other steps
  * ({@link #syncConfirmar()}), and reacts to the actions its step components dispatch. Confirming
- * runs the real domain lifecycle: assign the room, check the stay in, occupy the room and open the
- * folio with the accommodation and add-on charges.
+ * is the {@link CheckInService#checkIn} use case, one transaction: assign the room, check the stay in,
+ * occupy the room and open the folio with the accommodation and add-on charges.
+ *
+ * <p>A prototype bean: Mateu takes it from Spring and hydrates it, so the services are injected. Its
+ * steps are not — the wizard creates them and Mateu re-creates them from the state — and read through
+ * the static {@code FrontOffice} gateway.
  */
+@Service
+@Scope("prototype")
 @Title("Check-In")
 @Style(StyleConstants.CONTAINER)
 @WizardProgress(WizardProgressStyle.STEPS)
@@ -63,6 +74,16 @@ public class CheckInWizard extends Wizard {
   @Label("Check-in completado")
   ResultStep result;
 
+  final StayQueries queries;
+  final CheckInService checkIn;
+  final RoomRepository rooms;
+
+  public CheckInWizard(StayQueries queries, CheckInService checkIn, RoomRepository rooms) {
+    this.queries = queries;
+    this.checkIn = checkIn;
+    this.rooms = rooms;
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────────────────
 
   @Override
@@ -86,7 +107,7 @@ public class CheckInWizard extends Wizard {
 
   /** Seeds the steps from the stay's reservation data — once per stay. */
   void populate() {
-    var view = FrontOffice.stayView(stayId);
+    var view = queries.view(stayId);
     identidad.setStayId(stayId);
     habitacion.setStayId(stayId);
     habitacion.setHabitacionSeleccionada(view.stay().roomNumber());
@@ -96,7 +117,7 @@ public class CheckInWizard extends Wizard {
     confirmar.setStayId(stayId);
     // operaciones ya completadas desde la Reserva 360 (o un wizard anterior): el paso
     // Confirmar las muestra en verde y no las vuelve a pedir
-    var ops = FrontOffice.checkInOps().of(stayId);
+    var ops = queries.ops(stayId);
     if (ops.llave()) {
       confirmar.setLlaveEstado("grabada");
     }
@@ -110,7 +131,7 @@ public class CheckInWizard extends Wizard {
 
   /** The Confirmar step shows data derived from the other steps — recompute it on each request. */
   void syncConfirmar() {
-    var view = FrontOffice.stayView(stayId);
+    var view = queries.view(stayId);
     var stay = view.stay();
     confirmar.setHuespedPrincipal(view.guest().name());
     var room =
@@ -124,8 +145,8 @@ public class CheckInWizard extends Wizard {
   }
 
   /** The selected room's type from the room inventory, falling back to the reservation's. */
-  static String roomTypeOf(String roomNumber, String fallback) {
-    return io.mateu.ecdemo1.frontoffice.ui.common.CheckInFlow.roomTypeOf(roomNumber, fallback);
+  String roomTypeOf(String roomNumber, String fallback) {
+    return rooms.findByNumber(roomNumber).map(Room::typeLabel).orElse(fallback);
   }
 
   // ── Actions dispatched by the step components ──────────────────────────────
@@ -194,7 +215,7 @@ public class CheckInWizard extends Wizard {
       }
       case "llaveGrabada" -> {
         confirmar.setLlaveEstado("grabada");
-        FrontOffice.checkInOps().save(stayId, FrontOffice.checkInOps().of(stayId).withLlave(true));
+        checkIn.keyEncoded(stayId);
         return List.of(this, new Message("Llave / pulsera grabada"));
       }
       case "requestPreauth" -> {
@@ -214,7 +235,7 @@ public class CheckInWizard extends Wizard {
       }
       case "preautorizado" -> {
         confirmar.setPreauthEstado("preautorizado");
-        FrontOffice.checkInOps().save(stayId, FrontOffice.checkInOps().of(stayId).withCobro(true));
+        checkIn.paymentTaken(stayId);
         return List.of(
             this,
             new Message(
@@ -232,7 +253,7 @@ public class CheckInWizard extends Wizard {
       }
       case "firmaCapturada" -> {
         confirmar.setFirmaEstado("firmada");
-        FrontOffice.checkInOps().save(stayId, FrontOffice.checkInOps().of(stayId).withFirma(true));
+        checkIn.registrationSigned(stayId);
         return List.of(this, new Message("Firma capturada"));
       }
       default -> {
@@ -285,14 +306,9 @@ public class CheckInWizard extends Wizard {
       return true;
     }
     return switch (stepFieldName) {
-      case "identidad" ->
-          io.mateu.ecdemo1.frontoffice.ui.common.Paxes.paxPendientes(
-                  FrontOffice.stayView(stayId).stay())
-              > 0;
-      case "habitacion" ->
-          !io.mateu.ecdemo1.frontoffice.ui.common.CheckInFlow.habitacionAsignada(
-              FrontOffice.stayView(stayId).stay());
-      case "extras" -> !FrontOffice.checkInOps().of(stayId).extras();
+      case "identidad" -> queries.pendingPax(queries.view(stayId).stay()) > 0;
+      case "habitacion" -> !queries.view(stayId).stay().hasRoom();
+      case "extras" -> !queries.ops(stayId).extras();
       default -> true;
     };
   }
@@ -301,8 +317,7 @@ public class CheckInWizard extends Wizard {
   @Label("Confirmar check-in")
   Object confirmarCheckin() {
     syncConfirmar();
-    io.mateu.ecdemo1.frontoffice.ui.common.CheckInFlow.completar(
-        stayId, habitacion.getHabitacionSeleccionada(), extras.addedIds());
+    checkIn.checkIn(stayId, habitacion.getHabitacionSeleccionada(), extras.addedIds());
     result = new ResultStep();
     result.setStayId(stayId);
     result.setHabitacionFinal(confirmar.getHabitacionAsignada());

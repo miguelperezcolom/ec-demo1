@@ -1,7 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.domain.catalog;
 
 import java.math.BigDecimal;
-import org.springframework.data.annotation.Id;
 
 /**
  * An add-on offered during check-in (packages, transfer, late check-out…). Reference data;
@@ -9,7 +8,7 @@ import org.springframework.data.annotation.Id;
  * carrying a price.
  */
 public record AddOnCatalogItem(
-    @Id String id,
+    String id,
     String icon,
     String title,
     String description,

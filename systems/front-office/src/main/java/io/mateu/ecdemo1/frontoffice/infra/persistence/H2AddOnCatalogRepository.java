@@ -21,16 +21,17 @@ class H2AddOnCatalogRepository implements AddOnCatalogRepository {
 
   @Override
   public Optional<AddOnCatalogItem> findById(String id) {
-    return crud.findById(id);
+    return crud.findById(id).map(CatalogEntities.AddOnRow::toDomain);
   }
 
   @Override
   public List<AddOnCatalogItem> findAll() {
-    return crud.findAll();
+    return crud.findAll().stream().map(CatalogEntities.AddOnRow::toDomain).toList();
   }
 
   @Override
   public AddOnCatalogItem save(AddOnCatalogItem item) {
-    return crud.existsById(item.id()) ? crud.save(item) : template.insert(item);
+    var row = CatalogEntities.AddOnRow.of(item);
+    return (crud.existsById(item.id()) ? crud.save(row) : template.insert(row)).toDomain();
   }
 }

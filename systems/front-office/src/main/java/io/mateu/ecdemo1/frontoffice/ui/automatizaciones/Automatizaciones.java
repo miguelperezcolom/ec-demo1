@@ -2,7 +2,7 @@ package io.mateu.ecdemo1.frontoffice.ui.automatizaciones;
 
 import io.mateu.ecdemo1.frontoffice.domain.automation.Automation;
 import io.mateu.ecdemo1.frontoffice.domain.automation.ConnectedSystem;
-import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
+import io.mateu.ecdemo1.frontoffice.domain.automation.AutomationRepository;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Audience;
 import io.mateu.uidl.annotations.Label;
@@ -26,7 +26,20 @@ import java.util.concurrent.Callable;
  */
 // el board scoreboard+monitor se conserva en una ruta propia; /automatizaciones es el LISTADO
 @Title("Automatizaciones")
+@org.springframework.stereotype.Service
+@org.springframework.context.annotation.Scope("prototype")
 public class Automatizaciones {
+
+  final AutomationRepository automations;
+
+  public Automatizaciones(AutomationRepository automations) {
+    this.automations = automations;
+  }
+
+  /** Every monitored automation (a method: the panels' lambdas are built before the constructor runs). */
+  java.util.List<Automation> todas() {
+    return automations.findAll();
+  }
 
   public enum HotelFiltro {
     TodosLosHoteles,
@@ -66,7 +79,7 @@ public class Automatizaciones {
   @Label("")
   Callable<Component> estadoGeneral =
       () -> {
-        var automations = FrontOffice.automations().findAll();
+        var automations = todas();
         var ok = automations.stream().mapToInt(Automation::okCount).sum();
         var warnings = automations.stream().mapToInt(Automation::warningCount).sum();
         var errors = automations.stream().mapToInt(Automation::errorCount).sum();
@@ -112,7 +125,7 @@ public class Automatizaciones {
       () ->
           ProcessMonitor.builder()
               .items(
-                  FrontOffice.automations().findAll().stream()
+                  todas().stream()
                       .map(Automatizaciones::process)
                       .toList())
               .style("width: 100%;")
@@ -161,11 +174,11 @@ public class Automatizaciones {
   }
 
   Object fix(String automationId) {
-    var automation = FrontOffice.automations().findById(automationId).orElse(null);
+    var automation = automations.findById(automationId).orElse(null);
     if (automation == null) {
       return new Message("Proceso no encontrado: " + automationId);
     }
-    var resolved = FrontOffice.automations().save(automation.resolveWarnings());
+    var resolved = automations.save(automation.resolveWarnings());
     return List.of(
         this,
         new Message(

@@ -20,17 +20,18 @@ class H2FolioRepository implements FolioRepository {
 
   @Override
   public Optional<Folio> findById(String id) {
-    return RequestCache.get("folio:" + id, () -> crud.findById(id));
+    return RequestCache.get("folio:" + id, () -> crud.findById(id).map(FolioEntity::toDomain));
   }
 
   @Override
   public Optional<Folio> findByStayId(String stayId) {
-    return RequestCache.get("folio-of-stay:" + stayId, () -> crud.findByStayId(stayId));
+    return RequestCache.get("folio-of-stay:" + stayId, () -> crud.findByStayId(stayId).map(FolioEntity::toDomain));
   }
 
   @Override
   public Folio save(Folio folio) {
     RequestCache.evict("folio:" + folio.id(), "folio-of-stay:" + folio.stayId());
-    return crud.existsById(folio.id()) ? crud.save(folio) : template.insert(folio);
+    var row = FolioEntity.of(folio);
+    return (crud.existsById(folio.id()) ? crud.save(row) : template.insert(row)).toDomain();
   }
 }

@@ -156,7 +156,9 @@ public class IdentidadStep implements WizardStep {
         // the Documento island receives its context (stayId + the selected pax) through the
         // embedded field's seeded initialData — the scan/edit lifecycle is fully owned by
         // DocumentoView
-        documento = new DocumentoView();
+        // a prototype bean (its writes go through the kárdex use case): asked of Mateu's bean
+        // provider, since this step is itself created by the wizard, not by Spring
+        documento = io.mateu.uidl.di.MateuBeanProvider.getBean(DocumentoView.class);
         documento.setStayId(stayId);
         documento.setPaxIndex(selectedPax < 1 ? 1 : selectedPax);
         return this;

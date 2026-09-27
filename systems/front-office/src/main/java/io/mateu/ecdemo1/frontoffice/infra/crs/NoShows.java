@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
 import java.util.Map;
 
 /**
@@ -17,30 +18,25 @@ import java.util.Map;
 @Service
 public class NoShows {
 
-  private static NoShows instance;
-
   final RestClient crs;
   final String hotel;
+  final WalkIns walkIns;
 
-  public NoShows(@Value("${frontoffice.crs-integration-url:}") String crsIntegrationUrl,
+  public NoShows(WalkIns walkIns, @Value("${frontoffice.crs-integration-url:}") String crsIntegrationUrl,
                  @Value("${frontoffice.hotel:MRU01}") String hotel) {
+    this.walkIns = walkIns;
     this.crs = crsIntegrationUrl == null || crsIntegrationUrl.isBlank() ? null
         : RestClient.builder().baseUrl(crsIntegrationUrl).build();
     this.hotel = hotel;
-    instance = this;
   }
 
   /** Reports the stay as a no-show; what to tell the desk. */
-  public static String report(String stayId) {
-    return instance == null ? "No se ha podido avisar al CRS." : instance.send(stayId);
-  }
-
-  String send(String stayId) {
+  public String report(String stayId) {
     if (crs == null) {
       return "Este front office no está conectado al CRS: el no show queda solo aquí.";
     }
     // A walk-in is a booking of the CRS under another name: the one the CRS gave it.
-    var walkIn = WalkInDesk.of(stayId).orElse(null);
+    var walkIn = walkIns.of(stayId).orElse(null);
     if (walkIn != null && walkIn.locator() == null) {
       return "Este walk-in aún no está en el CRS: el no show queda solo aquí.";
     }

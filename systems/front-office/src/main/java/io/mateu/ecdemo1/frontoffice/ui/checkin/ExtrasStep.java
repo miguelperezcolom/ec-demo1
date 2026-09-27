@@ -40,7 +40,7 @@ public class ExtrasStep implements WizardStep {
               .currency("€")
               .actionId("extrasChanged")
               .items(
-                  FrontOffice.addOnCatalog().findAll().stream()
+                  FrontOffice.addOns().stream()
                       .map(item -> addOn(item, addedIds()))
                       .toList())
               .build();

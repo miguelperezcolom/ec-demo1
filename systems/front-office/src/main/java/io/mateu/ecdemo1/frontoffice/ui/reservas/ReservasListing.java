@@ -3,7 +3,9 @@ package io.mateu.ecdemo1.frontoffice.ui.reservas;
 import io.mateu.ecdemo1.frontoffice.ui.Paging;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel.StayRow;
-import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
+import io.mateu.ecdemo1.frontoffice.application.DemoReservationsService;
+import io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel;
+import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.ui.common.Tiers;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
@@ -33,8 +35,20 @@ import java.util.Locale;
 @Trigger(type = TriggerType.OnLoad, actionId = "search")
 // tras seedear reservas de demo, el propio listado se refresca (bus estándar)
 @Trigger(type = TriggerType.OnCustomEvent, actionId = "search", eventName = "reservas-seeded")
+@org.springframework.stereotype.Service
+@org.springframework.context.annotation.Scope("prototype")
 public class ReservasListing
     implements Listing<ReservasListing.Reserva>, Searchable, Filterable<ReservasListing.Filtros> {
+
+  final StayReadModel stayReads;
+  final StayRepository stays;
+  final DemoReservationsService demoReservations;
+
+  public ReservasListing(StayReadModel stayReads, StayRepository stays, DemoReservationsService demoReservations) {
+    this.stayReads = stayReads;
+    this.stays = stays;
+    this.demoReservations = demoReservations;
+  }
 
   private static final DateTimeFormatter FECHA =
       DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("es"));
@@ -70,7 +84,7 @@ public class ReservasListing
     // Una consulta (estancia + huésped, sin colecciones); el filtro, el orden y la búsqueda sobre la
     // fila ya pintada siguen en memoria, que es lo que permite buscar por "Llega mañana".
     var rows =
-        FrontOffice.stayReads().rows().stream()
+        stayReads.rows().stream()
             .filter(s -> matchesVista(s, filtros == null ? null : filtros.vista))
             .sorted(
                 java.util.Comparator.comparing((StayRow s) -> s.status().ordinal())
@@ -157,74 +171,22 @@ public class ReservasListing
     return verbo + " " + FECHA.format(fecha);
   }
 
-  // ── seed de reservas de demo (botón del toolbar del listado) ─────────────────
-
-  /** Crea ~10 reservas de demo repartidas entre llegadas, en casa y salidas. */
-  @io.mateu.uidl.annotations.ListToolbarButton(rowsSelectedRequired = false)
-  // detrás del walk-in: Redwood solo despacha la primera acción de la cabecera (las secundarias
-  // llegan por su id y la cadena de Mateu las busca por su etiqueta), y el walk-in es la de recepción
-  @io.mateu.uidl.annotations.Toolbar(order = 1)
-  @Label("＋ 10 reservas demo")
-  public void seedDemo() {
-    // la lógica vive en handleAction (dispatch uniforme con "view")
-  }
-
-  private Object seedDemoReservas() {
-    record Plantilla(String nombre, String tier) {}
-    var plantillas = List.of(
-        new Plantilla("Lucía Ortega", "GOLD"),
-        new Plantilla("Marc Vidal", "SILVER"),
-        new Plantilla("Chiara Rossi", "PLATINUM"),
-        new Plantilla("Tom Becker", "SILVER"),
-        new Plantilla("Aiko Tanaka", "GOLD"),
-        new Plantilla("Pierre Dubois", "SILVER"),
-        new Plantilla("Helena Costa", "GOLD"),
-        new Plantilla("Omar Haddad", "SILVER"),
-        new Plantilla("Ingrid Larsen", "PLATINUM"),
-        new Plantilla("Diego Ramírez", "SILVER"));
-    var today = LocalDate.now();
-    var stamp = String.valueOf(System.currentTimeMillis() % 1_000_000);
-    var tipos = List.of("Standard", "Deluxe King", "Junior Suite", "Premium Sea View");
-    var regimenes = List.of("Solo alojamiento", "Alojamiento y desayuno", "Media pensión");
-    for (int i = 0; i < plantillas.size(); i++) {
-      var p = plantillas.get(i);
-      var id = "demo-" + stamp + "-" + i;
-      FrontOffice.guests().save(new io.mateu.ecdemo1.frontoffice.domain.guest.Guest(
-          id, p.nombre(), "D" + stamp + i, true, null, null,
-          io.mateu.ecdemo1.frontoffice.domain.guest.GuestTier.valueOf(p.tier()),
-          1000 + i * 500, 1 + i % 5, 4 + i, 1 + i % 3, 0, 1,
-          null, null, List.of()));
-      // reparto: 4 llegadas de hoy, 1 de mañana, 3 en casa (1 sale hoy), 2 salidas
-      var estado = i < 4 ? io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
-          : i == 4 ? io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
-          : i < 8 ? io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE
-          : io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED;
-      var checkIn = switch (estado) {
-        case ARRIVING -> i == 4 ? today.plusDays(1) : today;
-        case IN_HOUSE -> today.minusDays(1 + i % 3);
-        case DEPARTED, CANCELLED, NO_SHOW -> today.minusDays(4 + i % 2);
-      };
-      var checkOut = switch (estado) {
-        case ARRIVING -> checkIn.plusDays(2 + i % 4);
-        case IN_HOUSE -> i == 5 ? today : today.plusDays(1 + i % 3);
-        case DEPARTED, CANCELLED, NO_SHOW -> today.minusDays(i % 2);
-      };
-      FrontOffice.stays().save(new Stay(
-          id, id, String.valueOf(200 + i * 7), tipos.get(i % tipos.size()),
-          regimenes.get(i % regimenes.size()), checkIn, checkOut, 1 + i % 3,
-          i % 2 == 0 ? "Directo · Web" : "Booking.com",
-          new java.math.BigDecimal(300 + i * 85),
-          estado, 0, 0, null, List.of(), List.of(), java.util.Set.of()));
-    }
-    return List.of(
-        new io.mateu.uidl.data.Message(plantillas.size() + " reservas de demo creadas"),
-        io.mateu.uidl.data.UICommand.dispatchEvent("reservas-seeded"));
-  }
+  // ── el toolbar del listado: primero la acción de recepción (el walk-in), después la ayuda de
+  // la demo — Redwood despacha ya las acciones secundarias, así que el orden es solo el de uso ──
 
   /** Un cliente sin reserva en el mostrador: el CRS pone el precio y hace la reserva. */
   @io.mateu.uidl.annotations.ListToolbarButton(rowsSelectedRequired = false)
+  @io.mateu.uidl.annotations.Toolbar(order = 1)
   @Label("＋ Walk-in")
   public void walkIn() {
+    // la lógica vive en handleAction (dispatch uniforme con "view")
+  }
+
+  /** Crea ~10 reservas de demo repartidas entre llegadas, en casa y salidas. */
+  @io.mateu.uidl.annotations.ListToolbarButton(rowsSelectedRequired = false)
+  @io.mateu.uidl.annotations.Toolbar(order = 2)
+  @Label("＋ 10 reservas demo")
+  public void seedDemo() {
     // la lógica vive en handleAction (dispatch uniforme con "view")
   }
 
@@ -239,14 +201,16 @@ public class ReservasListing
   @Override
   public Object handleAction(String actionId, HttpRequest httpRequest) {
     if ("seedDemo".equals(actionId)) {
-      return seedDemoReservas();
+      return List.of(
+          new io.mateu.uidl.data.Message(demoReservations.seed() + " reservas de demo creadas"),
+          io.mateu.uidl.data.UICommand.dispatchEvent("reservas-seeded"));
     }
     if ("walkIn".equals(actionId)) {
       return URI.create("/walk-in");
     }
     if ("view".equals(actionId)) {
       var id = String.valueOf(httpRequest.runActionRq().parameters().get("id"));
-      var stay = FrontOffice.stays().findById(id).orElse(null);
+      var stay = stays.findById(id).orElse(null);
       if (stay == null) {
         return null;
       }

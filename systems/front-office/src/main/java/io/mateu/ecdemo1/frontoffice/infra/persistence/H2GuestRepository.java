@@ -21,18 +21,19 @@ class H2GuestRepository implements GuestRepository {
 
   @Override
   public Optional<Guest> findById(String id) {
-    return RequestCache.get("guest:" + id, () -> crud.findById(id));
+    return RequestCache.get("guest:" + id, () -> crud.findById(id).map(GuestEntity::toDomain));
   }
 
   @Override
   public List<Guest> findAll() {
-    return crud.findAll();
+    return crud.findAll().stream().map(GuestEntity::toDomain).toList();
   }
 
   @Override
   public Guest save(Guest guest) {
     RequestCache.evict("guest:" + guest.id());
     // Ids are application-assigned, so new aggregates must be inserted explicitly.
-    return crud.existsById(guest.id()) ? crud.save(guest) : template.insert(guest);
+    var row = GuestEntity.of(guest);
+    return (crud.existsById(guest.id()) ? crud.save(row) : template.insert(row)).toDomain();
   }
 }

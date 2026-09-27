@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.MappedCollection;
 
 /**
  * Stay aggregate root — a booking's life at the hotel: room assignment, dates, board, the people
@@ -17,7 +15,7 @@ import org.springframework.data.relational.core.mapping.MappedCollection;
  * in the Guest aggregate (referenced by {@code guestId}).
  */
 public record Stay(
-    @Id String id,
+    String id,
     String guestId,
     String roomNumber,
     String roomType,
@@ -31,9 +29,9 @@ public record Stay(
     int wishesGranted,
     int wishesTotal,
     String vipNote,
-    @MappedCollection(idColumn = "stay_id", keyColumn = "idx") List<Companion> companions,
-    @MappedCollection(idColumn = "stay_id", keyColumn = "idx") List<Incident> incidents,
-    @MappedCollection(idColumn = "stay_id") Set<SelectedAddOn> addOns) {
+    List<Companion> companions,
+    List<Incident> incidents,
+    Set<SelectedAddOn> addOns) {
 
   public Stay {
     if (id == null || id.isBlank()) throw new IllegalArgumentException("Stay id is required");
@@ -50,6 +48,11 @@ public record Stay(
   /** Where the stay sleeps, for a person: its room, or that it has none yet. */
   public String roomLabel() {
     return roomNumber == null || roomNumber.isBlank() ? "Sin asignar" : "Hab " + roomNumber;
+  }
+
+  /** Whether the stay has a room assigned — the room task of the check-in is done. */
+  public boolean hasRoom() {
+    return roomNumber != null && !roomNumber.isBlank();
   }
 
   /** Whether the stay takes a room: expected or in the house — not gone, not cancelled. */
@@ -171,6 +174,48 @@ public record Stay(
     return new Stay(
         id, guestId, roomNumber, roomType, board, checkIn, checkOut, pax, agency, total, status,
         wishesGranted, wishesTotal, vipNote, updated, incidents, addOns);
+  }
+
+  /**
+   * The desk's demo scanner read the document of companion {@code paxNumber}: the identity is seen —
+   * with a made-up {@code ESC-…} document if none was known — and a contact filled where there was none.
+   */
+  public Stay scanCompanion(int paxNumber) {
+    var companion = companionAt(paxNumber);
+    if (companion == null) {
+      companion = Companion.pending(paxNumber);
+    }
+    if (!companion.identityComplete()) {
+      var document = companion.document() == null || companion.document().isBlank()
+          ? "ESC-" + id.toUpperCase() + "-P" + paxNumber
+          : companion.document();
+      companion = companion.verifyIdentity(document);
+    }
+    if (companion.email() == null || companion.email().isBlank()) {
+      companion = companion.updateContact(
+          companion.name().toLowerCase().replace(' ', '.').replace("é", "e") + "@email.com",
+          companion.phone() == null || companion.phone().isBlank() ? "+00 000 000 000" : companion.phone());
+    }
+    return registerCompanion(paxNumber, companion);
+  }
+
+  /**
+   * Companion {@code paxNumber} registered by hand at the desk: document, name and contact in one go.
+   * Without a document the identity is still marked as seen, with a made-up {@code MAN-…} one.
+   */
+  public Stay registerCompanionAtDesk(int paxNumber, String document, String name, String email, String phone) {
+    var companion = companionAt(paxNumber);
+    if (companion == null) {
+      companion = Companion.pending(paxNumber);
+    }
+    var doc = document == null || document.isBlank() ? "MAN-" + id.toUpperCase() + "-P" + paxNumber : document;
+    return registerCompanion(paxNumber, companion.rename(name).verifyIdentity(doc).updateContact(email, phone));
+  }
+
+  /** The contact of a companion already registered; a slot nobody registered stays as it is. */
+  public Stay updateCompanionContact(int paxNumber, String email, String phone) {
+    var companion = companionAt(paxNumber);
+    return companion == null ? this : registerCompanion(paxNumber, companion.updateContact(email, phone));
   }
 
   public Stay reportIncident(Incident incident) {

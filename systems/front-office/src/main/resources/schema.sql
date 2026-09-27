@@ -165,3 +165,15 @@ create table if not exists walk_in (
     created_at         timestamp     not null,
     booked_at          timestamp
 );
+
+-- The desk's check-in operations of each stay (wifi, key, signature, payment, ancillaries closed) and
+-- the pax it marked as no-shows — kept with the stay, so a check-in writes them in its transaction.
+create table if not exists check_in_ops (
+    stay_id     varchar(64) primary key,
+    wifi        boolean     not null,
+    llave       boolean     not null,
+    firma       boolean     not null,
+    cobro       boolean     not null,
+    extras      boolean     not null,
+    no_show_pax varchar(100)
+);

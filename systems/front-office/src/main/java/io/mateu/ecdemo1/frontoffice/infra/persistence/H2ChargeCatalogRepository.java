@@ -21,23 +21,24 @@ class H2ChargeCatalogRepository implements ChargeCatalogRepository {
 
   @Override
   public Optional<ChargeCatalogItem> findByCode(String code) {
-    return crud.findById(code);
+    return crud.findById(code).map(CatalogEntities.ChargeRow::toDomain);
   }
 
   @Override
   public List<ChargeCatalogItem> findAll() {
-    return crud.findAll();
+    return crud.findAll().stream().map(CatalogEntities.ChargeRow::toDomain).toList();
   }
 
   @Override
   public List<ChargeCatalogItem> search(String text) {
     return text == null || text.isBlank()
-        ? crud.findAll()
-        : crud.findByNameContainingIgnoreCase(text.trim());
+        ? findAll()
+        : crud.findByNameContainingIgnoreCase(text.trim()).stream().map(CatalogEntities.ChargeRow::toDomain).toList();
   }
 
   @Override
   public ChargeCatalogItem save(ChargeCatalogItem item) {
-    return crud.existsById(item.code()) ? crud.save(item) : template.insert(item);
+    var row = CatalogEntities.ChargeRow.of(item);
+    return (crud.existsById(item.code()) ? crud.save(row) : template.insert(row)).toDomain();
   }
 }

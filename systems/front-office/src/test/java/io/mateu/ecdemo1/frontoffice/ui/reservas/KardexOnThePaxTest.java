@@ -27,7 +27,7 @@ class KardexOnThePaxTest {
 
   @Test
   void pendingMarksTheGuestAndTheField() {
-    var row = ReservaOverview.conKardex(ROW, change(KardexStatus.PENDING, null), PABLO);
+    var row = HuespedesPanel.conKardex(ROW, change(KardexStatus.PENDING, null), PABLO);
 
     assertThat(row.status()).isEqualTo("Pendiente de Salesforce");
     assertThat(row.statusColor()).isEqualTo("warning");
@@ -37,7 +37,7 @@ class KardexOnThePaxTest {
 
   @Test
   void rejectedSaysWhatStaysAndWhy() {
-    var row = ReservaOverview.conKardex(ROW, change(KardexStatus.REJECTED, "Número equivocado"), PABLO);
+    var row = HuespedesPanel.conKardex(ROW, change(KardexStatus.REJECTED, "Número equivocado"), PABLO);
 
     assertThat(row.status()).isEqualTo("Rechazado en Salesforce");
     assertThat(row.statusColor()).isEqualTo("error");
@@ -68,14 +68,14 @@ class KardexOnThePaxTest {
   void theKardexFormListsEachChangedFieldWithItsState() {
     var rejected = change(KardexStatus.REJECTED, "Número equivocado");
 
-    assertThat(ReservaOverview.camposEnSalesforce(rejected, PABLO)).singleElement().satisfies(item -> {
+    assertThat(HuespedesPanel.camposEnSalesforce(rejected, PABLO)).singleElement().satisfies(item -> {
       assertThat(item.title()).isEqualTo("Teléfono");
       assertThat(item.description()).isEqualTo("Propuesto +34 611222333 — se queda +34 600000001");
       assertThat(item.status()).isEqualTo("Rechazado");
       assertThat(item.statusColor()).isEqualTo("error");
       assertThat(item.lines()).containsExactly("Motivo: Número equivocado");
     });
-    assertThat(ReservaOverview.camposEnSalesforce(change(KardexStatus.PENDING, null), PABLO)).singleElement()
+    assertThat(HuespedesPanel.camposEnSalesforce(change(KardexStatus.PENDING, null), PABLO)).singleElement()
         .satisfies(item -> assertThat(item.status()).isEqualTo("Pendiente de Salesforce"));
   }
 

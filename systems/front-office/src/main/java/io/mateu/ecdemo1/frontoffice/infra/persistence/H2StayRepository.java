@@ -22,35 +22,36 @@ class H2StayRepository implements StayRepository {
 
   @Override
   public Optional<Stay> findById(String id) {
-    return RequestCache.get("stay:" + id, () -> crud.findById(id));
+    return RequestCache.get("stay:" + id, () -> crud.findById(id).map(StayEntity::toDomain));
   }
 
   @Override
   public List<Stay> findAll() {
-    return crud.findAll();
+    return crud.findAll().stream().map(StayEntity::toDomain).toList();
   }
 
   @Override
   public List<Stay> findByPerson(String customerId) {
     var ids = crud.idsOfPerson(customerId);
-    return ids.isEmpty() ? List.of() : crud.findAllById(ids).stream()
+    return ids.isEmpty() ? List.of() : crud.findAllById(ids).stream().map(StayEntity::toDomain)
         .sorted(java.util.Comparator.comparing(Stay::checkIn).reversed())
         .toList();
   }
 
   @Override
   public List<Stay> findArrivals() {
-    return crud.findByStatusOrderByCheckInAsc(StayStatus.ARRIVING);
+    return crud.findByStatusOrderByCheckInAsc(StayStatus.ARRIVING).stream().map(StayEntity::toDomain).toList();
   }
 
   @Override
   public List<Stay> findInHouse() {
-    return crud.findByStatusOrderByCheckOutAsc(StayStatus.IN_HOUSE);
+    return crud.findByStatusOrderByCheckOutAsc(StayStatus.IN_HOUSE).stream().map(StayEntity::toDomain).toList();
   }
 
   @Override
   public Stay save(Stay stay) {
     RequestCache.evict("stay:" + stay.id());
-    return crud.existsById(stay.id()) ? crud.save(stay) : template.insert(stay);
+    var row = StayEntity.of(stay);
+    return (crud.existsById(stay.id()) ? crud.save(row) : template.insert(row)).toDomain();
   }
 }
