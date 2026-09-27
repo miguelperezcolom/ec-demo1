@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.booking.infra.in.ui.pages;
 
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
+import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ListToolbarButton;
 import io.mateu.uidl.annotations.Title;
@@ -39,6 +40,7 @@ public class BookingCrudOrchestrator extends Crud<
 
     final BookingViewModel viewModel;
     final BookingCancellationForm cancellationForm;
+    final DemoBookingsForm demoBookingsForm;
     final BookingQueryService queryService;
     final CrsCatalog catalog;
 
@@ -127,6 +129,20 @@ public class BookingCrudOrchestrator extends Crud<
             return Message.error("Select the bookings to cancel");
         }
         return cancellationForm.dialogFor(selection.stream().map(BookingRow::id).toList(), LIST_ROUTE);
+    }
+
+    /**
+     * Ten plausible bookings for MRU01, made through the same use cases as one made by hand. Needs no
+     * selection; the dialog it opens asks before creating anything, since MRU01 may write to Opera.
+     */
+    @ListToolbarButton(rowsSelectedRequired = false, confirmationRequired = true)
+    @Action(confirmationTitle = "+ 10 reservas demo",
+            confirmationMessage = "Se crearán 10 reservas de MRU01 con datos aleatorios, con llegada en las próximas"
+                    + " 2 a 8 semanas, algunas de turoperadores y agencias online. " + DemoBookingsForm.OPERA_WARNING,
+            confirmationText = "Crear", confirmationDenialText = "Cancelar")
+    @Label("+ 10 reservas demo")
+    public Object seedDemo() {
+        return List.of(demoBookingsForm.create().message(), UICommand.navigateTo(LIST_ROUTE));
     }
 
     @Override

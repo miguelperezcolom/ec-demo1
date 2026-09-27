@@ -94,6 +94,11 @@ spring:
       # serializer here fails with "[B cannot be cast to String" on the first reply.
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 
+# The ERP's master of partners: where the demo bookings pick the tour operators and agencies of
+# the channels that sell through one.
+partners:
+  url: ${PARTNERS_URL:http://localhost:8120}
+
 # The OpenAPI document at /v3/api-docs describes this service's REST API and nothing else: without
 # this it also lists the endpoints Mateu serves its screens from, which no agent should be offered.
 springdoc:
