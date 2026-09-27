@@ -306,7 +306,7 @@ public class Integrations {
             notifyAttention(i, "Hotel %s has %d code(s) without an equivalent in the PMS".formatted(i.crsHotelCode, i.pendingMappings),
                     "Map them in Mapping → Dictionary, choosing the integration — or ask the mapping agent for a proposal there"
                             + " and approve it.",
-                    properties.consoleUrl() + "/mapping/dictionary");
+                    properties.consoleUrl() + "/mapping/dictionary?integration=" + i.crsHotelCode);
             i.record(clock.instant(), "onboarding", "Waiting for a person to map the %d pending code(s)".formatted(i.pendingMappings));
         } else if (i.pendingMappings > 0) {
             try {

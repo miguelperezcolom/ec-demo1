@@ -25,12 +25,23 @@ public class ProposalAnnouncer {
 
     @Transactional
     public void proposalsReady(int count) {
+        proposalsReady(count, null);
+    }
+
+    /**
+     * @param hotelCode the hotel every proposal is for, or null when they span several (or the chain):
+     *                  the notice then links to the Dictionary already filtered by that hotel's integration
+     */
+    @Transactional
+    public void proposalsReady(int count, String hotelCode) {
         var now = clock.instant();
+        var link = properties.consoleUrl() + "/mapping/dictionary"
+                + (hotelCode == null || hotelCode.isBlank() ? "" : "?integration=" + hotelCode);
         outbox.appendNotification(new NotificationRequested(UUID.randomUUID().toString(),
-                NotificationType.PROPOSAL_READY, null, SUBJECT,
+                NotificationType.PROPOSAL_READY, hotelCode, SUBJECT,
                 "%d mapping proposal(s) to review".formatted(count),
                 "The agent proposed %d equivalence(s). None is in force until someone approves it.".formatted(count),
-                properties.consoleUrl() + "/mapping/dictionary",
+                link,
                 "proposal-ready:" + now.toEpochMilli(), now));
     }
 }
