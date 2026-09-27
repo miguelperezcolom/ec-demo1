@@ -164,6 +164,16 @@ spring:
             - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
             - Path=/ai/**
 
+        # Web Push at the front desk: the same script, service worker and subscriptions as the
+        # consoles' — the push paths of the inbox and nothing else of it (the desk has no inbox). A
+        # browser that subscribes from this host is the front desk's: communication-service tells it
+        # only what the recipients push to the desk (FRONT_DESK_PUSH).
+        - id: front-office-push
+          uri: ${COMMUNICATION_URL:http://communication-service:8125}
+          predicates:
+            - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/_inbox/push/**
+
         - id: front-office
           uri: ${FRONT_OFFICE_URL:http://front-office:8128}
           predicates:

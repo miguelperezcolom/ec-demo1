@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.communication.mcp;
 
 import io.mateu.ecdemo1.communication.application.Recipients;
 import io.mateu.ecdemo1.communication.send.Deliveries;
+import io.mateu.ecdemo1.communication.send.TestPushes;
 import io.mateu.ecdemo1.communication.store.Channel;
 import io.mateu.ecdemo1.communication.store.NotificationRepository;
 import io.mateu.ecdemo1.communication.store.Recipient;
@@ -24,6 +25,7 @@ public class CommunicationMcpTools implements McpSystemContext {
     final RecipientRepository recipients;
     final Deliveries deliveries;
     final Recipients recipientChanges;
+    final TestPushes testPushes;
 
     @Override
     public String getSystemContext() {
@@ -34,8 +36,11 @@ public class CommunicationMcpTools implements McpSystemContext {
                 - La tabla de destinatarios es la única regla de quién se entera de qué y por dónde. Cada destinatario
                   dice a quién (usuarios de Keycloak y/o roles del realm, o una dirección de email), qué (tipos de
                   aviso — ninguno = todos —, si también las tareas del motor de formularios, y un hotel — vacío =
-                  todos) y por dónde: INBOX (la bandeja de sus personas), WEB_PUSH (sus navegadores), EMAIL (su
-                  dirección) y GOOGLE_CHAT (los espacios que nombra; vacío = todos).
+                  todos) y por dónde: INBOX (la bandeja de sus personas), WEB_PUSH (sus navegadores en las consolas),
+                  FRONT_DESK_PUSH (sus navegadores en recepción, el front office), EMAIL (su dirección) y
+                  GOOGLE_CHAT (los espacios que nombra; vacío = todos).
+                - Una persona activa los avisos en cada navegador (menú de usuario → Avisos). sendTestPush le manda
+                  una prueba a todos sus navegadores, para ver que llegan.
                 - Cada aviso llega a todos los destinatarios activos que lo quieren, una vez por persona, navegador,
                   dirección y espacio. Urgente es lo que alguien pidió recibir por email.
                 """;
@@ -74,7 +79,8 @@ public class CommunicationMcpTools implements McpSystemContext {
 
     @Tool(description = "Add a recipient: who (users and/or roles, or an e-mail address), what (types, tasks, hotel) and where "
             + "(channels). Types: CAUSE_OPENED, PROPOSAL_READY, RETRYING_TOO_LONG, PMS_REJECTED, INTEGRATION_NEEDS_ATTENTION; "
-            + "none is all. Channels: INBOX, WEB_PUSH (need users or roles), EMAIL (needs the address), GOOGLE_CHAT")
+            + "none is all. Channels: INBOX, WEB_PUSH (the consoles' browsers), FRONT_DESK_PUSH (the front office's browsers) — these three need "
+            + "users or roles —, EMAIL (needs the address), GOOGLE_CHAT")
     public String addRecipient(String name,
                                @ToolParam(description = "how it is told") List<Channel> channels,
                                @ToolParam(required = false, description = "Keycloak usernames, comma-separated") String users,
@@ -93,6 +99,12 @@ public class CommunicationMcpTools implements McpSystemContext {
                 blank(email), types, Boolean.TRUE.equals(tasks), blank(hotelCode), set, blank(chatSpaces)));
         return "Recipient %s added".formatted(id);
     }
+    @Tool(description = "Send a test notification to every browser where this Keycloak user enabled notifications — the consoles' "
+            + "and the front desk's — to check that Web Push reaches them. Says, per browser, whether the push service took it")
+    public List<TestPushes.Result> sendTestPush(@ToolParam(description = "the Keycloak username") String username) {
+        return testPushes.toUser(username);
+    }
+
     static String blank(String value) {
         return value == null || value.isBlank() ? null : value.replace(" ", "");
     }

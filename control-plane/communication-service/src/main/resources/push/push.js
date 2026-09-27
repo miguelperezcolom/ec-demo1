@@ -1,88 +1,294 @@
-// Web Push for the consoles: loaded by every shell (@Script), served by communication-service.
+// Web Push for the consoles and the front office: loaded by every shell (@Script), served by
+// communication-service through the gateway.
 //
 // Waits for the Keycloak token the bootstrap page keeps in localStorage, registers the service
 // worker, and — once the person allowed notifications — tells the inbox where this browser is. It
 // does so on every load, so the roles it receives for are always the current ones. The permission
 // is only asked after a click: browsers ignore, or block, a request nobody asked for.
-const BASE = '/_inbox/push';
-const DISMISSED = '__ec_push_dismissed';
+//
+// The service worker lives under /_inbox/push/, so its scope is /_inbox/push/ and it controls no page
+// of the console — it does not need to: a push reaches the registration whatever its scope. Which is
+// also why this never waits on navigator.serviceWorker.ready: that promise is for a worker whose scope
+// covers this page, and here it never resolves.
+//
+// What it puts on the page: a small offer in a corner the first time ("Activar avisos", dismissable
+// for good), and <ec-push-toggle> — the "Avisos" line of the user menu — which says the state of this
+// browser (activados / desactivados / bloqueados por el navegador / no disponibles) and turns them on
+// or off, or sends a test. window.ecPush is the same, for a console to call.
+(() => {
+  if (window.ecPush) return; // loaded twice: the first one is already at work
 
-function token() {
-  return localStorage.getItem('__mateu_auth_token');
-}
+  const BASE = '/_inbox/push';
+  const DISMISSED = '__ec_push_dismissed';
+  const TURNED_OFF = '__ec_push_off';
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext;
 
-async function waitForToken(ms) {
-  const until = Date.now() + ms;
-  while (!token() && Date.now() < until) {
-    await new Promise(r => setTimeout(r, 500));
+  let state = supported ? 'loading' : 'unsupported';
+  let registration = null;
+  let publicKey = null;
+  let busy = false;
+  let note = '';
+
+  const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* private window */ } };
+  const token = () => get('__mateu_auth_token');
+  const auth = () => ({ Authorization: 'Bearer ' + token() });
+
+  function set(next, message) {
+    state = next;
+    note = message || '';
+    window.dispatchEvent(new CustomEvent('ec-push-state', { detail: { state, note } }));
   }
-  return token();
-}
 
-function urlBase64ToUint8Array(base64) {
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
-}
+  async function waitForToken(ms) {
+    const until = Date.now() + ms;
+    while (!token() && Date.now() < until) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+    return token();
+  }
 
-async function subscribe(registration) {
-  const auth = { Authorization: 'Bearer ' + token() };
-  const answer = await fetch(BASE + '/public-key', { headers: auth });
-  if (!answer.ok) return; // Web Push is not configured on this deployment
-  const { publicKey } = await answer.json();
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
+  function urlBase64ToUint8Array(base64) {
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+    const raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+
+  // The registration once its worker is active — its own, not navigator.serviceWorker.ready (see above).
+  async function activated(reg) {
+    if (reg.active) return reg;
+    const worker = reg.installing || reg.waiting;
+    if (worker) {
+      await new Promise(resolve => {
+        const check = () => { if (worker.state === 'activated' || reg.active) resolve(); };
+        worker.addEventListener('statechange', check);
+        check();
+      });
+    }
+    return reg;
+  }
+
+  async function register() {
+    if (registration) return registration;
+    const reg = await navigator.serviceWorker.register(BASE + '/sw.js', { scope: BASE + '/' });
+    registration = await activated(reg);
+    return registration;
+  }
+
+  async function tellTheInbox(subscription) {
+    const answer = await fetch(BASE + '/subscriptions', {
+      method: 'POST',
+      headers: { ...auth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(subscription.toJSON()),
     });
+    if (!answer.ok) throw new Error('The inbox answered ' + answer.status);
   }
-  await fetch(BASE + '/subscriptions', {
-    method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify(subscription.toJSON()),
-  });
-}
 
-function offer(registration) {
-  if (localStorage.getItem(DISMISSED)) return;
-  const bar = document.createElement('div');
-  bar.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:10000;display:flex;gap:8px;align-items:center;'
-    + 'padding:8px 12px;border-radius:8px;background:#1f2937;color:#fff;font:14px system-ui,sans-serif;'
-    + 'box-shadow:0 2px 8px rgba(0,0,0,.25)';
-  const enable = document.createElement('button');
-  enable.textContent = '🔔 Enable notifications';
-  enable.style.cssText = 'border:0;border-radius:6px;padding:6px 10px;background:#2563eb;color:#fff;cursor:pointer;font:inherit';
-  const later = document.createElement('button');
-  later.textContent = '✕';
-  later.title = 'Not now';
-  later.style.cssText = 'border:0;background:transparent;color:#cbd5e1;cursor:pointer;font:inherit';
-  enable.onclick = async () => {
-    bar.remove();
-    if (await Notification.requestPermission() === 'granted') {
-      await subscribe(registration);
+  async function subscribe() {
+    const reg = await register();
+    let subscription = await reg.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
     }
-  };
-  later.onclick = () => {
-    localStorage.setItem(DISMISSED, '1');
-    bar.remove();
-  };
-  bar.append(enable, later);
-  document.body.appendChild(bar);
-}
-
-(async () => {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
-  if (!await waitForToken(60000)) return;
-  try {
-    const registration = await navigator.serviceWorker.register(BASE + '/sw.js');
-    await navigator.serviceWorker.ready;
-    if (Notification.permission === 'granted') {
-      await subscribe(registration);
-    } else if (Notification.permission === 'default') {
-      offer(registration);
-    }
-  } catch (e) {
-    console.log('Web Push not available', e);
+    await tellTheInbox(subscription);
+    return subscription;
   }
+
+  // Where this browser stands, without asking anything.
+  async function refresh() {
+    if (!supported) return set('unsupported');
+    if (!publicKey) return set('unavailable');
+    if (Notification.permission === 'denied') return set('blocked');
+    const reg = await register();
+    const subscription = await reg.pushManager.getSubscription();
+    if (Notification.permission === 'granted' && !get(TURNED_OFF)) {
+      // Allowed, and not turned off here: subscribed, and the inbox told (again) — roles change.
+      await subscribe();
+      return set('on');
+    }
+    if (subscription && get(TURNED_OFF)) await subscription.unsubscribe();
+    return set('off');
+  }
+
+  // After a click only: that is when a browser shows its permission prompt.
+  async function enable() {
+    if (busy || !supported || !publicKey) return state;
+    busy = true;
+    try {
+      put(TURNED_OFF, null);
+      put(DISMISSED, '1');
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        await subscribe();
+        set('on');
+      } else {
+        set(permission === 'denied' ? 'blocked' : 'off');
+      }
+    } catch (e) {
+      console.warn('Web Push: could not enable notifications', e);
+      set('error', String(e && e.message || e));
+    } finally {
+      busy = false;
+    }
+    return state;
+  }
+
+  async function disable() {
+    if (busy || !supported) return state;
+    busy = true;
+    try {
+      put(TURNED_OFF, '1');
+      const reg = await register();
+      const subscription = await reg.pushManager.getSubscription();
+      if (subscription) {
+        await fetch(BASE + '/subscriptions?endpoint=' + encodeURIComponent(subscription.endpoint), { method: 'DELETE', headers: auth() });
+        await subscription.unsubscribe();
+      }
+      set(Notification.permission === 'denied' ? 'blocked' : 'off');
+    } catch (e) {
+      console.warn('Web Push: could not disable notifications', e);
+      set('error', String(e && e.message || e));
+    } finally {
+      busy = false;
+    }
+    return state;
+  }
+
+  // "Enviarme una prueba": the service sends one straight to this browser.
+  async function test() {
+    const reg = await register();
+    const subscription = await reg.pushManager.getSubscription();
+    if (!subscription) return { outcome: 'NOT_FOUND', detail: 'Este navegador no tiene los avisos activados' };
+    const answer = await fetch(BASE + '/test', {
+      method: 'POST',
+      headers: { ...auth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint }),
+    });
+    if (!answer.ok) return { outcome: 'FAILED', detail: 'El servicio respondió ' + answer.status };
+    return answer.json();
+  }
+
+  // ── On the page ────────────────────────────────────────────────────────────────────────────────
+
+  const LABELS = {
+    loading: 'comprobando…',
+    on: 'activados',
+    off: 'desactivados',
+    blocked: 'bloqueados por el navegador',
+    unsupported: 'no disponibles en este navegador',
+    unavailable: 'no disponibles',
+    error: 'no se pudieron activar',
+  };
+
+  function offer() {
+    if (get(DISMISSED) || state !== 'off' || Notification.permission !== 'default') return;
+    const bar = document.createElement('div');
+    bar.setAttribute('role', 'status');
+    bar.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:10000;display:flex;gap:8px;align-items:center;'
+      + 'max-width:calc(100vw - 32px);padding:8px 10px 8px 12px;border-radius:8px;background:#1f2937;color:#fff;'
+      + 'font:14px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+    const text = document.createElement('span');
+    text.textContent = '¿Avisos en este navegador?';
+    const enableButton = document.createElement('button');
+    enableButton.textContent = 'Activar avisos';
+    enableButton.style.cssText = 'border:0;border-radius:6px;padding:6px 10px;background:#2563eb;color:#fff;cursor:pointer;font:inherit';
+    const later = document.createElement('button');
+    later.textContent = '✕';
+    later.title = 'Ahora no (se pueden activar luego en el menú de usuario)';
+    later.setAttribute('aria-label', 'Ahora no');
+    later.style.cssText = 'border:0;background:transparent;color:#cbd5e1;cursor:pointer;font:inherit;padding:4px 6px';
+    enableButton.onclick = () => { bar.remove(); enable(); };
+    later.onclick = () => { put(DISMISSED, '1'); bar.remove(); };
+    window.addEventListener('ec-push-state', () => { if (state !== 'off') bar.remove(); });
+    bar.append(text, enableButton, later);
+    document.body.appendChild(bar);
+  }
+
+  // The "Avisos" line of the user menu: the state of this browser, and what can be done about it.
+  class PushToggle extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this.onState = () => this.render();
+      this.testNote = '';
+    }
+
+    connectedCallback() {
+      window.addEventListener('ec-push-state', this.onState);
+      this.render();
+    }
+
+    disconnectedCallback() {
+      window.removeEventListener('ec-push-state', this.onState);
+    }
+
+    render() {
+      const s = state;
+      const hint = s === 'blocked'
+        ? 'Para activarlos, permite las notificaciones de este sitio en el candado de la barra de direcciones y recarga.'
+        : s === 'error' ? note : s === 'unavailable' ? 'Este despliegue no tiene Web Push configurado.' : '';
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host { display: block; font: inherit; }
+          .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+          .state { font-weight: 600; }
+          .state.on { color: #15803d; } .state.blocked, .state.error { color: #b91c1c; }
+          button { font: inherit; font-size: .875em; border: 1px solid rgba(128,128,128,.5); border-radius: 6px;
+                   padding: 3px 8px; background: transparent; color: inherit; cursor: pointer; }
+          button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+          .hint { margin: 4px 0 0; font-size: .8em; opacity: .75; max-width: 260px; }
+        </style>
+        <div class="row"><span>Avisos: <span class="state ${s}">${LABELS[s] || s}</span></span></div>
+        <div class="row" style="margin-top:4px">
+          ${s === 'off' || s === 'error' ? '<button class="primary" data-do="enable">Activar avisos</button>' : ''}
+          ${s === 'on' ? '<button data-do="test">Enviarme una prueba</button><button data-do="disable">Desactivar</button>' : ''}
+        </div>
+        ${hint ? `<p class="hint"></p>` : ''}
+        ${this.testNote ? `<p class="hint test"></p>` : ''}`;
+      if (hint) this.shadowRoot.querySelector('.hint').textContent = hint;
+      if (this.testNote) this.shadowRoot.querySelector('.hint.test').textContent = this.testNote;
+      this.shadowRoot.querySelectorAll('button').forEach(b => b.addEventListener('click', e => this.act(e, b.dataset.do)));
+    }
+
+    async act(event, what) {
+      event.stopPropagation(); // a click here is not a click that closes the menu
+      this.testNote = '';
+      if (what === 'enable') await enable();
+      if (what === 'disable') await disable();
+      if (what === 'test') {
+        this.testNote = 'Enviando…';
+        this.render();
+        const r = await test();
+        this.testNote = r.outcome === 'SENT' ? 'Enviada: debería aparecer en unos segundos.'
+          : r.outcome === 'NOT_CONFIGURED' ? 'Web Push no está configurado en este despliegue.'
+          : r.outcome === 'GONE' ? 'El navegador ya no tenía la suscripción: vuelve a activar los avisos.'
+          : 'No se pudo enviar: ' + (r.detail || r.outcome);
+        if (r.outcome === 'GONE') { put(TURNED_OFF, '1'); await refresh().catch(() => {}); }
+      }
+      this.render();
+    }
+  }
+
+  if (!customElements.get('ec-push-toggle')) customElements.define('ec-push-toggle', PushToggle);
+
+  window.ecPush = { state: () => state, enable, disable, test, refresh };
+
+  (async () => {
+    if (!supported) return set('unsupported');
+    if (!await waitForToken(60000)) return;
+    try {
+      const answer = await fetch(BASE + '/public-key', { headers: auth() });
+      if (!answer.ok) return set('unavailable'); // Web Push is not configured on this deployment
+      publicKey = (await answer.json()).publicKey;
+      await refresh();
+      // A moment after the page settles, not while the shell is still drawing.
+      setTimeout(offer, 4000);
+    } catch (e) {
+      console.warn('Web Push not available', e);
+      set('error', String(e && e.message || e));
+    }
+  })();
 })();

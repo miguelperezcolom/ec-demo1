@@ -1,10 +1,12 @@
 package io.mateu.ecdemo1.communication.rest;
 
 import io.mateu.ecdemo1.communication.config.CommunicationProperties;
+import io.mateu.ecdemo1.communication.send.TestPushes;
 import io.mateu.ecdemo1.communication.send.WebPushCrypto;
 import io.mateu.ecdemo1.communication.store.PushSubscription;
 import io.mateu.ecdemo1.communication.store.PushSubscriptionRepository;
 import io.mateu.ecdemo1.communication.ui.inbox.Caller;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -30,21 +32,40 @@ import java.util.Map;
  * (the gateway lets them through without a token: a browser loads a script or a service worker
  * without one); the rest needs the signed-in user: the recipients that push to them — by name or by
  * one of their roles — decide what their browser receives.
+ *
+ * <p>A browser that subscribes from the front office's host is the front desk's: it is told only what
+ * the recipients push to the desk. Which host it is comes from the Origin the browser sends with the
+ * POST — the gateway forwards it untouched — or, without one, from X-Forwarded-Host.
  */
 @Slf4j
 @RestController
 @RequiredArgsConstructor
 public class PushController {
 
+    /*
+     * What the browser posts is PushSubscription.toJSON(): endpoint, keys — and expirationTime, which
+     * nothing here needs. This application's ObjectMapper fails on a field it does not know, so every
+     * one of these ignores what it does not use: without that, every browser's subscription was a 400
+     * and no browser was ever registered.
+     */
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Keys(String p256dh, String auth) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Subscription(String endpoint, Keys keys) {
+    }
+
+    /** Which browser to send the test to: its subscription's endpoint. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record TestRequest(String endpoint) {
     }
 
     final CommunicationProperties properties;
     final PushSubscriptionRepository subscriptions;
     final Clock clock;
+    final TestPushes tests;
 
     @GetMapping(value = "/_inbox/push/push.js", produces = "text/javascript")
     public String script() throws IOException {
@@ -67,6 +88,8 @@ public class PushController {
     /** The browser the signed-in user allowed, with who they are and their roles. Refreshed on every load. */
     @PostMapping("/_inbox/push/subscriptions")
     public ResponseEntity<Void> subscribe(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                          @RequestHeader(value = "Origin", required = false) String origin,
+                                          @RequestHeader(value = "X-Forwarded-Host", required = false) String forwardedHost,
                                           @RequestBody Subscription subscription) {
         var username = Caller.username(authorization);
         if (username == null) {
@@ -86,18 +109,69 @@ public class PushController {
         s.auth = subscription.keys().auth();
         s.username = username;
         s.roles = String.join(",", Caller.roles(authorization));
+        s.app = frontDesk(origin, forwardedHost) ? PushSubscription.FRONT_DESK : null;
         if (created) {
             s.subscribedAt = clock.instant();
-            log.info("{} allowed notifications in a browser (roles {})", username, s.roles);
+            log.info("{} allowed notifications in a browser{} (roles {})", username, s.atFrontDesk() ? " at the front desk" : "", s.roles);
         }
         subscriptions.save(s);
         return ResponseEntity.noContent().build();
     }
 
+    /** The person turned notifications off in this browser. Only their own browser: nobody else's. */
     @DeleteMapping("/_inbox/push/subscriptions")
-    public ResponseEntity<Void> unsubscribe(@RequestParam String endpoint) {
-        subscriptions.deleteById(id(endpoint));
+    public ResponseEntity<Void> unsubscribe(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                            @RequestParam String endpoint) {
+        var username = Caller.username(authorization);
+        if (username == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        subscriptions.findById(id(endpoint))
+                .filter(s -> username.equals(s.username))
+                .ifPresent(s -> {
+                    subscriptions.delete(s);
+                    log.info("{} turned notifications off in a browser", username);
+                });
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * "Enviarme una prueba": a notification to this browser, if it is the caller's. 200 with what
+     * happened — the push service took it, or why not — so the page can say it.
+     */
+    @PostMapping("/_inbox/push/test")
+    public ResponseEntity<TestPushes.Result> test(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                                  @RequestBody TestRequest request) {
+        var username = Caller.username(authorization);
+        if (username == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (request == null || request.endpoint() == null || request.endpoint().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(tests.toBrowser(username, id(request.endpoint())));
+    }
+
+    /** Whether the browser that calls is on one of the front office's hosts. */
+    boolean frontDesk(String origin, String forwardedHost) {
+        var host = host(origin);
+        if (host == null && forwardedHost != null && !forwardedHost.isBlank()) {
+            host = forwardedHost.split(",")[0].trim().toLowerCase(java.util.Locale.ROOT);
+            host = host.contains(":") ? host.substring(0, host.indexOf(':')) : host;
+        }
+        return host != null && properties.push().frontDeskHosts().contains(host);
+    }
+
+    static String host(String origin) {
+        if (origin == null || origin.isBlank() || "null".equals(origin)) {
+            return null;
+        }
+        try {
+            var host = java.net.URI.create(origin.trim()).getHost();
+            return host == null ? null : host.toLowerCase(java.util.Locale.ROOT);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     static String id(String endpoint) {

@@ -21,7 +21,7 @@ public record CommunicationProperties(String from, String defaultEmail, int maxA
         if (maxAttempts <= 0) maxAttempts = 5;
         if (inbox == null) inbox = new Inbox(null);
         if (chat == null) chat = new Chat(null);
-        if (push == null) push = new Push(null, null, null);
+        if (push == null) push = new Push(null, null, null, null);
     }
 
     /**
@@ -39,8 +39,15 @@ public record CommunicationProperties(String from, String defaultEmail, int maxA
      * @param publicKey  the VAPID public key, uncompressed P-256, base64url — what the browser subscribes with
      * @param privateKey the VAPID private key, base64url; a secret
      * @param subject    who sends, for the push services: a mailto: or an https: URL
+     * @param frontDeskHosts the front office's hosts: a browser that subscribes from one of them is at
+     *                   the front desk, and is told only what the recipients push to the desk
      */
-    public record Push(String publicKey, String privateKey, String subject) {
+    public record Push(String publicKey, String privateKey, String subject, List<String> frontDeskHosts) {
+
+        public Push {
+            frontDeskHosts = frontDeskHosts == null ? List.of()
+                    : frontDeskHosts.stream().filter(h -> h != null && !h.isBlank()).map(h -> h.trim().toLowerCase()).toList();
+        }
 
         public boolean configured() {
             return publicKey != null && !publicKey.isBlank() && privateKey != null && !privateKey.isBlank();

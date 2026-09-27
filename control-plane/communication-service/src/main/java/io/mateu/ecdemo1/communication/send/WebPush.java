@@ -12,7 +12,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.LinkedHashMap;
 
 /** Sends an inbox item to one browser, through its push service. */
 @Component
@@ -40,9 +39,17 @@ public class WebPush {
         return properties.push().configured();
     }
 
+    /** What the service worker shows: a title, a body, where a click takes the person, and whether it stays until seen. */
+    public record Message(String title, String body, String url, String tag, boolean urgent) {
+    }
+
     public void send(PushSubscription subscription, InboxItem item) {
+        send(subscription, message(item));
+    }
+
+    public void send(PushSubscription subscription, Message message) {
         try {
-            var body = WebPushCrypto.encrypt(payload(item), WebPushCrypto.unb64(subscription.p256dh),
+            var body = WebPushCrypto.encrypt(json.writeValueAsBytes(message), WebPushCrypto.unb64(subscription.p256dh),
                     WebPushCrypto.unb64(subscription.auth));
             var push = properties.push();
             var request = HttpRequest.newBuilder(URI.create(subscription.endpoint))
@@ -50,7 +57,7 @@ public class WebPush {
                     .header("Content-Encoding", "aes128gcm")
                     .header("Content-Type", "application/octet-stream")
                     .header("TTL", "86400")
-                    .header("Urgency", item.urgent ? "high" : "normal")
+                    .header("Urgency", message.urgent() ? "high" : "normal")
                     .header("Authorization", WebPushCrypto.vapidAuthorization(subscription.endpoint,
                             push.subject() == null || push.subject().isBlank() ? "mailto:integration@ec1.mateu.io" : push.subject(),
                             push.publicKey(), push.privateKey(), clock.instant().plus(Duration.ofHours(12)).getEpochSecond()))
@@ -73,15 +80,10 @@ public class WebPush {
         }
     }
 
-    /** What the service worker shows: a title, a body, and where a click takes the person. */
-    byte[] payload(InboxItem item) throws Exception {
-        var payload = new LinkedHashMap<String, Object>();
-        payload.put("title", (item.hotelCode == null ? "" : item.hotelCode + " · ") + item.title);
+    /** An inbox item as the browser shows it: its hotel before the title, and the body cut to fit. */
+    static Message message(InboxItem item) {
         var body = item.body == null ? "" : item.body;
-        payload.put("body", body.length() > 300 ? body.substring(0, 297) + "…" : body);
-        payload.put("url", item.link);
-        payload.put("tag", item.id);
-        payload.put("urgent", item.urgent);
-        return json.writeValueAsBytes(payload);
+        return new Message((item.hotelCode == null ? "" : item.hotelCode + " · ") + item.title,
+                body.length() > 300 ? body.substring(0, 297) + "…" : body, item.link, item.id, item.urgent);
     }
 }

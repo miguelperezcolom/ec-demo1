@@ -70,7 +70,8 @@ public class Recipients {
         if (channels.isEmpty()) {
             problems.add("Tick at least one channel; to silence a recipient, deactivate it.");
         }
-        if ((channels.contains(Channel.INBOX) || channels.contains(Channel.WEB_PUSH)) && users == null && roles == null) {
+        if ((channels.contains(Channel.INBOX) || channels.contains(Channel.WEB_PUSH) || channels.contains(Channel.FRONT_DESK_PUSH))
+                && users == null && roles == null) {
             problems.add("Inbox and Web Push need users or roles.");
         }
         if (channels.contains(Channel.EMAIL) && email == null) {

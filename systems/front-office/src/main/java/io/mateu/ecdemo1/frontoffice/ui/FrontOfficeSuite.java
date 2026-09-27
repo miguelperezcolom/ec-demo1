@@ -28,6 +28,10 @@ import java.util.List;
 @App(themeToggle = true) // variante AUTO: menú plano de RouteLinks → TABS (in-app navigation)
 @io.mateu.uidl.annotations.Logo("/images/riu.svg")
 @io.mateu.uidl.annotations.FavIcon("/images/riu.svg")
+// Web Push at the desk: the inbox's script, through the gateway (front.ec1's /_inbox/push/**). It
+// offers "Activar avisos" once, and the user menu says and switches the state. What reaches the desk
+// is what the recipients push to it (FRONT_DESK_PUSH) — nothing, until one does.
+@io.mateu.uidl.annotations.Script(src = "/_inbox/push/push.js")
 // The reception agent's chat. Declaring it is what puts Redwood's conversation button in the global
 // header (next to the user widget) and opens the chat in the drawer on the left. Mateu's client posts
 // the prompt here with the session's token; the gateway sends front.ec1's /ai/** to the front office's
