@@ -35,12 +35,19 @@ public class PartnerCrudOrchestrator extends Crud<PartnerViewModel, PartnerViewM
         var found = filters == null
                 ? repository.search(request.searchText(), null, null, null,
                         request.pageable().page(), request.pageable().size())
-                : repository.search(request.searchText(), filters.type, filters.billingMode,
-                        filters.status == null ? null : filters.status == PartnerFilters.PartnerStatus.Active,
+                : repository.search(request.searchText(), filters.type, filters.billingMode, active(filters.status),
                         request.pageable().page(), request.pageable().size());
         var rows = found.partners().stream().map(PartnerCrudOrchestrator::row).toList();
         return new ListingData<>(new Page<>(request.searchText(), request.pageable().size(),
                 request.pageable().page(), found.total(), rows));
+    }
+
+    /** Active, inactive, or either — both ticked is the same as none. */
+    static Boolean active(java.util.Set<PartnerFilters.PartnerStatus> status) {
+        if (status == null || status.size() != 1) {
+            return null;
+        }
+        return status.contains(PartnerFilters.PartnerStatus.Active);
     }
 
     static PartnerRow row(Partner p) {
