@@ -33,7 +33,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * The steps that write to Opera, one per task contract (ec-definitions, definitions/tasks; registered
@@ -55,7 +54,6 @@ public class TaskHandlers {
     final OperaReservations reservations;
     final ReservationPayload payload;
     final Connections connections;
-    final ReservationLocks locks;
     final PmsIntegrationProperties settings;
     final OhipProperties ohipProperties;
     final io.mateu.ecdemo1.pmsintegration.frontoffice.StayProjection stays;
@@ -176,14 +174,12 @@ public class TaskHandlers {
     /**
      * The HLA's «Grabar la reserva»: find it by the CRS locator, compare the CRS version its UDF
      * carries with the one being written, and create or update — or, if Opera already holds this
-     * version or a newer one, write nothing. The read-compare-write is serialised per reservation
-     * ({@link ReservationLocks}): OHIP has no conditional write to make it atomic.
+     * version or a newer one, write nothing. OHIP has no conditional write to make the read-compare-write
+     * atomic: the definition serialises it per reservation with the engine's lock (LOCK / UNLOCK
+     * {@code reservation}, {@code hotelCode/locator}, shared with the cancellation), and the version
+     * guard keeps an older version from overwriting a newer one whatever order they arrive in.
      */
     public Write upsertReservation(ReservationTask input, TaskContext task) {
-        return locked(input, () -> writeReservation(input, task));
-    }
-
-    Write writeReservation(ReservationTask input, TaskContext task) {
         var r = reservation(task, input);
         var codes = codesOf(r);
         var resolved = integration.resolve(r.hotelCode(), new ArrayList<>(codes));
@@ -340,10 +336,6 @@ public class TaskHandlers {
      * for it to be projected, so the PMS keeps the record and a penalty would have a folio (R37).
      */
     public Write cancelReservation(ReservationTask input, TaskContext task) {
-        return locked(input, () -> writeCancellation(input, task));
-    }
-
-    Write writeCancellation(ReservationTask input, TaskContext task) {
         var r = reservation(task, input);
         var codes = new ArrayList<CodeRef>();
         codes.add(new CodeRef(CodeType.HOTEL, r.hotelCode()));
@@ -460,11 +452,6 @@ public class TaskHandlers {
         stays.project(required(task, ProcessVariables.PMS_HOTEL_CODE, input.pmsHotelCode()),
                 required(task, ProcessVariables.PMS_RESERVATION_ID, input.pmsReservationId()));
         return null;
-    }
-
-    /** Serialised per reservation: the read of the version Opera holds and the write that follows. */
-    <T> T locked(ReservationTask input, Supplier<T> step) {
-        return locks.withLock(input.hotelCode(), input.locator(), step);
     }
 
     /**

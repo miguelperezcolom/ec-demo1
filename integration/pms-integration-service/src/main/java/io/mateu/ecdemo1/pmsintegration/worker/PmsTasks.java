@@ -1,7 +1,6 @@
 package io.mateu.ecdemo1.pmsintegration.worker;
 
 import io.mateu.ecdemo1.pmsintegration.ohip.PmsTransientException;
-import io.mateu.ecdemo1.pmsintegration.worker.runtime.LegacyTaskRefs;
 import io.mateu.workflow.worker.api.ReplyNotAcceptedException;
 import io.mateu.workflow.worker.api.TaskFailure;
 import io.mateu.workflow.worker.api.TaskHandler;
@@ -71,20 +70,6 @@ public class PmsTasks {
         return new TaskRegistration<>(PROJECT_STAY, 1, TOPIC, TaskHandlers.StayTask.class, Void.class,
                 watched(watch, handlers::projectStay, TaskHandlers.StayTask::pmsHotelCode,
                         input -> input.pmsHotelCode() + "/" + input.pmsReservationId()));
-    }
-
-    /**
-     * The contract a step answers to when its definition does not name one yet: every step of
-     * proyectar-reserva, proyectar-cancelacion, proyectar-interlocutor and proyectar-estancia today —
-     * the step ids are the contract ids. Goes once those reference their tasks.
-     */
-    @Bean
-    public LegacyTaskRefs legacyTaskRefs() {
-        return (definitionId, stepId) -> stepId == null ? null : switch (stepId) {
-            case ENSURE_GUEST_PROFILE, UPSERT_RESERVATION, CANCEL_RESERVATION, ENSURE_PARTNER_PROFILE, PROJECT_STAY ->
-                    stepId + "@1";
-            default -> null;
-        };
     }
 
     /**

@@ -428,7 +428,17 @@ class MappingTest {
             case "relaunch" -> "relaunch-prepare";
             default -> step;
         };
-        var task = new TaskExecutionRequested(taskId, "P-" + taskId, definition, stepId, "", variables);
+        // The contract the step names in its definition, which the engine dispatches as the taskId.
+        var contract = switch (stepId) {
+            case "prepare" -> switch (definition) {
+                case "proyectar-cancelacion" -> "prepare-cancellation";
+                case "proyectar-interlocutor" -> "prepare-partner";
+                default -> "prepare-reservation";
+            };
+            case "relaunch-prepare" -> "relaunch-process";
+            default -> stepId;
+        } + "@1";
+        var task = new TaskExecutionRequested(taskId, "P-" + taskId, definition, stepId, contract, variables);
         send("mapping", task.processId(), objectMapper.writerFor(DomainEvent.class).writeValueAsString(task));
         return consume("upstream", r -> r.value().contains(taskId) && r.value().contains("task-status-changed"), 1, 20)
                 .stream().findFirst().map(r -> json(r.value()))

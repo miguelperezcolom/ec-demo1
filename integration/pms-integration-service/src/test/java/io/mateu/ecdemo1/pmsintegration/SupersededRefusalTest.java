@@ -11,7 +11,6 @@ import io.mateu.ecdemo1.integration.model.reservation.Room;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.ohip.OperaReservations;
-import io.mateu.ecdemo1.pmsintegration.worker.ReservationLocks;
 import io.mateu.ecdemo1.pmsintegration.worker.TaskHandlers;
 import io.mateu.ecdemo1.pmsintegration.frontoffice.PmsEvents;
 import io.mateu.ecdemo1.pmsintegration.write.ReservationPayload;
@@ -55,7 +54,7 @@ class SupersededRefusalTest {
     @BeforeEach
     void setUp() {
         var ohip = new OhipProperties("ECDEMO1", "UDFN01", "CASH", Duration.ofSeconds(2), "", false, false, null, null);
-        handlers = new TaskHandlers(integration, null, reservations, payload, null, new ReservationLocks(), null, ohip, null, events);
+        handlers = new TaskHandlers(integration, null, reservations, payload, null, null, ohip, null, events);
         when(integration.resolve(eq("MRU01"), any())).thenReturn(new IntegrationClients.Resolved(
                 List.of(new Translation(CodeType.HOTEL, "MRU01", "XMAR", Map.of())), List.of()));
         when(payload.build(any(), any(), anyString(), any(), any(), any(), any()))

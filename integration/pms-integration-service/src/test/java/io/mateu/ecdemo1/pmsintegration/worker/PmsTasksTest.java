@@ -8,7 +8,6 @@ import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.frontoffice.StayProjection;
 import io.mateu.ecdemo1.pmsintegration.ohip.PmsTransientException;
 import io.mateu.ecdemo1.pmsintegration.worker.runtime.ExactStrings;
-import io.mateu.ecdemo1.pmsintegration.worker.runtime.WorkerRuntime;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import io.mateu.workflow.worker.api.Cancellations;
@@ -40,7 +39,7 @@ class PmsTasksTest {
     final IntegrationClients integration = mock(IntegrationClients.class);
     final StayProjection stays = mock(StayProjection.class);
     final RetryWatch watch = mock(RetryWatch.class);
-    final TaskHandlers handlers = new TaskHandlers(integration, null, null, null, null, new ReservationLocks(), null,
+    final TaskHandlers handlers = new TaskHandlers(integration, null, null, null, null, null,
             new OhipProperties("ECDEMO1", "UDFN01", "CASH", Duration.ofSeconds(2), "", false, false, null, null), stays, null);
     final PmsTasks tasks = new PmsTasks();
     final RecordingSink sink = new RecordingSink();
@@ -49,7 +48,6 @@ class PmsTasksTest {
             tasks.cancelReservationTask(handlers, watch), tasks.ensurePartnerProfileTask(handlers, watch),
             tasks.projectStayTask(handlers, watch))),
             sink, Cancellations.NONE, new ExactStrings(new ObjectMapper()), false);
-    final WorkerRuntime.LegacyTasks legacy = new WorkerRuntime.LegacyTasks(dispatcher, tasks.legacyTaskRefs());
 
     static class RecordingSink implements TaskReplySink {
         final List<String> replies = new ArrayList<>();
@@ -150,18 +148,11 @@ class PmsTasksTest {
     }
 
     @Test
-    void aStepWhoseDefinitionNamesNoContractRunsAsTheContractItAnswersTo() {
-        var taken = legacy.accept(task("proyectar-estancia", "project-stay", null,
-                new Variable("pmsHotelCode", "XMAR"), new Variable("pmsReservationId", "12E45")), null);
+    void anIdThatLooksLikeANumberReachesTheHandlerAsItIs() {
+        dispatcher.dispatch(task("proyectar-estancia", "project-stay", "project-stay@1",
+                new Variable("pmsHotelCode", "XMAR"), new Variable("pmsReservationId", "12E45")));
 
-        assertThat(taken).isTrue();
-        // An id that looks like a number reaches the handler as it is.
         verify(stays).project("XMAR", "12E45");
     }
 
-    @Test
-    void theLegacyConsumerLeavesContractTasksAndOtherStepsAlone() {
-        assertThat(legacy.accept(task("proyectar-estancia", "project-stay", "project-stay@1"), null)).isFalse();
-        assertThat(legacy.accept(task("proyectar-reserva", "write-front-office", null), null)).isFalse();
-    }
 }
