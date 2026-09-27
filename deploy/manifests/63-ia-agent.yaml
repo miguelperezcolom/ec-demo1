@@ -50,7 +50,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: ia-agent
-          image: miguelperezcolom/ec-demo1-ia-agent:0.14.7
+          image: miguelperezcolom/ec-demo1-ia-agent:0.15.0
           env:
             - name: SERVER_PORT
               value: "8095"

@@ -3,7 +3,7 @@
 Estado a 2026-09-25, tarde. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
 **tenant real de Opera** (OHIP UAT, propiedad **XMAR**); ya no hay doble de Opera en el despliegue
 (`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.22.1** y
-las apps, Mateu **3.0-alpha.364**. Lo marcado *(pendiente)* no está construido todavía o espera una
+las apps, Mateu **3.0-alpha.367**. Lo marcado *(pendiente)* no está construido todavía o espera una
 decisión.
 
 **ec1 está a cero** desde las 08:20Z (`deploy/demo/zero.sh`): sin integraciones, reservas, mapeados,
