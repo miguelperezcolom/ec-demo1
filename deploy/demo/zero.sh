@@ -38,7 +38,7 @@ echo "Salesforce"
 python3 - <<'EOF'
 import json, sys, urllib.parse, urllib.request
 from pathlib import Path
-sys.path.insert(0, str(Path.cwd().parents[1] / "customer-mdm-service/salesforce"))
+sys.path.insert(0, str(Path.cwd().parents[1] / "integration/customer-mdm-service/salesforce"))
 import deploy
 instance, access, _ = deploy.token()
 def call(method, path):

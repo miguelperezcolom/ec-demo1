@@ -54,25 +54,46 @@ so a process is changed by a pull request rather than by an API call.
 
 ## What is in here
 
+The modules are grouped by system. Each is still its own Maven project and its own image, named after
+its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggregates them, so one
+`mvn -DskipTests package` builds everything.
+
 | | |
 |---|---|
-| `shell/` | The Mateu shell — authenticates against Keycloak, hosts the other UIs as remote menus, carries the branding |
-| `shell-redwood/` | The same shell with `io.mateu:redwood` in place of `io.mateu:vaadin-lit`, and nothing else changed |
-| `gateway/` | Spring Cloud Gateway — routes the console and enforces the token |
-| `booking/` | Bookings: a CRUD, the MCP tools the agent calls, and the worker side of the booking saga |
-| `content/` | Content, labels and content types — a CRUD and nothing else |
-| `users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
-| `ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
-| `ia-control-plane/` | The catalogues the agent is configured from: LLMs and their credentials, MCP servers, APIs offered as MCP servers, RAG sources, and the agents that compose them |
-| `api-mcp/` | Serves the catalogued APIs as MCP servers, one endpoint per entry. Owns no data and no screens |
-| `control-shell/` | The control console's shell, on `console.ec1.mateu.io`, behind the `ai-admin` role |
-| `control-shell-redwood/` | The same, rendered by Redwood, on `rw-console.ec1.mateu.io` |
+| **`systems/`** | **The systems of the chain — the ones the PoC stands in for, and the hotel's front office** |
+| `systems/crs/booking/` | The CRS (Rumbo's role): bookings with rooms, guests, nightly rates and payments, priced from its own catalog; a CRUD, an API, MCP tools and the worker side of the booking saga |
+| `systems/erp/` | The ERP: the master of trading partners (tour operators, agencies, companies), with its own outbox |
+| `systems/front-office/` | The hotel's front office (MRU01): stays, check-in, the kárdex, no shows and walk-ins |
+| `systems/pms/opera-mock/` | An OHIP double for the local end-to-end suite only; ec1 works against the chain's real tenant |
+| **`integration/`** | **The ACL: what flows between the systems (data plane)** |
+| `integration/crs-integration-service/` | The CRS-side adapter: inbox, reread, canonical reservation, event → process router |
+| `integration/pms-integration-service/` | The connector: every call to OHIP, and the writes to the front office |
+| `integration/mapping-service/` | The CRS → Opera code dictionary with approval, and the causes a process waits on |
+| `integration/customer-mdm-service/` | The customer hub: identity resolution, cross-references, distribution; Salesforce cleans and decides |
+| `integration/integration-model/` | The integration's business model, a library the services compile against. No image |
+| **`control-plane/`** | **Who governs the flow** |
+| `control-plane/integrations-service/` | One integration per hotel and its onboarding, gate by gate, to activation |
+| `control-plane/audit-service/` | Who did what (F016) |
+| `control-plane/communication-service/` | Notifications, recipients, the inbox and its badge |
+| `control-plane/users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
+| `control-plane/grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
+| **`consoles/`** | **What people see** |
+| `consoles/gateway/` | Spring Cloud Gateway — routes the consoles and enforces the token |
+| `consoles/shell/`, `consoles/shell-redwood/` | The data plane's shell, rendered by Vaadin and by Redwood (`io.mateu:redwood` in place of `io.mateu:vaadin-lit`, and nothing else changed) |
+| `consoles/control-shell/`, `consoles/control-shell-redwood/` | The control console's shell, on `console.ec1.mateu.io` and `rw-console.ec1.mateu.io`, behind the `ai-admin` role |
+| **`ai/`** | **The agents** |
+| `ai/ia-agent/` | The console's chat agent — an LLM that answers only by calling MCP tools |
+| `ai/ia-control-plane/` | The catalogues the agent is configured from: LLMs and their credentials, MCP servers, APIs offered as MCP servers, RAG sources, and the agents that compose them |
+| `ai/api-mcp/` | Serves the catalogued APIs as MCP servers, one endpoint per entry. Owns no data and no screens |
+| **`supporting/`** | |
+| `supporting/content/` | Content, labels and content types — a CRUD and nothing else |
+| **the rest** | |
 | `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
-| `grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
-| `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, shell, gateway, the four services, Kafka console, ingress, certificate issuers |
+| `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, the shells, the gateway, every service, Kafka console, ingress, certificate issuers |
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
 | `deploy/deploy.sh` | The whole thing, from an empty cluster |
+| `docs/`, `gitops/` | The PoC's documents; an example of the IA catalogue kept in git |
 
 New here? **[ONBOARDING.md](ONBOARDING.md)** — access, what lives in which repository, and the
 four things about this cluster that otherwise cost an afternoon.
@@ -333,7 +354,7 @@ engine definitions (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelac
 
 | | path | what it is |
 |---|---|---|
-| `partners` | `/_partners` | The master of partners (tour operators, agencies, companies) — the ERP's role — with its own outbox |
+| `erp` | `/_erp` | The ERP: the master of partners (tour operators, agencies, companies), with its own outbox. Its database is still `partners` |
 | `crs-integration-service` | — | The CRS-side adapter: inbox, reread, canonical reservation, event → process router |
 | `mapping-service` | `/_mapping` | CRS → Opera code dictionary with approval, the causes a process waits on, MCP tools for the mapping agent |
 | `pms-integration-service` | — | **The connector**: every call to OHIP, with the version guard in a UDF and idempotent writes |

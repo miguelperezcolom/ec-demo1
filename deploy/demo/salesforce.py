@@ -11,7 +11,7 @@ Credentials as deploy.py's: ~/.config/ec-demo1/salesforce.env."""
 import json, sys, urllib.parse, urllib.request
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "customer-mdm-service/salesforce"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "integration/customer-mdm-service/salesforce"))
 import deploy  # noqa: E402
 
 work = Path(sys.argv[1])

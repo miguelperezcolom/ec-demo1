@@ -1,7 +1,7 @@
 """The customer MDM's round trip through the real Salesforce org, against the local stack (after
 scenario.py, which leaves PMI01 active and its codes mapped). Needs the org's client credentials
 (SF_ENV, default ~/.config/ec-demo1/salesforce.env) and its metadata deployed
-(customer-mdm-service/salesforce/deploy.py).
+(integration/customer-mdm-service/salesforce/deploy.py).
 
 Two bookings of the same guest, spelt differently and with different emails: nothing certain links
 them, so they are two provisional customers. Salesforce flags them as possible duplicates; a steward
@@ -11,7 +11,7 @@ import json, sys, time, urllib.parse, urllib.request
 from pathlib import Path
 import functools; print = functools.partial(print, flush=True)
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "customer-mdm-service/salesforce"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "integration/customer-mdm-service/salesforce"))
 sys.argv = sys.argv[:1]
 import deploy  # the MDM's own credentials and REST helpers
 
