@@ -1,0 +1,587 @@
+{
+  "title": "IA agents",
+  "uid": "ia-agents",
+  "tags": [
+    "ia"
+  ],
+  "timezone": "",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "agent",
+        "label": "Agent",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(ia_agent_prompt_seconds_count, gen_ai_agent_id)",
+          "refId": "agent"
+        },
+        "definition": "label_values(ia_agent_prompt_seconds_count, gen_ai_agent_id)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "IA token usage",
+      "type": "link",
+      "url": "/d/ia-tokens",
+      "icon": "dashboard"
+    }
+  ],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Prompts (ia_agent_prompt_seconds — one per prompt, span invoke_agent <agent>)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Prompts in selected range",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\"}[$__range]))",
+          "legendFormat": "total",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Failed prompts in selected range",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\",ia_outcome!=\"success\"}[$__range])) or vector(0)",
+          "legendFormat": "total",
+          "refId": "A"
+        }
+      ],
+      "description": "refused (budget, disabled agent, no configuration), no_tools (no MCP server and no RAG source reachable) and error (an exception during the prompt)."
+    },
+    {
+      "type": "timeseries",
+      "title": "Prompts/sec by agent",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (gen_ai_agent_id) (rate(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\"}[5m]))",
+          "legendFormat": "{{gen_ai_agent_id}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Failed prompts/sec by agent and outcome",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (gen_ai_agent_id, ia_outcome) (rate(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\",ia_outcome!=\"success\"}[5m]))",
+          "legendFormat": "{{gen_ai_agent_id}} · {{ia_outcome}}",
+          "refId": "A"
+        }
+      ],
+      "description": "ia_outcome: refused | no_tools | error. \"unresolved\" is a prompt refused before the control plane named an agent."
+    },
+    {
+      "type": "timeseries",
+      "title": "Prompt latency p50 / p95 by agent",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, gen_ai_agent_id) (rate(ia_agent_prompt_seconds_bucket{gen_ai_agent_id=~\"$agent\"}[5m])))",
+          "legendFormat": "p50 {{gen_ai_agent_id}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, gen_ai_agent_id) (rate(ia_agent_prompt_seconds_bucket{gen_ai_agent_id=~\"$agent\"}[5m])))",
+          "legendFormat": "p95 {{gen_ai_agent_id}}",
+          "refId": "B"
+        }
+      ],
+      "description": "The whole prompt: resolve, MCP connections, every model round trip and every tool call."
+    },
+    {
+      "type": "row",
+      "title": "Model (gen_ai_client_operation_seconds — one per round trip to the LLM)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Model latency p50 / p95 by model",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, gen_ai_request_model) (rate(gen_ai_client_operation_seconds_bucket{gen_ai_agent_id=~\"$agent\"}[5m])))",
+          "legendFormat": "p50 {{gen_ai_request_model}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, gen_ai_request_model) (rate(gen_ai_client_operation_seconds_bucket{gen_ai_agent_id=~\"$agent\"}[5m])))",
+          "legendFormat": "p95 {{gen_ai_request_model}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Model calls/sec by model and error",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (gen_ai_request_model, gen_ai_system, error) (rate(gen_ai_client_operation_seconds_count{gen_ai_agent_id=~\"$agent\"}[5m]))",
+          "legendFormat": "{{gen_ai_request_model}} ({{gen_ai_system}}) · {{error}}",
+          "refId": "A"
+        }
+      ],
+      "description": "error=\"none\" is a successful call; anything else is the exception class. A prompt with tool calls makes several model calls."
+    },
+    {
+      "type": "row",
+      "title": "Tools (spring_ai_tool_seconds — one per tool call, span execute_tool <tool>)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool calls/sec by tool",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (spring_ai_tool_definition_name) (rate(spring_ai_tool_seconds_count{gen_ai_agent_id=~\"$agent\"}[5m]))",
+          "legendFormat": "{{spring_ai_tool_definition_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool calls/sec by agent",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (gen_ai_agent_id) (rate(spring_ai_tool_seconds_count{gen_ai_agent_id=~\"$agent\"}[5m]))",
+          "legendFormat": "{{gen_ai_agent_id}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool latency p50 / p95 by tool",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, spring_ai_tool_definition_name) (rate(spring_ai_tool_seconds_bucket{gen_ai_agent_id=~\"$agent\"}[5m])))",
+          "legendFormat": "p50 {{spring_ai_tool_definition_name}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, spring_ai_tool_definition_name) (rate(spring_ai_tool_seconds_bucket{gen_ai_agent_id=~\"$agent\"}[5m])))",
+          "legendFormat": "p95 {{spring_ai_tool_definition_name}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool errors/sec by tool",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (spring_ai_tool_definition_name, error) (rate(spring_ai_tool_seconds_count{gen_ai_agent_id=~\"$agent\",error!=\"none\"}[5m]))",
+          "legendFormat": "{{spring_ai_tool_definition_name}} · {{error}}",
+          "refId": "A"
+        }
+      ],
+      "description": "A failed MCP call (server down, timeout, tool error) — answered to the model as an error text, and recorded here."
+    },
+    {
+      "type": "table",
+      "title": "Tool calls in selected range, by agent and tool",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Value",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "gen_ai_agent_id": "agent",
+              "spring_ai_tool_definition_name": "tool",
+              "Value": "calls"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "sum by (gen_ai_agent_id, spring_ai_tool_definition_name) (round(increase(spring_ai_tool_seconds_count{gen_ai_agent_id=~\"$agent\"}[$__range])))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Tokens",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Tokens in selected range",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(ia_tokens_total{agent=~\"$agent\"}[$__range]))",
+          "legendFormat": "total",
+          "refId": "A"
+        }
+      ],
+      "description": "ia_tokens_total, from the control plane: what the agent reported per prompt, the figure budgets are checked against."
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens/sec by agent and type (control plane)",
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 6,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (agent, type) (rate(ia_tokens_total{agent=~\"$agent\"}[5m]))",
+          "legendFormat": "{{agent}} · {{type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens/sec by model and type (Spring AI)",
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (gen_ai_request_model, gen_ai_token_type) (rate(gen_ai_client_token_usage_total{gen_ai_agent_id=~\"$agent\",gen_ai_token_type!=\"total\"}[5m]))",
+          "legendFormat": "{{gen_ai_request_model}} · {{gen_ai_token_type}}",
+          "refId": "A"
+        }
+      ],
+      "description": "gen_ai_client_token_usage_total, per model round trip, as the provider reported it. No cost panel: the LLM catalogue carries no price per model."
+    },
+    {
+      "type": "row",
+      "title": "Traces (Tempo)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent ia-agent prompts",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "description": "One row per prompt; open a trace ID to see the model round trips, each execute_tool span and the MCP servers and control-plane calls that trace. Attributes: gen_ai.agent.id, gen_ai.request.model, gen_ai.usage.*, spring.ai.tool.definition.name. No prompt or answer text is recorded.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ia-agent\" && name=~\"invoke_agent.*\"}",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ]
+    }
+  ]
+}

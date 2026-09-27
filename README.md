@@ -176,6 +176,34 @@ The seeded model is `claude-sonnet-4-5`, a generation behind what the API offers
 now a field in the console rather than a Deployment variable — which is most of what the control
 plane is for.
 
+### Observing the agents
+
+`ia-agent` and `ia-control-plane` send traces to Tempo the way the engines do (`OTEL_SERVICE_NAME`,
+`OTLP_TRACING_ENDPOINT`, `TRACING_SAMPLING`), and Grafana has an **IA agents** dashboard
+(`deploy/observability/dashboards/ia-agents.json`) next to **IA token usage**.
+
+- **One trace per prompt.** `invoke_agent <agent>` is the root, with `gen_ai.agent.id`, the
+  catalogue's LLM id and model, the tokens and an outcome (`success`, `refused`, `no_tools`,
+  `error`). Under it, Spring AI's own spans: `chat <model>` per round trip to the LLM (model, finish
+  reason, `gen_ai.usage.*`) and `execute_tool <tool>` per tool call. The MCP call carries the trace
+  headers, so a server that traces (the engines) adds its span to the same trace; so does the
+  control plane on resolve, RAG search and usage.
+- **No content.** Prompts, answers and tool arguments/results are customer data and stay out:
+  `spring.ai.chat.observations.log-prompt|log-completion`, `spring.ai.chat.client.observations.*`
+  and `spring.ai.tools.observations.include-content` are all `false` in `ia-agent`'s
+  application.yaml. The agent's own INFO logs are another matter — they still print the message
+  and the tool input/output into Loki.
+- **Metrics**, scraped from `/actuator/prometheus`: `ia_agent_prompt_seconds` (per prompt),
+  `gen_ai_client_operation_seconds` and `gen_ai_client_token_usage_total` (per model call),
+  `spring_ai_tool_seconds` (per tool, `spring_ai_tool_definition_name`), all labelled with
+  `gen_ai_agent_id` and with histogram buckets for p50/p95. `ia_tokens_total` still comes from the
+  control plane. There is no cost panel: the LLM catalogue has no price per model.
+- **The agent id is copied down, not native.** Spring AI's observations know the model and the tool
+  but not the agent; an `ObservationFilter` (`AgentObservability`) takes it from the enclosing
+  `invoke_agent` observation. The chat models are built by hand per credential, so they only
+  observe anything because `ChatClientRegistry` hands them the `ObservationRegistry` — a model
+  built without it gets the no-op one, silently.
+
 ### Propagating users to Keycloak
 
 `users` is the source of truth for who a person is; Keycloak holds the copy that authenticates

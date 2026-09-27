@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.iaagent.usage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.iaagent.identity.CallerIdentity;
+import io.mateu.ecdemo1.iaagent.observability.TraceHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -40,8 +42,11 @@ public class UsageReporter {
         return t;
     });
     private final String url;
+    private final TraceHeaders traceHeaders;
 
-    public UsageReporter(@Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl) {
+    public UsageReporter(@Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl,
+                         TraceHeaders traceHeaders) {
+        this.traceHeaders = traceHeaders;
         this.url = controlPlaneUrl.replaceAll("/+$", "") + "/internal/usage";
     }
 
@@ -58,13 +63,15 @@ public class UsageReporter {
         var id = caller == null ? CallerIdentity.anonymous() : caller;
         var report = new UsageReport(agentId, llmId, model, inputTokens, outputTokens, totalTokens,
                 id.userId(), id.username(), id.roles(), id.tenant(), sessionId);
-        worker.execute(() -> send(report));
+        // Captured here, on the prompt's thread: the worker has no trace of its own.
+        var trace = traceHeaders.current();
+        worker.execute(() -> send(report, trace));
     }
 
-    private void send(UsageReport report) {
+    private void send(UsageReport report, Map<String, String> trace) {
         try {
             var body = mapper.writeValueAsString(report);
-            var response = http.send(HttpRequest.newBuilder(URI.create(url))
+            var response = http.send(TraceHeaders.applyTo(HttpRequest.newBuilder(URI.create(url)), trace)
                             .timeout(Duration.ofSeconds(5))
                             .header("Content-Type", "application/json")
                             .POST(HttpRequest.BodyPublishers.ofString(body)).build(),

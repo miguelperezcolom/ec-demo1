@@ -52,6 +52,14 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8110"
+            # Traces to Tempo: the control plane's side of a prompt (resolve, RAG search, usage)
+            # lands inside ia-agent's trace, which sends the trace headers on those calls.
+            - name: OTEL_SERVICE_NAME
+              value: ia-control-plane
+            - name: OTLP_TRACING_ENDPOINT
+              value: http://tempo.observability.svc.cluster.local:4318/v1/traces
+            - name: TRACING_SAMPLING
+              value: "1.0"
             # cp-postgres, not postgres: the control plane keeps its own server — see
             # 70-cp-postgres.yaml.
             - name: DB_URL

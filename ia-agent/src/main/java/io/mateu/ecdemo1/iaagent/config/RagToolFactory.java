@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.iaagent.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mateu.ecdemo1.iaagent.observability.TraceHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
@@ -64,9 +65,12 @@ public class RagToolFactory {
             .build();
     private final ObjectMapper mapper = new ObjectMapper();
     private final String controlPlaneUrl;
+    private final TraceHeaders traceHeaders;
 
-    public RagToolFactory(@Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl) {
+    public RagToolFactory(@Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl,
+                          TraceHeaders traceHeaders) {
         this.controlPlaneUrl = controlPlaneUrl.replaceAll("/+$", "");
+        this.traceHeaders = traceHeaders;
     }
 
     public List<ToolCallback> toolsFor(List<AgentConfig.Rag> rags) {
@@ -133,9 +137,11 @@ public class RagToolFactory {
             try {
                 var body = mapper.writeValueAsString(
                         java.util.Map.of("query", query, "topK", rag.topK()));
-                var response = http.send(HttpRequest
+                // Under the spring.ai.tool span of this call, so the control plane's search lands
+                // in the prompt's trace.
+                var response = http.send(traceHeaders.applyTo(HttpRequest
                                 .newBuilder(URI.create(controlPlaneUrl + "/internal/rag/"
-                                        + rag.id() + "/search"))
+                                        + rag.id() + "/search")))
                                 .timeout(TIMEOUT)
                                 .header("Content-Type", "application/json")
                                 .POST(HttpRequest.BodyPublishers.ofString(body))

@@ -29,6 +29,26 @@ spring:
         # reaches is the control plane's answer, and it can change between two prompts.
         enabled: false
 
+    # Observations of the model and its tools. The spans and the gen_ai.* metrics are on as soon
+    # as the ObservationRegistry reaches the chat models — ChatClientRegistry passes it, since it
+    # builds them itself. What is switched off here, explicitly and on purpose, is CONTENT: a
+    # prompt, a completion and a tool's arguments and result all carry customer data (names,
+    # bookings, e-mails), and a trace backend is not where that is allowed to end up. The trace
+    # keeps the agent, the model, the tokens and each tool's name; turning any of these on is a
+    # decision about personal data, not about debugging.
+    chat:
+      observations:
+        log-prompt: false
+        log-completion: false
+        include-error-logging: false
+      client:
+        observations:
+          log-prompt: false
+          log-completion: false
+    tools:
+      observations:
+        include-content: false
+
 ia:
   # The two things this pod knows about itself. Everything else — model, credential, system
   # prompt, MCP servers — comes from the control plane at /internal/agents/{agent-id}/config.
@@ -64,6 +84,28 @@ management:
         # cached configuration that was keeping this pod working.
         liveness:
           include: livenessState
+
+  # Traces, to Tempo, the same way the engines send theirs. Sampling is 0 unless TRACING_SAMPLING
+  # says otherwise, so a laptop without a collector exports nothing and logs nothing about it.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.0}
+  # Under this name and no other: Boot 4 deprecated management.otlp.tracing.endpoint at level
+  # ERROR, so it is no longer bound — set there, it reads back fine and no exporter is created.
+  # The service name comes from OTEL_SERVICE_NAME, set in the manifest.
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+  metrics:
+    # Buckets, so the dashboard can take a p50/p95 of them. Without these a timer is exported as
+    # count, sum and max only, and a percentile of that does not exist.
+    distribution:
+      percentiles-histogram:
+        gen_ai.client.operation: true
+        spring.ai.tool: true
+        ia.agent.prompt: true
 
 logging:
   level:

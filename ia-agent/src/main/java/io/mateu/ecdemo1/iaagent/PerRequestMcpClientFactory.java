@@ -1,8 +1,12 @@
 package io.mateu.ecdemo1.iaagent;
 
+import io.mateu.ecdemo1.iaagent.observability.TraceHeaders;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
+import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * Creates a fresh set of McpSyncClient connections for every prompt.
@@ -52,14 +57,31 @@ public class PerRequestMcpClientFactory {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(60);
 
-    private final ExecutorService executor;
+    /** Where the trace headers ride from the calling thread to the transport's request builder. */
+    private static final String TRACE_HEADERS = "ia.trace-headers";
 
-    public PerRequestMcpClientFactory() {
+    private final ExecutorService executor;
+    private final ObservationRegistry observationRegistry;
+    private final TraceHeaders traceHeaders;
+
+    public PerRequestMcpClientFactory(ObservationRegistry observationRegistry, TraceHeaders traceHeaders) {
+        this.observationRegistry = observationRegistry;
+        this.traceHeaders = traceHeaders;
         this.executor = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "mcp-tool-executor");
             t.setDaemon(true);
             return t;
         });
+    }
+
+    /**
+     * Runs {@code work} on this thread as if it were still inside {@code observation} — the one
+     * that was current where the work was handed to the executor. A thread pool does not carry
+     * the trace context on its own, and without this every MCP call would start a trace of its
+     * own, or none, instead of sitting under the prompt and the tool call that caused it.
+     */
+    private static <T> T inScope(Observation observation, Supplier<T> work) {
+        return observation == null ? work.get() : observation.scoped(work);
     }
 
     /**
@@ -80,9 +102,11 @@ public class PerRequestMcpClientFactory {
     public PerRequestTools createTools(List<String> serverUrls, String authorizationHeader) {
         // Connect to all MCP servers in parallel so total wait = max(individual timeouts)
         // instead of sum(individual timeouts).
+        Observation prompt = observationRegistry.getCurrentObservation();
         List<CompletableFuture<McpConnection>> futures = serverUrls.stream()
                 .map(url -> CompletableFuture.supplyAsync(
-                        () -> connectToServer(url, authorizationHeader), executor))
+                        () -> inScope(prompt, () -> connectToServer(url, authorizationHeader)),
+                        executor))
                 .toList();
 
         long timeoutSecs = CONNECT_TIMEOUT.toSeconds() + 5;
@@ -114,17 +138,27 @@ public class PerRequestMcpClientFactory {
 
     private McpConnection connectToServer(String url, String authorizationHeader) {
         try {
+            boolean forwardToken = authorizationHeader != null && !authorizationHeader.isBlank();
+            // The customizer sees every request the transport makes — the SSE stream and each
+            // message POST. Two things ride on it: the caller's token, for a server that enforces
+            // its own authorization, and the trace headers, so a server that traces records the
+            // call in this prompt's trace. The trace headers are not read here — this runs inside
+            // the transport's reactive chain, on whatever thread that is — but taken from the
+            // transport context, which the client below fills on the thread that made the call.
             var transportBuilder = HttpClientSseClientTransport.builder(url)
-                    .customizeClient(cb -> cb.connectTimeout(CONNECT_TIMEOUT));
-            if (authorizationHeader != null && !authorizationHeader.isBlank()) {
-                // The customizer sees every request the transport makes — the SSE stream and each
-                // message POST — which is what the caller's token has to reach for a server that
-                // enforces its own authorization.
-                transportBuilder.httpRequestCustomizer(
-                        (requestBuilder, method, uri, body, context) ->
-                                requestBuilder.header("Authorization", authorizationHeader));
-            }
+                    .customizeClient(cb -> cb.connectTimeout(CONNECT_TIMEOUT))
+                    .httpRequestCustomizer((requestBuilder, method, uri, body, context) -> {
+                        if (forwardToken) {
+                            requestBuilder.header("Authorization", authorizationHeader);
+                        }
+                        if (context != null && context.get(TRACE_HEADERS) instanceof Map<?, ?> headers) {
+                            headers.forEach((k, v) -> requestBuilder.setHeader(
+                                    String.valueOf(k), String.valueOf(v)));
+                        }
+                    });
             McpSyncClient client = McpClient.sync(transportBuilder.build())
+                    .transportContextProvider(() -> McpTransportContext.create(
+                            Map.of(TRACE_HEADERS, traceHeaders.current())))
                     .requestTimeout(REQUEST_TIMEOUT)
                     .clientInfo(new McpSchema.Implementation(clientNameFor(url), "1.0"))
                     .build();
@@ -219,20 +253,33 @@ public class PerRequestMcpClientFactory {
                     public String call(String toolInput) {
                         String toolName = cb.getToolDefinition().name();
                         log.info("MCP tool call: {} input={}", toolName, toolInput);
+                        // The spring.ai.tool observation Spring AI opened around this call. The
+                        // failures below are answered to the model as text rather than thrown, so
+                        // this is the only place that can mark the tool's span and metric as the
+                        // error they are.
+                        Observation current = observationRegistry.getCurrentObservation();
+                        Observation toolCall = current != null
+                                && "spring.ai.tool".equals(current.getContext().getName()) ? current : null;
                         try {
-                            String result = executor.submit(() -> cb.call(toolInput))
+                            String result = executor.submit(() -> inScope(current, () -> cb.call(toolInput)))
                                     .get(60, TimeUnit.SECONDS);
                             log.info("MCP tool result: {} -> {}", toolName, result);
                             return result;
                         } catch (ExecutionException e) {
                             String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
                             log.error("MCP tool {} execution error: {}", toolName, msg);
+                            if (toolCall != null) {
+                                toolCall.error(e.getCause() != null ? e.getCause() : e);
+                            }
                             return "{\"error\":true,\"tool\":\"" + toolName + "\","
                                     + "\"message\":\"HERRAMIENTA NO DISPONIBLE: " + toolName
                                     + " falló con el error: " + msg + ". "
                                     + "NO inventes datos. Informa al usuario de este error.\"}";
                         } catch (Exception e) {
                             log.error("MCP tool {} call failed: {}", toolName, e.getMessage());
+                            if (toolCall != null) {
+                                toolCall.error(e);
+                            }
                             return "{\"error\":true,\"tool\":\"" + toolName + "\","
                                     + "\"message\":\"HERRAMIENTA NO DISPONIBLE: " + toolName
                                     + " no respondió a tiempo o no está levantada. "
