@@ -90,6 +90,15 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_customers/**
 
+        # A booking's journey across the chain, drawn from its traces in Tempo by journey-service:
+        # the data plane's screen behind "Ver recorrido". Only the screens — the service reads Tempo
+        # from inside the cluster; the browser never talks to Tempo.
+        - id: journey
+          uri: ${JOURNEY_URL:http://journey-service:8130}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_journey/**
+
         - id: content
           uri: ${CONTENT_URL:http://content:8104}
           predicates:

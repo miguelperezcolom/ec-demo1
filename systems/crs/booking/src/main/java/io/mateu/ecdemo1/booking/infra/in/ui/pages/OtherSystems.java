@@ -20,12 +20,31 @@ final class OtherSystems {
     private OtherSystems() {
     }
 
+    /** Where a booking's journey across the chain is drawn: journey-service's screen, on this console. */
+    static final String JOURNEY_ROUTE = "/journey/bookings";
+
     static Component of(String pmsReservationId, CustomerLinks.ReservationLinks links) {
-        var rows = rows(pmsReservationId, links);
-        if (rows.isEmpty()) {
-            return Text.builder().text("Not in any other system yet.").build();
+        return of(null, pmsReservationId, links);
+    }
+
+    /** With the booking's journey first, when the booking has a locator to find it by. */
+    static Component of(String locator, String pmsReservationId, CustomerLinks.ReservationLinks links) {
+        var rows = new ArrayList<Html.Link>();
+        if (locator != null && !locator.isBlank()) {
+            rows.add(new Html.Link("Journey", "Ver recorrido", journey(locator)));
         }
+        var elsewhere = rows(pmsReservationId, links);
+        if (elsewhere.isEmpty()) {
+            if (rows.isEmpty()) {
+                return Text.builder().text("Not in any other system yet.").build();
+            }
+        }
+        rows.addAll(elsewhere);
         return Html.block(Html.linksTable(rows));
+    }
+
+    static String journey(String locator) {
+        return JOURNEY_ROUTE + "/" + java.net.URLEncoder.encode(locator, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     static List<Html.Link> rows(String pmsReservationId, CustomerLinks.ReservationLinks links) {

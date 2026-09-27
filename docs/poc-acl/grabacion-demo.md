@@ -130,6 +130,16 @@ en XMAR: hay que evitar repetir tomas sin necesidad.
    - **Front office:** las 10 estancias.
    - **Salesforce:** los contactos creados.
    - **Rótulo:** «CRS → proyectar-reserva → MDM → Opera y front office; los clientes, a Salesforce.»
+8. **El recorrido de una reserva** (el plano estrella). En Call center → Bookings, una de las diez →
+   **«Ver recorrido»** (o, en Clientes, la columna *Recorrido* de sus reservas).
+   - **Se enseña:** arriba, *Hasta Opera* y *Hasta el front office* en segundos; los carriles por
+     sistema (CRS, integración, motor, mapeado, MDM, Opera, front office), con la línea en la que Opera
+     y la recepción la tuvieron; la tabla de cambios: el primero, el backfill que **esperó** a su causa
+     (el mapeado), y el que siguió al aprobarlo; *Causas de esta reserva* con quién las resolvió; y en
+     *Paso a paso*, las equivalencias que se usaron y el cliente que el MDM reconoció o dio de alta.
+   - **Rótulo:** «Una reserva, de punta a punta: cada salto, cuándo y cuánto tardó. Sale de sus trazas
+     (OpenTelemetry), contado en palabras de negocio.»
+   - Para quien pregunte cómo: «Ver traza técnica» abre la misma traza en Grafana (Tempo).
 
 ## Flujo 2: un cliente que vuelve
 
@@ -229,6 +239,11 @@ Preparación fuera de cámara, antes de la toma: `deploy/demo/opera-outage.sh on
      panel de evidencias o la búsqueda por *Conf / Cxl / External*), la estancia en el front office y
      el aviso ya resuelto.
    - **Rótulo:** «Opera vuelve y la reserva llega sola, una vez. El aviso se cierra solo.»
+5. **Su recorrido.** En la reserva, **«Ver recorrido»**.
+   - **Se enseña:** en el carril de Opera, *Asegurar el perfil del huésped* en ámbar, con sus
+     reintentos, y *Hasta Opera* en minutos en vez de segundos; el resto del recorrido, igual que
+     siempre.
+   - **Rótulo:** «Donde se paró y cuánto: el recorrido lo cuenta sin abrir un log.»
 
 Después de la toma: `opera-outage.sh alert 10m`.
 

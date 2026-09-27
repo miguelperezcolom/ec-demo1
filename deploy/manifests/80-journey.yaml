@@ -1,0 +1,84 @@
+# A booking's journey across the chain (journey-service): the data plane's "Ver recorrido". It reads
+# the booking's traces from Tempo's query API — inside the cluster, the browser never talks to Tempo —
+# and names what the spans do not say by asking the CRS, the MDM and the mapping. Owns no data, and
+# exports no traces of its own: reading a trace must not write more of them.
+#
+# No NetworkPolicy is in force in either namespace (kubectl get networkpolicy -A), so ec-demo1 reaches
+# tempo.observability:3200 as every service reaches :4318 to export. deploy/demo/opera-outage.sh adds
+# one only for the PMS connector, and only while it runs.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: journey-service
+  namespace: ec-demo1
+  labels: { app: journey-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: journey-service }
+  template:
+    metadata:
+      labels:
+        app: journey-service
+        app.kubernetes.io/component: journey-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8130"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: journey-service
+          image: miguelperezcolom/ec-demo1-journey-service:0.1.0
+          env:
+            - name: SERVER_PORT
+              value: "8130"
+            - name: TEMPO_URL
+              value: http://tempo.observability.svc.cluster.local:3200
+            - name: GRAFANA_URL
+              value: https://grafana.ec1.mateu.io
+            - name: BOOKING_URL
+              value: http://booking:8108
+            - name: CUSTOMER_MDM_URL
+              value: http://customer-mdm-service:8127
+            - name: MAPPING_URL
+              value: http://mapping-service:8122
+          ports:
+            - { name: http, containerPort: 8130 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "256Mi", cpu: "50m" }
+            limits:   { memory: "512Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8130 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8130 }
+            initialDelaySeconds: 40
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: journey-service
+  namespace: ec-demo1
+  labels: { app: journey-service }
+spec:
+  selector: { app: journey-service }
+  ports:
+    - { name: http, port: 8130, targetPort: 8130 }

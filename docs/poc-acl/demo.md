@@ -216,6 +216,31 @@ Una reserva nueva de MRU01 por su *Central de reservas* (canal `CALLCENTER`; o p
 - En el CRS: dónde ha quedado en Opera.
 - En *Customers*: los pasajeros resueltos contra el maestro de clientes.
 
+### El recorrido de una reserva («Ver recorrido»)
+
+Cada cambio de una reserva es **una** traza de OpenTelemetry que cruza el CRS, la integración, el
+motor, el mapeado, el MDM, Opera y el front office (Tempo, dashboard *Booking traces* en Grafana).
+`journey-service` la lee de Tempo desde dentro del clúster y la cuenta en palabras de negocio en la
+consola del plano de datos: **Call center → la reserva → «Ver recorrido»**, la columna *Recorrido* de
+las reservas de un cliente en *Clientes*, o *Recorrido de la reserva* en «En otros sistemas» de la
+estancia en el front office. Ruta: `/journey/bookings/<localizador>`; `/journey/bookings` lista las
+reservas con cambios en los últimos 7 días.
+
+- **Tiempos**: *Hasta Opera* y *Hasta el front office* desde el cambio en el CRS, y el total.
+- **Recorrido por sistemas**: un carril por sistema, cada salto una barra en el eje de tiempo; en ámbar
+  lo que esperó (un candado de la reserva, una causa, reintentos), en rojo lo que falló; las líneas
+  discontinuas, el momento en que Opera y la recepción la tuvieron.
+- **Cambios de la reserva**, el más reciente primero (creada, modificada, cancelada, no-show, walk-in,
+  backfill, reanudada tras resolver sus causas), cada uno con su recorrido; **Causas de esta reserva**.
+- **Paso a paso**: cada salto con su hora, su desfase y su duración, y lo que hizo: las equivalencias
+  usadas, cómo reconoció el MDM al cliente (nuevo, por email, por documento…), la reserva y el perfil de
+  Opera con la versión del CRS escrita, la estancia y el contacto de Salesforce (que el MDM envía por su
+  cuenta, fuera de la traza).
+- **«Ver traza técnica»**: la misma traza en Grafana; y cada proceso, en *Admin → Processes*.
+
+Las trazas llegan a Tempo unos segundos después: una reserva recién hecha dice *Sin trazas aún* o *En
+curso* y la página vuelve a mirar sola.
+
 ## 9. El cliente se limpia en Salesforce
 
 Los pasajeros de cada reserva se proyectan a Salesforce como contactos. Allí se fusionan los
@@ -366,6 +391,9 @@ servicios, DNS); Cilium la aplica y el script lo comprueba desde el pod antes de
 
 `python3 deploy/demo/ec1.py show <localizador>` enseña de una vez el CRS, los procesos con su paso e
 intentos, las causas, los avisos de la bandeja, Opera por localizador y la estancia.
+
+**En pantalla**: la reserva → **«Ver recorrido»**: el paso de Opera en ámbar con sus reintentos y
+*Hasta Opera* en minutos (ver [El recorrido de una reserva](#el-recorrido-de-una-reserva-ver-recorrido)).
 
 Probado en ec1 el 2026-09-27: corte 17:42:35–17:46:25Z (4 min); reserva **ZMPBEY** a las 17:42:55;
 cinco intentos fallidos de `ensure-guest-profile` («OHIP unreachable for a token … Connect timed

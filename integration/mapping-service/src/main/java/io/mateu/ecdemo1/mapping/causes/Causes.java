@@ -151,6 +151,19 @@ public class Causes {
     public String relaunch(String processKey) {
         var waiter = waiters.findById(processKey).orElseThrow(() -> new NoSuchElementException("No waiting process " + processKey));
         var successorKey = processKey + ">r";
+        // The successor starts in the trace of whoever resolved the causes — an approval, for as many
+        // reservations as it released — so it says which reservation it is, as the router does: the
+        // booking's journey (journey-service) finds it by this.
+        if (waiter.getSubject() != null && (Definitions.PROJECT_RESERVATION.equals(waiter.getDefinitionId())
+                || Definitions.PROJECT_CANCELLATION.equals(waiter.getDefinitionId()))) {
+            var span = io.opentelemetry.api.trace.Span.current();
+            span.setAttribute("booking.locator", waiter.getSubject());
+            if (waiter.getHotelCode() != null) {
+                span.setAttribute("hotel.code", waiter.getHotelCode());
+            }
+            span.setAttribute("booking.event", "relaunch");
+            span.setAttribute("eventconductor.business-key", successorKey);
+        }
         if (waiter.getStatus() != WaiterStatus.RELAUNCHED) {
             var variables = new java.util.ArrayList<>(waiter.getVariables());
             variables.add(new Variable(ProcessVariables.PROCESS_KEY, successorKey));

@@ -1,0 +1,32 @@
+server:
+  port: 8130
+
+spring:
+  application:
+    name: ec-demo1-journey
+
+journey:
+  # Tempo's query API, inside the cluster. The same Tempo every service exports its spans to.
+  tempo-url: ${TEMPO_URL:http://localhost:3200}
+  # "Ver traza técnica": the trace in Grafana's Explore, for engineers.
+  grafana-url: ${GRAFANA_URL:https://grafana.ec1.mateu.io}
+  lookback: ${JOURNEY_LOOKBACK:P7D}
+  # What the spans do not carry, read from the services that know it.
+  booking-url: ${BOOKING_URL:http://localhost:8108}
+  mdm-url: ${CUSTOMER_MDM_URL:http://localhost:8127}
+  mapping-url: ${MAPPING_URL:http://localhost:8122}
+  zone: ${JOURNEY_ZONE:Europe/Madrid}
+  cache-for: ${JOURNEY_CACHE_FOR:PT5S}
+
+management:
+  # No traces from here: reading a booking's trace must not write traces into the store it reads.
+  tracing:
+    enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

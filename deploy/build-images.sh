@@ -25,7 +25,7 @@ TAG="${1:-0.8.0}"
 # By path: the modules are grouped by system (README, "Layout"). The image is named after the
 # module's folder — systems/erp builds ec-demo1-erp. The shells in this list build twice: see
 # RENDERED_TWICE below.
-APPS="consoles/shell consoles/gateway systems/crs/booking supporting/content control-plane/users ai/ia-agent ai/ia-control-plane ai/api-mcp consoles/control-shell systems/erp integration/crs-integration-service integration/mapping-service integration/pms-integration-service control-plane/communication-service control-plane/integrations-service integration/customer-mdm-service systems/front-office control-plane/audit-service"
+APPS="consoles/shell consoles/gateway systems/crs/booking supporting/content control-plane/users ai/ia-agent ai/ia-control-plane ai/api-mcp consoles/control-shell systems/erp integration/crs-integration-service integration/mapping-service integration/pms-integration-service control-plane/communication-service control-plane/integrations-service integration/customer-mdm-service systems/front-office control-plane/audit-service integration/journey-service"
 
 # grpc-interface first, and installed rather than packaged: it is not an application and gets no
 # image, but `users` compiles against the protobuf stubs generated from its .proto, so it has to

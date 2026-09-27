@@ -66,6 +66,12 @@ const dataScreens: Screen[] = [
     // technical screens (golden records, consolidations) are on the control plane.
     { menu: 'Clientes', entry: 'Buscar clientes', route: '/customers/search', title: 'Clientes' },
     { menu: 'Clientes', entry: 'Solicitudes de cambio', route: '/customers/changes' },
+    // A booking's journey (journey-service, /_journey), hidden from the bar: it is opened from a
+    // booking ("Ver recorrido"), from Clientes and from the front office's stay. The list of bookings
+    // with traces lately, and one booking's journey — whose heading names it even when Tempo no
+    // longer keeps its traces (it then says so), so the check does not depend on retention.
+    { menu: 'Recorrido', entry: 'Recorridos de reservas', route: '/journey/bookings', title: 'Recorrido de las reservas' },
+    { menu: 'Recorrido', entry: 'Recorrido de 36K69K', route: '/journey/bookings/36K69K', listing: false },
 ]
 
 /**

@@ -59,6 +59,9 @@ public class CrossLinks {
       return links;
     }
     links.add(new Link("Reserva en el CRS", shortId(locator), console + "/booking/bookings/" + encode(locator)));
+    // Its journey across the chain — CRS, integración, motor, Opera, este front office — on the data
+    // plane's console (journey-service).
+    links.add(new Link("Recorrido de la reserva", "Ver recorrido", console + "/journey/bookings/" + encode(locator)));
     if (mdm == null) {
       return links;
     }

@@ -94,16 +94,24 @@ public class Preparation {
             missing.add(Cause.integrationInactive(hotelCode));
             stillMissing.add(() -> !flows(hotelCode));
         }
+        var translated = new java.util.ArrayList<String>();
         for (var code : codes) {
-            if (dictionary.resolve(hotelCode, code.type(), code.code()).isEmpty()) {
+            var translation = dictionary.resolve(hotelCode, code.type(), code.code());
+            if (translation.isEmpty()) {
                 missing.add(Cause.missingMapping(scope, code.type(), code.code()));
                 stillMissing.add(() -> dictionary.resolve(hotelCode, code.type(), code.code()).isEmpty());
+            } else {
+                translated.add(code.type() + " " + code.code() + "=" + translation.get().targetCode());
             }
         }
         if (partnerCode != null && !partnerProfiles.existsById(partnerCode)) {
             missing.add(Cause.missingPartner(partnerCode));
             stillMissing.add(() -> !partnerProfiles.existsById(partnerCode));
         }
+        // On the task's span, for the booking's journey (journey-service): the equivalences this
+        // version was prepared with, and what it waits on — as they were then, not as they are now.
+        tag("mapping.translations", String.join("; ", translated));
+        tag("mapping.causes", String.join("; ", missing.stream().map(c -> c.key() + "=" + c.description()).toList()));
         if (missing.isEmpty()) {
             return Outcome.OK;
         }
@@ -117,6 +125,12 @@ public class Preparation {
             }
         }
         return Outcome.WAIT;
+    }
+
+    static void tag(String key, String value) {
+        if (value != null && !value.isEmpty()) {
+            io.opentelemetry.api.trace.Span.current().setAttribute(key, value);
+        }
     }
 
     /** Whether the hotel's reservations may reach the PMS in real time: an integration, and an active one. */

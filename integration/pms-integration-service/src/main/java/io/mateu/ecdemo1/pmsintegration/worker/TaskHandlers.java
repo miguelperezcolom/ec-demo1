@@ -121,6 +121,8 @@ public class TaskHandlers {
                 var id = OperaReservations.guestProfileId(existing.get());
                 if (id.isPresent()) {
                     log.info("{} v{}: Opera already holds it; guest profile {} left as it is", r.locator(), r.version(), id.get());
+                    tag("opera.profile.id", id.get());
+                    tag("opera.profile.action", "kept");
                     return new GuestProfile(Outcome.OK.name(), id.get(), customerId);
                 }
             }
@@ -136,6 +138,9 @@ public class TaskHandlers {
             }
             log.info("Guest profile {} {} for {} (customer {})", ensured.profileId(), ensured.created() ? "created" : "updated",
                     r.locator(), customerId);
+            tag("opera.profile.id", ensured.profileId());
+            tag("opera.profile.action", ensured.created() ? "created" : "updated");
+            tag("mdm.customer.id", customerId);
             return new GuestProfile(Outcome.OK.name(), ensured.profileId(), customerId);
         } catch (PmsRejectedException e) {
             rejected(task, input, r, "guest profile of " + r.locator(), e);
@@ -204,6 +209,7 @@ public class TaskHandlers {
             if (existing.isEmpty()) {
                 reservationId = reservations.create(hotel, body);
                 log.info("{} v{} created in {} as {}", r.locator(), r.version(), hotel, reservationId);
+                written(hotel, reservationId, "created", r.version());
             } else {
                 reservationId = OperaReservations.id(existing.get());
                 var written = reservations.writtenVersion(existing.get());
@@ -211,6 +217,7 @@ public class TaskHandlers {
                     log.info("{} v{}: Opera already holds v{}{}, nothing to write", r.locator(), r.version(), written,
                             OperaReservations.cancelled(existing.get()) ? " (cancelled)" : "");
                     supersedeRefusals(r, written);
+                    written(hotel, reservationId, "stale", written);
                     // Opera had it already; whoever consumes Opera is told all the same — a merge in the MDM,
                     // a backfill, projects the same version precisely to be read again.
                     events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
@@ -218,6 +225,7 @@ public class TaskHandlers {
                 }
                 reservations.update(hotel, reservationId, body);
                 log.info("{} v{} -> v{} updated in {} ({})", r.locator(), written, r.version(), hotel, reservationId);
+                written(hotel, reservationId, "updated", r.version());
             }
             if (!ohipProperties.postDeposits() && !r.payments().isEmpty()) {
                 log.info("{}: {} payment(s) not posted to the folio — deposits are off for this tenant", r.locator(), r.payments().size());
@@ -232,6 +240,23 @@ public class TaskHandlers {
         } catch (PmsRejectedException e) {
             rejected(task, input, r, "reservation " + r.locator(), e);
             return new Write(Outcome.WAIT.name(), null);
+        }
+    }
+
+    /**
+     * What was written to Opera, on the task's span — for the booking's journey (journey-service),
+     * which shows the Opera reservation, what was done to it and the CRS version it holds.
+     */
+    static void written(String hotel, String reservationId, String action, long version) {
+        tag("opera.hotel", hotel);
+        tag("opera.reservation.id", reservationId);
+        tag("opera.action", action);
+        tag("opera.version", String.valueOf(version));
+    }
+
+    static void tag(String key, String value) {
+        if (value != null) {
+            io.opentelemetry.api.trace.Span.current().setAttribute(key, value);
         }
     }
 
@@ -388,6 +413,7 @@ public class TaskHandlers {
                             r.cancellationFee(), r.currency(), r.originalAmount())
                     : "Cancelled in the CRS (reason " + r.cancellationReasonCode() + ")");
             log.info("{} cancelled in {} ({})", r.locator(), hotel, reservationId);
+            written(hotel, reservationId, r.noShow() ? "no-show" : "cancelled", r.version());
             events.written(hotel, reservationId, r.hotelCode(), r.locator(), task.workflowDefinitionId());
             return new Write(Outcome.DONE.name(), reservationId);
         } catch (PmsRejectedException e) {
@@ -489,6 +515,7 @@ public class TaskHandlers {
     }
 
     void await(ReservationTask input, Reservation r, List<Cause> causes) {
+        tag("mapping.causes", String.join("; ", causes.stream().map(c -> c.key() + "=" + c.description()).toList()));
         integration.await(input.processKey(), input.definitionId(), r.hotelCode(), r.locator(), input.variables(), causes);
     }
 

@@ -141,6 +141,9 @@ public class SecurityConfig {
                         // Clientes, the MDM's business face on the data plane: personal data, so never
                         // anonymous — read-only, and a signed-in user of the data plane is who it is for.
                         .pathMatchers("/_customers/**").authenticated()
+                        // A booking's journey (journey-service): who the guests are and where the
+                        // reservation went — personal data again, so signed in like Clientes.
+                        .pathMatchers("/_journey/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the
