@@ -61,9 +61,12 @@ public class FrontOfficeIntegrationViewModel implements Identifiable {
     /** Where the front office answers the integration's queries; the stays and the catalogue go by Kafka. */
     @EditableOnlyWhenCreating
     String frontOfficeUrl;
-    /** ALL: every reservation of the property, wherever it was made. CHAIN: only those the chain's integration wrote. */
+    /**
+     * CHAIN (the default): only those the chain's integration wrote. ALL: every reservation of the
+     * property, wherever it was made — in a shared Opera tenant, real guests of others too.
+     */
     @EditableOnlyWhenCreating
-    FrontOfficeIntegration.Scope scope = FrontOfficeIntegration.Scope.ALL;
+    FrontOfficeIntegration.Scope scope = FrontOfficeIntegration.Scope.DEFAULT;
     /** How many days ahead of today the front office is backfilled, and polled for changes. */
     @EditableOnlyWhenCreating
     int horizonDays;
@@ -115,7 +118,7 @@ public class FrontOfficeIntegrationViewModel implements Identifiable {
         frontOffice = null;
         name = null;
         frontOfficeUrl = properties.frontOfficeUrl();
-        scope = FrontOfficeIntegration.Scope.ALL;
+        scope = FrontOfficeIntegration.Scope.DEFAULT;
         horizonDays = properties.frontOffice().horizonDays();
         id = null;
         return this;

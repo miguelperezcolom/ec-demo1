@@ -40,9 +40,19 @@ opera_context() {
   ctx=$(kubectl -n "$NS" get configmap ec-demo-run -o jsonpath='{.data.OPERA_EXTERNAL_SYSTEM}' 2>/dev/null || true)
   echo "${ctx:-$OPERA_CONTEXT_DEFAULT}"
 }
-# Sets it; takes effect when pms-integration-service starts.
+# The Opera «Custom Reference» a run's reservations carry: what a pms-fo integration of scope CHAIN
+# (the default, «only ours») searches Opera by. Per run as the context is, so a new run's front office
+# gets that run's reservations and not an earlier run's; the baseline's context keeps EC-DEMO1, the
+# reference everything was written with before there was one per run.
+opera_custom_reference() {
+  if [ "$1" = "$OPERA_CONTEXT_DEFAULT" ]; then echo "EC-DEMO1"; else echo "$1"; fi
+}
+# Sets both; takes effect when pms-integration-service starts.
 set_opera_context() {
+  local reference
+  reference=$(opera_custom_reference "$1")
   kubectl -n "$NS" create configmap ec-demo-run --from-literal=OPERA_EXTERNAL_SYSTEM="$1" \
+    --from-literal=OPERA_CUSTOM_REFERENCE="$reference" \
     --dry-run=client -o yaml | kubectl -n "$NS" apply -f - >/dev/null
-  echo "  Opera context: $1"
+  echo "  Opera context: $1 (custom reference $reference)"
 }
