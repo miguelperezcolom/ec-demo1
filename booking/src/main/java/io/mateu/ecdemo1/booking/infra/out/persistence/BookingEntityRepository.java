@@ -20,6 +20,9 @@ public interface BookingEntityRepository extends JpaRepository<BookingEntity, St
     @Query("select b from BookingEntity b where b.id = :id")
     Optional<BookingEntity> findByIdForUpdate(@Param("id") String id);
 
+    Optional<BookingEntity> findFirstByHotelCodeAndChannelCodeAndExternalReference(String hotelCode, String channelCode,
+                                                                                   String externalReference);
+
     @Query("""
             select b from BookingEntity b
             where :text is null or :text = ''

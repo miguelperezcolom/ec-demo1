@@ -45,6 +45,7 @@ public class BookingController {
 
     final BookingQueryService queryService;
     final CreateBookingUseCase createBookingUseCase;
+    final io.mateu.ecdemo1.booking.application.usecases.booking.quote.QuoteBookingUseCase quoteBookingUseCase;
     final UpdateBookingUseCase updateBookingUseCase;
     final ConfirmBookingUseCase confirmBookingUseCase;
     final CancelBookingUseCase cancelBookingUseCase;
@@ -56,6 +57,9 @@ public class BookingController {
     }
 
     public record CancelRequest(String reasonCode) {
+    }
+
+    public record QuoteRequest(String hotelCode, BookingRequest booking) {
     }
 
     public record PaymentRequest(PaymentType type, String methodCode, BigDecimal amount, LocalDate date,
@@ -98,6 +102,13 @@ public class BookingController {
     @Operation(summary = "Create a booking in a hotel. The CRS prices each room night by night")
     public Created create(@RequestBody CreateBookingCommand command) {
         return new Created(createBookingUseCase.handle(command));
+    }
+
+    @PostMapping("/quote")
+    @Operation(summary = "Price a booking without making it: nights, each room's nightly rates and the total. "
+            + "Holds nothing — the CRS does not model availability")
+    public io.mateu.ecdemo1.booking.application.usecases.booking.quote.Quote quote(@RequestBody QuoteRequest request) {
+        return quoteBookingUseCase.handle(request.hotelCode(), request.booking());
     }
 
     @PutMapping("/{id}")
