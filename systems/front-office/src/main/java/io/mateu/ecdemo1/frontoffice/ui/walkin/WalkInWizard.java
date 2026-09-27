@@ -10,6 +10,7 @@ import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.WizardCompletionAction;
+import io.mateu.uidl.annotations.WizardLabels;
 import io.mateu.uidl.annotations.WizardProgress;
 import io.mateu.uidl.annotations.WizardProgressStyle;
 import io.mateu.uidl.data.Message;
@@ -37,6 +38,8 @@ import org.springframework.stereotype.Service;
 @Title("Walk-in")
 @Style(StyleConstants.CONTAINER)
 @WizardProgress(WizardProgressStyle.STEPS)
+// the screens are written in Spanish; without this the wizard's own buttons read Back / Next
+@WizardLabels(back = "Atrás", next = "Siguiente")
 public class WalkInWizard extends Wizard {
 
   @Label("Estancia")
