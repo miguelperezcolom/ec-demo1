@@ -22,7 +22,7 @@ public record IntegrationDto(String id, String crsHotelCode, String pmsHotelCode
     }
 
     public static IntegrationDto of(Integration i, BackfillRun run) {
-        return new IntegrationDto(i.id, i.crsHotelCode, i.pmsHotelCode, i.name, i.status, waitingFor(i.gate), i.gatewayUrl,
+        return new IntegrationDto(i.id, i.crsHotelCode, i.pmsHotelCode, i.name, i.getStatus(), waitingFor(i.gate), i.gatewayUrl,
                 i.appKey, i.clientId, i.enterpriseId, i.connectivityOk, i.connectivityMessage, i.propertyConfigured,
                 i.contrastSummary, i.pendingMappings, i.mappingApprovedAt, i.mappingApprovedBy, i.partnersMissing, i.gaps,
                 i.futureReservations, run == null ? null : new Backfill(run.id, run.status.name(), run.dispatched,

@@ -8,6 +8,7 @@ import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
 import io.mateu.ecdemo1.integration.model.integration.PmsProperty;
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
+import io.mateu.ecdemo1.integration.model.partner.PartnerType;
 import io.mateu.ecdemo1.integrations.config.IntegrationsProperties;
 import io.mateu.ecdemo1.integrations.config.TolerantReader;
 import org.springframework.core.ParameterizedTypeReference;
@@ -81,6 +82,21 @@ public class Services {
         body.put("attributes", Map.of());
         mapping.post().uri(b -> b.path("/entries/definitions").queryParam("by", by).build()).body(body)
                 .retrieve().toBodilessEntity();
+    }
+
+    /**
+     * Which OPERA profile type each partner type is: certain when the partners come from Opera, so the
+     * integration enters it rather than leaving it pending for a person. Keyed by the integration's
+     * canonical type, which is what preparing a partner resolves.
+     */
+    public void definePartnerTypes(String by) {
+        for (var type : Map.of(
+                PartnerType.TRAVEL_AGENT, "Agent",
+                PartnerType.TOUR_OPERATOR, "Agent",
+                PartnerType.COMPANY, "Company",
+                PartnerType.ONLINE_AGENCY, "Source").entrySet()) {
+            define(CodeType.PARTNER_TYPE, null, type.getKey().name(), type.getValue(), by);
+        }
     }
 
     /** Which PMS profile a partner already is, as an import from the PMS found it. */

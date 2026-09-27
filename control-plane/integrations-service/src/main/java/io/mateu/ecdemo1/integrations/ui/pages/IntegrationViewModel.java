@@ -226,7 +226,7 @@ public class IntegrationViewModel implements Identifiable {
 
     public IntegrationViewModel load(Integration i) {
         var run = runs.findFirstByIntegrationIdOrderByStartedAtDesc(i.id).orElse(null);
-        status = IntegrationCrud.status(i.status);
+        status = IntegrationCrud.status(i.getStatus());
         crsHotelCode = i.crsHotelCode;
         operaProperty = i.pmsHotelCode;
         name = i.name;

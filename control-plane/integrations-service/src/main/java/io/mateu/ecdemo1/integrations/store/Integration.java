@@ -10,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -54,9 +55,11 @@ public class Integration {
     public String clientSecretSealed;
     public String enterpriseId;
 
+    /** Changed only through {@link #begin} and {@link #apply}: see {@link IntegrationTransition}. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    public IntegrationStatus status;
+    @Setter(AccessLevel.NONE)
+    private IntegrationStatus status;
     /** The onboarding's process key: what its gates' messages are correlated by. */
     public String processKey;
     /** The gate the onboarding waits at, as the message that opens it; null when it waits for nothing. */
@@ -103,6 +106,24 @@ public class Integration {
     public String createdBy;
     @Version
     public Long version;
+
+    /** A new integration: where the onboarding starts. */
+    public void begin() {
+        if (status != null) {
+            throw new IllegalStateException("Integration " + id + " has already begun; it is " + status);
+        }
+        status = IntegrationTransition.INITIAL;
+    }
+
+    /** Moves the integration on, if its life allows it from where it is; refused otherwise. */
+    public IntegrationStatus apply(IntegrationTransition transition) {
+        status = transition.from(status);
+        return status;
+    }
+
+    public boolean is(IntegrationStatus s) {
+        return status == s;
+    }
 
     public void record(Instant at, String by, String what) {
         if (history == null) {

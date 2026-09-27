@@ -7,6 +7,8 @@ import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
 import io.mateu.ecdemo1.integrations.backfill.Backfill;
 import io.mateu.ecdemo1.integrations.lifecycle.Gates;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
+import io.mateu.ecdemo1.integrations.outbox.RemoteCall;
+import io.mateu.ecdemo1.integrations.outbox.RemoteCalls;
 import io.mateu.ecdemo1.integrations.store.BackfillRun;
 import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
 import io.mateu.ecdemo1.integrations.store.IntegrationRepository;
@@ -21,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -63,7 +66,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "integrations.opera.gateway-url=https://ohip.example", "integrations.opera.app-key=chain-app",
         "integrations.opera.client-id=chain-client", "integrations.opera.client-secret=ch41n",
         "integrations.opera.enterprise-id=RIUE",
-        "integrations.backfill-per-tick=2", "integrations.activation-window-days=10"})
+        "integrations.backfill-per-tick=2", "integrations.activation-window-days=10",
+        // The remote-call relay off too: the test sends what is due itself.
+        "integrations.remote-calls.interval=1h"})
 @AutoConfigureMockMvc
 @Testcontainers
 class IntegrationsTest {
@@ -85,6 +90,10 @@ class IntegrationsTest {
     static volatile int pendingCodes = 3;
     static volatile String gaps = "[]";
     static volatile boolean nordtravelIsAProfile = false;
+    // Other services failing, and something that happens while one is being asked.
+    static volatile boolean mappingDown = false;
+    static volatile boolean connectorDown = false;
+    static volatile Runnable whileAsked = null;
     static final LocalDate TODAY = LocalDate.now();
 
     static String future(String query) {
@@ -110,6 +119,15 @@ class IntegrationsTest {
             var request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             calls.add(exchange.getRequestMethod() + " " + path + (query == null ? "" : "?" + query)
                     + (request.isBlank() ? "" : " " + request));
+            var during = whileAsked;
+            if (during != null) {
+                during.run();
+            }
+            if ((mappingDown && path.startsWith("/causes/")) || (connectorDown && path.startsWith("/connections/"))) {
+                exchange.sendResponseHeaders(503, -1);
+                exchange.close();
+                return;
+            }
             String body = switch (path) {
                 case "/connections/properties" -> """
                         [{"code":"RIUPMI","name":"Riu Demo Palma","currency":"EUR"},
@@ -181,6 +199,8 @@ class IntegrationsTest {
     @Autowired
     JdbcTemplate jdbc;
     @Autowired
+    RemoteCalls remoteCalls;
+    @Autowired
     MockMvc mvc;
     @Autowired
     ObjectMapper objectMapper;
@@ -189,7 +209,11 @@ class IntegrationsTest {
     void reset() {
         runs.deleteAll();
         integrations.deleteAll();
+        jdbc.update("delete from remote_call");
         calls.clear();
+        mappingDown = false;
+        connectorDown = false;
+        whileAsked = null;
         connectionWorks = true;
         roomTypes = 5;
         pendingCodes = 3;
@@ -218,7 +242,7 @@ class IntegrationsTest {
         // The catalogues: the property is configured, codes are pending.
         lifecycle.stepContrastCatalogues(id);
         assertThat(integrations.findById(id)).get().satisfies(i -> {
-            assertThat(i.status).isEqualTo(IntegrationStatus.MAPPING_PENDING);
+            assertThat(i.getStatus()).isEqualTo(IntegrationStatus.MAPPING_PENDING);
             assertThat(i.contrastSummary).contains("5 room types").contains("3 CRS code(s) without equivalence");
         });
         assertGateSignalled(id, "integration-property-configured");
@@ -243,7 +267,7 @@ class IntegrationsTest {
         gaps = """
                 [{"kind":"MAPPING","type":"BOARD","code":"MP","reservations":4}]""";
         lifecycle.stepBackfillPrePass(id);
-        assertThat(integrations.findById(id).orElseThrow().status).isEqualTo(IntegrationStatus.BACKFILL_BLOCKED);
+        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.BACKFILL_BLOCKED);
         assertThat(lifecycle.gateOpen(integrations.findById(id).orElseThrow())).isFalse();
         gaps = "[]";
         lifecycle.recheck(id, "test");
@@ -269,19 +293,19 @@ class IntegrationsTest {
 
         // Ready; a person activates; the cause that held the hotel's traffic is resolved.
         lifecycle.stepAwaitActivation(id);
-        assertThat(integrations.findById(id).orElseThrow().status).isEqualTo(IntegrationStatus.READY_TO_ACTIVATE);
+        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.READY_TO_ACTIVATE);
         assertThat(lifecycle.gateOpen(integrations.findById(id).orElseThrow())).isFalse();
         lifecycle.activate(id, "ana");
         assertGateSignalled(id, "integration-activation-requested");
         lifecycle.stepActivate(id);
-        assertThat(integrations.findById(id).orElseThrow().status).isEqualTo(IntegrationStatus.ACTIVE);
+        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.ACTIVE);
         assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01"));
         mvc.perform(get("/integrations/hotels/NEW01")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE")).andExpect(jsonPath("$.pmsHotelCode").value("RIUNEW"));
 
         // Paused, its traffic waits; resumed, what waited goes on.
         lifecycle.pause(id, "ana");
-        assertThat(integrations.findById(id).orElseThrow().status).isEqualTo(IntegrationStatus.PAUSED);
+        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.PAUSED);
         calls.clear();
         lifecycle.resume(id, "ana");
         assertThat(calls).anyMatch(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01"));
@@ -293,7 +317,7 @@ class IntegrationsTest {
         var id = register();
         lifecycle.stepVerifyConnectivity(id);
         var failed = integrations.findById(id).orElseThrow();
-        assertThat(failed.status).isEqualTo(IntegrationStatus.CONNECTIVITY_FAILED);
+        assertThat(failed.getStatus()).isEqualTo(IntegrationStatus.CONNECTIVITY_FAILED);
         assertThat(failed.connectivityMessage).contains("invalid client");
         assertThat(lifecycle.gateOpen(failed)).isFalse();
         assertThat(consume("notifications", r -> r.value().contains("INTEGRATION_NEEDS_ATTENTION") && r.value().contains("NEW01"), 1, 15))
@@ -302,7 +326,7 @@ class IntegrationsTest {
         connectionWorks = true;
         lifecycle.changeConnection(id, new Integrations.ConnectionChange(null, null, null, "n3w", null), "ana");
         var fixed = integrations.findById(id).orElseThrow();
-        assertThat(fixed.status).isEqualTo(IntegrationStatus.CREATED);
+        assertThat(fixed.getStatus()).isEqualTo(IntegrationStatus.CREATED);
         assertThat(lifecycle.gateOpen(fixed)).isTrue();
         assertThat(lifecycle.connection(fixed).clientSecret()).isEqualTo("n3w");
     }
@@ -313,13 +337,13 @@ class IntegrationsTest {
         var id = register();
         lifecycle.stepVerifyConnectivity(id);
         lifecycle.stepContrastCatalogues(id);
-        assertThat(integrations.findById(id).orElseThrow().status).isEqualTo(IntegrationStatus.PENDING_CONFIGURATION);
+        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.PENDING_CONFIGURATION);
         assertThat(lifecycle.gateOpen(integrations.findById(id).orElseThrow())).isFalse();
 
         roomTypes = 4;
         lifecycle.recheck(id, "test");
         var configured = integrations.findById(id).orElseThrow();
-        assertThat(configured.status).isEqualTo(IntegrationStatus.MAPPING_PENDING);
+        assertThat(configured.getStatus()).isEqualTo(IntegrationStatus.MAPPING_PENDING);
         assertThat(lifecycle.gateOpen(configured)).isTrue();
     }
 
@@ -412,6 +436,120 @@ class IntegrationsTest {
         assertThat(calls).noneMatch(c -> c.contains("12345678"));
         assertThat(i.history).anyMatch(h -> h.what().contains("1 new, 1 updated, 0 unchanged")
                 && h.what().contains("left out, on more than one Opera profile: 12345678"));
+    }
+
+    @Test
+    void noDatabaseTransactionIsHeldWhileAnotherServiceIsAsked() {
+        var id = register();
+        var heldWhileAsked = new CopyOnWriteArrayList<Integer>();
+        // Asked from the double's own connection, while the action waits on the connector: any
+        // connection of the service idle inside a transaction that touched the integration.
+        whileAsked = () -> heldWhileAsked.add(jdbc.queryForObject("""
+                select count(*) from pg_stat_activity
+                where datname = current_database() and pid <> pg_backend_pid()
+                  and state like 'idle in transaction%' and query ilike '%integration%' and query not ilike '%outbox_message%'
+                """, Integer.class));
+
+        lifecycle.verifyNow(id, "ana");
+        lifecycle.stepVerifyConnectivity(id);
+        lifecycle.stepContrastCatalogues(id);
+
+        assertThat(heldWhileAsked).isNotEmpty().containsOnly(0);
+    }
+
+    @Test
+    void aDecisionThatCannotBeSavedAsksNothingOfAnyone() {
+        var id = register();
+        lifecycle.stepVerifyConnectivity(id);
+        lifecycle.stepContrastCatalogues(id);
+        var before = integrations.findById(id).orElseThrow();
+        calls.clear();
+
+        // While the mapping is asked what is pending, someone else changes the integration.
+        whileAsked = () -> jdbc.update("update integration set version = version + 1 where id = ?", id);
+        assertThatThrownBy(() -> lifecycle.stepRequestMapping(id)).isInstanceOf(OptimisticLockingFailureException.class);
+        whileAsked = null;
+
+        // Nothing saved, and the agent not asked: the decision that would have asked it is not there.
+        var after = integrations.findById(id).orElseThrow();
+        assertThat(after.gate).isEqualTo(before.gate);
+        assertThat(after.history).hasSameSizeAs(before.history);
+        assertThat(calls).noneMatch(c -> c.startsWith("POST /agent-proposals"));
+        assertThat(remoteCalls.pending()).isEmpty();
+        assertThat(jdbc.queryForObject("select count(*) from remote_call where kind = 'RequestAgentProposal'", Integer.class)).isZero();
+
+        // Tried again — as the engine retries a step — it is saved, and the agent asked once.
+        lifecycle.stepRequestMapping(id);
+        assertThat(integrations.findById(id).orElseThrow().gate).isEqualTo("integration-mapping-approved");
+        assertThat(calls).filteredOn(c -> c.startsWith("POST /agent-proposals?hotelCode=NEW01")).hasSize(1);
+        assertThat(remoteCalls.pending()).isEmpty();
+    }
+
+    @Test
+    void aServiceThatDoesNotAnswerDoesNotUndoTheDecisionAndIsAskedAgainUntilItDoes() {
+        var id = register();
+        jdbc.update("update integration set status = 'PAUSED' where id = ?", id);
+        mappingDown = true;
+
+        var resumed = lifecycle.resume(id, "ana");
+
+        // Resumed and saved, though the mapping did not take the cause's resolution: that waits in the outbox.
+        assertThat(resumed.getStatus()).isEqualTo(IntegrationStatus.ACTIVE);
+        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.ACTIVE);
+        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01")).hasSize(1);
+        assertThat(remoteCalls.pending()).containsExactly(new RemoteCall.ResolveCause("INTEGRATION_INACTIVE:NEW01", "ana"));
+        assertThat(jdbc.queryForObject("select last_error from remote_call", String.class)).isNotBlank();
+
+        // Not before its backoff...
+        remoteCalls.relay();
+        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open")).hasSize(1);
+
+        // ...and once it is due and the mapping answers, it is sent, and done.
+        mappingDown = false;
+        jdbc.update("update remote_call set next_attempt_at = now() - interval '1 second'");
+        remoteCalls.relay();
+        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open?key=INTEGRATION_INACTIVE:NEW01")).hasSize(2);
+        assertThat(remoteCalls.pending()).isEmpty();
+        remoteCalls.relay();
+        assertThat(calls).filteredOn(c -> c.startsWith("POST /causes/resolve-if-open")).hasSize(2);
+    }
+
+    @Test
+    void aServiceThatFailsWhileAskedLeavesTheIntegrationAsItWas() {
+        var id = register();
+        var before = integrations.findById(id).orElseThrow();
+        connectorDown = true;
+
+        assertThatThrownBy(() -> lifecycle.verifyNow(id, "ana")).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> lifecycle.stepVerifyConnectivity(id)).isInstanceOf(RuntimeException.class);
+
+        var after = integrations.findById(id).orElseThrow();
+        assertThat(after.version).isEqualTo(before.version);
+        assertThat(after.gate).isNull();
+        assertThat(after.connectivityOk).isNull();
+        assertThat(after.history).hasSameSizeAs(before.history);
+        assertThat(remoteCalls.pending()).isEmpty();
+    }
+
+    @Test
+    void anIntegrationIsDecommissionedOnceAndItsOnboardingStopsThere() {
+        var id = register();
+        lifecycle.decommission(id, "ana");
+        assertThat(integrations.findById(id).orElseThrow().getStatus()).isEqualTo(IntegrationStatus.DECOMMISSIONED);
+
+        assertThatThrownBy(() -> lifecycle.decommission(id, "ana")).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("already DECOMMISSIONED");
+        assertThatThrownBy(() -> lifecycle.resume(id, "ana")).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Only a paused integration can be resumed");
+
+        // A step the engine runs late does nothing to it: no gate comes back, nobody is asked anything.
+        calls.clear();
+        lifecycle.stepVerifyConnectivity(id);
+        lifecycle.stepActivate(id);
+        var decommissioned = integrations.findById(id).orElseThrow();
+        assertThat(decommissioned.gate).isNull();
+        assertThat(decommissioned.getStatus()).isEqualTo(IntegrationStatus.DECOMMISSIONED);
+        assertThat(calls).isEmpty();
     }
 
     void assertGateSignalled(String id, String gate) {

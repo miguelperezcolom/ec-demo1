@@ -40,14 +40,14 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
     public ListingData<IntegrationRow> search(SearchRequest request, HttpRequest httpRequest) {
         var text = request.searchText() == null ? "" : request.searchText().toLowerCase();
         var rows = integrations.findAllByOrderByCrsHotelCodeAsc().stream()
-                .filter(i -> (i.crsHotelCode + " " + i.pmsHotelCode + " " + i.name + " " + i.status).toLowerCase().contains(text))
+                .filter(i -> (i.crsHotelCode + " " + i.pmsHotelCode + " " + i.name + " " + i.getStatus()).toLowerCase().contains(text))
                 .map(this::row).toList();
         return Paging.page(rows, request);
     }
 
     IntegrationRow row(Integration i) {
         var run = runs.findFirstByIntegrationIdOrderByStartedAtDesc(i.id).orElse(null);
-        return new IntegrationRow(i.crsHotelCode, i.pmsHotelCode, i.name, status(i.status),
+        return new IntegrationRow(i.crsHotelCode, i.pmsHotelCode, i.name, status(i.getStatus()),
                 IntegrationDto.waitingFor(i.gate),
                 run == null ? "" : "%s · %d%s".formatted(run.status, run.dispatched, run.expected == null ? "" : "/" + run.expected));
     }
