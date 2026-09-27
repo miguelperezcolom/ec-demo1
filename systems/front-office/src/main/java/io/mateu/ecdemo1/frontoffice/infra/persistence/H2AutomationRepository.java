@@ -21,16 +21,17 @@ class H2AutomationRepository implements AutomationRepository {
 
   @Override
   public Optional<Automation> findById(String id) {
-    return crud.findById(id);
+    return crud.findById(id).map(AutomationEntity::toDomain);
   }
 
   @Override
   public List<Automation> findAll() {
-    return crud.findAll();
+    return crud.findAll().stream().map(AutomationEntity::toDomain).toList();
   }
 
   @Override
   public Automation save(Automation automation) {
-    return crud.existsById(automation.id()) ? crud.save(automation) : template.insert(automation);
+    var row = AutomationEntity.of(automation);
+    return (crud.existsById(automation.id()) ? crud.save(row) : template.insert(row)).toDomain();
   }
 }

@@ -2,15 +2,13 @@ package io.mateu.ecdemo1.frontoffice.domain.guest;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.MappedCollection;
 
 /**
  * Guest aggregate root — the hotel's cardex: identity, contact data, loyalty standing and
  * preferences. Stays reference guests by id; a guest exists independently of any stay.
  */
 public record Guest(
-    @Id String id,
+    String id,
     String name,
     String document,
     boolean documentVerified,
@@ -25,7 +23,7 @@ public record Guest(
     int hotels,
     String lastStaySummary,
     String lastStayComplementaryInfo,
-    @MappedCollection(idColumn = "guest_id", keyColumn = "idx") List<Preference> preferences) {
+    List<Preference> preferences) {
 
   public Guest {
     if (id == null || id.isBlank()) throw new IllegalArgumentException("Guest id is required");
@@ -122,6 +120,32 @@ public record Guest(
         id, name == null || name.isBlank() ? this.name : name, document, documentVerified, email, phone,
         tier, loyaltyPoints, stays, nights, yearsAsClient, complaints, hotels, lastStaySummary,
         lastStayComplementaryInfo, preferences);
+  }
+
+  /**
+   * The desk's demo scanner read the guest's document: the identity is seen — with a made-up
+   * {@code ESC-…} document if none was known — and a contact filled where there was none.
+   */
+  public Guest scanned() {
+    var guest = this;
+    if (!guest.identityComplete()) {
+      guest = guest.verifyIdentity(document == null || document.isBlank() ? "ESC-" + id.toUpperCase() : document);
+    }
+    if (guest.email() == null || guest.email().isBlank()) {
+      guest = guest.updateContact(
+          name.toLowerCase().replace(' ', '.').replace("í", "i").replace("é", "e") + "@email.com",
+          phone == null || phone.isBlank() ? "+00 000 000 000" : phone);
+    }
+    return guest;
+  }
+
+  /**
+   * Registered by hand at the desk: document, name and contact in one go. Without a document the
+   * identity is still marked as seen, with a made-up {@code MAN-…} one.
+   */
+  public Guest registeredAtDesk(String document, String name, String email, String phone) {
+    var doc = document == null || document.isBlank() ? "MAN-" + id.toUpperCase() : document;
+    return rename(name).verifyIdentity(doc).updateContact(email, phone);
   }
 
   /** Updates the contact data captured at the desk. */

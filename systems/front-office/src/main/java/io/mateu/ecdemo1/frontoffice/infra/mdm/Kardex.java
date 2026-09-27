@@ -26,8 +26,6 @@ import java.util.Optional;
 @Service
 public class Kardex {
 
-  private static Kardex instance;
-
   final KardexChanges changes;
   final GuestRepository guests;
   final RestClient mdm;
@@ -40,32 +38,38 @@ public class Kardex {
     this.guests = guests;
     this.mdm = mdmUrl == null || mdmUrl.isBlank() ? null : RestClient.builder().baseUrl(mdmUrl).build();
     this.hotel = hotel;
-    instance = this;
   }
 
-  /** The desk changed a guest: if what the master keeps changed, it is proposed to it. */
-  public static void edited(Guest before, Guest after) {
-    if (instance != null) {
-      instance.onEdit(before, after);
-    }
+  /**
+   * The desk changed a guest: if what the master keeps changed, the change is kept as pending and
+   * proposed to it at once. {@link #record} and {@link #send} apart, for a caller that has to send
+   * only once its own transaction committed.
+   */
+  public void edited(Guest before, Guest after) {
+    record(before, after).ifPresent(this::send);
   }
 
-  public static Optional<KardexChange> of(String guestId) {
-    return instance == null ? Optional.empty() : instance.changes.of(guestId);
+  /** The guest's last change to the master's data, if the desk ever made one. */
+  public Optional<KardexChange> of(String guestId) {
+    return changes.of(guestId);
   }
 
-  void onEdit(Guest before, Guest after) {
+  /**
+   * Keeps what the desk changed of what the master keeps as a change pending its decision — nothing if
+   * the guest is not the chain's or nothing the master keeps changed. It is not sent yet: see {@link #send}.
+   */
+  public Optional<KardexChange> record(Guest before, Guest after) {
     if (before == null || !isChainCustomer(after.id())) {
-      return;
+      return Optional.empty();
     }
     var fields = fieldsChanged(before, after);
     if (fields.isEmpty()) {
-      return;
+      return Optional.empty();
     }
     var change = KardexChange.pending(after.id(), fields, clock.instant());
     changes.save(change);
     log.info("{}: {} — pending the master's approval", after.id(), change.changes());
-    send(change);
+    return Optional.of(change);
   }
 
   /** A guest known to the chain's MDM — one the integration brought, by its customer code. */
@@ -79,7 +83,8 @@ public class Kardex {
     changes.unsynced().forEach(this::send);
   }
 
-  void send(KardexChange change) {
+  /** Proposes the change to the MDM; one it does not take now goes again with {@link #resend}. */
+  public void send(KardexChange change) {
     if (mdm == null) {
       return;
     }

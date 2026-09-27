@@ -60,6 +60,7 @@ class KardexTest {
 
   @Autowired MockMvc mvc;
   @Autowired GuestRepository guests;
+  @Autowired Kardex kardex;
 
   static String kardex(String name, String email, String requestId, String decision) {
     return kardex(name, email, "12345678Z", requestId, decision, null);
@@ -79,7 +80,7 @@ class KardexTest {
     var before = guests.findById(id).orElseThrow();
     var after = before.rename(name).updateContact(email, before.phone());
     guests.save(after);
-    Kardex.edited(before, after);
+    kardex.edited(before, after);
     return after;
   }
 
@@ -92,7 +93,7 @@ class KardexTest {
 
     // Shown at once, pending; proposed to the MDM with the new data.
     assertThat(guests.findById("C-KX1").orElseThrow().email()).isEqualTo("ana.maria@example.com");
-    var change = Kardex.of("C-KX1").orElseThrow();
+    var change = kardex.of("C-KX1").orElseThrow();
     assertThat(change.status()).isEqualTo(KardexChange.KardexStatus.PENDING);
     assertThat(change.changes()).contains("email ana@example.com → ana.maria@example.com");
     assertThat(change.fields()).extracting(KardexChange.FieldChange::field).containsExactly("nombre", "email");
@@ -109,7 +110,7 @@ class KardexTest {
     // Approved: the master's data — the desk's, as approved — and the kardex says so.
     mvc.perform(put("/api/guests/C-KX1/kardex").contentType(MediaType.APPLICATION_JSON)
         .content(kardex("Ana María García", "ana.maria@example.com", requestId, "APPROVED"))).andExpect(status().isNoContent());
-    var approved = Kardex.of("C-KX1").orElseThrow();
+    var approved = kardex.of("C-KX1").orElseThrow();
     assertThat(approved.status()).isEqualTo(KardexChange.KardexStatus.APPROVED);
     assertThat(guests.findById("C-KX1").orElseThrow().name()).isEqualTo("Ana María García");
     // Approved, the data just stays: no mark on the guest.
@@ -122,7 +123,7 @@ class KardexTest {
     guests.save(Guest.fromReservation("C-KX2", "Leo Pons", "X1234567L", "leo@example.com", null));
 
     edit("C-KX2", "Leo Pons", "leo.nuevo@example.com");
-    var requestId = Kardex.of("C-KX2").orElseThrow().requestId();
+    var requestId = kardex.of("C-KX2").orElseThrow().requestId();
 
     mvc.perform(put("/api/guests/C-KX2/kardex").contentType(MediaType.APPLICATION_JSON)
         .content(kardex("Leo Pons", "leo@example.com", "X1234567L", requestId, "REJECTED", "No es su email")))
@@ -130,7 +131,7 @@ class KardexTest {
 
     var guest = guests.findById("C-KX2").orElseThrow();
     assertThat(guest.email()).isEqualTo("leo@example.com");
-    var rejected = Kardex.of("C-KX2").orElseThrow();
+    var rejected = kardex.of("C-KX2").orElseThrow();
     assertThat(rejected.status()).isEqualTo(KardexChange.KardexStatus.REJECTED);
     assertThat(rejected.reason()).isEqualTo("No es su email");
     // The field says what was proposed, what stays — the master's — and why.
@@ -144,7 +145,7 @@ class KardexTest {
     sent.clear();
     edit("crs-LOCAL1", "Sin Cliente", "y@example.com");
     assertThat(sent).isEmpty();
-    assertThat(Kardex.of("crs-LOCAL1")).isEmpty();
+    assertThat(kardex.of("crs-LOCAL1")).isEmpty();
 
     mvc.perform(put("/api/guests/C-NOBODY/kardex").contentType(MediaType.APPLICATION_JSON)
         .content(kardex("X", "x@example.com", null, null))).andExpect(status().isNotFound());
@@ -159,9 +160,9 @@ class KardexTest {
     var before = guests.findById("C-KX3").orElseThrow();
     var after = before.verifyIdentity("MAN-C-KX3").updateContact("eva@example.com", "+34 600000002");
     guests.save(after);
-    Kardex.edited(before, after);
+    kardex.edited(before, after);
 
-    var change = Kardex.of("C-KX3").orElseThrow();
+    var change = kardex.of("C-KX3").orElseThrow();
     assertThat(change.fields()).singleElement().extracting(KardexChange.FieldChange::field).isEqualTo("teléfono");
     assertThat(sent).singleElement().asString().contains("\"documentNumber\":null").doesNotContain("MAN-");
 
@@ -178,9 +179,9 @@ class KardexTest {
     var before = guests.findById("C-KX4").orElseThrow();
     var after = before.verifyIdentity("ESC-C-KX4");
     guests.save(after);
-    Kardex.edited(before, after);
+    kardex.edited(before, after);
 
     assertThat(sent).isEmpty();
-    assertThat(Kardex.of("C-KX4")).isEmpty();
+    assertThat(kardex.of("C-KX4")).isEmpty();
   }
 }

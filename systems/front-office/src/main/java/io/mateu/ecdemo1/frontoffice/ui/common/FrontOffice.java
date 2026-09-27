@@ -1,110 +1,76 @@
 package io.mateu.ecdemo1.frontoffice.ui.common;
 
-import io.mateu.ecdemo1.frontoffice.domain.automation.AutomationRepository;
+import io.mateu.ecdemo1.frontoffice.application.StayQueries;
+import io.mateu.ecdemo1.frontoffice.application.StayView;
+import io.mateu.ecdemo1.frontoffice.domain.catalog.AddOnCatalogItem;
 import io.mateu.ecdemo1.frontoffice.domain.catalog.AddOnCatalogRepository;
-import io.mateu.ecdemo1.frontoffice.domain.catalog.ChargeCatalogRepository;
-import io.mateu.ecdemo1.frontoffice.domain.folio.Folio;
-import io.mateu.ecdemo1.frontoffice.domain.folio.FolioRepository;
-import io.mateu.ecdemo1.frontoffice.domain.guest.Guest;
-import io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository;
+import io.mateu.ecdemo1.frontoffice.domain.room.Room;
 import io.mateu.ecdemo1.frontoffice.domain.room.RoomRepository;
-import io.mateu.ecdemo1.frontoffice.domain.stay.CheckInOpsRepository;
+import io.mateu.ecdemo1.frontoffice.domain.stay.CheckInOps;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
-import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
+import io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * Static gateway from the view models to the domain ports. Mateu builds screens, wizard steps and
- * {@code Callable<Component>} holders reflectively (no constructor injection there), so this bean
- * captures the repositories at startup and exposes them statically — the same pattern the old
- * {@code HotelData} fixtures used.
+ * Static, READ-ONLY access to the front office for the view models Mateu builds itself, where
+ * nothing can be injected: the check-in wizard's steps (the wizard creates them with {@code new} and
+ * Mateu re-creates them from the component state on every request), the shared header and link
+ * builders they call ({@link GuestHeaders}, {@link OtherSystems}), and {@code Bienvenida}, whose KPIs
+ * are computed in field initializers, before any constructor could hand it a bean.
+ *
+ * <p>Every screen that is a route of its own is a Spring prototype bean and gets what it needs
+ * injected; every write goes through the application services. Nothing here writes.
  */
 @Component
 public class FrontOffice {
 
   private static FrontOffice instance;
 
-  private final GuestRepository guests;
-  private final StayRepository stays;
-  private final io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel stayReads;
-  private final FolioRepository folios;
+  private final StayQueries queries;
+  private final StayReadModel stayReads;
   private final RoomRepository rooms;
-  private final AutomationRepository automations;
-  private final ChargeCatalogRepository chargeCatalog;
   private final AddOnCatalogRepository addOnCatalog;
-  private final CheckInOpsRepository checkInOps = new CheckInOpsRepository();
 
-  public FrontOffice(
-      GuestRepository guests,
-      StayRepository stays,
-      io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel stayReads,
-      FolioRepository folios,
-      RoomRepository rooms,
-      AutomationRepository automations,
-      ChargeCatalogRepository chargeCatalog,
-      AddOnCatalogRepository addOnCatalog) {
-    this.guests = guests;
-    this.stays = stays;
+  public FrontOffice(StayQueries queries, StayReadModel stayReads, RoomRepository rooms,
+                     AddOnCatalogRepository addOnCatalog) {
+    this.queries = queries;
     this.stayReads = stayReads;
-    this.folios = folios;
     this.rooms = rooms;
-    this.automations = automations;
-    this.chargeCatalog = chargeCatalog;
     this.addOnCatalog = addOnCatalog;
     instance = this;
   }
 
-  public static GuestRepository guests() {
-    return instance.guests;
+  /** The stay behind a screen's route, with its guest and folio. */
+  public static StayView stayView(String stayId) {
+    return instance.queries.view(stayId);
   }
 
-  public static StayRepository stays() {
-    return instance.stays;
+  /** Where the stay's check-in operations stand. */
+  public static CheckInOps ops(String stayId) {
+    return instance.queries.ops(stayId);
+  }
+
+  /** How many of the stay's pax still lack a verified identity. */
+  public static int pendingPax(Stay stay) {
+    return instance.queries.pendingPax(stay);
   }
 
   /** Stays as screens that only look read them: plain queries, no aggregates. */
-  public static io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel stayReads() {
+  public static StayReadModel stayReads() {
     return instance.stayReads;
   }
 
-  public static FolioRepository folios() {
-    return instance.folios;
+  public static List<Room> roomsOnFloor(int floor) {
+    return instance.rooms.findByFloor(floor);
   }
 
-  public static RoomRepository rooms() {
-    return instance.rooms;
+  public static Optional<Room> room(String number) {
+    return instance.rooms.findByNumber(number);
   }
 
-  public static AutomationRepository automations() {
-    return instance.automations;
-  }
-
-  public static ChargeCatalogRepository chargeCatalog() {
-    return instance.chargeCatalog;
-  }
-
-  public static AddOnCatalogRepository addOnCatalog() {
-    return instance.addOnCatalog;
-  }
-
-  public static CheckInOpsRepository checkInOps() {
-    return instance.checkInOps;
-  }
-
-  /** A stay with its guest and folio — the working unit of every front-office screen. */
-  public record StayView(Stay stay, Guest guest, Folio folio) {}
-
-  /**
-   * Loads the stay + guest + folio behind a screen route. Falls back to the first stay when the
-   * route carries a stale/unknown id, mirroring the old fixtures' behavior.
-   */
-  public static StayView stayView(String stayId) {
-    Stay stay =
-        stays()
-            .findById(stayId == null ? "" : stayId)
-            .orElseGet(() -> stays().findAll().stream().findFirst().orElseThrow());
-    Guest guest = guests().findById(stay.guestId()).orElseThrow();
-    Folio folio = folios().findByStayId(stay.id()).orElse(null);
-    return new StayView(stay, guest, folio);
+  public static List<AddOnCatalogItem> addOns() {
+    return instance.addOnCatalog.findAll();
   }
 }

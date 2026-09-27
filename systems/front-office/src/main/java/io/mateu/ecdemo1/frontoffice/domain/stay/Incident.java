@@ -1,7 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.domain.stay;
 
 import java.time.LocalDateTime;
-import org.springframework.data.relational.core.mapping.Table;
 
 /**
  * An incident reported during the stay (maintenance issue, service delay, active complaint...).
@@ -9,7 +8,6 @@ import org.springframework.data.relational.core.mapping.Table;
  * {@code description} is the OPENING comment; {@code openedAt}/{@code resolvedAt} anchor the
  * incident's little timeline; {@code type} drives triage and the icon.
  */
-@Table("stay_incident")
 public record Incident(
     String code,
     IncidentType type,

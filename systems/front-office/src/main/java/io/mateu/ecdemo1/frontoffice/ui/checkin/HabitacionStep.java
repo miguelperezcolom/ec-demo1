@@ -52,7 +52,7 @@ public class HabitacionStep implements WizardStep {
   Callable<Component> habitaciones =
       () -> {
         var stay = FrontOffice.stayView(stayId).stay();
-        var floor = FrontOffice.rooms().findByFloor(12);
+        var floor = FrontOffice.roomsOnFloor(12);
         return ResourceGrid.builder()
             .style("width: 100%;")
             .actionId("pickRoom")
@@ -96,7 +96,7 @@ public class HabitacionStep implements WizardStep {
         var selected =
             habitacionSeleccionada != null ? habitacionSeleccionada : stay.roomNumber();
         var floor =
-            FrontOffice.rooms().findByNumber(selected).map(Room::floor).map(String::valueOf)
+            FrontOffice.room(selected).map(Room::floor).map(String::valueOf)
                 .orElse(selected.length() >= 2 ? selected.substring(0, 2) : selected);
         return HorizontalLayout.builder()
             .spacing(true)

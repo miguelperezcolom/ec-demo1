@@ -1,13 +1,11 @@
 package io.mateu.ecdemo1.frontoffice.domain.stay;
 
-import org.springframework.data.relational.core.mapping.Table;
 
 /**
  * A person accompanying the stay's main guest. Value object owned by {@link Stay}. Carries its own
  * identity data (document + contact) so every pax of the reservation can be registered at the desk
  * — the main guest's identity lives in the Guest aggregate instead.
  */
-@Table("stay_companion")
 public record Companion(
     String companionId,
     String name,

@@ -2,7 +2,8 @@ package io.mateu.ecdemo1.frontoffice.ui.checkin;
 
 import io.mateu.core.infra.declarative.orchestrators.editableview.EditableView;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
-import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
+import io.mateu.ecdemo1.frontoffice.application.KardexService;
+import io.mateu.ecdemo1.frontoffice.application.StayQueries;
 import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.PlainText;
@@ -20,8 +21,11 @@ import io.mateu.uidl.interfaces.HttpRequest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 /**
@@ -49,7 +53,18 @@ import reactor.core.publisher.Flux;
 @Setter
 @UI("/checkin-documento")
 @Title("Documento")
+@Service
+@Scope("prototype")
 public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoEditor> {
+
+  @Getter(AccessLevel.NONE) final StayQueries queries;
+  @Getter(AccessLevel.NONE) final KardexService kardex;
+
+  /** A prototype bean: Mateu takes the island from Spring; the Identidad step asks Mateu for one too. */
+  public DocumentoView(StayQueries queries, KardexService kardex) {
+    this.queries = queries;
+    this.kardex = kardex;
+  }
 
   @Hidden String stayId;
   @Hidden int paxIndex = 1;
@@ -158,12 +173,14 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     if (edited == null) {
       return;
     }
-    var pax = pax();
-    if (pax.complete()) {
-      pax.updateContact(edited.getEmail(), edited.getTelefono());
+    if (stayId == null || stayId.isBlank()) {
+      return;
+    }
+    if (pax().complete()) {
+      kardex.contactUpdated(stayId, paxIndex(), edited.getEmail(), edited.getTelefono());
     } else {
-      pax.register(
-          edited.getDocumento(), edited.getNombre(), edited.getEmail(), edited.getTelefono());
+      kardex.registered(stayId, paxIndex(), edited.getDocumento(), edited.getNombre(), edited.getEmail(),
+          edited.getTelefono());
     }
   }
 
@@ -199,8 +216,8 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
                           .delayElements(Duration.ofMillis(450))
                           .map(
                               i -> {
-                                if (i == 4) {
-                                  pax().simulateScan();
+                                if (i == 4 && stayId != null && !stayId.isBlank()) {
+                                  kardex.scanned(stayId, paxIndex());
                                 }
                                 return progress.step(SCAN_STEPS[i - 1], i / 4.0);
                               }));
@@ -256,14 +273,6 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     String email();
 
     String phone();
-
-    /** The same demo shortcut the wizard used to offer: verify + fill the contact data. */
-    void simulateScan();
-
-    void updateContact(String email, String phone);
-
-    /** Manual registration at the desk: document + name + contact in one go. */
-    void register(String document, String name, String email, String phone);
   }
 
   private class MainGuestPax implements Pax {
@@ -271,7 +280,7 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
       if (stayId == null || stayId.isBlank()) {
         return null;
       }
-      return FrontOffice.stayView(stayId).guest();
+      return queries.view(stayId).guest();
     }
 
     @Override
@@ -303,53 +312,6 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
       var guest = guest();
       return guest == null ? null : guest.phone();
     }
-
-    @Override
-    public void simulateScan() {
-      var guest = guest();
-      if (guest == null) {
-        return;
-      }
-      if (!guest.identityComplete()) {
-        var document =
-            guest.document() == null || guest.document().isBlank()
-                ? "ESC-" + guest.id().toUpperCase()
-                : guest.document();
-        guest = guest.verifyIdentity(document);
-      }
-      if (guest.email() == null || guest.email().isBlank()) {
-        guest =
-            guest.updateContact(
-                guest.name().toLowerCase().replace(' ', '.').replace("í", "i").replace("é", "e")
-                    + "@email.com",
-                guest.phone() == null || guest.phone().isBlank()
-                    ? "+00 000 000 000"
-                    : guest.phone());
-      }
-      FrontOffice.guests().save(guest);
-    }
-
-    @Override
-    public void updateContact(String email, String phone) {
-      var guest = guest();
-      if (guest != null) {
-        var edited = guest.updateContact(email, phone);
-        FrontOffice.guests().save(edited);
-        io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.edited(guest, edited);
-      }
-    }
-
-    @Override
-    public void register(String document, String name, String email, String phone) {
-      var guest = guest();
-      if (guest == null) {
-        return;
-      }
-      var doc = document == null || document.isBlank() ? "MAN-" + guest.id().toUpperCase() : document;
-      var edited = guest.rename(name).verifyIdentity(doc).updateContact(email, phone);
-      FrontOffice.guests().save(edited);
-      io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex.edited(guest, edited);
-    }
   }
 
   private class CompanionPax implements Pax {
@@ -359,16 +321,11 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
       this.number = number;
     }
 
-    private io.mateu.ecdemo1.frontoffice.domain.stay.Stay stay() {
+    private Companion companion() {
       if (stayId == null || stayId.isBlank()) {
         return null;
       }
-      return FrontOffice.stayView(stayId).stay();
-    }
-
-    private Companion companion() {
-      var stay = stay();
-      return stay == null ? null : stay.companionAt(number);
+      return queries.view(stayId).stay().companionAt(number);
     }
 
     @Override
@@ -399,67 +356,6 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     public String phone() {
       var companion = companion();
       return companion == null ? null : companion.phone();
-    }
-
-    @Override
-    public void simulateScan() {
-      var stay = stay();
-      if (stay == null) {
-        return;
-      }
-      var companion = stay.companionAt(number);
-      if (companion == null) {
-        companion = Companion.pending(number);
-      }
-      if (!companion.identityComplete()) {
-        var document =
-            companion.document() == null || companion.document().isBlank()
-                ? "ESC-" + stay.id().toUpperCase() + "-P" + number
-                : companion.document();
-        companion = companion.verifyIdentity(document);
-      }
-      if (companion.email() == null || companion.email().isBlank()) {
-        companion =
-            companion.updateContact(
-                companion.name().toLowerCase().replace(' ', '.').replace("é", "e")
-                    + "@email.com",
-                companion.phone() == null || companion.phone().isBlank()
-                    ? "+00 000 000 000"
-                    : companion.phone());
-      }
-      FrontOffice.stays().save(stay.registerCompanion(number, companion));
-    }
-
-    @Override
-    public void updateContact(String email, String phone) {
-      var stay = stay();
-      if (stay == null) {
-        return;
-      }
-      var companion = stay.companionAt(number);
-      if (companion != null) {
-        FrontOffice.stays().save(stay.registerCompanion(number, companion.updateContact(email, phone)));
-      }
-    }
-
-    @Override
-    public void register(String document, String name, String email, String phone) {
-      var stay = stay();
-      if (stay == null) {
-        return;
-      }
-      var companion = stay.companionAt(number);
-      if (companion == null) {
-        companion = Companion.pending(number);
-      }
-      var doc =
-          document == null || document.isBlank()
-              ? "MAN-" + stay.id().toUpperCase() + "-P" + number
-              : document;
-      FrontOffice.stays()
-          .save(
-              stay.registerCompanion(
-                  number, companion.rename(name).verifyIdentity(doc).updateContact(email, phone)));
     }
   }
 }

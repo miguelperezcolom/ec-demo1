@@ -72,10 +72,10 @@ public class WalkInDesk {
     instance = this;
   }
 
-  public static WalkInDesk desk() {
-    return instance;
-  }
-
+  /**
+   * The walk-in a stay is, if it is one. Static — like {@link #stayIdFor} — for the header and route
+   * helpers the Mateu-built wizard steps call, where nothing is injected.
+   */
   public static Optional<WalkIn> of(String stayId) {
     return instance == null || stayId == null ? Optional.empty() : instance.walkIns.of(stayId);
   }
@@ -162,7 +162,7 @@ public class WalkInDesk {
    * The stay's id is the booking's reference in the CRS: FO-….
    */
   public WalkIn open(Request request, Quote quote) {
-    // The screens reach this bean statically, past its proxy: the transaction is written out.
+    // One transaction for the guest, the stay and the walk-in; the CRS is asked outside it (send).
     return transaction.execute(status -> opened(request, quote));
   }
 

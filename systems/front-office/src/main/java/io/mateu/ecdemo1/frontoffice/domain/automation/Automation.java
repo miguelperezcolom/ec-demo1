@@ -1,8 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.domain.automation;
 
 import java.util.List;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.MappedCollection;
 
 /**
  * Automation aggregate root — a monitored back-office process (credit invoicing, prepayments,
@@ -10,13 +8,12 @@ import org.springframework.data.relational.core.mapping.MappedCollection;
  * always derived from the counters.
  */
 public record Automation(
-    @Id String id,
+    String id,
     String name,
     int okCount,
     int warningCount,
     int errorCount,
-    @MappedCollection(idColumn = "automation_id", keyColumn = "idx")
-        List<ConnectedSystem> systems) {
+    List<ConnectedSystem> systems) {
 
   public Automation {
     if (id == null || id.isBlank()) throw new IllegalArgumentException("Automation id is required");

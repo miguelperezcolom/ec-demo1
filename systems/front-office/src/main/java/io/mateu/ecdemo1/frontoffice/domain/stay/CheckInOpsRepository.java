@@ -1,22 +1,12 @@
 package io.mateu.ecdemo1.frontoffice.domain.stay;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
- * In-memory store of the per-stay {@link CheckInOps} flags (demo scope — restarting the backend
- * resets every operation, like the rest of the seeded snapshot).
+ * Where the per-stay {@link CheckInOps} flags are kept. A stay nobody worked on yet has none of its
+ * operations done.
  */
-public class CheckInOpsRepository {
+public interface CheckInOpsRepository {
 
-  private final Map<String, CheckInOps> byStay = new ConcurrentHashMap<>();
+  CheckInOps of(String stayId);
 
-  public CheckInOps of(String stayId) {
-    return byStay.getOrDefault(stayId, CheckInOps.none());
-  }
-
-  public CheckInOps save(String stayId, CheckInOps ops) {
-    byStay.put(stayId, ops);
-    return ops;
-  }
+  CheckInOps save(String stayId, CheckInOps ops);
 }

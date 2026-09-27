@@ -18,23 +18,23 @@ class ReservaCierreTest {
   void unNoShowDiceQueNoLlegoNadieYLoQueCuesta() {
     var noShow = llegando.noShow(new BigDecimal("139.50"));
 
-    assertEquals("no show el 27 sept", ReservaOverview.cierre(noShow));
+    assertEquals("no show el 27 sept", EstanciaPanel.cierre(noShow));
     assertEquals("No se presentó nadie: el CRS la canceló como no show, con un cargo de 139,50 €",
-        ReservaOverview.avisoCierre(noShow));
+        EstanciaPanel.avisoCierre(noShow));
   }
 
   @Test
   void unaCanceladaNoSalio() {
     var cancelada = llegando.cancel();
 
-    assertEquals("cancelada", ReservaOverview.cierre(cancelada));
-    assertEquals("Reserva cancelada antes de la llegada", ReservaOverview.avisoCierre(cancelada));
+    assertEquals("cancelada", EstanciaPanel.cierre(cancelada));
+    assertEquals("Reserva cancelada antes de la llegada", EstanciaPanel.avisoCierre(cancelada));
   }
 
   @Test
   void sinDocumentoSoloAdulto() {
-    assertEquals("Adulto", ReservaOverview.docAdulto(null));
-    assertEquals("Adulto", ReservaOverview.docAdulto(" "));
-    assertEquals("Doc 12345678Z · Adulto", ReservaOverview.docAdulto("12345678Z"));
+    assertEquals("Adulto", HuespedesPanel.docAdulto(null));
+    assertEquals("Adulto", HuespedesPanel.docAdulto(" "));
+    assertEquals("Doc 12345678Z · Adulto", HuespedesPanel.docAdulto("12345678Z"));
   }
 }

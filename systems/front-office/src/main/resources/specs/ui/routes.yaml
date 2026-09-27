@@ -14,4 +14,4 @@ routes:
   - route: checkin/:id
     viewModel: io.mateu.ecdemo1.frontoffice.ui.checkin.CheckInWizard
   - route: walk-in
-    viewModel: io.mateu.ecdemo1.frontoffice.ui.walkin.WalkInForm
+    viewModel: io.mateu.ecdemo1.frontoffice.ui.walkin.WalkInWizard

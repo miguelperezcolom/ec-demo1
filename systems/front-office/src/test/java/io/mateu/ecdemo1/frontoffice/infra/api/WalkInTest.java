@@ -105,13 +105,18 @@ class WalkInTest {
         null);
   }
 
-  @Test
-  void theFormStartsOnWhatTheCrsOffersFirstSoTheUsualCaseNeedsNoCodes() {
-    var form = new io.mateu.ecdemo1.frontoffice.ui.walkin.WalkInForm();
+  @Autowired org.springframework.beans.factory.ObjectProvider<io.mateu.ecdemo1.frontoffice.ui.walkin.EstanciaWalkIn> estancia;
 
-    assertThat(form.getHabitacion()).isEqualTo("STD-KING");
-    assertThat(form.getTarifa()).isEqualTo("DIRECTA");
-    assertThat(form.getRegimen()).isEqualTo("DESAYUNO");
+  @Test
+  void theStayStepOffersWhatTheCrsSellsAsSelectsWithItsCodesAndNames() {
+    var step = estancia.getObject();
+
+    assertThat(step.options("habitacion", null)).extracting(io.mateu.uidl.data.Option::value).containsExactly("STD-KING");
+    assertThat(step.options("habitacion", null)).extracting(io.mateu.uidl.data.Option::label)
+        .containsExactly("Estándar con cama king (STD-KING)");
+    assertThat(step.options("tarifa", null)).extracting(io.mateu.uidl.data.Option::value).containsExactly("DIRECTA");
+    assertThat(step.options("regimen", null)).extracting(io.mateu.uidl.data.Option::value).containsExactly("DESAYUNO");
+    assertThat(step.stereotype("habitacion", null)).isEqualTo(io.mateu.uidl.data.FieldStereotype.select);
   }
 
   @Test

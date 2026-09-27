@@ -1,14 +1,12 @@
 package io.mateu.ecdemo1.frontoffice.domain.room;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
 
 /**
  * Room aggregate root — physical inventory: occupancy, housekeeping state and open maintenance
  * notes. Room assignment during check-in reads from here ({@code assignable()}).
  */
 public record Room(
-    @Id @Column("room_number") String number,
+    String number,
     int floor,
     String type,
     RoomOccupancy occupancy,
@@ -23,6 +21,11 @@ public record Room(
   /** A room can be assigned when it is free — a maintenance note only warns, it does not block. */
   public boolean assignable() {
     return occupancy == RoomOccupancy.FREE;
+  }
+
+  /** The room's type as the desk reads it: its type, or its floor when the inventory has none. */
+  public String typeLabel() {
+    return type != null ? type : "Planta " + floor;
   }
 
   public Room occupy() {

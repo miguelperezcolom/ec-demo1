@@ -48,7 +48,7 @@ public class GuestsApi {
   @org.springframework.web.bind.annotation.GetMapping("/{id}")
   public ResponseEntity<GuestView> guest(@PathVariable String id) {
     return guests.findById(id).map(g -> {
-      var change = Kardex.of(id).orElse(null);
+      var change = kardex.of(id).orElse(null);
       return ResponseEntity.ok(new GuestView(g.id(), g.name(), g.document(), g.email(), g.phone(),
           change == null ? null : change.status().name(), change == null ? null : change.changes(),
           change == null ? null : change.reason()));

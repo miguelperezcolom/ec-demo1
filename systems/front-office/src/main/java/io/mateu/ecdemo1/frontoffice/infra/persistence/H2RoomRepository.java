@@ -28,21 +28,22 @@ class H2RoomRepository implements RoomRepository {
     if (number == null || number.isBlank()) {
       return Optional.empty();
     }
-    return crud.findById(number);
+    return crud.findById(number).map(RoomEntity::toDomain);
   }
 
   @Override
   public List<Room> findAll() {
-    return crud.findAll();
+    return crud.findAll().stream().map(RoomEntity::toDomain).toList();
   }
 
   @Override
   public List<Room> findByFloor(int floor) {
-    return crud.findByFloorOrderByNumberAsc(floor);
+    return crud.findByFloorOrderByNumberAsc(floor).stream().map(RoomEntity::toDomain).toList();
   }
 
   @Override
   public Room save(Room room) {
-    return crud.existsById(room.number()) ? crud.save(room) : template.insert(room);
+    var row = RoomEntity.of(room);
+    return (crud.existsById(room.number()) ? crud.save(row) : template.insert(row)).toDomain();
   }
 }

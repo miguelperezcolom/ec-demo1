@@ -3,7 +3,7 @@ package io.mateu.ecdemo1.frontoffice.ui.automatizaciones;
 import io.mateu.ecdemo1.frontoffice.ui.Paging;
 import io.mateu.ecdemo1.frontoffice.domain.automation.Automation;
 import io.mateu.ecdemo1.frontoffice.domain.automation.ConnectedSystem;
-import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
+import io.mateu.ecdemo1.frontoffice.domain.automation.AutomationRepository;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.Trigger;
@@ -31,10 +31,18 @@ import java.util.stream.Collectors;
 @Title("Automatizaciones")
 @Trigger(type = TriggerType.OnLoad, actionId = "search")
 @Trigger(type = TriggerType.OnCustomEvent, actionId = "search", eventName = "automatizacion-arreglada")
+@org.springframework.stereotype.Service
+@org.springframework.context.annotation.Scope("prototype")
 public class AutomatizacionesListing
     implements Listing<AutomatizacionesListing.Proceso>,
         Searchable,
         Filterable<AutomatizacionesListing.Filtros> {
+
+  final AutomationRepository automations;
+
+  public AutomatizacionesListing(AutomationRepository automations) {
+    this.automations = automations;
+  }
 
   /** Vista rápida por estado (chips junto al smart search). */
   public enum Estado {
@@ -80,7 +88,7 @@ public class AutomatizacionesListing
     var searchText = request.searchText();
     var filtros = filters(request);
     var rows =
-        FrontOffice.automations().findAll().stream()
+        automations.findAll().stream()
             .filter(a -> matchesEstado(a, filtros == null ? null : filtros.estado))
             .map(AutomatizacionesListing::row)
             .filter(row -> matches(row, searchText))
@@ -135,11 +143,11 @@ public class AutomatizacionesListing
   /** La acción de FILA: resuelve los warnings del proceso (dominio real) y refresca por el bus. */
   public Object solucionar(HttpRequest httpRequest) {
     var id = rowId(httpRequest);
-    var automation = id == null ? null : FrontOffice.automations().findById(id).orElse(null);
+    var automation = id == null ? null : automations.findById(id).orElse(null);
     if (automation == null) {
       return new Message("Proceso no encontrado");
     }
-    var resolved = FrontOffice.automations().save(automation.resolveWarnings());
+    var resolved = automations.save(automation.resolveWarnings());
     return List.of(
         new Message("✅ " + resolved.name() + " — incidencias resueltas"),
         UICommand.dispatchEvent("automatizacion-arreglada"));
