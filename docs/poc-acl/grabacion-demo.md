@@ -1,7 +1,8 @@
 # Grabar el vídeo de la demo
 
 Instrucciones para grabar la demo de la PoC de principio a fin: reset, los cinco flujos de la
-presentación y, en cada paso, dónde se ve viajar el dato. Escritas el 2026-09-27 para grabar al día
+presentación, los tres del día a día con la integración activa (6, Opera no responde; 7, modificar y
+cancelar; 8, un código nuevo) y, en cada paso, dónde se ve viajar el dato. Escritas el 2026-09-27 para grabar al día
 siguiente desde el trabajo.
 
 ## Dos modos: API o interfaces
@@ -23,10 +24,14 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
 > Vamos a grabar el vídeo de la demo siguiendo `docs/poc-acl/grabacion-demo.md`. Primero comprueba
 > los requisitos previos. Luego abre el navegador visible con el perfil de grabación, para que yo
 > entre en Salesforce y en Opera Cloud. Cuando te diga que he entrado, pon ec1 a cero y graba los
-> cinco flujos, toma por toma, con los rótulos. Al final monta el mp4, enséñame dónde está y borra
+> ocho flujos, toma por toma, con los rótulos. Al final monta el mp4, enséñame dónde está y borra
 > el perfil.
 
 ## Requisitos previos (lo comprueba Claude)
+
+- **`deploy/demo/demo-prep.sh`** en verde (sin `FAIL`): despliegues, motor, Opera y Salesforce (solo
+  GET), integración, diccionario y causas, sin corte de Opera puesto. Tras el reset, `demo-prep.sh
+  --zero` hace las dos cosas.
 
 - **Versiones:** ec1 con todo desplegado y la batería de pantallas en verde
   (`cd e2e && npx playwright test tests/consoles.spec.ts`; un fallo suelto que pasa al repetir es
@@ -88,7 +93,8 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
     el front office. Si algo de Redwood falla en una toma, se graba esa toma en Vaadin
     (`ec1.mateu.io`, `console.ec1.mateu.io`).
   - **Login:** demo/demo en Keycloak.
-- **Duración:** entre 8 y 12 minutos en total.
+- **Duración:** entre 12 y 16 minutos en total (los flujos 6–8, unos 4 más: la espera del flujo 6 se
+  recorta en el montaje).
 
 ## Reset
 
@@ -196,11 +202,66 @@ en XMAR: hay que evitar repetir tomas sin necesidad.
    - **Front office:** el chip «Walk-in · CRS … · Opera …», en la misma estancia, sin duplicar.
    - **Rótulo:** «CRS → Opera → de vuelta a la misma estancia.»
 
+## Flujo 6: Opera no responde
+
+Preparación fuera de cámara, antes de la toma: `deploy/demo/opera-outage.sh on --alert-after 2m`
+(reinicia el conector, ~1 min, y corta su red hacia Opera; se levanta sola a los 15 min).
+
+1. **Reserva nueva.** Call center → New: MRU01, noviembre, STD-KING / DIRECTA / DESAYUNO.
+   - **Rótulo:** «Opera no responde: el conector no llega a OHIP. Una reserva nueva.»
+2. **Espera.** Admin → Processes: el `proyectar-reserva` en «Asegurar el perfil del huésped», con los
+   intentos subiendo (uno cada ~40 s). Mapping → Causes, vacío.
+   - **Rótulo:** «Un proceso bloqueado espera, no falla: el motor reintenta. No es una causa.»
+3. **Aviso.** A los ~2 min 40 s, el aviso de la bandeja «Writing … to the PMS keeps failing».
+   - **Rótulo:** «Si dura, alguien se entera: la bandeja (y el email urgente).»
+   - Esta espera se recorta en el montaje.
+4. **Vuelve Opera.** `opera-outage.sh off` fuera de cámara; se refresca.
+   - **Se enseña:** el proceso COMPLETED, la reserva en Opera (una sola bajo su localizador, con el
+     panel de evidencias o la búsqueda por *Conf / Cxl / External*), la estancia en el front office y
+     el aviso ya resuelto.
+   - **Rótulo:** «Opera vuelve y la reserva llega sola, una vez. El aviso se cierra solo.»
+
+Después de la toma: `opera-outage.sh alert 10m`.
+
+## Flujo 7: modificar y cancelar desde el CRS
+
+1. **Modificación.** Call center → la reserva del flujo 6 → editar: fechas (del 13 al 17 de
+   noviembre) y tipo de habitación JS-STD. Antes, `python3 deploy/demo/opera.py availability XMAR
+   2026-11-13 2026-11-17` para elegir un tipo que Opera venda esas noches.
+   - **Rótulo:** «El CRS cambia fechas y habitación: versión nueva.»
+2. **En su sitio.**
+   - **Se enseña:** Opera, **el mismo número de reserva** con las fechas, el tipo y la versión (UDF)
+     nuevos; el front office, la estancia con las fechas y la habitación nuevas.
+   - **Rótulo:** «La misma reserva de Opera, cambiada en su sitio: se busca por localizador y solo
+     entra una versión más nueva.»
+3. **Cancelación.** Call center → Cancelar (motivo «Otros motivos»).
+   - **Se enseña:** `proyectar-cancelacion` COMPLETED, Opera *Cancelled*, la estancia *Cancelada*.
+   - **Rótulo:** «La cancelación baja igual: Opera y front office.»
+
+## Flujo 8: un código nuevo con la integración activa
+
+1. **Tarifa nueva.** Fuera de cámara: `python3 deploy/demo/ec1.py rate-plan MRU01 EMPLEADOS-27
+   "Empleados de la cadena de vacaciones 2027" 0.5`. En cámara, Mapping → Dictionary (MRU01): el
+   código, *Unmapped*.
+   - **Rótulo:** «Producto abre una tarifa nueva en el CRS. La integración, ya activa, no la conoce.»
+2. **Reserva con ella.** Call center → New: MRU01, JS-STD, EMPLEADOS-27, solo alojamiento, 20–23 de
+   noviembre.
+   - **Se enseña:** Mapping → Causes, la causa `MISSING_MAPPING … EMPLEADOS-27` con 1 proceso
+     esperando; el aviso de la bandeja, y **Open**.
+   - **Rótulo:** «La reserva espera al mapeado: una causa, y el aviso a quien la resuelve.»
+3. **Propuesta.** Dictionary → «Ask the agent» (~10 s): `432040HLXMU` «STAFF ON HOLIDAY XMU A27».
+   - **Rótulo:** «El agente la empareja por significado con la de Opera, con su porqué.»
+4. **Aprobación.** Se selecciona **solo esa** propuesta y «Approve».
+   - **Se enseña:** la causa resuelta, el proceso COMPLETED, Opera con la tarifa `432040HLXMU` y la
+     estancia en el front office.
+   - **Rótulo:** «Una persona aprueba y la reserva sigue sola hasta Opera.»
+
 ## Al terminar
 
 - **Entrega:** el mp4 y `guion-con-tiempos.md` en `~/Movies/`.
 - **Limpieza:**
   - se borra el perfil del navegador;
   - se borran los specs temporales de `e2e/tests/zz-*`;
+  - `deploy/demo/opera-outage.sh status`: ningún corte puesto y el aviso en 10m;
   - lo que quede en XMAR se apunta en `docs/poc-acl/demo.md`, en la lista de datos de prueba que
     quedan en Opera.
