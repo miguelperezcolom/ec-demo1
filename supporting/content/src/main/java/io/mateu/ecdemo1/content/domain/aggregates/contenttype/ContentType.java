@@ -1,7 +1,6 @@
 package io.mateu.ecdemo1.content.domain.aggregates.contenttype;
 
 
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.workflow.ddd.AggregateRoot;
 import io.mateu.ecdemo1.content.domain.aggregates.contenttype.vo.ContentTypeId;
 import io.mateu.ecdemo1.content.domain.aggregates.contenttype.vo.ContentTypeName;

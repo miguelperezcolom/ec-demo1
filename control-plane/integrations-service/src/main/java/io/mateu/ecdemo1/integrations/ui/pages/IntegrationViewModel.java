@@ -2,7 +2,7 @@ package io.mateu.ecdemo1.integrations.ui.pages;
 
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
 import io.mateu.ecdemo1.integrations.rest.IntegrationDto;
-import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
+import io.mateu.ecdemo1.integrations.application.IntegrationQueries;
 import io.mateu.ecdemo1.integrations.store.Integration;
 import io.mateu.ecdemo1.integrations.ui.suppliers.CrsHotelLabel;
 import io.mateu.ecdemo1.integrations.ui.suppliers.CrsHotelOptions;
@@ -121,7 +121,7 @@ public class IntegrationViewModel implements Identifiable {
     String id;
 
     final Integrations lifecycle;
-    final BackfillRunRepository runs;
+    final IntegrationQueries queries;
 
     /** A new integration starts from the chain's connection: the person names the hotel and the property. */
     public IntegrationViewModel blank() {
@@ -225,7 +225,7 @@ public class IntegrationViewModel implements Identifiable {
     }
 
     public IntegrationViewModel load(Integration i) {
-        var run = runs.findFirstByIntegrationIdOrderByStartedAtDesc(i.id).orElse(null);
+        var run = queries.lastBackfill(i.id).orElse(null);
         status = IntegrationCrud.status(i.getStatus());
         crsHotelCode = i.crsHotelCode;
         operaProperty = i.pmsHotelCode;

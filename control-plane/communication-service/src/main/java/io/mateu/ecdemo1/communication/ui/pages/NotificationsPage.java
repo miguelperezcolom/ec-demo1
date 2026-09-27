@@ -1,9 +1,9 @@
 package io.mateu.ecdemo1.communication.ui.pages;
 
-import io.mateu.ecdemo1.communication.ui.Paging;
+import io.mateu.ecdemo1.communication.application.NotificationQueries;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.ecdemo1.communication.store.DeliveryStatus;
 import io.mateu.ecdemo1.communication.store.Notification;
-import io.mateu.ecdemo1.communication.store.NotificationRepository;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
@@ -16,11 +16,14 @@ import io.mateu.uidl.interfaces.Searchable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 /** Everything the integration asked to tell someone, newest first, and whether it went. */
@@ -33,18 +36,24 @@ public class NotificationsPage implements Listing<NotificationRow>, Searchable, 
     /** When, as a person reads it: local time to the minute — the year short, since history spans more than one. */
     static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM/yy HH:mm").withZone(ZoneId.of("Europe/Madrid"));
 
-    final NotificationRepository notifications;
+    final NotificationQueries notifications;
     final ObjectProvider<NotificationViewModel> detail;
 
     @Override
     public ListingData<NotificationRow> search(SearchRequest request, HttpRequest httpRequest) {
-        var text = request.searchText() == null ? "" : request.searchText().toLowerCase();
-        var rows = notifications.findAllByOrderByRequestedAtDesc().stream()
-                .filter(n -> (n.title + " " + n.hotelCode + " " + n.type).toLowerCase().contains(text))
-                .map(n -> new NotificationRow(n.id, when(n.requestedAt), String.valueOf(n.type), n.hotelCode,
-                        shortTitle(n.title), n.recipients, status(n), detail(n)))
-                .toList();
-        return Paging.page(rows, request);
+        return DbPaging.page(request, p -> notifications.find(request.searchText(), sorted(p, request)),
+                n -> new NotificationRow(n.id, when(n.requestedAt), String.valueOf(n.type), n.hotelCode,
+                        shortTitle(n.title), n.recipients, status(n), detail(n)));
+    }
+
+    /** Grid column → notification property: what a click on a column's header sorts by. */
+    static final Map<String, String> SORTABLE = Map.of("requestedAt", "requestedAt", "type", "type",
+            "hotel", "hotelCode", "title", "title", "status", "status");
+
+    /** The page DbPaging asks for, in the order the grid asked for on the columns that map to one. */
+    static Pageable sorted(Pageable page, SearchRequest request) {
+        return PageRequest.of(page.getPageNumber(), page.getPageSize(),
+                DbPaging.pageable(request.pageable(), SORTABLE).getSort());
     }
 
     static final int TITLE_LENGTH = 70;
@@ -79,6 +88,6 @@ public class NotificationsPage implements Listing<NotificationRow>, Searchable, 
 
     @Override
     public NotificationViewModel view(String id, HttpRequest httpRequest) {
-        return detail.getObject().load(notifications.findById(id).orElseThrow(() -> new NoSuchElementException("No notification " + id)));
+        return detail.getObject().load(notifications.byId(id).orElseThrow(() -> new NoSuchElementException("No notification " + id)));
     }
 }

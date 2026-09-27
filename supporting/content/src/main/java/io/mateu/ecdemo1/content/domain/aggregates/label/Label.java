@@ -1,7 +1,6 @@
 package io.mateu.ecdemo1.content.domain.aggregates.label;
 
 
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.workflow.ddd.AggregateRoot;
 import io.mateu.ecdemo1.content.domain.aggregates.label.vo.LabelId;
 import io.mateu.ecdemo1.content.domain.aggregates.label.vo.LabelName;

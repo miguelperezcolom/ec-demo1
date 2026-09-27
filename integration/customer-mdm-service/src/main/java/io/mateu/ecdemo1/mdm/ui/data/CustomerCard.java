@@ -3,12 +3,10 @@ package io.mateu.ecdemo1.mdm.ui.data;
 import io.mateu.ecdemo1.mdm.footprint.Footprint;
 import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.ecdemo1.mdm.footprint.Links;
-import io.mateu.ecdemo1.mdm.store.ChangeRequestRepository;
+import io.mateu.ecdemo1.mdm.application.CustomerQueries;
 import io.mateu.ecdemo1.mdm.store.Customer;
-import io.mateu.ecdemo1.mdm.store.CustomerRepository;
 import io.mateu.ecdemo1.mdm.store.SalesforceState;
 import io.mateu.ecdemo1.mdm.store.Xref;
-import io.mateu.ecdemo1.mdm.store.XrefRepository;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ReadOnly;
@@ -89,9 +87,7 @@ public class CustomerCard implements Identifiable {
 
     final Footprint footprint;
     final Links links;
-    final XrefRepository xrefs;
-    final ChangeRequestRepository changeRequestRepository;
-    final CustomerRepository customers;
+    final CustomerQueries customers;
 
     public CustomerCard load(Customer c) {
         status = Estados.customer(c.status);
@@ -108,7 +104,7 @@ public class CustomerCard implements Identifiable {
         salesforce = salesforce(c);
         updatedAt = Estados.moment(c.updatedAt);
         var name = c.fullName();
-        changeRequests = changeRequestRepository.findByCustomerIdInOrderByRequestedAtDesc(codes).stream()
+        changeRequests = customers.changeRequestsOf(codes).stream()
                 .map(r -> ChangeRequestRows.of(r, name))
                 .toList();
         return this;
@@ -133,14 +129,14 @@ public class CustomerCard implements Identifiable {
      */
     String systemsMarkup() {
         // Read again by its code: the screen's state holds what it shows, not the record.
-        var customer = id == null ? null : customers.findById(id).orElse(null);
+        var customer = id == null ? null : customers.find(id).orElse(null);
         if (customer == null) {
             return "";
         }
         var html = new StringBuilder();
         var codes = footprint.codesOf(customer);
         var known = new ArrayList<Xref>();
-        codes.forEach(code -> known.addAll(xrefs.findByCustomerIdOrderBySystemAscReferenceAsc(code)));
+        codes.forEach(code -> known.addAll(customers.xrefsOf(code)));
 
         html.append(Html.heading("Dónde está"));
         var places = new ArrayList<List<String>>();
@@ -218,7 +214,7 @@ public class CustomerCard implements Identifiable {
                     "Front office"), rows));
         }
 
-        var cases = changeRequestRepository.findByCustomerIdInOrderByRequestedAtDesc(codes).stream()
+        var cases = customers.changeRequestsOf(codes).stream()
                 .filter(r -> r.salesforceCaseId != null).toList();
         if (!cases.isEmpty()) {
             html.append(Html.heading("Solicitudes de cambio en Salesforce"));

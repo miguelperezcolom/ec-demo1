@@ -2,7 +2,7 @@ package io.mateu.ecdemo1.communication.ui.inbox;
 
 import io.mateu.ecdemo1.communication.inbox.Inbox;
 import io.mateu.ecdemo1.communication.store.InboxItem;
-import io.mateu.ecdemo1.communication.ui.Paging;
+import io.mateu.ecdemo1.uicommons.paging.Paging;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ListToolbarButton;
 import io.mateu.uidl.annotations.Title;

@@ -2,7 +2,7 @@ package io.mateu.ecdemo1.communication.ui.pages;
 
 import io.mateu.ecdemo1.communication.store.Channel;
 import io.mateu.ecdemo1.communication.store.Recipient;
-import io.mateu.ecdemo1.communication.store.RecipientRepository;
+import io.mateu.ecdemo1.communication.application.Recipients;
 import io.mateu.ecdemo1.integration.model.notification.NotificationType;
 import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.UUID;
 
 /**
  * A recipient: who is told, about what, and where. Every active recipient that wants a notification
@@ -78,7 +77,7 @@ public class RecipientViewModel implements Identifiable {
     @Help("1, 2…; empty is every space")
     String chatSpaces;
 
-    final RecipientRepository recipients;
+    final Recipients recipients;
 
     public String save() {
         var channels = EnumSet.noneOf(Channel.class);
@@ -86,44 +85,15 @@ public class RecipientViewModel implements Identifiable {
         if (byWebPush) channels.add(Channel.WEB_PUSH);
         if (byEmail) channels.add(Channel.EMAIL);
         if (byGoogleChat) channels.add(Channel.GOOGLE_CHAT);
-        var problems = problems(channels, blankToNull(users), blankToNull(roles), blankToNull(email));
-        if (!problems.isEmpty()) {
-            throw new IllegalArgumentException(String.join(" ", problems));
-        }
-        var r = id == null ? new Recipient() : recipients.findById(id).orElseGet(Recipient::new);
-        r.id = id == null ? UUID.randomUUID().toString() : id;
-        r.name = name;
-        r.active = active;
-        r.users = blankToNull(users);
-        r.roles = blankToNull(roles);
-        r.email = blankToNull(email);
         var types = new ArrayList<NotificationType>();
         if (causeOpened) types.add(NotificationType.CAUSE_OPENED);
         if (proposalReady) types.add(NotificationType.PROPOSAL_READY);
         if (retryingTooLong) types.add(NotificationType.RETRYING_TOO_LONG);
         if (pmsRejected) types.add(NotificationType.PMS_REJECTED);
         if (integrationNeedsAttention) types.add(NotificationType.INTEGRATION_NEEDS_ATTENTION);
-        r.types = Recipient.join(types);
-        r.tasks = tasks;
-        r.hotelCode = hotelCode == null || hotelCode.isBlank() ? null : hotelCode.trim();
-        r.channels = Recipient.join(channels);
-        r.chatSpaces = byGoogleChat ? blankToNull(chatSpaces) : null;
-        return recipients.save(r).id;
-    }
-
-    /** What a recipient needs to reach anyone on its channels. */
-    public static java.util.List<String> problems(EnumSet<Channel> channels, String users, String roles, String email) {
-        var problems = new ArrayList<String>();
-        if (channels.isEmpty()) {
-            problems.add("Tick at least one channel; to silence a recipient, deactivate it.");
-        }
-        if ((channels.contains(Channel.INBOX) || channels.contains(Channel.WEB_PUSH)) && users == null && roles == null) {
-            problems.add("Inbox and Web Push need users or roles.");
-        }
-        if (channels.contains(Channel.EMAIL) && email == null) {
-            problems.add("E-mail needs an address.");
-        }
-        return problems;
+        return recipients.save(new Recipients.RecipientChange(id, name, active, blankToNull(users), blankToNull(roles),
+                blankToNull(email), types, tasks, hotelCode == null || hotelCode.isBlank() ? null : hotelCode.trim(),
+                channels, byGoogleChat ? blankToNull(chatSpaces) : null));
     }
 
     public RecipientViewModel load(Recipient r) {

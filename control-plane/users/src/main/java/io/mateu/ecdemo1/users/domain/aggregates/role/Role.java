@@ -1,7 +1,6 @@
 package io.mateu.ecdemo1.users.domain.aggregates.role;
 
 
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.workflow.ddd.AggregateRoot;
 import io.mateu.ecdemo1.users.domain.aggregates.permission.vo.PermissionId;
 import io.mateu.ecdemo1.users.domain.aggregates.role.vo.RoleId;
