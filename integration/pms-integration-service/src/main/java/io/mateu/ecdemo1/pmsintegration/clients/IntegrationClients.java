@@ -128,6 +128,12 @@ public class IntegrationClients {
                 .retrieve().toBodilessEntity();
     }
 
+    /** Resolves a cause if it is open — whatever waited only on it goes on; nothing if it is not open. */
+    public void resolveCauseIfOpen(String causeKey, String by) {
+        mapping.post().uri(b -> b.path("/causes/resolve-if-open").queryParam("key", causeKey).queryParam("by", by).build())
+                .retrieve().toBodilessEntity();
+    }
+
     record ResolveRequest(String hotelCode, List<CodeRef> codes) {
     }
 

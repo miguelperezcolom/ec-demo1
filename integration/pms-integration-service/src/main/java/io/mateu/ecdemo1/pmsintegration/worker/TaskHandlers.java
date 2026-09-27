@@ -181,6 +181,7 @@ public class TaskHandlers {
                 if (written >= r.version() || OperaReservations.cancelled(existing.get())) {
                     log.info("{} v{}: Opera already holds v{}{}, nothing to write", r.locator(), r.version(), written,
                             OperaReservations.cancelled(existing.get()) ? " (cancelled)" : "");
+                    supersedeRefusals(r, written);
                     return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.STALE.name()),
                             new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
                 }
@@ -194,10 +195,32 @@ public class TaskHandlers {
                 reservations.ensureDeposit(hotel, reservationId, payment,
                         resolved.target(CodeType.PAYMENT_METHOD, payment.methodCode()), r.currency());
             }
+            supersedeRefusals(r, r.version());
             return List.of(new Variable(ProcessVariables.WRITE_OUTCOME, Outcome.DONE.name()),
                     new Variable(ProcessVariables.PMS_RESERVATION_ID, reservationId));
         } catch (PmsRejectedException e) {
             return rejected(task, r, "reservation " + r.locator(), e, ProcessVariables.WRITE_OUTCOME);
+        }
+    }
+
+    /** The steps whose refusal a newer version written to Opera leaves with nothing to wait for. */
+    static final List<String> SUPERSEDED_STEPS = List.of("ensure-guest-profile", "upsert-reservation");
+
+    /**
+     * Opera holds this reservation at {@code version} now. An older version Opera refused — a room type
+     * with no rooms left, say — waits on its refusal; once a newer version is in, there is nothing left
+     * for anyone to resolve: the refusal is resolved here, the process that waited on it resumes, finds
+     * Opera ahead of it and ends. A cause that is not open is left alone; if the mapping does not
+     * answer, the refusal stays for a person, and the write is not undone for it.
+     */
+    void supersedeRefusals(Reservation r, long version) {
+        for (var step : SUPERSEDED_STEPS) {
+            try {
+                integration.resolveCauseIfOpen(Cause.pmsRejectedReservation(r.hotelCode(), r.locator(), step, "").key(),
+                        "pms-integration: v%d is in Opera".formatted(version));
+            } catch (RuntimeException e) {
+                log.warn("{}: a refusal of its {} could not be resolved as superseded: {}", r.locator(), step, e.getMessage());
+            }
         }
     }
 
