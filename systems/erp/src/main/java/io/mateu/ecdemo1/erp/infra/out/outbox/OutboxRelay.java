@@ -1,8 +1,9 @@
 package io.mateu.ecdemo1.erp.infra.out.outbox;
 
+import io.mateu.ecdemo1.erp.tracing.Traces;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.stream.function.StreamBridge;
+import org.springframework.cloud.stream.function.StreamOperations;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,8 +30,9 @@ public class OutboxRelay {
 
     final OutboxMessageRepository repository;
     final OutboxProperties properties;
-    final StreamBridge streamBridge;
+    final StreamOperations streamBridge;
     final Clock clock;
+    final Traces traces;
 
     @Scheduled(fixedDelayString = "${outbox.interval:500ms}")
     @Transactional
@@ -41,9 +43,14 @@ public class OutboxRelay {
             if (message.messageKey != null) {
                 builder.setHeader(KafkaHeaders.KEY, message.messageKey);
             }
-            if (!streamBridge.send(message.binding, builder.build())) {
-                throw new IllegalStateException("Broker did not accept outbox message " + message.seq);
-            }
+            traces.continuing(message.traceparent, message.tracestate, "outbox " + message.binding, headers -> {
+                // byte[], as the W3C propagators on the other side read them; a String header would
+                // reach them JSON-quoted.
+                headers.forEach((name, value) -> builder.setHeader(name, value.getBytes(StandardCharsets.UTF_8)));
+                if (!streamBridge.send(message.binding, builder.build())) {
+                    throw new IllegalStateException("Broker did not accept outbox message " + message.seq);
+                }
+            });
             message.publishedAt = clock.instant();
             log.debug("Published {} #{} to {}", message.eventType, message.seq, message.binding);
         }

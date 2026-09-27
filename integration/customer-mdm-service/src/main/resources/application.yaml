@@ -33,6 +33,8 @@ spring:
     stream:
       kafka:
         binder:
+          # Consumers continue the trace their record carries; records sent carry the trace they were sent in.
+          enable-observation: true
           brokers: ${KAFKA_BROKERS:localhost:9192}
           auto-create-topics: true
         bindings:
@@ -87,6 +89,14 @@ springdoc:
   packages-to-scan: io.mateu.ecdemo1.mdm.rest
 
 management:
+  # Traces to Tempo, as the engine's. Sampled at 0 unless TRACING_SAMPLING says otherwise (1.0 in
+  # the cluster); the service name comes from OTEL_SERVICE_NAME, set in the manifest.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
   endpoints:
     web:
       exposure:
