@@ -2,7 +2,7 @@ package io.mateu.ecdemo1.mdm.commands;
 
 import io.mateu.ecdemo1.integration.model.command.CustomerCommand;
 import io.mateu.ecdemo1.mdm.change.ChangeRequests;
-import io.mateu.ecdemo1.mdm.inbox.Inbox;
+import io.mateu.ecdemo1.messaging.Inbox;
 import io.mateu.ecdemo1.mdm.outbox.CustomerEvents;
 import io.mateu.ecdemo1.mdm.scan.ScannedIdentities;
 import io.mateu.ecdemo1.mdm.store.ChangeRequest;

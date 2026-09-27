@@ -1,7 +1,7 @@
 # Runbook — verifying user → Keycloak propagation (and the SMTP relay)
 
 How to confirm, on a live cluster, that creating/editing/deleting a user in the `users` console
-reaches Keycloak through the identity outbox, and that Keycloak can send the set-password mail
+reaches Keycloak through the identity outbox (the shared outbox table `outbox_message`, destination `identity`; the old `identity_outbox` table keeps only its history), and that Keycloak can send the set-password mail
 through the postfix relay.
 
 Read alongside the README section *Propagating users to Keycloak* and *Email and SMTP*. Everything
@@ -82,8 +82,8 @@ Now verify, in order:
 ```sh
 # a) The outbox took the intent. Immediately after saving you may catch it pending;
 #    within ~5s the relay should mark it delivered (deliveredAt set).
-psql_users "select event_type, delivered_at is not null as delivered, attempts, abandoned
-            from identity_outbox where aggregate_id='$TEST_ID' order by occurred_at;"
+psql_users "select event_type, published_at is not null as delivered, attempts, abandoned
+            from outbox_message where binding='identity' and message_key='$TEST_ID' order by seq;"
 #   UserCreated | f | 0 | f      (just after save)
 #   UserCreated | t | 0 | f      (after the next relay tick)
 
@@ -99,7 +99,7 @@ kubectl -n "$NS" logs deploy/postfix | grep -i "$TEST_ID\|to=<" | tail
 The `users` pod logs narrate the same story from its side:
 
 ```sh
-kubectl -n "$NS" logs deploy/users | grep -iE "identity outbox|Created Keycloak user|set-password" | tail
+kubectl -n "$NS" logs deploy/users | grep -iE "outbox|Created Keycloak user|set-password" | tail
 ```
 
 ---
@@ -109,8 +109,8 @@ kubectl -n "$NS" logs deploy/users | grep -iE "identity outbox|Created Keycloak 
 **Trigger:** in the Users console, change the test user's name or email and save.
 
 ```sh
-psql_users "select event_type, delivered_at is not null as delivered
-            from identity_outbox where aggregate_id='$TEST_ID' order by occurred_at;"
+psql_users "select event_type, published_at is not null as delivered
+            from outbox_message where binding='identity' and message_key='$TEST_ID' order by seq;"
 #   a new UserUpdated row appears and flips to delivered
 
 kcadm get users -r ec-demo1 -q username="$TEST_ID" --fields username,email,firstName
@@ -124,8 +124,8 @@ kcadm get users -r ec-demo1 -q username="$TEST_ID" --fields username,email,first
 **Trigger:** in the Users console, delete the test user.
 
 ```sh
-psql_users "select event_type, delivered_at is not null as delivered
-            from identity_outbox where aggregate_id='$TEST_ID' order by occurred_at;"
+psql_users "select event_type, published_at is not null as delivered
+            from outbox_message where binding='identity' and message_key='$TEST_ID' order by seq;"
 #   a UserDeleted row appears and flips to delivered
 
 kcadm get users -r ec-demo1 -q username="$TEST_ID" --fields username
@@ -140,8 +140,8 @@ Delivered rows are kept for the retention window (default 7 days) then purged by
 Right after the steps above you should still see the delivered rows:
 
 ```sh
-psql_users "select event_type, occurred_at, delivered_at from identity_outbox
-            where aggregate_id='$TEST_ID' order by occurred_at;"
+psql_users "select event_type, created_at, published_at from outbox_message
+            where binding='identity' and message_key='$TEST_ID' order by seq;"
 ```
 
 ---
@@ -163,8 +163,8 @@ test the **outbox** retry, break the Admin API path (e.g. temporarily set a wron
 ```sh
 watch -n2 "kubectl -n $NS exec -i deploy/ec-postgres -c postgres -- \
   psql -U workflow -d users -tAc \
-  \"select event_type,attempts,delivered_at is not null,next_attempt_at,abandoned \
-    from identity_outbox where aggregate_id like '${TEST_ID}-b%';\""
+  \"select event_type,attempts,published_at is not null,next_attempt_at,abandoned \
+    from outbox_message where binding='identity' and message_key like '${TEST_ID}-b%';\""
 #   attempts climbs, next_attempt_at pushes out with backoff, delivered stays false.
 #   After max-attempts (default 10) abandoned flips true and it stops — that is the poison-pill guard.
 ```
@@ -179,7 +179,7 @@ kubectl -n "$NS" scale deploy/postfix --replicas=1
 
 > A row that reached `abandoned=true` will **not** self-heal — that is intentional. Requeue it by
 > clearing its state once the underlying cause is fixed:
-> `psql_users "update identity_outbox set abandoned=false, attempts=0, next_attempt_at=now() where abandoned;"`
+> `psql_users "update outbox_message set abandoned=false, attempts=0, next_attempt_at=now() where binding='identity' and abandoned;"`
 
 ---
 
@@ -188,7 +188,7 @@ kubectl -n "$NS" scale deploy/postfix --replicas=1
 Delete any test users left in the console, then confirm nothing lingers:
 
 ```sh
-psql_users "select count(*) from identity_outbox where aggregate_id like '${TEST_ID}%';"
+psql_users "select count(*) from outbox_message where binding='identity' and message_key like '${TEST_ID}%';"
 kcadm get users -r ec-demo1 -q username="$TEST_ID" --fields username
 ```
 

@@ -193,7 +193,9 @@ class MdmTest {
     @Autowired
     io.mateu.ecdemo1.mdm.change.SalesforceProjection salesforceProjection;
     @Autowired
-    io.mateu.ecdemo1.mdm.outbox.OutboxMessageRepository outboxMessages;
+    io.mateu.ecdemo1.messaging.Outbox outboxMessages;
+    @Autowired
+    org.springframework.jdbc.core.JdbcTemplate outboxTable;
     @Autowired
     io.mateu.ecdemo1.mdm.change.SalesforceInbox salesforceInbox;
     @Autowired
@@ -218,7 +220,7 @@ class MdmTest {
     void aScannedDocumentFillsWhatTheCustomerLacksAndGoesToSalesforceWithoutACase() throws Exception {
         var ana = resolve("S1", person("Ana", "Ruiz", "ana.ruiz@example.com", null, null)).get(0).customerId();
         projection.projectPending();
-        outboxMessages.deleteAll();
+        outboxTable.update("delete from outbox_message");
         calls.clear();
 
         customerCommands.handle(scan("S1", 1, ana, "Ana", "Ruiz", "12345678Z", java.time.LocalDate.of(1984, 3, 2)));
@@ -302,7 +304,7 @@ class MdmTest {
         projection.projectPending();
         var holderContact = contactByMdmId.get(holder);
         var provisionalContact = contactByMdmId.get(provisional);
-        outboxMessages.deleteAll();
+        outboxTable.update("delete from outbox_message");
 
         // At the desk, her document: the one the MDM already knows her by.
         var outcome = customerCommands.handle(scan("S5", 1, provisional, "Marta", "Soler", "33.333.333-P", java.time.LocalDate.of(1990, 2, 3)));
@@ -356,7 +358,7 @@ class MdmTest {
     @Test
     void theDesksChangeIsTakenOnceByItsOwnIdAndOneThatChangesNothingIsApprovedToTheDesk() throws Exception {
         var eva = resolve("S8", person("Eva", "Serra", "eva.serra@example.com", null, null)).get(0).customerId();
-        outboxMessages.deleteAll();
+        outboxTable.update("delete from outbox_message");
         var change = new io.mateu.ecdemo1.integration.model.command.CustomerCommand.ProposeChange("CR-FO-TEST1", eva,
                 "Eva Serra", "eva.serra@example.com", "+34 600 111 222", null, "front office MRU01");
 
@@ -379,7 +381,7 @@ class MdmTest {
 
     @Test
     void anApprovalArrivingTwiceAtOnceIsProjectedOnce() throws Exception {
-        outboxMessages.deleteAll();
+        outboxTable.update("delete from outbox_message");
         var eva = resolve("L11", person("Eva", "Soler", "eva@example.com", null, null)).get(0).customerId();
         projection.projectPending();
         var contactId = contactByMdmId.get(eva);
@@ -408,12 +410,12 @@ class MdmTest {
 
     /** What the MDM said about a customer on the customers topic, oldest first. */
     List<CustomerEvent> events(String customerId) {
-        return outboxMessages.findAll().stream()
-                .filter(m -> customerId.equals(m.getMessageKey()))
-                .sorted(java.util.Comparator.comparing(m -> m.getSeq()))
+        return outboxMessages.messages().stream()
+                .filter(m -> customerId.equals(m.key()))
+                .sorted(java.util.Comparator.comparing(m -> m.seq()))
                 .map(m -> {
                     try {
-                        return json.readValue(m.getPayload(), CustomerEvent.class);
+                        return json.readValue(m.payload(), CustomerEvent.class);
                     } catch (IOException e) {
                         throw new IllegalStateException(e);
                     }
@@ -446,7 +448,7 @@ class MdmTest {
 
     @Test
     void aChangeProposedByAHotelIsDecidedInSalesforceAndTheDecisionReachesTheHotels() throws Exception {
-        outboxMessages.deleteAll();
+        outboxTable.update("delete from outbox_message");
         var ana = resolve("L9", person("Ana", "García", "ana@example.com", null, null)).get(0).customerId();
         projection.projectPending();
         var contactId = contactByMdmId.get(ana);
@@ -497,7 +499,7 @@ class MdmTest {
 
     @Test
     void aContactChangedInSalesforceIsProjectedOnceAndItsEchoGoesNoFurther() throws Exception {
-        outboxMessages.deleteAll();
+        outboxTable.update("delete from outbox_message");
         var leo = resolve("L10", person("Leo", "Pons", "leo@example.com", null, null)).get(0).customerId();
         projection.projectPending();
         var contactId = contactByMdmId.get(leo);
@@ -529,7 +531,7 @@ class MdmTest {
     @BeforeEach
     void clean() {
         budget.succeeded();
-        outboxMessages.deleteAll();
+        outboxTable.update("delete from outbox_message");
         consolidationRecords.deleteAll();
         sources.deleteAll();
         customers.deleteAll();
@@ -689,8 +691,8 @@ class MdmTest {
         assertThat(waiting.projectionError).isNull();
         assertThat(budget.open()).isFalse();
         // Said once, to whoever sees to the integration.
-        assertThat(outboxMessages.findAll()).filteredOn(m -> m.getBinding().equals("notifications")).singleElement()
-                .satisfies(m -> assertThat(m.getPayload()).contains("INTEGRATION_NEEDS_ATTENTION", "salesforce/api-allowance",
+        assertThat(outboxMessages.messages()).filteredOn(m -> m.destination().equals("notifications")).singleElement()
+                .satisfies(m -> assertThat(m.payload()).contains("INTEGRATION_NEEDS_ATTENTION", "salesforce/api-allowance",
                         "daily API allowance spent"));
 
         // While paused, nothing asks: not the projection, not the polls, not a changed contact.
@@ -710,8 +712,8 @@ class MdmTest {
         salesforceInbox.refreshPending();
         assertThat(customers.findById(ana).orElseThrow().salesforceRefreshPending).isNull();
         assertThat(calls).contains("GET /services/data/v67.0/queryAll");
-        assertThat(outboxMessages.findAll()).filteredOn(m -> m.getBinding().equals("resolutions")).singleElement()
-                .satisfies(m -> assertThat(m.getPayload()).contains("salesforce/api-allowance"));
+        assertThat(outboxMessages.messages()).filteredOn(m -> m.destination().equals("resolutions")).singleElement()
+                .satisfies(m -> assertThat(m.payload()).contains("salesforce/api-allowance"));
         assertThat(budget.open()).isTrue();
     }
 

@@ -52,17 +52,21 @@ keycloak:
   # the create. Turn off to provision credential-less users some other way.
   password-setup-email: ${KEYCLOAK_PASSWORD_SETUP_EMAIL:true}
 
-# The identity outbox relay. poll-interval drains what is due; the rest govern retries and how long
-# delivered rows are kept before the daily purge removes them.
-identity:
+# The identity changes go through the shared outbox (supporting/messaging) to Keycloak
+# (IdentityTransport): the relay drains what is due every interval; a failed delivery is retried after
+# a backoff that doubles from backoff-initial up to backoff-max, the user's later changes waiting behind
+# it, and abandoned after max-attempts; one user's failure does not hold the others back
+# (continue-after-failure). Delivered changes are kept for the retention, then purged. The env
+# variables are the ones the identity outbox had.
+messaging:
   outbox:
-    poll-interval-ms: ${IDENTITY_OUTBOX_POLL_MS:5000}
+    interval: ${IDENTITY_OUTBOX_POLL_MS:5000}ms
     batch-size: ${IDENTITY_OUTBOX_BATCH:50}
     max-attempts: ${IDENTITY_OUTBOX_MAX_ATTEMPTS:10}
-    backoff-seconds: ${IDENTITY_OUTBOX_BACKOFF_SECONDS:10}
-    backoff-cap-seconds: ${IDENTITY_OUTBOX_BACKOFF_CAP_SECONDS:600}
-    retention-days: ${IDENTITY_OUTBOX_RETENTION_DAYS:7}
-    purge-cron: ${IDENTITY_OUTBOX_PURGE_CRON:0 0 3 * * *}
+    backoff-initial: ${IDENTITY_OUTBOX_BACKOFF_SECONDS:10}s
+    backoff-max: ${IDENTITY_OUTBOX_BACKOFF_CAP_SECONDS:600}s
+    retention: ${IDENTITY_OUTBOX_RETENTION_DAYS:7}d
+    continue-after-failure: true
 
 management:
   endpoints:

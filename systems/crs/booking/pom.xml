@@ -83,6 +83,13 @@
 
         <!-- The engine's event DTOs — TaskExecutionRequested, WorkerReply, Variable. Published to
              Maven Central by the engine, so nothing here needs eventconductor checked out. -->
+        <!-- The outbox, its relay and the inbox, shared by the services. Installed from
+             ../../../supporting/messaging first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>messaging</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu.workflow</groupId>
             <artifactId>shared</artifactId>

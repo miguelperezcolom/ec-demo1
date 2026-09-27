@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.mdm.outbox;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integration.model.customer.CustomerEvent;
-import io.mateu.ecdemo1.mdm.tracing.Traces;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,6 +13,9 @@ import java.time.Clock;
 /**
  * What must leave only if the decision that produced it was saved: the MDM's events about a
  * customer, on the {@code customers} topic, keyed by the customer.
+ *
+ * <p>This service's messages, in its words; the outbox itself — the table, the relay, the trace
+ * context carried to the record — is the shared one ({@link io.mateu.ecdemo1.messaging.Outbox}).
  */
 @Component
 @RequiredArgsConstructor
@@ -23,27 +25,13 @@ public class Outbox {
     public static final String NOTIFICATIONS = "notifications";
     public static final String RESOLUTIONS = "resolutions";
 
-    final OutboxMessageRepository repository;
+    final io.mateu.ecdemo1.messaging.Outbox outbox;
     final ObjectMapper objectMapper;
     final Clock clock;
-    final Traces traces;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void append(CustomerEvent event) {
-        var message = new OutboxMessageEntity();
-        message.binding = CUSTOMERS;
-        message.messageKey = event.customerId();
-        message.eventType = event.getClass().getSimpleName();
-        try {
-            message.payload = objectMapper.writerFor(CustomerEvent.class).writeValueAsString(event);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Cannot serialise " + event, e);
-        }
-        message.createdAt = clock.instant();
-        var trace = traces.current();
-        message.traceparent = trace.get(Traces.TRACEPARENT);
-        message.tracestate = trace.get(Traces.TRACESTATE);
-        repository.save(message);
+        write(CUSTOMERS, event.customerId(), event.getClass().getSimpleName(), serialise(CustomerEvent.class, event));
     }
 
     /** A person to be told something: the communication service decides who, and how. */
@@ -62,16 +50,7 @@ public class Outbox {
     }
 
     void write(String binding, String key, String type, String payload) {
-        var message = new OutboxMessageEntity();
-        message.binding = binding;
-        message.messageKey = key;
-        message.eventType = type;
-        message.payload = payload;
-        message.createdAt = clock.instant();
-        var trace = traces.current();
-        message.traceparent = trace.get(Traces.TRACEPARENT);
-        message.tracestate = trace.get(Traces.TRACESTATE);
-        repository.save(message);
+        outbox.append(binding, key, type, payload, null);
     }
 
     String serialise(Class<?> as, Object value) {

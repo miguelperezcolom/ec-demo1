@@ -129,7 +129,7 @@ class McpServerOverHttpTest {
       assertThat(confirmed).contains("Hecho. Late check-out de HTTP-1 contratado");
     }
     assertThat(folios.findByStayId("HTTP-1").orElseThrow().lateCheckOutContracted()).isTrue();
-    assertThat(jdbc.queryForList("select payload from audit_outbox", String.class))
+    assertThat(jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class))
         .anySatisfy(p -> assertThat(p).contains("HTTP-1").contains("\"by\":\"reception-agent (ana)\""));
   }
 }

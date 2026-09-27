@@ -1,12 +1,14 @@
 package io.mateu.ecdemo1.mapping.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.mateu.ecdemo1.mapping.tracing.Traces;
+import io.mateu.ecdemo1.messaging.MessagingProperties;
+import io.mateu.ecdemo1.messaging.TraceContexts;
+import io.mateu.ecdemo1.messaging.engine.EngineOutbox;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.ProcessCreationRequested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
-import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,23 +21,41 @@ class OutboxTraceTest {
 
     static final String TRACEPARENT = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
 
-    final List<OutboxMessageEntity> saved = new ArrayList<>();
-    final OutboxMessageRepository repository = (OutboxMessageRepository) Proxy.newProxyInstance(
-            getClass().getClassLoader(), new Class<?>[]{OutboxMessageRepository.class}, (proxy, method, args) -> {
-                if (method.getName().equals("save")) {
-                    saved.add((OutboxMessageEntity) args[0]);
-                    return args[0];
-                }
-                throw new UnsupportedOperationException(method.getName());
-            });
+    record Written(String destination, String key, String type, String payload) {
+    }
 
-    static Traces tracesWith(Map<String, String> current) {
-        return new Traces(null, null) {
+    final List<Written> written = new ArrayList<>();
+
+    static TraceContexts tracesWith(Map<String, String> current) {
+        return new TraceContexts() {
             @Override
             public Map<String, String> current() {
                 return current;
             }
+
+            @Override
+            public void tag(String key, String value) {
+            }
+
+            @Override
+            public void continuing(String traceparent, String tracestate, String name, Send send) throws Exception {
+                send.accept(Map.of());
+            }
         };
+    }
+
+    Outbox outbox(TraceContexts traces) {
+        var shared = new io.mateu.ecdemo1.messaging.Outbox(null, MessagingProperties.defaults(), traces, Clock.systemUTC()) {
+            @Override
+            public void append(String destination, String key, String type, String payload, Map<String, String> headers) {
+                written.add(new Written(destination, key, type, payload));
+            }
+        };
+        var mapper = new ObjectMapper();
+        var engine = new EngineOutbox(shared, traces,
+                new StaticListableBeanFactory(Map.of("objectMapper", mapper)).getBeanProvider(ObjectMapper.class),
+                Outbox.ENGINE);
+        return new Outbox(shared, engine, mapper, Clock.systemUTC());
     }
 
     static ProcessCreationRequested successor() {
@@ -44,24 +64,20 @@ class OutboxTraceTest {
 
     @Test
     void aProcessStartedHereJoinsTheCurrentTrace() throws Exception {
-        new Outbox(repository, new ObjectMapper(), Clock.systemUTC(),
-                tracesWith(Map.of("traceparent", TRACEPARENT, "tracestate", "k=v")))
-                .appendToEngine(successor());
+        outbox(tracesWith(Map.of("traceparent", TRACEPARENT, "tracestate", "k=v"))).appendToEngine(successor());
 
-        var message = saved.getFirst();
-        assertThat(message.traceparent).isEqualTo(TRACEPARENT);
-        assertThat(message.tracestate).isEqualTo("k=v");
-        var payload = new ObjectMapper().readTree(message.payload);
+        var message = written.getFirst();
+        assertThat(message.destination()).isEqualTo("outboxUpstream");
+        assertThat(message.key()).isEqualTo(successor().partitionKey());
+        var payload = new ObjectMapper().readTree(message.payload());
         assertThat(payload.at("/traceContext/traceparent").asText()).isEqualTo(TRACEPARENT);
         assertThat(payload.at("/traceContext/tracestate").asText()).isEqualTo("k=v");
     }
 
     @Test
     void untracedItStartsAsBefore() throws Exception {
-        new Outbox(repository, new ObjectMapper(), Clock.systemUTC(), tracesWith(Map.of())).appendToEngine(successor());
+        outbox(tracesWith(Map.of())).appendToEngine(successor());
 
-        var message = saved.getFirst();
-        assertThat(message.traceparent).isNull();
-        assertThat(new ObjectMapper().readTree(message.payload).has("traceContext")).isFalse();
+        assertThat(new ObjectMapper().readTree(written.getFirst().payload()).has("traceContext")).isFalse();
     }
 }

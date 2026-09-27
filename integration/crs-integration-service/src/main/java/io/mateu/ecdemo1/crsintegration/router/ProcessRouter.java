@@ -1,7 +1,7 @@
 package io.mateu.ecdemo1.crsintegration.router;
 
 import io.mateu.ecdemo1.crsintegration.config.CrsProperties;
-import io.mateu.ecdemo1.crsintegration.inbox.Inbox;
+import io.mateu.ecdemo1.messaging.Inbox;
 import io.mateu.ecdemo1.crsintegration.outbox.Outbox;
 import io.mateu.ecdemo1.integration.model.events.IntegrationEvent;
 import io.mateu.ecdemo1.integration.model.events.PartnerChanged;
@@ -43,7 +43,7 @@ public class ProcessRouter {
     final Outbox outbox;
     final CrsProperties properties;
     final Integrations integrations;
-    final io.mateu.ecdemo1.crsintegration.tracing.Traces traces;
+    final io.mateu.ecdemo1.messaging.TraceContexts traces;
 
     @Transactional
     public void route(IntegrationEvent event) {

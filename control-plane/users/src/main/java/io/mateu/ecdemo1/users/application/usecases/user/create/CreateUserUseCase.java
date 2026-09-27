@@ -30,7 +30,7 @@ public class CreateUserUseCase {
         );
         repository.save(user);
         // Same transaction as the save: the "tell Keycloak" intent commits with the user or not at
-        // all, and the relay delivers it afterwards. See IdentityOutbox.
+        // all, and the relay delivers it afterwards. See IdentityOutboxAppender.
         identityOutboxAppender.drain(user);
     }
 

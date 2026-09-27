@@ -305,7 +305,7 @@ class FrontDeskMcpToolsTest {
   List<String> audited(String stayId) {
     // The parameters travel as a JSON string inside the action: {\"stayId\":\"MCP-1\",…}
     var needle = "\\\"stayId\\\":\\\"" + stayId + "\\\"";
-    return jdbc.queryForList("select payload from audit_outbox", String.class).stream()
+    return jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class).stream()
         .filter(p -> p.contains(needle)).toList();
   }
 

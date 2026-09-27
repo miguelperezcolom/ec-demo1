@@ -178,27 +178,11 @@ create table if not exists check_in_ops (
     no_show_pax varchar(100)
 );
 
--- What the reception agent did here, as AuditedActions (HLA F016) still to be relayed to the audit
--- service's topic: written after each action, sent — and marked — by AuditRelay.
-create table if not exists audit_outbox (
-    action_id    varchar(64)   primary key,
-    payload      varchar(8000) not null,
-    created_at   timestamp     not null,
-    published_at timestamp
-);
-
--- What the front office asks of other services — a change to a customer, a scanned document for the
--- MDM, a no-show for the CRS — written in the same transaction as the desk's decision and relayed to
--- its Kafka topic by CommandRelay: the desk never waits for the other service, and nothing is lost if
--- the broker is down.
-create table if not exists command_outbox (
-    message_id   varchar(64)   primary key,
-    topic        varchar(64)   not null,
-    message_key  varchar(200),
-    payload      varchar(8000) not null,
-    created_at   timestamp     not null,
-    published_at timestamp
-);
+-- What the reception agent did here (AuditedActions, HLA F016) and what the front office asks of other
+-- services — a change to a customer, a scanned document for the MDM, a no-show for the CRS — go through
+-- the shared outbox (supporting/messaging), whose tables it creates itself: outbox_message, and
+-- inbox_entry for the commands taken. The front office's own audit_outbox, command_outbox and
+-- command_inbox came before it; LegacyOutboxes carries over what they still hold.
 
 -- ── The PMS, through the pms-fo integration ─────────────────────────────────
 -- Which PMS reservation each stay is, and the PMS's last modification of it written here: the order
@@ -225,8 +209,3 @@ create table if not exists pms_catalogue_sync (
     synced_at  timestamp   not null
 );
 
--- The commands taken from other services (front-office-commands), by id: each is applied once.
-create table if not exists command_inbox (
-    command_id varchar(64) primary key,
-    taken_at   timestamp   not null
-);

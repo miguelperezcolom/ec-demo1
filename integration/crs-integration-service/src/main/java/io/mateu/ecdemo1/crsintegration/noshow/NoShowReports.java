@@ -1,6 +1,6 @@
 package io.mateu.ecdemo1.crsintegration.noshow;
 
-import io.mateu.ecdemo1.crsintegration.inbox.Inbox;
+import io.mateu.ecdemo1.messaging.Inbox;
 import io.mateu.ecdemo1.crsintegration.router.ProcessRouter;
 import io.mateu.ecdemo1.crsintegration.source.CrsSource;
 import io.mateu.ecdemo1.integration.model.command.ReportNoShow;

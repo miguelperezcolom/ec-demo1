@@ -1,7 +1,7 @@
 package io.mateu.ecdemo1.mapping.commands;
 
 import io.mateu.ecdemo1.integration.model.command.MappingCommand;
-import io.mateu.ecdemo1.mapping.inbox.Inbox;
+import io.mateu.ecdemo1.messaging.Inbox;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

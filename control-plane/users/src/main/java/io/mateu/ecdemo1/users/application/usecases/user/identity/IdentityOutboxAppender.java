@@ -1,7 +1,8 @@
 package io.mateu.ecdemo1.users.application.usecases.user.identity;
 
 import io.mateu.ecdemo1.users.application.out.identity.UserIdentity;
-import io.mateu.ecdemo1.users.application.out.outbox.IdentityOutbox;
+import io.mateu.core.infra.JsonSerializer;
+import io.mateu.ecdemo1.messaging.Outbox;
 import io.mateu.ecdemo1.users.domain.aggregates.user.User;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserCreated;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserDeleted;
@@ -24,6 +25,11 @@ import org.springframework.stereotype.Service;
  * and calling it drains the events into the same transaction that wrote the user. That co-commit is
  * the outbox's entire guarantee; move this outside the transaction and it is gone.
  *
+ * <p>The outbox is the shared one ({@link Outbox}): each change goes to the {@link #DESTINATION}
+ * destination, keyed by the user — so one user's changes reach the provider in the order they were
+ * made — and its relay hands it to the provider (infra/out/keycloak/IdentityTransport), with a backoff
+ * on failure and abandoning it after too many (application.yaml, {@code messaging.outbox.*}).
+ *
  * <p>Events it does not recognise are ignored rather than rejected. Today those are the only two,
  * but an aggregate that later raises an event about groups or roles should not break identity
  * propagation by existing — this cares about identity and lets the rest pass.
@@ -36,21 +42,28 @@ public class IdentityOutboxAppender {
     public static final String CREATED = "UserCreated";
     public static final String UPDATED = "UserUpdated";
     public static final String DELETED = "UserDeleted";
+    /** Where the identity changes go in the outbox: the identity provider. */
+    public static final String DESTINATION = "identity";
 
-    private final IdentityOutbox outbox;
+    private final Outbox outbox;
+
+    /** In the caller's transaction: the change commits with the user, or not at all. */
+    void append(String userId, String eventType, UserIdentity identity) {
+        outbox.append(DESTINATION, userId, eventType, JsonSerializer.toJson(identity), null);
+    }
 
     public void drain(User user) {
         for (var event : user.popEvents()) {
             if (event instanceof UserCreated e) {
-                outbox.append(e.userId(), CREATED,
+                append(e.userId(), CREATED,
                         new UserIdentity(e.userId(), e.userId(), e.email(), e.name(), e.enabled()));
             } else if (event instanceof UserUpdated e) {
-                outbox.append(e.userId(), UPDATED,
+                append(e.userId(), UPDATED,
                         new UserIdentity(e.userId(), e.userId(), e.email(), e.name(), e.enabled()));
             } else if (event instanceof UserDeleted e) {
                 // A deletion needs only the username to key on. The other fields are left blank —
                 // there is no identity to describe once it is gone.
-                outbox.append(e.userId(), DELETED,
+                append(e.userId(), DELETED,
                         new UserIdentity(e.userId(), e.userId(), null, null, false));
             }
         }

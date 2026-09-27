@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -60,7 +59,11 @@ class SingleApprovedInDatabaseTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withTmpFs(Map.of("/var/lib/postgresql/data", "rw"));
 
-    @TestConfiguration
+    /**
+     * Imported, and not a {@code @TestConfiguration}: a configuration class anywhere under io.mateu is
+     * picked up by a component scan wider than the application's, and the application tests' context
+     * then had these stubs too — their clock colliding with the application's.
+     */
     static class Stubs {
         @Bean
         Clock clock() {

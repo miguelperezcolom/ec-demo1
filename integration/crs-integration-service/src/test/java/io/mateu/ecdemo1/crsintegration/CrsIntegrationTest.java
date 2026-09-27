@@ -66,7 +66,9 @@ class CrsIntegrationTest {
     // first with "BrokerNotAvailable". In memory it is also faster, and a test broker holds nothing
     // worth keeping.
     static RedpandaContainer redpanda = new RedpandaContainer("docker.redpanda.com/redpandadata/redpanda:v24.1.7")
-            .withTmpFs(java.util.Map.of("/var/lib/redpanda/data", "rw"));
+            // size=8g: unsized, a tmpfs gets half the Docker VM's memory, under Redpanda's 5 GiB free-space
+            // floor, and every write is refused. It is a ceiling, not an allocation.
+            .withTmpFs(java.util.Map.of("/var/lib/redpanda/data", "rw,size=8g"));
 
     static HttpServer crs;
     static final List<String> writes = new CopyOnWriteArrayList<>();
@@ -172,7 +174,8 @@ class CrsIntegrationTest {
                 {"type":"partner-changed","eventId":"E-3","partnerCode":"NORDTRAVEL","version":1,
                  "occurredAt":"2026-09-22T10:00:00Z"}""");
 
-        assertThat(consume("upstream", r -> r.value().contains("E-2"), 1, 15))
+        // Quoted: the worker's reply to task TE-2, from another test, is on this topic too.
+        assertThat(consume("upstream", r -> r.value().contains("\"E-2\""), 1, 15))
                 .singleElement().satisfies(r -> assertThat(json(r.value()).get("workflowDefinitionId").asText())
                         .isEqualTo("proyectar-cancelacion"));
         assertThat(consume("upstream", r -> r.value().contains("E-3"), 1, 15))
@@ -206,7 +209,7 @@ class CrsIntegrationTest {
                 .satisfies(r -> assertThat(json(r.value()).get("businessKey").asText())
                         .isEqualTo("proyectar-reserva:PMI01/LOC1:mdm-update-C-1-v2"));
         // CUN01 has none; and a rejection changed nothing, so nothing is written again.
-        assertThat(consume("upstream", r -> r.value().contains("CUN01/LOC3") || r.value().contains("C-2"), 1, 5)).isEmpty();
+        assertThat(consume("upstream", r -> r.value().contains("CUN01/LOC3") || r.value().contains("mdm-update-C-2"), 1, 5)).isEmpty();
     }
 
     @Test

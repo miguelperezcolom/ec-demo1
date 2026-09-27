@@ -28,7 +28,7 @@ public class SaveUserUseCase {
                 );
         repository.save(user);
         // Same transaction as the save: the change to propagate commits with the user. See
-        // IdentityOutbox.
+        // IdentityOutboxAppender.
         identityOutboxAppender.drain(user);
     }
 

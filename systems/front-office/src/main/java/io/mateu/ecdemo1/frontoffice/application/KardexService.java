@@ -77,7 +77,7 @@ public class KardexService {
           customerId != null && customerId.startsWith("C-") ? customerId : null, document.firstName(),
           document.lastName(), document.documentType(), document.documentNumber(), document.birthDate(),
           document.nationality(), "front office " + hotel + " · " + stayId + " pax " + pax);
-      outbox.append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), commandId, command);
+      outbox.append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), command);
     });
     return document;
   }

@@ -31,7 +31,7 @@ class KardexTest {
   /** What the kardex proposed to the MDM for a guest, oldest first. */
   List<String> sent(String guestId) {
     return outbox.all(CommandOutbox.CUSTOMER_COMMANDS).stream().filter(e -> guestId.equals(e.key()))
-        .map(CommandOutbox.Entry::payload).toList();
+        .map(io.mateu.ecdemo1.messaging.OutboxMessage::payload).toList();
   }
 
   @Autowired MockMvc mvc;
