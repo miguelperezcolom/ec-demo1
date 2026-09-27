@@ -47,6 +47,14 @@ spec:
         - name: communication-service
           image: miguelperezcolom/ec-demo1-communication-service:0.26.1
           env:
+            # Traces to Tempo, the one the engine exports to: a booking's trace runs from the CRS through
+            # this service and the orchestrator (docs: deploy/observability, "Trazas de una reserva").
+            - name: OTEL_SERVICE_NAME
+              value: communication
+            - name: OTLP_TRACING_ENDPOINT
+              value: http://tempo.observability.svc.cluster.local:4318/v1/traces
+            - name: TRACING_SAMPLING
+              value: "1.0"
             - name: SERVER_PORT
               value: "8125"
             - name: KAFKA_BROKERS
