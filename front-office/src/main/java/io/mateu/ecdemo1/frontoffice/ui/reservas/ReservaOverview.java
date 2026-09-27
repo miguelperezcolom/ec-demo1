@@ -169,7 +169,7 @@ public class ReservaOverview
           // la info clave (salida + huéspedes) como zona complementaria estrecha
           var tituloMain = modoCheckout
               ? "Check-out · " + balanceResumen()
-              : "Estancia · salió el " + DAY.format(stay.checkOut());
+              : "Estancia · " + cierre(stay);
           return io.mateu.uidl.data.HorizontalLayout.builder()
               .style("width: 100%; gap: 1.5rem;")
               .wrap(true)
@@ -257,8 +257,7 @@ public class ReservaOverview
         .filter(io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange::marked)
         .orElse(null);
     items.add(conKardex(paxItem(1, guest.name(),
-        guest.document() != null && !guest.document().isBlank()
-            ? "Doc " + guest.document() + " · Adulto" : "Adulto",
+        docAdulto(guest.document()),
         guest.identityComplete(), ops.isNoShow(1)), ops.isNoShow(1) ? null : kardex, guest));
     var companions = stay.companions();
     for (int i = 0; i < companions.size(); i++) {
@@ -329,7 +328,7 @@ public class ReservaOverview
         .container(io.mateu.uidl.data.TextContainer.h3).style("margin: 0;").build());
     contenido.add(Text.builder().text(view.guest().name()).noMargins(true).build());
     contenido.add(Text.builder()
-        .text("Doc " + view.guest().document() + " · Adulto")
+        .text(docAdulto(view.guest().document()))
         .size(io.mateu.uidl.data.TextSize.xs).noMargins(true).build());
     for (var companion : stay.companions()) {
       contenido.add(Text.builder().text(companion.name()).noMargins(true).build());
@@ -964,7 +963,7 @@ public class ReservaOverview
         .container(io.mateu.uidl.data.TextContainer.h3).style("margin: 0;").build());
     contenido.add(Text.builder().text(view.guest().name()).noMargins(true).build());
     contenido.add(Text.builder()
-        .text("Doc " + view.guest().document() + " · Adulto")
+        .text(docAdulto(view.guest().document()))
         .size(io.mateu.uidl.data.TextSize.xs).noMargins(true).build());
     for (var companion : stay.companions()) {
       contenido.add(Text.builder().text(companion.name()).noMargins(true).build());
@@ -984,13 +983,42 @@ public class ReservaOverview
     return contenido;
   }
 
+  /** Cómo acabó una estancia cerrada, para el título: salió, no se presentó o se canceló. */
+  static String cierre(Stay stay) {
+    return switch (stay.status()) {
+      case NO_SHOW -> "no show el " + DAY.format(stay.checkIn());
+      case CANCELLED -> "cancelada";
+      default -> "salió el " + DAY.format(stay.checkOut());
+    };
+  }
+
+  /** El aviso de una estancia cerrada: en un no show, que no llegó nadie y lo que cuesta. */
+  static String avisoCierre(Stay stay) {
+    return switch (stay.status()) {
+      case NO_SHOW -> "No se presentó nadie: el CRS la canceló como no show"
+          + (stay.total() == null ? "" : ", con un cargo de " + euros(stay.total()));
+      case CANCELLED -> "Reserva cancelada antes de la llegada";
+      default -> "Salió el " + DAY.format(stay.checkOut()) + " — folio cerrado";
+    };
+  }
+
+  static String euros(java.math.BigDecimal amount) {
+    return String.format(Locale.forLanguageTag("es-ES"), "%,.2f €", amount);
+  }
+
+  /** El documento del titular, si lo hay: sin él, solo que es adulto (nunca «Doc null»). */
+  static String docAdulto(String document) {
+    return document == null || document.isBlank() || "null".equals(document)
+        ? "Adulto" : "Doc " + document + " · Adulto";
+  }
+
   private Component paraSalida(Stay stay) {
     var view = FrontOffice.stayView(stayId);
     var folio = view.folio();
     var content = new ArrayList<Component>();
     content.add(
         Notice.builder().theme("info")
-            .text("Salió el " + DAY.format(stay.checkOut()) + " — folio cerrado")
+            .text(avisoCierre(stay))
             .build());
     if (folio != null) {
       content.add(
