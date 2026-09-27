@@ -99,6 +99,11 @@ spring:
 partners:
   url: ${PARTNERS_URL:http://localhost:8120}
 
+# The customer MDM: who a booking's people are elsewhere — Clientes, Salesforce, Opera, the front
+# office — for the booking's screen to link to. Blank: the screen shows no links.
+customer-mdm:
+  url: ${CUSTOMER_MDM_URL:}
+
 # The OpenAPI document at /v3/api-docs describes this service's REST API and nothing else: without
 # this it also lists the endpoints Mateu serves its screens from, which no agent should be offered.
 springdoc:
