@@ -123,8 +123,9 @@ takes ec1 back to its baseline (`reset.sh`) or to before anything was integrated
 
 The engine runs only that PoC's processes, imported from
 [ec-definitions](https://github.com/miguelperezcolom/ec-definitions): `alta-integracion`,
-`proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show` and
-`verify-booking-payment`, which the CRS starts to confirm each new reservation. The engine's own
+`proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor` and `registrar-no-show`. A
+new reservation starts exactly one of them — one `proyectar-reserva` — because the CRS makes it
+confirmed and with its payments in one change, one event. The engine's own
 examples (`order-fulfilment`, the sagas) were removed from it on 2026-09-25.
 
 Two places to look while it runs: **Workflow → Processes** on the control console
@@ -162,8 +163,8 @@ is created. They inherit that PostgreSQL's `emptyDir`, so treat what they hold a
 consumer group of its own, subscribed to one topic, which is the arrangement the engine's own
 configuration argues for at length. It also publishes, through a transactional outbox, what
 happens to its bookings on `crs-bookings` — `booking-created`, `booking-modified`,
-`booking-cancelled`, keyed by booking id and carrying the booking's version, not its data — and the
-request that starts `verify-booking-payment`, so neither leaves unless the booking was saved. `content` and `users` arrived declaring a binder and three
+`booking-cancelled`, keyed by booking id and carrying the booking's version, not its data — so none
+leaves unless the booking was saved. `content` and `users` arrived declaring a binder and three
 bindings (`consumeOutbox`, `consumeUpstream`, `consumeWorkerEvent`) and implementing none of them,
 under the engine's own group names — `orchestrator-outbox`, `orchestrator-upstream`,
 `worker-group`. Deployed beside a real engine that would have taken partitions away from the
@@ -337,14 +338,15 @@ is the arrangement that makes the table above true.
 
 ### What is not wired yet
 
-`booking`'s saga half needs a definition whose `ACTION` steps name `topic: booking`. The one it
-was written for is `verify-booking-payment` — a human verifies a payment, a 30-second
-`onTimeoutStepId` routes to cancellation, and an `XOR` join ends whichever branch wins — and it is
-**not in [`ec-definitions`](https://github.com/miguelperezcolom/ec-definitions)**. Until it is
-added there by a pull request, that pod joins its consumer group and is handed nothing. The CRUD
-and the MCP tools do not depend on it.
-
-The form it needs, `verify-payment`, is already there.
+`booking` is born confirmed: the CRS takes a booking and confirms it in the same change, with the
+payments collected as it was made, so a new booking is one `booking-created` and one
+`proyectar-reserva`. There used to be a `verify-booking-payment` process, started for every new
+booking, that did nothing but confirm it at once — which was a second change, a second event and a
+second projection down to Opera for every booking. It is gone, from here and from
+[`ec-definitions`](https://github.com/miguelperezcolom/ec-definitions). If the CRS ever has to
+verify a payment for real, that is a process started for the bookings that need it, not for all.
+`booking`'s worker half answers `registrar-no-show`'s `register-no-show` step, on the `booking`
+topic.
 
 ### The CRS → Opera integration PoC
 

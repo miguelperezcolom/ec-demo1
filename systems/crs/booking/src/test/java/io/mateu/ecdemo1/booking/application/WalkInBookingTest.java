@@ -15,6 +15,11 @@ import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.ecdemo1.booking.domain.services.RoomPricing;
 import org.junit.jupiter.api.Test;
 
+import io.mateu.ecdemo1.booking.application.usecases.booking.PaymentRequest;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingCreated;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingStatus;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.PaymentType;
+
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -32,10 +37,10 @@ class WalkInBookingTest {
 
     static final LocalDate TODAY = LocalDate.of(2026, 9, 27);
 
-    final CrsCatalog catalog = CrsCatalog.standard();
+    final CrsCatalog catalog = io.mateu.ecdemo1.booking.infra.out.catalog.ImportedCatalogs.standardCatalog();
     final BookingTermsFactory terms = new BookingTermsFactory(catalog, new RoomPricing());
     final Store store = new Store();
-    final CreateBookingUseCase create = new CreateBookingUseCase(store, terms, catalog, (d, e) -> { },
+    final CreateBookingUseCase create = new CreateBookingUseCase(store, terms, catalog,
             new LocatorValueGenerator(), Clock.systemUTC());
     final QuoteBookingUseCase quote = new QuoteBookingUseCase(catalog, terms);
 
@@ -90,6 +95,31 @@ class WalkInBookingTest {
         assertThatThrownBy(() -> create.handle(
                 new CreateBookingCommand("MRU01", walkIn("FO-XYZ", holder(), 2), new BigDecimal("1.00"))))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("price changed");
+        assertThat(store.saved).isEmpty();
+    }
+
+    /**
+     * The payments collected as a booking is made go with it: one change, one event at version one,
+     * the booking confirmed — so whoever integrates with the CRS projects it once.
+     */
+    @Test
+    void madeConfirmedWithItsPaymentsAsOneChange() {
+        var id = create.handle(new CreateBookingCommand("MRU01", walkIn("FO-PAY", holder(), 2), null, List.of(
+                new PaymentRequest(PaymentType.Deposit, "VISA", new BigDecimal("100"), null, "R1"),
+                new PaymentRequest(PaymentType.Prepayment, "VISA", new BigDecimal("50"), TODAY, null))));
+
+        var booking = store.saved.get(id);
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.Confirmed);
+        assertThat(booking.getVersion()).isEqualTo(1);
+        assertThat(booking.paidAmount()).isEqualByComparingTo("150");
+        assertThat(booking.popEvents()).singleElement().isInstanceOf(BookingCreated.class);
+    }
+
+    @Test
+    void aPaymentWithAnUnknownMethodRefusesTheWholeBooking() {
+        assertThatThrownBy(() -> create.handle(new CreateBookingCommand("MRU01", walkIn("FO-BAD", holder(), 2), null,
+                List.of(new PaymentRequest(PaymentType.Deposit, "NOPE", BigDecimal.TEN, null, null)))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("NOPE");
         assertThat(store.saved).isEmpty();
     }
 

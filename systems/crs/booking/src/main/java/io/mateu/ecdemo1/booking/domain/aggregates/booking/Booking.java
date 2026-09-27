@@ -58,12 +58,33 @@ public class Booking extends AggregateRoot {
         this.version = version;
     }
 
+    /**
+     * A new booking, with the payments collected as it was made. It is born confirmed — this CRS
+     * has no step between taking a booking and confirming it — and at version one, so creating it
+     * is one change and one event however many payments came with it: registering them afterwards,
+     * each in a transaction of its own, announced the booking once per payment and sent it down
+     * to the PMS as many times.
+     *
+     * @param expectedTotal what the channel told the customer it costs, from a quote. If the terms
+     *                      price it differently now, the booking is refused rather than made at a
+     *                      price nobody agreed to. Null, the price is taken as it comes.
+     */
     public static Booking create(BookingId id, String hotelCode, String currency, BookingTerms terms,
-                                 Instant now) {
-        var booking = new Booking(id, hotelCode, currency, terms, List.of(), BookingStatus.Pending,
+                                 List<Payment> payments, BigDecimal expectedTotal, Instant now) {
+        if (expectedTotal != null && terms.total().compareTo(expectedTotal) != 0) {
+            throw new IllegalStateException("The price changed: quoted %s %s, the CRS prices it at %s %s now"
+                    .formatted(expectedTotal.toPlainString(), currency, terms.total().toPlainString(), currency));
+        }
+        var booking = new Booking(id, hotelCode, currency, terms, List.of(), BookingStatus.Confirmed,
                 null, null, now, now, 1);
+        (payments != null ? payments : List.<Payment>of()).forEach(booking::addPayment);
         booking.send(new BookingCreated(eventId(), id.id(), hotelCode, booking.version, now));
         return booking;
+    }
+
+    public static Booking create(BookingId id, String hotelCode, String currency, BookingTerms terms,
+                                 Instant now) {
+        return create(id, hotelCode, currency, terms, List.of(), null, now);
     }
 
     public void update(BookingTerms terms, Instant now) {
@@ -72,7 +93,10 @@ public class Booking extends AggregateRoot {
         modified(BookingChange.TermsUpdated, now);
     }
 
-    /** Confirming a confirmed booking is not a change, and records nothing. */
+    /**
+     * Confirms a booking left pending — only those stored before bookings were born confirmed can
+     * be. Confirming a confirmed booking is not a change, and records nothing.
+     */
     public void confirm(Instant now) {
         requireAlive("confirmed");
         if (status == BookingStatus.Confirmed) {
@@ -98,11 +122,27 @@ public class Booking extends AggregateRoot {
 
     public void registerPayment(Payment payment, Instant now) {
         requireAlive("paid");
+        addPayment(payment);
+        modified(BookingChange.PaymentRegistered, now);
+    }
+
+    private void addPayment(Payment payment) {
         if (payments.stream().anyMatch(p -> p.paymentId().equals(payment.paymentId()))) {
             throw new IllegalArgumentException("Payment %s is already registered".formatted(payment.paymentId()));
         }
         payments.add(payment);
-        modified(BookingChange.PaymentRegistered, now);
+    }
+
+    /**
+     * Deleting is a convenience of the demo, not something a CRS does, and it announces nothing. So
+     * it is refused for a booking that already reached the PMS: that one has to be cancelled, or it
+     * would stay alive in the property with nothing left in the CRS to cancel it from.
+     */
+    public void requireDeletable() {
+        if (pmsReference != null) {
+            throw new IllegalStateException(
+                    "Booking %s is already in the PMS: cancel it instead of deleting it".formatted(id.id()));
+        }
     }
 
     public void annotatePmsReference(String reservationId, Instant now) {
@@ -131,19 +171,16 @@ public class Booking extends AggregateRoot {
 
     /**
      * The guest did not arrive: the hotel says so (HLA F006), and the CRS applies its rule — the
-     * booking is cancelled as a no-show and costs a share of its original price. Once: a second
-     * notice of the same no-show changes nothing, and a booking already cancelled is not a no-show.
+     * booking is cancelled as a no-show and costs the policy's share of its original price. Once: a
+     * second notice of the same no-show changes nothing, and a booking already cancelled is not a
+     * no-show.
      */
-    public void noShow(int feePercent, Instant now) {
-        if (feePercent < 0 || feePercent > 100) {
-            throw new IllegalArgumentException("A no-show fee is a share of the price, 0 to 100: " + feePercent);
-        }
+    public void noShow(NoShowPolicy policy, Instant now) {
         if (status == BookingStatus.Cancelled) {
             return;
         }
-        var fee = terms.total().multiply(BigDecimal.valueOf(feePercent)).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
         status = BookingStatus.Cancelled;
-        cancellation = new Cancellation(NO_SHOW, now, fee, feePercent);
+        cancellation = new Cancellation(NO_SHOW, now, policy.feeFor(terms.total()), policy.feePercent());
         bump(now);
         send(new BookingCancelled(eventId(), id.id(), hotelCode, version, now, NO_SHOW));
     }

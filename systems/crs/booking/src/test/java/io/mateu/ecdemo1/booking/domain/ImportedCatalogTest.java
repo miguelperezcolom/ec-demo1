@@ -19,10 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ImportedCatalogTest {
 
-    static final Path PAIRS = Path.of("../deploy/demo/crs-catalog/MRU01-expected-pairs.md");
+    static final Path PAIRS = Path.of("../../../deploy/demo/crs-catalog/MRU01-expected-pairs.md");
     static final Pattern PAIR = Pattern.compile("^\\| [^|]+ \\| `([^`]+)` \\| [^|]+ \\| `([^`]+)` \\|");
 
-    final CrsCatalog catalog = CrsCatalog.standard();
+    final CrsCatalog catalog = io.mateu.ecdemo1.booking.infra.out.catalog.ImportedCatalogs.standardCatalog();
 
     List<String> mru01Codes() {
         var codes = catalog.codes("MRU01");

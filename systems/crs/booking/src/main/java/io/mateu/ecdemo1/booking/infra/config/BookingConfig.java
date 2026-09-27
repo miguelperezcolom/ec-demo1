@@ -1,11 +1,14 @@
 package io.mateu.ecdemo1.booking.infra.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.NoShowPolicy;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.ecdemo1.booking.domain.services.RoomPricing;
+import io.mateu.ecdemo1.booking.infra.out.catalog.ImportedCatalogs;
 import io.mateu.ecdemo1.booking.infra.out.outbox.OutboxProperties;
 import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.type.format.jackson.JacksonJsonFormatMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -25,8 +28,14 @@ public class BookingConfig {
     }
 
     @Bean
-    CrsCatalog crsCatalog() {
-        return CrsCatalog.standard();
+    CrsCatalog crsCatalog(ObjectMapper objectMapper) {
+        return CrsCatalog.standard(new ImportedCatalogs(objectMapper)::hotel);
+    }
+
+    /** The CRS's no-show rule: the share of the original price a guest who does not arrive owes. */
+    @Bean
+    NoShowPolicy noShowPolicy(@Value("${booking.no-show-fee-percent:25}") int feePercent) {
+        return new NoShowPolicy(feePercent);
     }
 
     @Bean

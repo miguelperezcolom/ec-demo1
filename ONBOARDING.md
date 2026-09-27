@@ -101,9 +101,6 @@ the cluster exactly as it was.
 
 Worth knowing before you go hunting, all about the services added around the engine:
 
-- **`booking`'s saga half has no definition to answer.** It consumes the `booking` topic, and no
-  definition in `ec-definitions` names `topic: booking` yet. Adding `verify-booking-payment` there
-  is a pull request to that repository, not a change here. Its CRUD and its MCP tools work now.
 - **`users` serves gRPC on 9191 and nothing calls it.** Unauthenticated, inside the namespace only.
   Do not put it behind an ingress as it stands.
 - **`ia-control-plane` serves `/internal/agents/{id}/config` with an API key in the clear.** Same

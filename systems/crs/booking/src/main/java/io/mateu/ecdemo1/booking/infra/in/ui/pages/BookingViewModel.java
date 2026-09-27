@@ -161,9 +161,8 @@ public class BookingViewModel implements Identifiable {
     final CustomerLinks customerLinks;
 
     public String create(HttpRequest httpRequest) {
-        var newId = createBookingUseCase.handle(new CreateBookingCommand(hotelCode, request()));
-        BookingRequests.registerNewPayments(registerPaymentUseCase, newId, payments);
-        return newId;
+        return createBookingUseCase.handle(new CreateBookingCommand(hotelCode, request(), null,
+                BookingRequests.newPayments(payments)));
     }
 
     public void save(HttpRequest httpRequest) {

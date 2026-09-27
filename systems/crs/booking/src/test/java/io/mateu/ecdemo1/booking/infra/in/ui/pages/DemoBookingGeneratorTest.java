@@ -5,8 +5,6 @@ import io.mateu.ecdemo1.booking.application.out.partners.PartnerDirectory.Tradin
 import io.mateu.ecdemo1.booking.application.usecases.booking.BookingTermsFactory;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingCommand;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingUseCase;
-import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentCommand;
-import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentUseCase;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.GuestType;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.ecdemo1.booking.domain.services.RoomPricing;
@@ -36,7 +34,7 @@ class DemoBookingGeneratorTest {
             new TradingPartner("09900002", "OnlineAgency", "PFRONT RIU CLASS IE"),
             new TradingPartner("04414660", "Company", "EMIRATES HOLIDAYS UK"));
 
-    final CrsCatalog catalog = CrsCatalog.standard();
+    final CrsCatalog catalog = io.mateu.ecdemo1.booking.infra.out.catalog.ImportedCatalogs.standardCatalog();
     final RoomPricing pricing = new RoomPricing();
     final BookingTermsFactory terms = new BookingTermsFactory(catalog, pricing);
 
@@ -124,8 +122,7 @@ class DemoBookingGeneratorTest {
     @Test
     void oneRefusedBookingDoesNotStopTheRest() {
         var created = new ArrayList<CreateBookingCommand>();
-        var paid = new ArrayList<RegisterPaymentCommand>();
-        var create = new CreateBookingUseCase(null, null, null, null, null, null) {
+        var create = new CreateBookingUseCase(null, null, null, null, null) {
             @Override
             public String handle(CreateBookingCommand command) {
                 created.add(command);
@@ -135,15 +132,8 @@ class DemoBookingGeneratorTest {
                 return "B-" + created.size();
             }
         };
-        var pay = new RegisterPaymentUseCase(null, null, null) {
-            @Override
-            public String handle(RegisterPaymentCommand command) {
-                paid.add(command);
-                return "P";
-            }
-        };
         PartnerDirectory directory = () -> PARTNERS;
-        var form = new DemoBookingsForm(create, pay, catalog, pricing, directory,
+        var form = new DemoBookingsForm(create, catalog, pricing, directory,
                 Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC));
 
         var outcome = form.create(1L);
@@ -151,29 +141,24 @@ class DemoBookingGeneratorTest {
         assertThat(created).hasSize(10);
         assertThat(outcome.created()).hasSize(9).doesNotContain("B-3");
         assertThat(outcome.failed()).singleElement().asString().contains("#3").contains("refused");
-        assertThat(paid).isNotEmpty().allSatisfy(p -> assertThat(p.id()).isNotEqualTo("B-3"));
+        // Each booking is made with its payments, in the one command: nothing is paid afterwards.
+        assertThat(created).anySatisfy(c -> assertThat(c.payments()).isNotEmpty());
         assertThat(outcome.message().text()).startsWith("9 of 10 demo bookings created");
     }
 
     @Test
     void unreadablePartnersLeaveTheBookingsDirect() {
-        var create = new CreateBookingUseCase(null, null, null, null, null, null) {
+        var create = new CreateBookingUseCase(null, null, null, null, null) {
             @Override
             public String handle(CreateBookingCommand command) {
                 assertThat(command.booking().partnerCode()).isNull();
                 return "B";
             }
         };
-        var pay = new RegisterPaymentUseCase(null, null, null) {
-            @Override
-            public String handle(RegisterPaymentCommand command) {
-                return "P";
-            }
-        };
         PartnerDirectory directory = () -> {
             throw new IllegalStateException("connection refused");
         };
-        var form = new DemoBookingsForm(create, pay, catalog, pricing, directory, Clock.systemUTC());
+        var form = new DemoBookingsForm(create, catalog, pricing, directory, Clock.systemUTC());
 
         var outcome = form.create();
 

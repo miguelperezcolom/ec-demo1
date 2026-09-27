@@ -1,16 +1,15 @@
 package io.mateu.ecdemo1.booking.infra.in.async;
 
-import io.mateu.ecdemo1.booking.application.usecases.booking.changestatus.ChangeBookingStatusCommand;
-import io.mateu.ecdemo1.booking.application.usecases.booking.changestatus.ChangeBookingStatusUseCase;
-import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingStatus;
+import io.mateu.ecdemo1.booking.application.usecases.booking.noshow.RegisterNoShowUseCase;
 import io.mateu.workflow.ddd.DomainEvent;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
+import io.mateu.workflow.dtos.events.integration.TaskStatus;
 import io.mateu.workflow.dtos.events.integration.TaskStatusChanged;
 import io.mateu.workflow.worker.WorkerReply;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cloud.stream.function.StreamBridge;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,19 +17,20 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The booking worker for the saga demo: it confirms or cancels a booking on request and answers
- * the engine through {@link WorkerReply}.
+ * The CRS's worker: the steps of the engine's processes that name {@code topic: booking}. Today
+ * that is «Registrar no-show»'s {@code register-no-show}; it answers the engine through
+ * {@link WorkerReply}.
  *
  * <p>The task is handled on the consumer thread, deliberately. Handing it to a thread of its own
- * — which this used to do — commits the offset immediately, so a reply the broker will not take
- * has nothing left to redeliver and the step waits forever.
+ * commits the offset immediately, so a reply the broker will not take has nothing left to
+ * redeliver and the step waits forever.
  */
 @Configuration
 @RequiredArgsConstructor
 @Slf4j
 public class BookingKafkaConsumerConfig {
 
-    final ChangeBookingStatusUseCase changeBookingStatusUseCase;
+    final RegisterNoShowUseCase registerNoShowUseCase;
     final StreamBridge streamBridge;
 
     @Bean
@@ -40,26 +40,18 @@ public class BookingKafkaConsumerConfig {
             if (!(event instanceof TaskExecutionRequested task)) {
                 return;
             }
-
             switch (task.stepId()) {
-                case "confirm-booking" -> changeStatus(task, BookingStatus.Confirmed);
-                case "cancel-booking" -> changeStatus(task, BookingStatus.Cancelled);
-                // «Registrar no-show»: the hotel says the guest did not arrive.
-                case "register-no-show" -> WorkerReply.send(streamBridge, new TaskStatusChanged(task.taskExecutionId(),
-                        changeBookingStatusUseCase.noShow(bookingId(task)), List.of(), task.processId()));
+                // «Registrar no-show»: the hotel says the guest did not arrive. Answered only once
+                // the change has committed — still on this thread, so a reply the broker will not
+                // take fails the listener and the task is redelivered.
+                case "register-no-show" -> {
+                    registerNoShowUseCase.handle(bookingId(task));
+                    WorkerReply.send(streamBridge, new TaskStatusChanged(task.taskExecutionId(), TaskStatus.COMPLETED,
+                            List.of(), task.processId()));
+                }
                 default -> log.debug("No handler for step {}", task.stepId());
             }
         };
-    }
-
-    /**
-     * Changes the booking, and only once that has committed answers the engine — still on this
-     * thread, so a reply the broker will not take fails the listener and the task is redelivered.
-     */
-    private void changeStatus(TaskExecutionRequested task, BookingStatus status) {
-        var outcome = changeBookingStatusUseCase.handle(new ChangeBookingStatusCommand(
-                bookingId(task), status, task.taskExecutionId(), task.processId()));
-        WorkerReply.send(streamBridge, new TaskStatusChanged(task.taskExecutionId(), outcome, List.of(), task.processId()));
     }
 
     private String bookingId(TaskExecutionRequested task) {

@@ -44,8 +44,8 @@ spring:
       bindings:
         # IN: the tasks the engine dispatches for this worker.
         #
-        # `booking` — the topic named by the confirm-booking and cancel-booking steps of the
-        # verify-booking-payment definition. The engine dispatches each task to the destination
+        # `booking` — the topic named by the register-no-show step of the registrar-no-show
+        # definition (ec-definitions). The engine dispatches each task to the destination
         # its step declares, so this service sees only its own; a step that names no topic goes to
         # `downstream`, where the test worker listens.
         #
@@ -59,8 +59,9 @@ spring:
         upstream:
           destination: upstream
         # OUT, via the outbox relay. `crs-bookings` is what happened to bookings — created,
-        # modified, cancelled — for whoever integrates with this CRS; `outboxUpstream` carries the
-        # requests to the engine that must only leave if the booking they are about was saved.
+        # modified, cancelled — for whoever integrates with this CRS; `outboxUpstream` is for
+        # requests to the engine that must only leave if the booking they are about was saved
+        # (none today: the payment-verification process a new booking used to start is gone).
         # Separate from `upstream` above so these two can be synchronous (below) without changing
         # how the worker replies are sent — see stream.kafka.bindings above.
         bookingEvents:

@@ -1,15 +1,14 @@
-# The booking service — the only one of the three demo services that is wired into the engine.
+# The booking service — the CRS.
 #
 # Three things live in this one pod:
 #   • a Mateu CRUD at /_booking, which the shell hosts as a remote menu;
 #   • an MCP server, which is where the chat agent's booking tools come from;
-#   • the worker side of the booking saga: it consumes the `booking` topic and replies on
-#     `upstream`, which is what confirms or cancels a booking when a process says so.
+#   • a worker for the engine: it consumes the `booking` topic and replies on `upstream` — today
+#     registrar-no-show's register-no-show step, which cancels a booking as a no-show.
 #
-# That third part needs a definition that names `topic: booking` on its ACTION steps. The one it
-# was written for is verify-booking-payment, and it is NOT in ec-definitions yet — until it is
-# added there by a pull request, this pod starts, joins the consumer group and is handed nothing.
-# The CRUD and the MCP tools work regardless.
+# A new booking is born confirmed, with its payments, as one change: one booking-created on
+# crs-bookings and one proyectar-reserva. (The verify-booking-payment process that used to confirm
+# it afterwards, doubling every projection, is gone.)
 apiVersion: apps/v1
 kind: Deployment
 metadata:

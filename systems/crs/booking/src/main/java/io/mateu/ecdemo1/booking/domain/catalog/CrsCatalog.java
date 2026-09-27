@@ -120,36 +120,13 @@ public record CrsCatalog(List<Hotel> hotels,
                 .formatted(what, code, valid.stream().collect(Collectors.joining(", "))));
     }
 
-    /** The file a hotel's catalog imported from its PMS's is versioned in, next to the classes. */
-    static final String IMPORTED = "/crs-catalog/%s.json";
-
     /**
-     * A hotel whose catalog was imported from its Opera property's — every code the CRS's own, named
-     * its own way, but each with a pair on the other side (deploy/demo/crs-catalog/generate.py makes
-     * the file, and says which pair). Read from the classpath: the CRS never calls Opera.
+     * The chain's catalog. {@code imported} gives the hotels whose catalog was imported from their
+     * PMS's — every code the CRS's own, named its own way, but each with a pair on the other side
+     * (deploy/demo/crs-catalog/generate.py makes the file, and says which pair). Reading them is
+     * infrastructure's: see ImportedCatalogs.
      */
-    static Hotel imported(String hotelCode) {
-        try (var in = CrsCatalog.class.getResourceAsStream(IMPORTED.formatted(hotelCode))) {
-            if (in == null) {
-                throw new IllegalStateException("No imported catalog for " + hotelCode);
-            }
-            var file = new com.fasterxml.jackson.databind.ObjectMapper().readValue(in, ImportedHotel.class);
-            return new Hotel(file.hotel().code(), file.hotel().name(), file.hotel().currency(), file.roomTypes(),
-                    new Codes(file.ratePlans(), file.boards(), file.channels(), file.cancellationReasons(),
-                            file.paymentMethods()));
-        } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException("Unreadable imported catalog for " + hotelCode, e);
-        }
-    }
-
-    record ImportedHotel(HotelHeader hotel, List<RoomType> roomTypes, List<RatePlan> ratePlans, List<Board> boards,
-                         List<Channel> channels, List<Code> cancellationReasons, List<Code> paymentMethods) {
-    }
-
-    record HotelHeader(String code, String name, String currency) {
-    }
-
-    public static CrsCatalog standard() {
+    public static CrsCatalog standard(java.util.function.Function<String, Hotel> imported) {
         return new CrsCatalog(
                 List.of(
                         new Hotel("PMI01", "Riu Demo Palma", "EUR", List.of(
@@ -163,8 +140,8 @@ public record CrsCatalog(List<Hotel> hotels,
                                 new RoomType("JSU", "Junior suite", 4, new BigDecimal("260")),
                                 new RoomType("SUI", "Suite", 4, new BigDecimal("380")))),
                         // Integrated with a real Opera tenant's pilot property (XMAR, "Piloto Mauricio"),
-                        // and its catalog imported from that property's: see imported(String).
-                        imported("MRU01")),
+                        // and its catalog imported from that property's: see standard(Function).
+                        imported.apply("MRU01")),
                 List.of(
                         new RatePlan("BAR", "Tarifa pública", new BigDecimal("1.00")),
                         new RatePlan("NRF", "No reembolsable", new BigDecimal("0.90")),

@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.booking.infra.in.ui.pages;
 import io.mateu.core.infra.declarative.orchestrators.wizard.Wizard;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingCommand;
 import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookingUseCase;
-import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentUseCase;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.Holder;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
 import io.mateu.uidl.annotations.Label;
@@ -65,7 +64,6 @@ public class NewBookingWizard extends Wizard {
     CreatedStep created;
 
     final CreateBookingUseCase createBookingUseCase;
-    final RegisterPaymentUseCase registerPaymentUseCase;
     final CrsCatalog catalog;
 
     @Override
@@ -154,9 +152,8 @@ public class NewBookingWizard extends Wizard {
                         stay.holderNationality()),
                 roomsStep != null ? roomsStep.rooms() : null, guestsStep != null ? guestsStep.guests() : null,
                 stay.comments());
-        var id = createBookingUseCase.handle(new CreateBookingCommand(stay.hotelCode(), request));
-        BookingRequests.registerNewPayments(registerPaymentUseCase, id,
-                paymentsStep != null ? paymentsStep.payments() : null);
+        var id = createBookingUseCase.handle(new CreateBookingCommand(stay.hotelCode(), request, null,
+                BookingRequests.newPayments(paymentsStep != null ? paymentsStep.payments() : null)));
         return List.of(new Message("Booking " + id + " created"), UICommand.navigateTo("/booking/bookings/" + id));
     }
 }
