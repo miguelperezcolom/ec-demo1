@@ -82,7 +82,8 @@ public class MappingMcpTools implements McpSystemContext {
             }
         }
         if (!ids.isEmpty()) {
-            announcer.proposalsReady(ids.size());
+            var hotels = proposals.stream().map(Dictionary.Proposal::hotelCode).distinct().toList();
+            announcer.proposalsReady(ids.size(), hotels.size() == 1 ? hotels.get(0) : null);
         }
         log.info("Agent proposed {} equivalence(s), {} refused", ids.size(), errors.size());
         return "Proposed %d, ids %s%s".formatted(ids.size(), ids,
