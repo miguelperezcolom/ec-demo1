@@ -14,30 +14,19 @@ import io.mateu.uidl.interfaces.StereotypeSupplier;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Service;
+import io.mateu.uidl.di.MateuBeanProvider;
 
 /**
  * Paso 1 del walk-in — la estancia: fechas, lo que el CRS vende (habitación, tarifa, régimen, en
- * desplegables con sus códigos y nombres) y quién duerme. Un bean prototipo: Mateu lo crea desde
- * Spring en cada petición, así que el catálogo del CRS le llega inyectado.
+ * desplegables con sus códigos y nombres) y quién duerme.
  */
 @Getter
 @Setter
-@Service
-@Scope("prototype")
 public class EstanciaWalkIn implements WizardStep, OptionsSupplier, StereotypeSupplier {
 
   static final List<String> SELECTS = List.of("habitacion", "tarifa", "regimen");
-
-  @Getter(AccessLevel.NONE) final WalkInService walkIns;
-
-  public EstanciaWalkIn(WalkInService walkIns) {
-    this.walkIns = walkIns;
-  }
 
   @Section(value = "Estancia", columns = 2)
   @Label("Llegada")
@@ -120,7 +109,9 @@ public class EstanciaWalkIn implements WizardStep, OptionsSupplier, StereotypeSu
   public List<Option> options(String fieldName, HttpRequest httpRequest) {
     WalkInDesk.Offer offer;
     try {
-      offer = walkIns.offer();
+      // Mateu re-creates the steps from the state with new — nothing injected — so the catalog is
+      // asked of Mateu's bean provider
+      offer = MateuBeanProvider.getBean(WalkInService.class).offer();
     } catch (RuntimeException e) {
       return List.of(); // sin catálogo del CRS el paso se abre igual; pedir precio dirá qué falla
     }

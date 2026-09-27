@@ -105,11 +105,9 @@ class WalkInTest {
         null);
   }
 
-  @Autowired org.springframework.beans.factory.ObjectProvider<io.mateu.ecdemo1.frontoffice.ui.walkin.EstanciaWalkIn> estancia;
-
   @Test
   void theStayStepOffersWhatTheCrsSellsAsSelectsWithItsCodesAndNames() {
-    var step = estancia.getObject();
+    var step = new io.mateu.ecdemo1.frontoffice.ui.walkin.EstanciaWalkIn();
 
     assertThat(step.options("habitacion", null)).extracting(io.mateu.uidl.data.Option::value).containsExactly("STD-KING");
     assertThat(step.options("habitacion", null)).extracting(io.mateu.uidl.data.Option::label)
