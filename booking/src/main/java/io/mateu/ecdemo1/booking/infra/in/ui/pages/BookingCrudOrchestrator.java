@@ -39,6 +39,7 @@ public class BookingCrudOrchestrator extends Crud<
 
     final BookingViewModel viewModel;
     final BookingCancellationForm cancellationForm;
+    final DemoBookingsForm demoBookingsForm;
     final BookingQueryService queryService;
     final CrsCatalog catalog;
 
@@ -127,6 +128,16 @@ public class BookingCrudOrchestrator extends Crud<
             return Message.error("Select the bookings to cancel");
         }
         return cancellationForm.dialogFor(selection.stream().map(BookingRow::id).toList(), LIST_ROUTE);
+    }
+
+    /**
+     * Ten plausible bookings for MRU01, made through the same use cases as one made by hand. Needs no
+     * selection; the dialog it opens asks before creating anything, since MRU01 may write to Opera.
+     */
+    @ListToolbarButton(rowsSelectedRequired = false)
+    @Label("+ 10 reservas demo")
+    public Object seedDemo() {
+        return demoBookingsForm.dialog();
     }
 
     @Override
