@@ -52,6 +52,9 @@ spec:
               value: "http://customer-mdm-service:8127"
             - name: FRONT_OFFICE_HOTEL
               value: "MRU01"
+            # The data plane's console: a stay links to its CRS booking and its customers (Clientes) there.
+            - name: CONSOLE_URL
+              value: "https://ec1.mateu.io"
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/front_office
             - name: DB_USERNAME

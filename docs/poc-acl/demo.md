@@ -50,12 +50,15 @@ superior de las cuatro, el **aviso de la bandeja** («Inbox (n)», lo que yo aú
 
 | Menú | Qué enseñar |
 | :--- | :---------- |
-| Call center | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario, cobros y su referencia en Opera |
+| Call center | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario, cobros y su referencia en Opera; en *In other systems*, sus enlaces: la estancia en el front office, el titular y los huéspedes en Clientes y en Salesforce, y la reserva y los perfiles de Opera (como referencias: Opera Cloud no tiene enlace estable) |
 | ERP | El maestro de interlocutores; cada uno sabe **qué perfil es en Opera** (*Opera profile*); *Resync* |
+| Clientes | La cara de negocio del maestro de clientes, solo consulta: *Buscar clientes* por nombre, email, teléfono o documento; la ficha con sus datos vigentes (lo que decidió Salesforce), dónde está (contacto de Salesforce, huésped del front office, perfiles de Opera), sus reservas en el CRS y sus estancias en el front office — cada una con su enlace — y sus solicitudes de cambio; *Solicitudes de cambio*: todas, con su estado. Los cambios se piden en recepción y los decide Salesforce |
 | Admin | Los procesos del motor, con sus pasos |
 
 **Front office del hotel — `https://front.ec1.mateu.io`** (Redwood): recepción. Las reservas de
-MRU01 que llegan a Opera llegan también aquí como estancias; check-in, huéspedes, folios.
+MRU01 que llegan a Opera llegan también aquí como estancias; check-in, huéspedes, folios. Cada
+reserva enseña *En otros sistemas*: la reserva del CRS, sus clientes en Clientes y su contacto en
+Salesforce (enlaces), y el perfil de Opera.
 
 **Plano de control — `https://console.ec1.mateu.io`**: lo que gobierna la plataforma.
 
@@ -63,7 +66,7 @@ MRU01 que llegan a Opera llegan también aquí como estancias; check-in, huéspe
 | :--- | :---------- |
 | Integrations | Una integración por hotel: su conexión con Opera, en qué puerta del alta está, *Relaunch backfill*, *Import partners* |
 | Mapping | Causes; Dictionary: se filtra por **integración** y muestra también lo **sin mapear** (*Unmapped*), *Ask the agent*, y aprobar, rechazar o **retirar** una entrada o las filas seleccionadas; Partners in the PMS |
-| Customers | El maestro de clientes: golden records y consolidaciones que llegan de Salesforce |
+| Customers | El maestro de clientes, lo técnico: golden records, su estado de proyección y las consolidaciones que llegan de Salesforce (la cara de negocio está en Clientes, en el plano de datos) |
 | Notifications | Lo que se ha comunicado y a quién; **destinatarios**: quién se entera de qué y por dónde (§11) |
 | Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
 | Workflow / Forms | Las definiciones de proceso: los seis de la PoC (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `registrar-no-show`, `verify-booking-payment`); formularios, hoy ninguno |

@@ -105,6 +105,14 @@ public class ShellHome implements WidgetSupplier {
     @Menu
     RemoteMenu partners = new RemoteMenu("/_partners").withLabel("ERP");
 
+    /**
+     * The customers, as the business sees them: find one, and see its data, where it is known, its
+     * reservations in every system and the changes asked for it. Read-only — served by the customer
+     * MDM, whose technical screens are on the control console.
+     */
+    @Menu
+    RemoteMenu customers = new RemoteMenu("/_customers").withLabel("Clientes");
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

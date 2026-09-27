@@ -138,6 +138,9 @@ public class SecurityConfig {
                         // The integration PoC's product-side screen: the partners master. Same
                         // reason as the two above.
                         .pathMatchers("/_partners/**").authenticated()
+                        // Clientes, the MDM's business face on the data plane: personal data, so never
+                        // anonymous — read-only, and a signed-in user of the data plane is who it is for.
+                        .pathMatchers("/_customers/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the
