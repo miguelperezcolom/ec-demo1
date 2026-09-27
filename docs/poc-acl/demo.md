@@ -254,6 +254,95 @@ El CRS es el dueño de todas las reservas; el front office es un canal más (`WA
 Hace falta la equivalencia `WALKIN → WLK` (canal, MRU01), que el agente propone en el alta. El CRS no
 modela disponibilidad: el presupuesto es un precio, no una habitación bloqueada.
 
+## Flujo 6. Opera no responde: un proceso bloqueado espera, no falla
+
+Los cinco flujos de la grabación (1, alta: §4–7; 2, cliente que vuelve: §9; 3, cambio de datos: §10;
+4, no show: §10 bis; 5, walk-in: §10 ter) siguen con estos tres. Todos con la integración MRU01 → XMAR
+**activa** (después del flujo 1).
+
+Se corta de verdad la red entre el conector y Opera, sin tocar Opera: una NetworkPolicy
+(`demo-opera-outage`) deja a `pms-integration-service` hablar solo con los pods del clúster (Kafka, los
+servicios, DNS); Cilium la aplica y el script lo comprueba desde el pod antes de dar el corte por hecho.
+
+1. **Antes** (fuera de cámara, ~1 min): `deploy/demo/opera-outage.sh on --alert-after 2m`. Baja el
+   umbral del aviso de reintentos de 10 min (el del manifiesto) a 2 — eso **reinicia el conector** — y
+   corta la red. El corte se levanta solo a los 15 min (`--auto-off`) si nadie lo hace: ec1 lo usan más.
+2. Una reserva nueva de MRU01 (Call center, o `python3 deploy/demo/ec1.py book --channel WEB --room
+   STD-KING --rate DIRECTA --board DESAYUNO --arrival 2026-11-10`).
+3. **Espera, no falla** (*Admin → Processes*): el `proyectar-reserva` se queda en *Asegurar el perfil del
+   huésped* con los intentos subiendo; no hay causa (un fallo transitorio no es una causa: se reintenta).
+   Cada intento tarda ~30 s (el timeout de conexión con OHIP) y el motor vuelve a lanzarlo a los ~10 s:
+   un intento cada ~40 s.
+4. **Alguien se entera**: pasado el umbral, en el siguiente fallo, llega a la bandeja (y al email
+   urgente, según *Recipients*) **«Writing <localizador> to the PMS keeps failing»**
+   (`RETRYING_TOO_LONG`). Con `--alert-after 2m`, a los ~2 min 40 s de la reserva.
+5. `deploy/demo/opera-outage.sh off`: en el siguiente reintento (≤ 40 s; en la prueba, 1 s) la reserva
+   llega sola a Opera y al front office, **una vez**, y el aviso de la bandeja se resuelve solo.
+6. Después: `deploy/demo/opera-outage.sh alert 10m` (reinicia el conector) o `off --restore-alert`.
+   `demo-prep.sh` avisa si el umbral no está en 10m o si el corte sigue puesto.
+
+`python3 deploy/demo/ec1.py show <localizador>` enseña de una vez el CRS, los procesos con su paso e
+intentos, las causas, los avisos de la bandeja, Opera por localizador y la estancia.
+
+Probado en ec1 el 2026-09-27: corte 17:42:35–17:46:25Z (4 min); reserva **ZMPBEY** a las 17:42:55;
+cinco intentos fallidos de `ensure-guest-profile` («OHIP unreachable for a token … Connect timed
+out»); aviso a las 17:46:06; al levantar el corte, en Opera a las 17:46:26 como **39484599** (una sola
+bajo el localizador), en el front office y el aviso resuelto a las 17:46:27; ninguna causa.
+
+## Flujo 7. Modificar y cancelar desde el CRS
+
+El CRS cambia la reserva y la misma reserva de Opera cambia **en su sitio**: se busca por el
+localizador, la versión del CRS va en el UDF (`UDFN01`) y solo se escribe una versión más nueva.
+
+1. Una reserva de MRU01 en Opera (la del flujo 6 sirve).
+2. **Modificar** en *Call center* (editar la reserva) o `python3 deploy/demo/ec1.py modify <localizador>
+   --arrival 2026-11-12 --nights 4 --room JS-STD`: fechas y tipo de habitación. El CRS la reprecia y
+   sube la versión.
+3. Se ve: un `proyectar-reserva` más; en Opera **el mismo número de reserva** con las fechas, el tipo
+   (`SJSB`) y la versión nuevas; en el front office la estancia con las fechas y la habitación nuevas.
+4. **Cancelar** en *Call center* o `ec1.py cancel <localizador> --reason OTR`: `proyectar-cancelacion`;
+   Opera la cancela (motivo `OTROS`) y la estancia pasa a *Cancelada*.
+
+Ojo con la **disponibilidad de XMAR**: Opera rechaza una modificación a un tipo sin habitaciones libres
+esas noches (`RSV00138` «There are not enough rooms available on Room Type level»). No falla: es una
+causa `PMS_REJECTED` con su aviso, y la reserva espera. Si después el CRS la cambia a algo que Opera sí
+acepta, esa versión entra y **resuelve sola la causa de la anterior** (desde pms-integration 0.29.0), que
+termina sin escribir nada. Para no llevarse sorpresas, qué tipos vende Opera esas noches: `python3
+deploy/demo/opera.py availability XMAR 2026-11-13 2026-11-17` (solo GET; `STDK` no sale en esa lista y
+aun así entra: las suites `SJ…` y `STD-KING` son las que aceptaron en noviembre).
+
+Probado en ec1 el 2026-09-27 con **ZMPBEY** / Opera **39484599**: v2 a `JS-SEA` rechazada por Opera
+(RSV00138, causa y aviso); v3 a `JS-STD` y del 12 al 16 de noviembre, en su sitio (`SJSB`, UDF 3); v4
+del 13 al 17, en su sitio, y la causa de la v2 resuelta sola («pms-integration: v4 is in Opera»); la
+cancelación, en Opera *Cancelled* y en el front office *CANCELLED*. Siempre una sola reserva en Opera.
+
+## Flujo 8. Un código nuevo con la integración ya activa
+
+El día a día después del alta: el equipo de producto abre una **tarifa nueva** en el CRS y la integración
+se entera sola, por la primera reserva que la usa.
+
+1. **Tarifa nueva en el CRS**: `python3 deploy/demo/ec1.py rate-plan MRU01 EMPLEADOS-27 "Empleados de la
+   cadena de vacaciones 2027" 0.5` (`POST /catalog/hotels/MRU01/rate-plans` del CRS; se guarda, se
+   vende al momento y el catálogo la lista). Repetirlo no cambia nada.
+2. En *Mapping → Dictionary*, filtrando por MRU01, aparece **sin mapear** (*Unmapped*).
+3. **Una reserva con ella** (Call center: la tarifa ya está en el asistente; o `ec1.py book --room JS-STD
+   --rate EMPLEADOS-27 --board SOLO-ALOJAMIENTO --arrival 2026-11-20`). Se queda esperando: causa
+   `MISSING_MAPPING:MRU01:RATE_PLAN:EMPLEADOS-27` en *Mapping → Causes* y su aviso en la bandeja (rol
+   `ai-admin`), que lleva a la pantalla.
+4. **Ask the agent** en el diccionario: propone `432040HLXMU` «STAFF ON HOLIDAY XMU A27» (confianza
+   0,95: «Corresponde exactamente a la tarifa de empleados de vacaciones para 2027…»). Tarda ~10 s.
+5. **Aprobar solo esa** propuesta: la causa se resuelve, el aviso se va y la reserva sigue sola hasta
+   Opera (con la tarifa `432040HLXMU`) y el front office, en segundos.
+
+La tarifa de Opera es de XMAR y se eligió por leerla (solo GET) entre las de la propiedad: vende del
+2026-01-01 al 2027-10-31. Sus tipos de habitación son suites: con `JS-STD` entra. `zero.sh` borra las
+tarifas abiertas así (tabla `catalog_rate_plan` del CRS): desde cero, el flujo 8 se puede repetir con el
+mismo código; sin poner a cero, con otro (una tarifa ya mapeada no vuelve a esperar).
+
+Probado en ec1 el 2026-09-27: `EMPLEADOS-27` abierta a las 17:55; reserva **66AYZ5** (JS-STD, 20–23 de
+noviembre, solo alojamiento) esperando a las 17:55:41; propuesta del agente en 11 s; aprobada a las
+17:57:07 y en Opera como **39484600** (`SJSB` / `432040HLXMU`) y en el front office.
+
 ## 11. Quién hizo qué, y qué me espera
 
 - *Audit*: cada acción que decide algo sobre un hotel — alta, aprobar o retirar un mapeado, activar,
@@ -290,7 +379,7 @@ de Cobros y factura de depósito.
 Dos scripts en `deploy/demo/`, y ninguno toca Opera:
 
 - **`zero.sh` — antes de cualquier integración** (unos 3 minutos). Vacía lo que hace la integración:
-  reservas del CRS, integraciones, mapeados, MDM, huéspedes y estancias del front office (las
+  reservas del CRS (y las tarifas abiertas después, flujo 8), integraciones, mapeados, MDM, huéspedes y estancias del front office (las
   habitaciones quedan libres), avisos, auditoría y los procesos del motor; y en Salesforce borra
   **todos** los contactos y los Cases del MDM (el org se comparte con el entorno local). Se queda lo
   que está configurado: interlocutores del ERP, habitaciones y catálogos del front office,
@@ -355,6 +444,24 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 
 ## Preparación de la demo
 
+**`deploy/demo/demo-prep.sh`** — un comando para preparar una demo o un ensayo:
+
+- `demo-prep.sh` (o `health`): la tabla PASS/FAIL — despliegues listos, motor, token de Opera y XMAR
+  legible (GET), token de Salesforce (GET), estado de la integración de MRU01 (ninguna tras `zero.sh`:
+  ahí empieza el flujo 1), diccionario y causas abiertas, que no quede un corte de Opera puesto ni el
+  umbral del aviso bajado, el contexto de Opera y las habitaciones libres del front office. Sale con 1
+  si algo falla. `--zero` pasa antes `zero.sh`; sin él no se resetea nada.
+- `demo-prep.sh seed returning-customer [--create]` (flujo 2): a quién teclear en el asistente — el
+  titular de una reserva del flujo 1, mismo nombre y teléfono, **otro email** —; `--create` la hace por
+  la API.
+- `demo-prep.sh seed arriving-today` (flujo 4): una reserva que llega hoy, esperando a que esté en Opera
+  y en el front office, para el no show.
+- `demo-prep.sh seed walk-in` (flujo 5): nada que crear; los datos a teclear y las habitaciones libres.
+
+Se pueden lanzar a mitad de demo y repetir: lo que crean lleva la marca `demo-prep:<semilla>` en los
+comentarios de la reserva y se reutiliza. Para los flujos 6–8, `opera-outage.sh` y `ec1.py` (book,
+modify, cancel, show, rate-plan, ask-agent, proposal); `opera.py` lee Opera (solo GET).
+
 - [ ] **Recorrer el alta desde cero**, MRU01 → XMAR (en curso): conectividad, contraste, mapeados
       (incluida `NOS → NOSHOW`), interlocutores, backfill y activación. **Antes del alta, crear
       reservas futuras de MRU01** por `CALLCENTER` (con algún interlocutor): el CRS está vacío, y sin
@@ -389,6 +496,9 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
     2026-09-27 — 39484567, 39484568, 39484573–39484581, 39484593, 39484597 y 39484582 (cancelada,
     no show) —, localizadores TEX39V, BVJJR6, V5M48N, HTJFGX, FEH9WH, 7YCUWJ, FVJ43M, TZFX5P, GB5STT,
     WKCBR5, DM95Z8, KF6HFC, M46BRN y KTQVZJ, cada una con su perfil de huésped.
+  - `ECDEMO1`, de los flujos 6–8 y `seed arriving-today` probados el 2026-09-27: 39484599 (ZMPBEY,
+    modificada y cancelada), 39484600 (66AYZ5, tarifa `432040HLXMU`) y 39484601 (3PJ492, llega el 27),
+    cada una con su perfil de huésped.
   - `ECDEMO1-<MMddHHmm>`: lo que escriba cada ejecución desde su `zero.sh` (sus reservas y sus perfiles
     de huésped); ampliar esta lista al estrenarlo.
   - `CRS`, de antes de poner ec1 a cero: reservas 39481284, 39481745, 39481775, 39481943, 39481944,
