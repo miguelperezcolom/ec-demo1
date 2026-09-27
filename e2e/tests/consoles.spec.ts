@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { CONSOLES, inboxScreen, signIn, menuLabels, screenRendered } from './consoles'
+import { CONSOLES, signIn, menuLabels, screenRendered, screenIs } from './consoles'
 
 /**
  * Every screen of every console, on both planes and through both renderers.
@@ -16,7 +16,8 @@ import { CONSOLES, inboxScreen, signIn, menuLabels, screenRendered } from './con
  *   <li><b>Each screen</b> catches three different things wearing the same face: a gateway route
  *       missing for a host, a Mateu route that resolves to "Not found." with an HTTP 200, and a
  *       component type the renderer does not cover — which Mateu paints as a placeholder rather
- *       than failing.</li>
+ *       than failing. And then that it is the RIGHT screen: its heading names the entry and, for a
+ *       listing, a table is on it — a route resolved to the wrong page renders just as well.</li>
  *   <li><b>The two planes</b> catch each other: Workflow and Forms exist on both and mean
  *       different things, so a screen appearing on the wrong one is a defect the console it is
  *       missing from cannot see.</li>
@@ -46,7 +47,6 @@ for (const console_ of CONSOLES) {
         // The inbox has no entry on the bar: the badge in the top bar is the way in. Its menu is
         // still declared, hidden, so a reload on the inbox resolves too — both are checked here.
         test('the inbox badge opens the inbox', async ({ page }) => {
-            test.skip(console_.renderer === 'redwood', 'Redwood does not draw the header widgets yet; its inbox is a menu entry')
             await signIn(page, console_)
             const badge = page.locator('a', { hasText: /Inbox/ }).first()
             await expect(badge, `${console_.name} shows no inbox badge`).toBeVisible({ timeout: 60_000 })
@@ -78,6 +78,17 @@ for (const console_ of CONSOLES) {
 
                 const { ok, why } = await screenRendered(page)
                 expect(ok, `${console_.name} ${screen.route}: ${why}`).toBe(true)
+
+                // Rendering is not arriving. A route that lands on the wrong screen still renders
+                // one, so the page has to name itself as the screen the menu entry opens.
+                await expect
+                    .poll(async () => (await screenIs(page, screen)).ok,
+                          { message: `${screen.route} never showed ${screen.entry}`, timeout: 30_000 })
+                    .toBe(true)
+                    .catch(async () => {
+                        const { why: wrong } = await screenIs(page, screen)
+                        throw new Error(`${console_.name} ${screen.route} is not ${screen.menu} → ${screen.entry}: ${wrong}`)
+                    })
             })
         }
     })
@@ -90,13 +101,10 @@ for (const console_ of CONSOLES) {
  * between them stopped being the pom.
  */
 test('both renderers of a plane offer the same screens', async () => {
-    // The one difference allowed, and on purpose: Redwood reaches the inbox from a menu entry,
-    // because it draws no header widgets for the badge Vaadin has instead.
-    const redwoodOnly = (route: string) => route === inboxScreen.route
     for (const plane of ['data', 'control'] as const) {
         const [vaadin, redwood] = CONSOLES.filter(c => c.plane === plane)
-        expect(redwood.screens.map(s => s.route).filter(r => !redwoodOnly(r)).sort())
+        expect(redwood.screens.map(s => s.route).sort())
             .toEqual(vaadin.screens.map(s => s.route).sort())
-        expect(redwood.menus.filter(m => m !== inboxScreen.menu).sort()).toEqual(vaadin.menus.slice().sort())
+        expect(redwood.menus.slice().sort()).toEqual(vaadin.menus.slice().sort())
     }
 })

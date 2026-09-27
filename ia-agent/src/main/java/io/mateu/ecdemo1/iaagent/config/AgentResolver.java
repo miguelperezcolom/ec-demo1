@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iaagent.config;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.iaagent.identity.CallerIdentity;
+import io.mateu.ecdemo1.iaagent.observability.TraceHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,10 +42,13 @@ public class AgentResolver {
 
     private final AgentConfigClient configClient;
     private final String url;
+    private final TraceHeaders traceHeaders;
 
     public AgentResolver(AgentConfigClient configClient,
-                         @Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl) {
+                         @Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl,
+                         TraceHeaders traceHeaders) {
         this.configClient = configClient;
+        this.traceHeaders = traceHeaders;
         this.url = controlPlaneUrl.replaceAll("/+$", "") + "/internal/agents/resolve";
     }
 
@@ -74,7 +78,7 @@ public class AgentResolver {
         try {
             var body = mapper.writeValueAsString(new ResolveRequest(id.userId(), id.username(),
                     id.roles(), id.tenant(), locale, route, configClient.agentId()));
-            var response = http.send(HttpRequest.newBuilder(URI.create(url))
+            var response = http.send(traceHeaders.applyTo(HttpRequest.newBuilder(URI.create(url)))
                             .timeout(Duration.ofSeconds(5))
                             .header("Content-Type", "application/json")
                             .header("Accept", "application/json")

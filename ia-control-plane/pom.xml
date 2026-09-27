@@ -19,7 +19,7 @@
     <properties>
         <java.version>21</java.version>
         <!-- Pinned rather than floating, like the shell's. -->
-        <mateu.version>3.0-alpha.366</mateu.version>
+        <mateu.version>3.0-alpha.367</mateu.version>
         <!-- Only for `shared`, the engine's DTO jar: this service uses its AggregateRoot base
              class, the same as booking, content and users. -->
         <eventconductor.version>2.14.1</eventconductor.version>
@@ -100,6 +100,25 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Traces, to the same Tempo the engines export to. Three entries because Boot 4 split
+             them: the bridge and the OTLP exporter are the OpenTelemetry libraries; what creates
+             the Tracer and the SpanExporter — and binds management.tracing.* and
+             management.opentelemetry.tracing.export.otlp.* — is spring-boot-micrometer-tracing-
+             opentelemetry. Without it both properties are owned by nothing and every span is built
+             and dropped, silently: the way the engine shipped 2.2.1. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
 
         <dependency>

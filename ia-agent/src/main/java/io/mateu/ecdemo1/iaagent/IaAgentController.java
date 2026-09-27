@@ -6,6 +6,10 @@ import io.mateu.ecdemo1.iaagent.config.AgentConfigClient;
 import io.mateu.ecdemo1.iaagent.config.AgentResolver;
 import io.mateu.ecdemo1.iaagent.config.ChatClientRegistry;
 import io.mateu.ecdemo1.iaagent.config.RagToolFactory;
+import io.mateu.ecdemo1.iaagent.observability.AgentObservability;
+import io.mateu.ecdemo1.iaagent.observability.ContentCapture;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -42,6 +46,8 @@ public class IaAgentController {
     private final io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader jwtIdentityReader;
     private final io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter;
     private final AgentResolver agentResolver;
+    private final ObservationRegistry observationRegistry;
+    private final ContentCapture content;
 
     public IaAgentController(AgentConfigClient configClient,
                              ChatClientRegistry chatClients,
@@ -52,7 +58,9 @@ public class IaAgentController {
                              ObjectMapper objectMapper,
                              io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader jwtIdentityReader,
                              io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter,
-                             AgentResolver agentResolver) {
+                             AgentResolver agentResolver,
+                             ObservationRegistry observationRegistry,
+                             ContentCapture content) {
         this.configClient = configClient;
         this.chatClients = chatClients;
         this.mcpFactory = mcpFactory;
@@ -63,6 +71,71 @@ public class IaAgentController {
         this.jwtIdentityReader = jwtIdentityReader;
         this.usageReporter = usageReporter;
         this.agentResolver = agentResolver;
+        this.observationRegistry = observationRegistry;
+        this.content = content;
+    }
+
+    // ── Observation ──────────────────────────────────────────────────────────
+
+    /**
+     * The {@code invoke_agent} span and the {@code ia_agent_prompt_seconds} timer: one per prompt,
+     * parent of every model round trip and tool call it causes. {@code parent} is passed in rather
+     * than taken from the thread because /stream answers on another one than the request's.
+     *
+     * <p>Every low-cardinality key is set at the start, with a placeholder, and overwritten as it
+     * becomes known: they are Prometheus labels, and a meter must carry the same ones on every
+     * sample.
+     *
+     * <p>The tokens, model calls and tool calls it ends with are not set here: every model round
+     * trip and tool call under it adds itself up in {@link AgentObservability.PromptStats} as it
+     * stops, and {@link AgentObservability} writes the totals when this one does. The user's
+     * message goes on it only when {@link ContentCapture} records content.
+     */
+    private Observation startPromptObservation(Observation parent, String sessionId, String userMessage) {
+        var observation = Observation.createNotStarted(AgentObservability.PROMPT, observationRegistry)
+                .parentObservation(parent)
+                .contextualName("invoke_agent")
+                .lowCardinalityKeyValue(AgentObservability.OPERATION, "invoke_agent")
+                .lowCardinalityKeyValue(AgentObservability.AGENT_ID, AgentObservability.UNRESOLVED)
+                .lowCardinalityKeyValue(AgentObservability.LLM_ID, AgentObservability.UNRESOLVED)
+                .lowCardinalityKeyValue(AgentObservability.REQUEST_MODEL, AgentObservability.UNRESOLVED)
+                .lowCardinalityKeyValue(AgentObservability.OUTCOME, "error")
+                .highCardinalityKeyValue(AgentObservability.SESSION_ID, String.valueOf(sessionId));
+        AgentObservability.attachStats(observation.getContext());
+        var captured = content.prepare(userMessage);
+        if (captured != null) {
+            observation.highCardinalityKeyValue(AgentObservability.USER_MESSAGE, captured);
+        }
+        return observation.start();
+    }
+
+    /** The answer as the user reads it — on the span only when content is recorded. */
+    private void tagResponse(Observation observation, String response) {
+        var captured = content.prepare(response);
+        if (captured != null) {
+            observation.highCardinalityKeyValue(AgentObservability.AGENT_RESPONSE, captured);
+        }
+    }
+
+    private static void tagAgent(Observation observation, AgentConfig config) {
+        observation.contextualName("invoke_agent " + config.agentId())
+                .lowCardinalityKeyValue(AgentObservability.AGENT_ID, config.agentId())
+                .highCardinalityKeyValue(AgentObservability.AGENT_NAME, String.valueOf(config.agentName()));
+        if (config.llm() != null) {
+            observation.lowCardinalityKeyValue(AgentObservability.LLM_ID, String.valueOf(config.llm().id()))
+                    .lowCardinalityKeyValue(AgentObservability.REQUEST_MODEL, String.valueOf(config.llm().model()));
+        }
+    }
+
+    private static void tagTools(Observation observation, PerRequestMcpClientFactory.PerRequestTools tools,
+                                 int toolCount) {
+        observation.highCardinalityKeyValue(AgentObservability.TOOLS_AVAILABLE, String.valueOf(toolCount))
+                .highCardinalityKeyValue(AgentObservability.MCP_SERVERS_EXPECTED, String.valueOf(tools.expectedServers()))
+                .highCardinalityKeyValue(AgentObservability.MCP_SERVERS_CONNECTED, String.valueOf(tools.connectedServers()));
+    }
+
+    private static void outcome(Observation observation, String outcome) {
+        observation.lowCardinalityKeyValue(AgentObservability.OUTCOME, outcome);
     }
 
     /**
@@ -128,6 +201,10 @@ public class IaAgentController {
         return sb.toString();
     }
 
+    private static int length(String text) {
+        return text == null ? 0 : text.length();
+    }
+
     private ServerSentEvent<String> tokenEvent(int input, int output, int total) {
         return ServerSentEvent.<String>builder()
                 .data("{\"inputTokens\":" + input
@@ -169,7 +246,7 @@ public class IaAgentController {
                 objectMapper.readTree(json);
                 String ssePayload = "{\"event\":\"navigation-requested\",\"detail\":" + json + "}";
                 navEvents.add(ServerSentEvent.<String>builder().data(ssePayload).build());
-                log.info("Navigation requested: {}", json);
+                log.debug("Navigation requested: {}", json);
             } catch (Exception e) {
                 log.warn("Malformed NAVIGATE block, ignoring: {}", json);
             }
@@ -184,16 +261,24 @@ public class IaAgentController {
     public String chat(@RequestBody ChatRequest request,
                        @RequestHeader(value = "Authorization", required = false) String authorization) {
         String sessionId = request.sessionId();
-        log.info("Chat request session={}: '{}'", sessionId, request.message());
+        // What happened goes to the log; what was said goes to the trace, and only when
+        // IA_CAPTURE_CONTENT says so. The text itself is here at DEBUG, for a local run.
+        log.info("Chat request session={}: {} chars", sessionId, length(request.message()));
+        log.debug("Chat request session={}: '{}'", sessionId, request.message());
         menuContextStore.update(sessionId, request.menuContext());
 
-        try {
+        var observation = startPromptObservation(observationRegistry.getCurrentObservation(), sessionId,
+                request.message());
+        try (var scope = observation.openScope()) {
             // Resolved before anything else: it decides the agent (by the caller's context), the
             // model, the credential, the prompt and which MCP servers to even open a connection to
             // — and refuses an over-budget request here rather than after spending on it.
             AgentConfig config = resolveConfig(authorization, request);
+            tagAgent(observation, config);
 
             try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
+                var toolCallbacks = allTools(config, tools);
+                tagTools(observation, tools, toolCallbacks.length);
                 // Only a hard stop when there is nothing at all to call. An agent whose MCP
                 // servers are all down but which still has a RAG source can answer from its
                 // documents, and refusing here would take that away.
@@ -202,6 +287,8 @@ public class IaAgentController {
                             + " configurados, 0 conectados) ni ninguna fuente RAG. No puedo "
                             + "responder sin acceso a las herramientas.";
                     log.warn("Chat aborted session={}: {}", sessionId, err);
+                    tagResponse(observation, err);
+                    outcome(observation, "no_tools");
                     return err;
                 }
                 String systemPrompt = buildSystemPrompt(config.systemPrompt(),
@@ -213,7 +300,7 @@ public class IaAgentController {
                         .system(systemPrompt)
                         .messages(history)
                         .user(request.message())
-                        .toolCallbacks(allTools(config, tools))
+                        .toolCallbacks(toolCallbacks)
                         .call()
                         .chatResponse();
 
@@ -242,16 +329,23 @@ public class IaAgentController {
                 usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
                         inputTokens, outputTokens, totalTokens,
                         jwtIdentityReader.read(authorization), sessionId);
+                tagResponse(observation, result);
+                outcome(observation, "success");
                 return result;
             }
         } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
             // Not an error during the prompt — a misconfiguration. The message is written for
             // whoever can fix it, so it is returned as it is rather than wrapped in a class name.
             log.warn("Chat aborted session={}: {}", sessionId, e.getMessage());
+            tagResponse(observation, e.getMessage());
+            outcome(observation, "refused");
             return e.getMessage();
         } catch (Exception e) {
             log.error("Error en chat session={} — {}: {}", sessionId, e.getClass().getName(), e.getMessage(), e);
+            observation.error(e);
             return "Error: " + e.getClass().getSimpleName() + ": " + e.getMessage();
+        } finally {
+            observation.stop();
         }
     }
 
@@ -276,67 +370,32 @@ public class IaAgentController {
     public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest request,
                                                 @RequestHeader(value = "Authorization", required = false) String authorization) {
         String sessionId = request.sessionId();
-        log.info("Stream request session={}: '{}'", sessionId, request.message());
+        log.info("Stream request session={}: {} chars", sessionId, length(request.message()));
+        log.debug("Stream request session={}: '{}'", sessionId, request.message());
 
         // Cache menu if provided
         menuContextStore.update(sessionId, request.menuContext());
 
         var history = conversationStore.getHistory(sessionId);
 
+        // Taken here, on the request's thread: the prompt runs on another, which does not inherit
+        // it, and without it the prompt's span would start a trace of its own.
+        Observation requestObservation = observationRegistry.getCurrentObservation();
+
         // Blocking LLM call on a dedicated thread; cache() so both subscribers share the result.
         Mono<LlmResult> resultMono = Mono.fromCallable(() -> {
-                    // Same order as /chat: resolve first, because it decides which agent, which
-                    // servers to connect to and with which model to answer — and can refuse.
-                    AgentConfig config = resolveConfig(authorization, request);
-                    try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
-                        if (tools.hasNoServers() && config.rags().isEmpty()) {
-                            String err = "No hay ningún servidor MCP disponible ("
-                                    + tools.expectedServers() + " configurados, 0 conectados) ni "
-                                    + "ninguna fuente RAG. No puedo responder sin acceso a las "
-                                    + "herramientas.";
-                            log.warn("Stream aborted session={}: no tools at all", sessionId);
-                            return new LlmResult(err, 0, 0, 0);
-                        }
-                        String systemPrompt = buildSystemPrompt(config.systemPrompt(),
-                                tools.getServerSystemContext(), sessionId);
-                        var chatResponse = chatClients.forLlm(config.llm()).prompt()
-                                .options(chatClients.optionsFor(config.llm()))
-                                .system(systemPrompt)
-                                .messages(history)
-                                .user(request.message())
-                                .toolCallbacks(allTools(config, tools))
-                                .call()
-                                .chatResponse();
-
-                        String content = null;
-                        int inputTokens = 0, outputTokens = 0, totalTokens = 0;
-
-                        if (chatResponse != null) {
-                            var result = chatResponse.getResult();
-                            if (result != null && result.getOutput() != null) {
-                                content = result.getOutput().getText();
-                            }
-                            var usage = chatResponse.getMetadata() != null
-                                    ? chatResponse.getMetadata().getUsage() : null;
-                            if (usage != null) {
-                                inputTokens  = usage.getPromptTokens()     != null ? usage.getPromptTokens()     : 0;
-                                outputTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
-                                totalTokens  = usage.getTotalTokens()      != null ? usage.getTotalTokens()      : 0;
-                            }
-                        }
-
-                        log.info("Stream completed session={}: {} chars, tokens={}/{}/{}",
-                                sessionId, content != null ? content.length() : 0,
-                                inputTokens, outputTokens, totalTokens);
-
-                        String raw = (content != null && !content.isBlank()) ? content : "(sin respuesta)";
-                        conversationStore.addExchange(sessionId, request.message(), raw);
-                        conversationStore.accumulateTokens(sessionId, inputTokens, outputTokens, totalTokens);
-                        usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
-                                inputTokens, outputTokens, totalTokens,
-                                jwtIdentityReader.read(authorization), sessionId);
-                        int[] cumulative = conversationStore.getTotalTokens(sessionId);
-                        return new LlmResult(raw, cumulative[0], cumulative[1], cumulative[2]);
+                    var observation = startPromptObservation(requestObservation, sessionId, request.message());
+                    try (var scope = observation.openScope()) {
+                        return streamPrompt(observation, request, authorization, sessionId, history);
+                    } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
+                        tagResponse(observation, e.getMessage());
+                        outcome(observation, "refused");
+                        throw e;
+                    } catch (Exception e) {
+                        observation.error(e);
+                        throw e;
+                    } finally {
+                        observation.stop();
                     }
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -375,5 +434,71 @@ public class IaAgentController {
                 .onErrorResume(e -> Flux.just(errorEvent(e)));
 
         return Flux.concat(periodicTokens, finalEvents);
+    }
+
+    /** The body of one /stream prompt, inside its observation. */
+    private LlmResult streamPrompt(Observation observation, ChatRequest request, String authorization,
+                                   String sessionId,
+                                   List<org.springframework.ai.chat.messages.Message> history) {
+        // Same order as /chat: resolve first, because it decides which agent, which
+        // servers to connect to and with which model to answer — and can refuse.
+        AgentConfig config = resolveConfig(authorization, request);
+        tagAgent(observation, config);
+        try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
+            var toolCallbacks = allTools(config, tools);
+            tagTools(observation, tools, toolCallbacks.length);
+            if (tools.hasNoServers() && config.rags().isEmpty()) {
+                String err = "No hay ningún servidor MCP disponible ("
+                        + tools.expectedServers() + " configurados, 0 conectados) ni "
+                        + "ninguna fuente RAG. No puedo responder sin acceso a las "
+                        + "herramientas.";
+                log.warn("Stream aborted session={}: no tools at all", sessionId);
+                tagResponse(observation, err);
+                outcome(observation, "no_tools");
+                return new LlmResult(err, 0, 0, 0);
+            }
+            String systemPrompt = buildSystemPrompt(config.systemPrompt(),
+                    tools.getServerSystemContext(), sessionId);
+            var chatResponse = chatClients.forLlm(config.llm()).prompt()
+                    .options(chatClients.optionsFor(config.llm()))
+                    .system(systemPrompt)
+                    .messages(history)
+                    .user(request.message())
+                    .toolCallbacks(toolCallbacks)
+                    .call()
+                    .chatResponse();
+
+            String content = null;
+            int inputTokens = 0, outputTokens = 0, totalTokens = 0;
+
+            if (chatResponse != null) {
+                var result = chatResponse.getResult();
+                if (result != null && result.getOutput() != null) {
+                    content = result.getOutput().getText();
+                }
+                var usage = chatResponse.getMetadata() != null
+                        ? chatResponse.getMetadata().getUsage() : null;
+                if (usage != null) {
+                    inputTokens  = usage.getPromptTokens()     != null ? usage.getPromptTokens()     : 0;
+                    outputTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
+                    totalTokens  = usage.getTotalTokens()      != null ? usage.getTotalTokens()      : 0;
+                }
+            }
+
+            log.info("Stream completed session={}: {} chars, tokens={}/{}/{}",
+                    sessionId, content != null ? content.length() : 0,
+                    inputTokens, outputTokens, totalTokens);
+
+            String raw = (content != null && !content.isBlank()) ? content : "(sin respuesta)";
+            conversationStore.addExchange(sessionId, request.message(), raw);
+            conversationStore.accumulateTokens(sessionId, inputTokens, outputTokens, totalTokens);
+            usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
+                    inputTokens, outputTokens, totalTokens,
+                    jwtIdentityReader.read(authorization), sessionId);
+            tagResponse(observation, raw);
+            outcome(observation, "success");
+            int[] cumulative = conversationStore.getTotalTokens(sessionId);
+            return new LlmResult(raw, cumulative[0], cumulative[1], cumulative[2]);
+        }
     }
 }

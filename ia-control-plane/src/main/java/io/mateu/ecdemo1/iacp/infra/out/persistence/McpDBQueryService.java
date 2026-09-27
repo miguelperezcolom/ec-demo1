@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 import io.mateu.ecdemo1.iacp.application.out.query.McpQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.McpDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.McpRow;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.StatusBadge;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpTransport;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
@@ -64,6 +65,6 @@ public class McpDBQueryService implements McpQueryService {
 
     static McpRow toRow(McpEntity e) {
         return new McpRow(e.getId(), e.getName(), e.getUrl(), e.getTransport(),
-                e.isEnabled() ? "enabled" : "disabled");
+                StatusBadge.enabled(e.isEnabled()));
     }
 }

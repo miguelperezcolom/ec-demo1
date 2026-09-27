@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 import io.mateu.ecdemo1.iacp.application.out.query.BudgetQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.BudgetDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.BudgetRow;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.StatusBadge;
 import io.mateu.ecdemo1.iacp.domain.aggregates.budget.vo.BudgetPeriod;
 import io.mateu.ecdemo1.iacp.domain.aggregates.budget.vo.BudgetScope;
 import io.mateu.uidl.data.ListingData;
@@ -65,6 +66,6 @@ public class BudgetDBQueryService implements BudgetQueryService {
 
     static BudgetRow toRow(BudgetEntity e) {
         return new BudgetRow(e.getId(), e.getName(), e.getScope(), e.getSubjectId(),
-                e.getPeriod(), e.getLimitTokens(), e.isEnabled() ? "enabled" : "disabled");
+                e.getPeriod(), e.getLimitTokens(), StatusBadge.enabled(e.isEnabled()));
     }
 }

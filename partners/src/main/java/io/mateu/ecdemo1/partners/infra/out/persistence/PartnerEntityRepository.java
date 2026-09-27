@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface PartnerEntityRepository extends JpaRepository<PartnerEntity, String> {
@@ -30,12 +31,13 @@ public interface PartnerEntityRepository extends JpaRepository<PartnerEntity, St
             where (:text is null or :text = ''
                    or lower(p.code) like lower(concat('%', :text, '%'))
                    or lower(p.name) like lower(concat('%', :text, '%')))
-              and (:type is null or p.type = :type)
-              and (:billingMode is null or p.billingMode = :billingMode)
+              and (:anyType = true or p.type in :types)
+              and (:anyBillingMode = true or p.billingMode in :billingModes)
               and (:active is null or p.active = :active)
             order by p.code
             """)
-    Page<PartnerEntity> search(@Param("text") String text, @Param("type") String type,
-                               @Param("billingMode") String billingMode, @Param("active") Boolean active,
-                               Pageable pageable);
+    Page<PartnerEntity> search(@Param("text") String text,
+                               @Param("anyType") boolean anyType, @Param("types") List<String> types,
+                               @Param("anyBillingMode") boolean anyBillingMode, @Param("billingModes") List<String> billingModes,
+                               @Param("active") Boolean active, Pageable pageable);
 }

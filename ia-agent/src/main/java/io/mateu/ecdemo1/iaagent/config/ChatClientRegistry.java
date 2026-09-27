@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iaagent.config;
 
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.anthropic.AnthropicChatModel;
@@ -46,6 +47,19 @@ public class ChatClientRegistry {
     private final Map<String, ChatClient> clients = new ConcurrentHashMap<>();
 
     /**
+     * Handed to every model and client built here. Spring AI observes nothing by default: a model
+     * or a ChatClient built without a registry gets the no-op one, and then there is no chat span,
+     * no tool span and no gen_ai.* metric — while the auto-configured handlers sit ready for
+     * observations that never come. The auto-configured models would have been given it; these are
+     * not auto-configured.
+     */
+    private final ObservationRegistry observationRegistry;
+
+    public ChatClientRegistry(ObservationRegistry observationRegistry) {
+        this.observationRegistry = observationRegistry;
+    }
+
+    /**
      * @throws UnsupportedProviderException for a provider this service cannot call. The catalogue
      *         can hold one — an entry may be written before it is usable — so this has to be an
      *         answerable error rather than something that stops the pod.
@@ -85,10 +99,14 @@ public class ChatClientRegistry {
         });
     }
 
-    private static ChatClient anthropic(AgentConfig.Llm llm) {
+    private ChatClient anthropic(AgentConfig.Llm llm) {
+        // The registry twice, and both are needed: the model's is the gen_ai.client.operation
+        // span and the token metrics; the client's is spring.ai.chat.client and — through the
+        // ToolCallingManager it builds with it — one spring.ai.tool span per tool call.
         return ChatClient.create(AnthropicChatModel.builder()
                 .options(anthropicOptions(llm).build())
-                .build());
+                .observationRegistry(observationRegistry)
+                .build(), observationRegistry);
     }
 
     /**
@@ -96,10 +114,11 @@ public class ChatClientRegistry {
      * empty it is OpenAI's own endpoint, and the completions path stays Spring AI's default
      * {@code /v1/chat/completions}, which is the path these servers agree on.
      */
-    private static ChatClient openAiCompatible(AgentConfig.Llm llm) {
+    private ChatClient openAiCompatible(AgentConfig.Llm llm) {
         return ChatClient.create(OpenAiChatModel.builder()
                 .options(openAiOptions(llm).build())
-                .build());
+                .observationRegistry(observationRegistry)
+                .build(), observationRegistry);
     }
 
     /**

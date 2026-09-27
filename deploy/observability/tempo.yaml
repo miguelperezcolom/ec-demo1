@@ -1,4 +1,10 @@
 nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+# Traces on a volume, as deployed: without this block a `deploy.sh` run would put Tempo back on an
+# emptyDir and lose every trace on its next restart.
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: hcloud-volumes
 tempo:
   # Grafana's Tempo datasource runs TraceQL with `rate() by(...)` for its service graph and RED
   # views, and those are computed by the metrics generator rather than read from the traces. With
@@ -55,6 +61,61 @@ tempo:
   resources:
     requests: { memory: 1Gi, cpu: 100m }
     limits: { memory: 3Gi, cpu: 1 }
+# The chart's own config template, copied from tempo-1.24.4 with ONE line added:
+# distributor.max_attribute_bytes. Tempo 2.9 truncates any span attribute longer than that — 2048
+# bytes by default — silently, on ingestion. ia-agent writes the conversation onto its spans
+# (IA_CAPTURE_CONTENT) with a limit of its own of 16384 characters and a note when it cuts, and a
+# 2 KB Tempo limit would cut nearly every prompt and model reply before that note is reached.
+# 65536 bytes is those 16384 characters at UTF-8's worst case, so Tempo never cuts first. The
+# chart exposes no value for the distributor beyond its receivers, and Tempo no flag for this, so
+# the template is the only place to say it. Everything else below renders exactly as before.
+config: |
+    memberlist:
+      cluster_label: "{{ .Release.Name }}.{{ .Release.Namespace }}"
+    multitenancy_enabled: {{ .Values.tempo.multitenancyEnabled }}
+    usage_report:
+      reporting_enabled: {{ .Values.tempo.reportingEnabled }}
+    compactor:
+      compaction:
+        block_retention: {{ .Values.tempo.retention }}
+    distributor:
+      max_attribute_bytes: 65536
+      receivers:
+        {{- toYaml .Values.tempo.receivers | nindent 8 }}
+    ingester:
+      {{- toYaml .Values.tempo.ingester | nindent 6 }}
+    server:
+      {{- toYaml .Values.tempo.server | nindent 6 }}
+    storage:
+      {{- toYaml .Values.tempo.storage | nindent 6 }}
+    querier:
+      {{- toYaml .Values.tempo.querier | nindent 6 }}
+    query_frontend:
+      {{- toYaml .Values.tempo.queryFrontend | nindent 6 }}
+    overrides:
+      {{- toYaml .Values.tempo.overrides | nindent 6 }}
+      {{- if .Values.tempo.metricsGenerator.enabled }}
+    metrics_generator:
+      {{- if .Values.tempo.metricsGenerator.processor }}
+      processor:
+        {{- toYaml .Values.tempo.metricsGenerator.processor | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tempo.metricsGenerator.registry }}
+      registry:
+        {{- toYaml .Values.tempo.metricsGenerator.registry | nindent 8 }}
+      {{- end }}
+      storage:
+        path: {{ .Values.tempo.metricsGenerator.storage.path | quote }}
+        {{- if .Values.tempo.metricsGenerator.storage.remote_write }}
+        remote_write:
+          {{- toYaml .Values.tempo.metricsGenerator.storage.remote_write | nindent 10 }}
+        {{- else }}
+        remote_write:
+          - url: {{ .Values.tempo.metricsGenerator.remoteWriteUrl }}
+        {{- end }}
+      traces_storage:
+        path: {{ .Values.tempo.metricsGenerator.traces_storage.path | quote }}
+      {{- end }}
 persistence:
   enabled: true
   storageClassName: hcloud-volumes

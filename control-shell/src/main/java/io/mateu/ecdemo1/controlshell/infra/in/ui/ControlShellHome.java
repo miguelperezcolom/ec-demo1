@@ -174,7 +174,7 @@ public class ControlShellHome implements WidgetSupplier {
                         .wrapped(Text.builder()
                                 .text("<vaadin-icon icon=\"vaadin:user\" style=\"display: var(--mateu-header-narrow-only, none); width: 1em; height: 1em; vertical-align: -0.125em;\"></vaadin-icon>"
                                                 + "<span style=\"display: var(--mateu-header-wide-only, inline)\">Hola, " + claims.get("name") + "</span>")
-                                .style("margin-right: 20px;")
+                                .style("margin-right: 20px; cursor: pointer;") // it opens the popover: who, and Logout
                                 .build())
                         .content(VerticalLayout.builder()
                                 .content(List.of(

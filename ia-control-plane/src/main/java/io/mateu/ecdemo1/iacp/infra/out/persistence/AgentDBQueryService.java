@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 import io.mateu.ecdemo1.iacp.application.out.query.AgentQueryService;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.AgentDto;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.AgentRow;
+import io.mateu.ecdemo1.iacp.application.out.query.dto.StatusBadge;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.Pageable;
@@ -64,6 +65,6 @@ public class AgentDBQueryService implements AgentQueryService {
     static AgentRow toRow(AgentEntity e) {
         return new AgentRow(e.getId(), e.getName(), e.getLlmId(),
                 IdList.split(e.getMcpIds()).size(), IdList.split(e.getRagIds()).size(),
-                e.isEnabled() ? "enabled" : "disabled");
+                StatusBadge.enabled(e.isEnabled()));
     }
 }

@@ -11,6 +11,7 @@ import io.mateu.ecdemo1.partners.domain.partner.PmsProfile;
 import io.mateu.ecdemo1.partners.infra.out.outbox.OutboxWriter;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import java.util.Collection;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -44,10 +45,18 @@ public class PartnerDBRepository implements PartnerRepository {
     }
 
     @Override
-    public PartnerPage search(String text, PartnerType type, BillingMode billingMode, Boolean active, int page, int size) {
-        var found = repository.search(text, type == null ? null : type.name(),
-                billingMode == null ? null : billingMode.name(), active, PageRequest.of(page, size));
+    public PartnerPage search(String text, Collection<PartnerType> types, Collection<BillingMode> billingModes, Boolean active,
+                              int page, int size) {
+        var typeNames = names(types);
+        var modeNames = names(billingModes);
+        var found = repository.search(text, typeNames.isEmpty(), typeNames.isEmpty() ? List.of("") : typeNames,
+                modeNames.isEmpty(), modeNames.isEmpty() ? List.of("") : modeNames, active, PageRequest.of(page, size));
         return new PartnerPage(found.map(PartnerDBRepository::toDomain).getContent(), found.getTotalElements());
+    }
+
+    /** An empty list means "any"; the query gets a flag for it, since `in ()` is not valid JPQL. */
+    static List<String> names(Collection<? extends Enum<?>> values) {
+        return values == null ? List.of() : values.stream().filter(java.util.Objects::nonNull).map(Enum::name).toList();
     }
 
     @Override

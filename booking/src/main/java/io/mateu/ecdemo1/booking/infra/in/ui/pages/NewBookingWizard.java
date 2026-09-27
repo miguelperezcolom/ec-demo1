@@ -70,10 +70,6 @@ public class NewBookingWizard extends Wizard {
 
     @Override
     public Object handleAction(String actionId, HttpRequest httpRequest) {
-        var list = WizardStepLists.listField(currentStepField().getType(), actionId);
-        if (list != null) {
-            return WizardStepLists.dispatch(this, actionId, list, httpRequest);
-        }
         if ("next".equals(actionId)) {
             var problem = problemLeaving(currentStepField().getName());
             if (problem != null) {

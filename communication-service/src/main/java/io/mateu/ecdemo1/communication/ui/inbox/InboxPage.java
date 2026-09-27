@@ -22,8 +22,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,12 +59,30 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
     @Override
     public ListingData<InboxRow> search(SearchRequest request, HttpRequest httpRequest) {
         var text = request.searchText() == null ? "" : request.searchText().trim().toLowerCase();
-        var seen = inbox.seenBy(Caller.username(httpRequest));
+        var seenAt = inbox.seenAtBy(Caller.username(httpRequest));
+        var seen = seenAt.keySet();
         var rows = inbox.openFor(Caller.roles(httpRequest), Caller.username(httpRequest)).stream()
                 .filter(i -> text.isEmpty() || (i.title + " " + i.body + " " + i.hotelCode + " " + i.type).toLowerCase().contains(text))
+                .sorted(order(seenAt))
                 .map(i -> row(i, seen))
                 .toList();
         return Paging.page(rows, request);
+    }
+
+    /**
+     * What I have not seen first, the oldest first — it has waited longest; then what I have seen,
+     * the most recently seen first.
+     */
+    static Comparator<InboxItem> order(Map<String, Instant> seenAt) {
+        Comparator<InboxItem> unseenFirst = Comparator.comparing(i -> seenAt.containsKey(i.id));
+        return unseenFirst.thenComparing((a, b) -> {
+            var aSeen = seenAt.get(a.id);
+            var bSeen = seenAt.get(b.id);
+            if (aSeen == null) {
+                return Comparator.nullsLast(Comparator.<Instant>naturalOrder()).compare(a.createdAt, b.createdAt);
+            }
+            return bSeen.compareTo(aSeen);
+        });
     }
 
     static InboxRow row(InboxItem i, Set<String> seen) {

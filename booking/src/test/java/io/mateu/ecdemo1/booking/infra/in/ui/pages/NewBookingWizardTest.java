@@ -65,19 +65,6 @@ class NewBookingWizardTest {
     }
 
     @Test
-    void theListActionsOfAStepAreTheStepsLists() {
-        assertThat(WizardStepLists.listField(RoomsStep.class, "rooms_add")).isNotNull();
-        assertThat(WizardStepLists.listField(RoomsStep.class, "rooms_create-and-stay").getName()).isEqualTo("rooms");
-        assertThat(WizardStepLists.listField(GuestsStep.class, "guests_remove")).isNotNull();
-        assertThat(WizardStepLists.listField(PaymentsStep.class, "payments_save")).isNotNull();
-        // not a list action, or not a list of this step: the wizard's own flow handles it
-        assertThat(WizardStepLists.listField(RoomsStep.class, "next")).isNull();
-        assertThat(WizardStepLists.listField(RoomsStep.class, "guests_add")).isNull();
-        assertThat(WizardStepLists.listField(RoomsStep.class, "rooms_frobnicate")).isNull();
-        assertThat(WizardStepLists.listField(StayStep.class, "hotelCode_add")).isNull();
-    }
-
-    @Test
     void noStepIsNamedLikeTheListItHolds() {
         // The wizard's state is one flat map: a list named like its step overwrote the step.
         for (var step : NewBookingWizard.class.getDeclaredFields()) {

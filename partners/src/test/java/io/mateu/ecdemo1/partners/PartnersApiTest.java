@@ -125,18 +125,21 @@ class PartnersApiTest {
 
     @Test
     void theListingFiltersByTypeBillingModeAndStatus() {
-        var tourOperators = partners.search(null, PartnerType.TourOperator, null, null, 0, 50);
+        var tourOperators = partners.search(null, java.util.Set.of(PartnerType.TourOperator), null, null, 0, 50);
         assertThat(tourOperators.partners()).extracting(Partner::getCode).contains("NORDTRAVEL")
                 .doesNotContain("BOOKIT", "VIAJESSOL", "ACME");
         assertThat(tourOperators.total()).isEqualTo(tourOperators.partners().size());
 
-        var onCredit = partners.search("", null, BillingMode.NoFront, true, 0, 50);
+        var onCredit = partners.search("", null, java.util.Set.of(BillingMode.NoFront), true, 0, 50);
         assertThat(onCredit.partners()).extracting(Partner::getCode).contains("NORDTRAVEL", "VIAJESSOL", "ACME")
                 .doesNotContain("BOOKIT");
         assertThat(onCredit.partners()).allMatch(Partner::isActive);
 
-        assertThat(partners.search("acme", PartnerType.Company, BillingMode.NoFront, false, 0, 50).total()).isZero();
+        assertThat(partners.search("acme", java.util.Set.of(PartnerType.Company), java.util.Set.of(BillingMode.NoFront), false, 0, 50).total()).isZero();
         assertThat(partners.search(null, null, null, null, 0, 2).partners()).hasSize(2);
+        // several of one filter are an "or": tour operators and companies together
+        var either = partners.search(null, java.util.Set.of(PartnerType.TourOperator, PartnerType.Company), null, null, 0, 50);
+        assertThat(either.partners()).extracting(Partner::getCode).contains("NORDTRAVEL", "ACME").doesNotContain("BOOKIT");
     }
 
     static List<ConsumerRecord<String, String>> consume(String key, int expected) {

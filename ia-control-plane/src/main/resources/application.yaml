@@ -94,6 +94,21 @@ management:
     health:
       probes:
         enabled: true
+  # Traces, to Tempo, like ia-agent's and the engines'. What this adds is the control plane's side
+  # of an agent's prompt: ia-agent sends the trace headers on /internal/agents/resolve, the RAG
+  # search and /internal/usage, so those requests appear as spans inside the prompt's trace.
+  # Sampling is 0 unless TRACING_SAMPLING says otherwise; an incoming sampled trace is followed
+  # regardless, because the sampler respects the parent's decision.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.0}
+  # Under this name and no other: management.otlp.tracing.endpoint is deprecated at level ERROR in
+  # Boot 4 and no longer bound — set there, no exporter is created. Service name: OTEL_SERVICE_NAME.
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
 
 logging:
   level:
