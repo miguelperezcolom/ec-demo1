@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.booking.infra.in.ui.pages;
 
 import io.mateu.ecdemo1.booking.infra.out.mdm.CustomerLinks;
+import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.data.Element;
 import io.mateu.uidl.data.Text;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class OtherSystemsTest {
 
     @Test
     void aBookingLinksToItsStayItsCustomersAndTheirContactsAndNamesItsOperaIds() {
-        assertThat(OtherSystems.rows("98765", LINKS)).extracting(OtherSystems.Row::what, OtherSystems.Row::label, OtherSystems.Row::href)
+        assertThat(OtherSystems.rows("98765", LINKS)).extracting(Html.Link::what, Html.Link::label, Html.Link::href)
                 .containsExactly(
                         // Opera Cloud has no stable deep link: its ids are references to copy.
                         tuple("Opera · reservation", "98765", null),
@@ -44,7 +45,7 @@ class OtherSystemsTest {
 
     @Test
     void withoutTheMdmOnlyWhatTheBookingKnowsIsShown() {
-        assertThat(OtherSystems.rows("98765", null)).extracting(OtherSystems.Row::what).containsExactly("Opera · reservation");
+        assertThat(OtherSystems.rows("98765", null)).extracting(Html.Link::what).containsExactly("Opera · reservation");
         assertThat(OtherSystems.of(null, null)).isInstanceOf(Text.class);
     }
 }

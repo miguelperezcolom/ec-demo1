@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.content.infra.in.ui.pages.label;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.uidl.data.NoFilters;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
@@ -35,7 +36,7 @@ public class LabelCrudOrchestrator extends Crud<
 
     @Override
     public ListingData<LabelRow> search(SearchRequest request, HttpRequest httpRequest) {
-        return queryService.findAll(request.searchText(), filters(request), request.pageable());
+        return DbPaging.page(request, p -> queryService.findAll(request.searchText(), filters(request), p), row -> row);
     }
 
     @Override

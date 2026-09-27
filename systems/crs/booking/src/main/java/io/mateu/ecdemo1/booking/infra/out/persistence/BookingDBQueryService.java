@@ -3,25 +3,19 @@ package io.mateu.ecdemo1.booking.infra.out.persistence;
 import io.mateu.ecdemo1.booking.application.out.query.BookingQueryService;
 import io.mateu.ecdemo1.booking.application.out.query.dto.BookingCriteria;
 import io.mateu.ecdemo1.booking.application.out.query.dto.BookingDto;
-import io.mateu.ecdemo1.booking.application.out.query.dto.BookingRow;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.Booking;
-import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
-import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
-import io.mateu.uidl.data.Pageable;
-import io.mateu.uidl.data.Status;
-import io.mateu.uidl.data.StatusType;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,17 +24,20 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class BookingDBQueryService implements BookingQueryService {
 
-    static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-
     final BookingEntityRepository repository;
-    final CrsCatalog catalog;
+
+    /** Most recent first unless the page asks for another order. */
+    public static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "created");
 
     @Override
-    public ListingData<BookingRow> findAll(String searchText, Object filters, Pageable pageable) {
-        var page = repository.findAll(matching(searchText, filters instanceof BookingCriteria c ? c : null),
-                PageRequest.of(pageable.page(), pageable.size(), Sort.by(Sort.Direction.DESC, "created")));
-        return new ListingData<>(new Page<>(searchText, page.getSize(), page.getNumber(), page.getTotalElements(),
-                page.getContent().stream().map(BookingMapper::toDomain).map(this::toRow).toList()));
+    public Page<BookingDto> findAll(String searchText, BookingCriteria criteria, Pageable pageable) {
+        return repository.findAll(matching(searchText, criteria), ordered(pageable))
+                .map(BookingMapper::toDomain).map(this::toDto);
+    }
+
+    static Pageable ordered(Pageable pageable) {
+        return pageable.getSort().isSorted() ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), NEWEST_FIRST);
     }
 
     /** The listing's query: the free text as {@link BookingEntityRepository#search}, and the criteria. */
@@ -80,7 +77,7 @@ public class BookingDBQueryService implements BookingQueryService {
 
     @Override
     public List<BookingDto> list(String text, int page, int size) {
-        return repository.search(text, org.springframework.data.domain.PageRequest.of(page, size))
+        return repository.search(text, PageRequest.of(page, size))
                 .map(BookingMapper::toDomain).map(this::toDto).getContent();
     }
 
@@ -88,7 +85,7 @@ public class BookingDBQueryService implements BookingQueryService {
     public List<BookingDto> future(String hotelCode, LocalDate from, LocalDate afterArrival, String afterId, int limit) {
         var start = afterArrival == null ? from.minusDays(1) : afterArrival;
         return repository.future(hotelCode, from, start, afterId == null ? "" : afterId,
-                        org.springframework.data.domain.PageRequest.of(0, limit)).stream()
+                        PageRequest.of(0, limit)).stream()
                 .map(BookingMapper::toDomain).map(this::toDto).toList();
     }
 
@@ -100,34 +97,6 @@ public class BookingDBQueryService implements BookingQueryService {
     @Override
     public Optional<BookingDto> getById(String id) {
         return repository.findById(id).map(BookingMapper::toDomain).map(this::toDto);
-    }
-
-    private BookingRow toRow(Booking booking) {
-        var terms = booking.getTerms();
-        return new BookingRow(
-                booking.getId().id(),
-                hotelName(booking.getHotelCode()),
-                terms.holder().fullName(),
-                terms.stay().arrival().format(DATE),
-                terms.stay().departure().format(DATE),
-                booking.totalAmount().toPlainString() + " " + booking.getCurrency(),
-                status(booking),
-                booking.getVersion(),
-                booking.getPmsReference() != null ? booking.getPmsReference().reservationId() : null);
-    }
-
-    /** A person reads a hotel by its name; the code stays for a hotel the catalog no longer has. */
-    String hotelName(String code) {
-        return catalog.hotels().stream().filter(h -> h.code().equals(code)).map(CrsCatalog.Hotel::name)
-                .findFirst().orElse(code);
-    }
-
-    static Status status(Booking booking) {
-        return new Status(switch (booking.getStatus()) {
-            case Pending -> StatusType.INFO;
-            case Confirmed -> StatusType.SUCCESS;
-            case Cancelled -> StatusType.DANGER;
-        }, booking.getStatus().name());
     }
 
     private BookingDto toDto(Booking booking) {

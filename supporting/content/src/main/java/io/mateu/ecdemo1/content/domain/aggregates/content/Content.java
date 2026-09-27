@@ -1,7 +1,6 @@
 package io.mateu.ecdemo1.content.domain.aggregates.content;
 
 
-import io.mateu.uidl.interfaces.Identifiable;
 import io.mateu.ecdemo1.content.domain.aggregates.content.vo.ContentValue;
 import io.mateu.ecdemo1.content.domain.aggregates.contenttype.vo.ContentTypeId;
 import io.mateu.ecdemo1.content.domain.aggregates.label.vo.LabelId;

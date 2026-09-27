@@ -1,11 +1,10 @@
 package io.mateu.ecdemo1.integrations.ui.pages;
 
-import io.mateu.ecdemo1.integrations.ui.Paging;
+import io.mateu.ecdemo1.integrations.application.IntegrationQueries;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
-import io.mateu.ecdemo1.integrations.store.BackfillRunRepository;
 import io.mateu.ecdemo1.integrations.store.Integration;
-import io.mateu.ecdemo1.integrations.store.IntegrationRepository;
 import io.mateu.ecdemo1.integrations.rest.IntegrationDto;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
@@ -16,9 +15,11 @@ import io.mateu.uidl.data.StatusType;
 import io.mateu.uidl.interfaces.HttpRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
@@ -32,21 +33,21 @@ import java.util.NoSuchElementException;
 public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewModel, IntegrationViewModel, NoFilters,
         IntegrationRow, String> {
 
+    /** Grid column → integration property: what a click on a column's header sorts by. */
+    static final Map<String, String> SORTABLE = Map.of("crsHotel", "crsHotelCode", "operaProperty", "pmsHotelCode",
+            "name", "name", "status", "status");
+
     final IntegrationViewModel viewModel;
-    final IntegrationRepository integrations;
-    final BackfillRunRepository runs;
+    final IntegrationQueries queries;
 
     @Override
     public ListingData<IntegrationRow> search(SearchRequest request, HttpRequest httpRequest) {
-        var text = request.searchText() == null ? "" : request.searchText().toLowerCase();
-        var rows = integrations.findAllByOrderByCrsHotelCodeAsc().stream()
-                .filter(i -> (i.crsHotelCode + " " + i.pmsHotelCode + " " + i.name + " " + i.getStatus()).toLowerCase().contains(text))
-                .map(this::row).toList();
-        return Paging.page(rows, request);
+        return DbPaging.page(request, p -> queries.find(request.searchText(), PageRequest.of(p.getPageNumber(),
+                p.getPageSize(), DbPaging.pageable(request.pageable(), SORTABLE).getSort())), this::row);
     }
 
     IntegrationRow row(Integration i) {
-        var run = runs.findFirstByIntegrationIdOrderByStartedAtDesc(i.id).orElse(null);
+        var run = queries.lastBackfill(i.id).orElse(null);
         return new IntegrationRow(i.crsHotelCode, i.pmsHotelCode, i.name, status(i.getStatus()),
                 IntegrationDto.waitingFor(i.gate),
                 run == null ? "" : "%s · %d%s".formatted(run.status, run.dispatched, run.expected == null ? "" : "/" + run.expected));
@@ -73,7 +74,7 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
 
     /** By the CRS hotel: it is the row's id, and what the URL of a screen carries. */
     private Integration find(String crsHotelCode) {
-        return integrations.findByCrsHotelCode(crsHotelCode)
+        return queries.byCrsHotel(crsHotelCode)
                 .orElseThrow(() -> new NoSuchElementException("No integration for hotel " + crsHotelCode));
     }
 

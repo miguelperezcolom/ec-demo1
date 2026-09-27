@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.communication.mcp;
 
+import io.mateu.ecdemo1.communication.application.Recipients;
 import io.mateu.ecdemo1.communication.send.Deliveries;
 import io.mateu.ecdemo1.communication.store.Channel;
 import io.mateu.ecdemo1.communication.store.NotificationRepository;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -23,6 +23,7 @@ public class CommunicationMcpTools implements McpSystemContext {
     final NotificationRepository notifications;
     final RecipientRepository recipients;
     final Deliveries deliveries;
+    final Recipients recipientChanges;
 
     @Override
     public String getSystemContext() {
@@ -84,26 +85,14 @@ public class CommunicationMcpTools implements McpSystemContext {
                                @ToolParam(required = false, description = "only this hotel; empty is all") String hotelCode,
                                @ToolParam(required = false, description = "Google Chat spaces by number, e.g. \"1,2\"; empty is all") String chatSpaces) {
         var set = channels == null || channels.isEmpty() ? EnumSet.noneOf(Channel.class) : EnumSet.copyOf(channels);
-        var problems = io.mateu.ecdemo1.communication.ui.pages.RecipientViewModel.problems(set, blank(users), blank(roles), blank(email));
+        var problems = Recipients.problems(set, blank(users), blank(roles), blank(email));
         if (!problems.isEmpty()) {
             return "Not added: " + String.join(" ", problems);
         }
-        var r = new Recipient();
-        r.id = UUID.randomUUID().toString();
-        r.name = name;
-        r.users = blank(users);
-        r.roles = blank(roles);
-        r.email = blank(email);
-        r.types = types == null ? null : Recipient.join(types);
-        r.tasks = Boolean.TRUE.equals(tasks);
-        r.hotelCode = blank(hotelCode);
-        r.channels = Recipient.join(set);
-        r.chatSpaces = blank(chatSpaces);
-        r.active = true;
-        recipients.save(r);
-        return "Recipient %s added".formatted(r.id);
+        var id = recipientChanges.save(new Recipients.RecipientChange(null, name, true, blank(users), blank(roles),
+                blank(email), types, Boolean.TRUE.equals(tasks), blank(hotelCode), set, blank(chatSpaces)));
+        return "Recipient %s added".formatted(id);
     }
-
     static String blank(String value) {
         return value == null || value.isBlank() ? null : value.replace(" ", "");
     }

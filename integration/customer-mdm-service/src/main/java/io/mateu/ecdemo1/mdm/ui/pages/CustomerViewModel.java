@@ -1,8 +1,7 @@
 package io.mateu.ecdemo1.mdm.ui.pages;
 
 import io.mateu.ecdemo1.mdm.store.Customer;
-import io.mateu.ecdemo1.mdm.store.CustomerRepository;
-import io.mateu.ecdemo1.mdm.store.SourceRepository;
+import io.mateu.ecdemo1.mdm.application.CustomerQueries;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
@@ -63,8 +62,7 @@ public class CustomerViewModel implements Identifiable {
     @Stereotype(FieldStereotype.grid)
     List<SourceRow> reservations;
 
-    final CustomerRepository customers;
-    final SourceRepository sources;
+    final CustomerQueries customers;
 
     public CustomerViewModel load(Customer c) {
         status = CustomersPage.status(c);
@@ -79,9 +77,9 @@ public class CustomerViewModel implements Identifiable {
         salesforce = "%s · v%d".formatted(c.salesforceState, c.version);
         contact = c.salesforceContactId == null ? "" : c.salesforceContactId;
         projectionError = c.projectionError == null ? "" : c.projectionError;
-        aliases = String.join(", ", customers.findByAliasOf(c.id).stream().map(a -> a.id).toList());
+        aliases = String.join(", ", customers.aliasesOf(c.id).stream().map(a -> a.id).toList());
         survivorship = c.survivorship == null ? "" : c.survivorship;
-        reservations = sources.findByCustomerIdOrderByFirstSeenAsc(c.id).stream()
+        reservations = customers.sourcesOf(c.id).stream()
                 .map(s -> new SourceRow(s.hotelCode + "/" + s.locator, s.passenger, s.firstCustomerId, String.valueOf(s.firstSeen)))
                 .toList();
         return this;

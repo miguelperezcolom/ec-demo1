@@ -1,8 +1,7 @@
 package io.mateu.ecdemo1.content.infra.out.persistence;
 
-import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
-import io.mateu.uidl.data.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import io.mateu.ecdemo1.content.application.query.ContentTypeQueryService;
 import io.mateu.ecdemo1.content.application.query.dto.ContentTypeDto;
 import io.mateu.ecdemo1.content.application.query.dto.ContentTypeRow;
@@ -47,14 +46,8 @@ public Optional<ContentTypeDto> getById(String id) {
     }
 
     @Override
-    public ListingData<ContentTypeRow> findAll(String searchText,
-        Object filters, Pageable pageable) {
-        var page = repository.findAllByNameContainingIgnoreCase(searchText, org.springframework.data.domain.Pageable
-        .ofSize(pageable.size())
-        .withPage(pageable.page())
-        );
-        return new ListingData(new Page(searchText, page.getSize(), page.getNumber(), page.getTotalElements(),
-        page.getContent().stream().map(this::toDomain).toList()));
-        }
-
-        }
+    public Page<ContentTypeRow> findAll(String searchText, Object filters, Pageable pageable) {
+        return repository.findAllByNameContainingIgnoreCase(searchText == null ? "" : searchText, pageable)
+                .map(this::toDomain);
+    }
+}

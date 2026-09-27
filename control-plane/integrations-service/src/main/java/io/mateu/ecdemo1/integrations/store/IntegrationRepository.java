@@ -2,11 +2,12 @@ package io.mateu.ecdemo1.integrations.store;
 
 import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface IntegrationRepository extends JpaRepository<Integration, String> {
+public interface IntegrationRepository extends JpaRepository<Integration, String>, JpaSpecificationExecutor<Integration> {
 
     Optional<Integration> findByCrsHotelCode(String crsHotelCode);
 

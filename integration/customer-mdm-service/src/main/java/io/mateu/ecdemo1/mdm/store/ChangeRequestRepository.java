@@ -1,10 +1,11 @@
 package io.mateu.ecdemo1.mdm.store;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 
-public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, String> {
+public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, String>, JpaSpecificationExecutor<ChangeRequest> {
 
     List<ChangeRequest> findByStatusOrderByRequestedAtAsc(String status);
 

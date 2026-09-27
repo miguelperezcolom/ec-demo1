@@ -1,10 +1,11 @@
 package io.mateu.ecdemo1.audit.ui.pages;
 
-import io.mateu.ecdemo1.audit.store.AuditRecord;
-import io.mateu.ecdemo1.audit.store.AuditRecordRepository;
+import io.mateu.ecdemo1.audit.application.AuditQueries;
+import io.mateu.ecdemo1.audit.application.AuditQuery;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
-import io.mateu.uidl.data.Page;
+import io.mateu.uidl.data.Pageable;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
@@ -15,19 +16,15 @@ import io.mateu.uidl.interfaces.Filterable;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
 import io.mateu.uidl.interfaces.Searchable;
-import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The audit trail: every auditable action, newest first. The free text looks in every column —
@@ -42,7 +39,11 @@ public class AuditPage implements Listing<AuditRow>, Searchable, Filterable<Audi
 
     static final int PAGE_SIZE = 50;
 
-    final AuditRecordRepository records;
+    /** Grid column → record property: what a click on a column's header sorts by. */
+    static final Map<String, String> SORTABLE = Map.of("when", "at", "hotel", "hotelCode", "user", "actor",
+            "service", "service", "action", "action", "outcome", "succeeded");
+
+    final AuditQueries queries;
 
     @Value("${audit.zone:Europe/Madrid}")
     String zone;
@@ -50,51 +51,32 @@ public class AuditPage implements Listing<AuditRow>, Searchable, Filterable<Audi
     @Override
     public ListingData<AuditRow> search(SearchRequest request, HttpRequest httpRequest) {
         var zoneId = ZoneId.of(zone);
-        var pageable = request.pageable();
-        var page = pageable == null ? 0 : Math.max(pageable.page(), 0);
-        var size = pageable == null || pageable.size() <= 0 ? PAGE_SIZE : pageable.size();
-        var found = records.findAll(matching(request.searchText(), filters(request), zoneId),
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "at")));
+        var found = queries.find(query(request.searchText(), filters(request)), pageable(request.pageable()));
         var when = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(zoneId);
-        var rows = found.getContent().stream().map(r -> new AuditRow(when.format(r.at), r.hotelCode, r.actor,
-                r.service, r.action, r.succeeded ? new Status(StatusType.SUCCESS, "Carried out")
-                        : new Status(StatusType.DANGER, "Refused"), r.parameters, r.response)).toList();
-        return new ListingData<>(new Page<>(request.searchText(), size, page, found.getTotalElements(), rows),
-                "No audited action matches");
+        var listing = DbPaging.listing(request.searchText(), found, r -> new AuditRow(when.format(r.at), r.hotelCode,
+                r.actor, r.service, r.action, r.succeeded ? new Status(StatusType.SUCCESS, "Carried out")
+                        : new Status(StatusType.DANGER, "Refused"), r.parameters, r.response));
+        return new ListingData<>(listing.page(), "No audited action matches");
     }
 
-    static Specification<AuditRecord> matching(String text, AuditFilters filters, ZoneId zone) {
-        return (root, query, cb) -> {
-            var where = new ArrayList<Predicate>();
-            if (text != null && !text.isBlank()) {
-                var like = "%" + text.trim().toLowerCase() + "%";
-                where.add(cb.or(List.of("service", "action", "hotelCode", "actor", "parameters", "response").stream()
-                        .map(field -> cb.like(cb.lower(root.get(field)), like)).toArray(Predicate[]::new)));
-            }
-            if (filters != null) {
-                contains(filters.hotel, "hotelCode", root, cb, where);
-                contains(filters.user, "actor", root, cb, where);
-                contains(filters.action, "action", root, cb, where);
-                contains(filters.service, "service", root, cb, where);
-                if (filters.when != null && filters.when.from() != null) {
-                    where.add(cb.greaterThanOrEqualTo(root.get("at"), filters.when.from().atStartOfDay(zone).toInstant()));
-                }
-                if (filters.when != null && filters.when.to() != null) {
-                    where.add(cb.lessThan(root.get("at"), filters.when.to().plusDays(1).atStartOfDay(zone).toInstant()));
-                }
-                if (filters.outcome != null && filters.outcome.size() == 1) {
-                    where.add(cb.equal(root.get("succeeded"), filters.outcome.contains(AuditFilters.Outcome.CARRIED_OUT)));
-                }
-            }
-            return cb.and(where.toArray(Predicate[]::new));
-        };
+    /** The page asked for — {@value #PAGE_SIZE} rows when it does not say — sorted by the columns that map to one. */
+    static org.springframework.data.domain.Pageable pageable(Pageable pageable) {
+        var sized = pageable == null || pageable.size() <= 0
+                ? new Pageable(pageable == null ? 0 : pageable.page(), PAGE_SIZE, pageable == null ? List.of() : pageable.sort())
+                : pageable;
+        return DbPaging.pageable(sized, SORTABLE);
     }
 
-    static void contains(String value, String field, jakarta.persistence.criteria.Root<AuditRecord> root,
-                         jakarta.persistence.criteria.CriteriaBuilder cb, List<Predicate> where) {
-        if (value != null && !value.isBlank()) {
-            where.add(cb.like(cb.lower(root.get(field)), "%" + value.trim().toLowerCase() + "%"));
+    /** The screen's search, as the trail's query. */
+    static AuditQuery query(String text, AuditFilters filters) {
+        if (filters == null) {
+            return new AuditQuery(text, null, null, null, null, null, null, null);
         }
+        return new AuditQuery(text, filters.hotel, filters.user, filters.action, filters.service,
+                filters.when == null ? null : filters.when.from(), filters.when == null ? null : filters.when.to(),
+                // both outcomes, or neither, is either
+                filters.outcome == null || filters.outcome.size() != 1 ? null
+                        : filters.outcome.contains(AuditFilters.Outcome.CARRIED_OUT));
     }
 
     /** Not navigable, so it would not search on opening by itself. */

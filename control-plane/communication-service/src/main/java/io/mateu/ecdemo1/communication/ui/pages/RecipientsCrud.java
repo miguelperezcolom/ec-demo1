@@ -1,8 +1,9 @@
 package io.mateu.ecdemo1.communication.ui.pages;
 
-import io.mateu.ecdemo1.communication.ui.Paging;
+import io.mateu.ecdemo1.communication.application.RecipientQueries;
+import io.mateu.ecdemo1.communication.application.Recipients;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
-import io.mateu.ecdemo1.communication.store.RecipientRepository;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.NoFilters;
@@ -10,9 +11,11 @@ import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
@@ -25,16 +28,19 @@ import java.util.NoSuchElementException;
 @Title("Recipients")
 public class RecipientsCrud extends Crud<RecipientViewModel, RecipientViewModel, RecipientViewModel, NoFilters, RecipientRow, String> {
 
+    /** Grid column → recipient property: what a click on a column's header sorts by. */
+    static final Map<String, String> SORTABLE = Map.of("name", "name", "hotel", "hotelCode", "active", "active");
+
     final RecipientViewModel viewModel;
-    final RecipientRepository recipients;
+    final RecipientQueries queries;
+    final Recipients recipients;
 
     @Override
     public ListingData<RecipientRow> search(SearchRequest request, HttpRequest httpRequest) {
-        var rows = recipients.findAll().stream()
-                .map(r -> new RecipientRow(r.id, r.name, who(r), what(r),
-                        r.hotelCode == null || r.hotelCode.isBlank() ? "any" : r.hotelCode, channels(r), r.active))
-                .toList();
-        return Paging.page(rows, request);
+        return DbPaging.page(request, p -> queries.page(PageRequest.of(p.getPageNumber(), p.getPageSize(),
+                        DbPaging.pageable(request.pageable(), SORTABLE).getSort())),
+                r -> new RecipientRow(r.id, r.name, who(r), what(r),
+                        r.hotelCode == null || r.hotelCode.isBlank() ? "any" : r.hotelCode, channels(r), r.active));
     }
 
     /** Its users, its roles (as role:…) and its address. */
@@ -62,7 +68,7 @@ public class RecipientsCrud extends Crud<RecipientViewModel, RecipientViewModel,
 
     @Override
     public RecipientViewModel view(String id, HttpRequest httpRequest) {
-        return viewModel.load(recipients.findById(id).orElseThrow(() -> new NoSuchElementException("No recipient " + id)));
+        return viewModel.load(queries.find(id).orElseThrow(() -> new NoSuchElementException("No recipient " + id)));
     }
 
     @Override
@@ -87,7 +93,7 @@ public class RecipientsCrud extends Crud<RecipientViewModel, RecipientViewModel,
 
     @Override
     public void deleteAllById(List<String> selectedIds, HttpRequest httpRequest) {
-        recipients.deleteAllById(selectedIds);
+        recipients.delete(selectedIds);
     }
 
     @Override

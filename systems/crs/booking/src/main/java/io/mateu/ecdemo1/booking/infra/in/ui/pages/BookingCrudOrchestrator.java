@@ -14,13 +14,15 @@ import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.OptionsSupplier;
 import io.mateu.ecdemo1.booking.application.out.query.BookingQueryService;
 import io.mateu.ecdemo1.booking.application.out.query.dto.BookingCriteria;
-import io.mateu.ecdemo1.booking.application.out.query.dto.BookingRow;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
+import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +48,20 @@ public class BookingCrudOrchestrator extends Crud<
 
     @Override
     public ListingData<BookingRow> search(SearchRequest request, HttpRequest httpRequest) {
-        return queryService.findAll(request.searchText(), criteria(filters(request)), request.pageable());
+        return DbPaging.page(request, p -> queryService.findAll(request.searchText(), criteria(filters(request)),
+                        PageRequest.of(p.getPageNumber(), p.getPageSize(),
+                                DbPaging.pageable(request.pageable(), SORTABLE).getSort())),
+                booking -> BookingRow.of(booking, this::hotelName));
+    }
+
+    /** Grid column → booking property: what a click on a column's header sorts by. */
+    static final Map<String, String> SORTABLE = Map.of("id", "id", "hotel", "hotelCode", "holder", "holderName",
+            "arrival", "arrival", "departure", "departure", "status", "status");
+
+    /** A person reads a hotel by its name; the code stays for a hotel the catalog no longer has. */
+    String hotelName(String code) {
+        return catalog.hotels().stream().filter(h -> h.code().equals(code)).map(CrsCatalog.Hotel::name)
+                .findFirst().orElse(code);
     }
 
     static BookingCriteria criteria(BookingFilters filters) {
