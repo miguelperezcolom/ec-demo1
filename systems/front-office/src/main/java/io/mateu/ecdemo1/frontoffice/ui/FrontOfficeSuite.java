@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.frontoffice.ui;
 
 import io.mateu.ecdemo1.uicommons.user.UserWidget;
+import io.mateu.uidl.annotations.AI;
 import io.mateu.uidl.annotations.App;
 import io.mateu.uidl.annotations.AppContext;
 import io.mateu.uidl.annotations.Audience;
@@ -17,7 +18,8 @@ import java.util.List;
 /**
  * The Front-Office Suite app shell: top menu with the four operational screens plus the two
  * application-context selectors — the persona switch ({@code Modo}, which drives every
- * {@code @Audience} projection because the field is named {@code audience}) and the active hotel.
+ * {@code @Audience} projection because the field is named {@code audience}) and the active hotel —
+ * and, in the header, the reception agent's chat.
  */
 @UI("")
 @Title("Front-Office Suite")
@@ -26,6 +28,11 @@ import java.util.List;
 @App(themeToggle = true) // variante AUTO: menú plano de RouteLinks → TABS (in-app navigation)
 @io.mateu.uidl.annotations.Logo("/images/riu.svg")
 @io.mateu.uidl.annotations.FavIcon("/images/riu.svg")
+// The reception agent's chat. Declaring it is what puts Redwood's conversation button in the global
+// header (next to the user widget) and opens the chat in the drawer on the left. Mateu's client posts
+// the prompt here with the session's token; the gateway sends front.ec1's /ai/** to the front office's
+// own ia-agent, whose agent is the reception one — with the front office's MCP tools and nothing else.
+@AI(sse = "/ai/api/agent/stream")
 public class FrontOfficeSuite implements HomeRouteSupplier, WidgetSupplier {
 
   // la home es la welcome page (Bienvenida)

@@ -1,0 +1,91 @@
+# The front office's chat agent: the same ia-agent image as the console's (63-ia-agent.yaml), as a pod
+# of its own whose agent is `reception-agent` — the front-desk assistant, whose only MCP server is the
+# front office's (ec-ia-config: ia/agents/reception-agent.yaml). The gateway sends front.ec1's /ai/**
+# here, so what is asked from the front office is answered by it, whoever asks.
+#
+# A pod rather than a routing rule: the control plane routes by the screen's route, and the front
+# office's routes (/reservas, /bienvenida…) share no prefix a rule could key on — its host is what
+# says the question comes from the front desk. The routing rules still apply first: none of today's
+# matches a front-office route.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ia-agent-front-office
+  namespace: ec-demo1
+  labels: { app: ia-agent-front-office }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ia-agent-front-office }
+  template:
+    metadata:
+      labels:
+        app: ia-agent-front-office
+        app.kubernetes.io/component: ia-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8095"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: ia-agent
+          image: miguelperezcolom/ec-demo1-ia-agent:0.15.0
+          env:
+            - name: SERVER_PORT
+              value: "8095"
+            - name: IA_CONTROL_PLANE_URL
+              value: http://ia-control-plane:8110
+            # Which agent this pod is: the reception one, from the catalogue.
+            - name: AGENT_ID
+              value: reception-agent
+            - name: OTEL_SERVICE_NAME
+              value: ia-agent-front-office
+            - name: OTLP_TRACING_ENDPOINT
+              value: http://tempo.observability.svc.cluster.local:4318/v1/traces
+            - name: TRACING_SAMPLING
+              value: "1.0"
+            # A DEMO environment, as the console's agent: see 63-ia-agent.yaml before real data.
+            - name: IA_CAPTURE_CONTENT
+              value: full
+          ports:
+            - { name: http, containerPort: 8095 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "384Mi", cpu: "100m" }
+            limits:   { memory: "1024Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8095 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8095 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ia-agent-front-office
+  namespace: ec-demo1
+  labels: { app: ia-agent-front-office }
+spec:
+  selector: { app: ia-agent-front-office }
+  ports:
+    - { name: http, port: 8095, targetPort: 8095 }
