@@ -1,56 +1,53 @@
 package io.mateu.ecdemo1.integrations.worker;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
+import io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
-import io.mateu.workflow.dtos.Variable;
-import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
+import io.mateu.workflow.worker.api.TaskContext;
+import io.mateu.workflow.worker.api.TaskHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
-/** The onboarding's steps, by step id. Every one idempotent: a step run twice records the same thing. */
+/**
+ * The onboarding's steps, one per task contract (ec-definitions, definitions/tasks). Every one
+ * idempotent: a step run twice records the same thing.
+ */
 @Component
 @RequiredArgsConstructor
 public class TaskHandlers {
 
+    /** The input of every onboarding task: which integration it is about. A task carries every variable of its process; the rest are not its. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Onboarding(String integrationId) {
+    }
+
     final Integrations integrations;
-    final io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations frontOffices;
+    final FrontOfficeIntegrations frontOffices;
 
-    public Optional<Function<TaskExecutionRequested, List<Variable>>> handler(TaskExecutionRequested task) {
-        return Optional.ofNullable(switch (task.stepId()) {
-            case "verify-connectivity" -> step(integrations::stepVerifyConnectivity);
-            case "contrast-catalogues" -> step(integrations::stepContrastCatalogues);
-            case "request-mapping" -> step(integrations::stepRequestMapping);
-            case "sync-partners" -> step(integrations::stepSyncPartners);
-            case "backfill-prepass" -> step(integrations::stepBackfillPrePass);
-            case "start-backfill" -> step(integrations::stepStartBackfill);
-            case "await-activation" -> step(integrations::stepAwaitActivation);
-            case "activate" -> step(integrations::stepActivate);
-            // «alta-integracion-fo»: the front office fed from the PMS.
-            case "fo-verify-connectivity" -> step(frontOffices::stepVerifyConnectivity);
-            case "fo-sync-catalogue" -> step(frontOffices::stepSyncCatalogue);
-            case "fo-start-backfill" -> step(frontOffices::stepStartBackfill);
-            case "fo-await-activation" -> step(frontOffices::stepAwaitActivation);
-            case "fo-activate" -> step(frontOffices::stepActivate);
-            default -> null;
-        });
+    /** The step of «alta-integracion» that takes this integration's id. */
+    public TaskHandler<Onboarding, Void> onboarding(BiConsumer<Integrations, String> step) {
+        return (input, task) -> run(input, task, id -> step.accept(integrations, id));
     }
 
-    static Function<TaskExecutionRequested, List<Variable>> step(Consumer<String> action) {
-        return task -> {
-            action.accept(integrationId(task));
-            return List.of();
-        };
+    /** The step of «alta-integracion-fo» — the front office fed from the PMS — that takes its id. */
+    public TaskHandler<Onboarding, Void> frontOffice(BiConsumer<FrontOfficeIntegrations, String> step) {
+        return (input, task) -> run(input, task, id -> step.accept(frontOffices, id));
     }
 
-    static String integrationId(TaskExecutionRequested task) {
-        return task.variables().stream().filter(v -> ProcessVariables.INTEGRATION_ID.equals(v.name()))
-                .map(Variable::value).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Step %s needs the variable %s"
-                        .formatted(task.stepId(), ProcessVariables.INTEGRATION_ID)));
+    static Void run(Onboarding input, TaskContext task, Consumer<String> action) {
+        action.accept(integrationId(input, task));
+        return null;
+    }
+
+    static String integrationId(Onboarding input, TaskContext task) {
+        if (input == null || input.integrationId() == null) {
+            throw new IllegalArgumentException("Step %s needs the variable %s"
+                    .formatted(task.stepId(), ProcessVariables.INTEGRATION_ID));
+        }
+        return input.integrationId();
     }
 }

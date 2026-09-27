@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.erp.infra.out.outbox;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.workflow.ddd.DomainEvent;
+import io.mateu.ecdemo1.erp.tracing.Traces;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -19,6 +20,7 @@ public class OutboxWriter {
     final OutboxProperties properties;
     final ObjectMapper objectMapper;
     final Clock clock;
+    final Traces traces;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void append(DomainEvent event) {
@@ -32,6 +34,9 @@ public class OutboxWriter {
             throw new IllegalStateException("Cannot serialise " + event, e);
         }
         message.createdAt = clock.instant();
+        var trace = traces.current();
+        message.traceparent = trace.get(Traces.TRACEPARENT);
+        message.tracestate = trace.get(Traces.TRACESTATE);
         repository.save(message);
     }
 }

@@ -286,6 +286,7 @@ apply_dashboard eventconductor       eventconductor.json       eventconductor.js
 apply_dashboard eventconductor-nodes eventconductor-nodes.json nodes.json
 apply_dashboard ia-tokens            ia-tokens.json            ia-tokens.json
 apply_dashboard ia-agents            ia-agents.json            ia-agents.json
+apply_dashboard booking-traces       booking-traces.json       booking-traces.json
 
 echo "══ 6/6  Waiting for the workloads ══"
 kubectl rollout status deployment/ec-eventconductor-orchestrator -n "$NS" --timeout=10m

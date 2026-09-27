@@ -8,7 +8,10 @@ import io.mateu.ecdemo1.booking.application.out.outbox.Outbox;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingCancelled;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingCreated;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingModified;
+import io.mateu.ecdemo1.booking.tracing.Traces;
 import io.mateu.workflow.ddd.DomainEvent;
+import io.mateu.workflow.dtos.TraceContext;
+import io.mateu.workflow.dtos.events.integration.ProcessCreationRequested;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,13 +36,15 @@ public class OutboxWriter implements Outbox {
     final OutboxProperties properties;
     final ObjectWriter writer;
     final Clock clock;
+    final Traces traces;
 
     public OutboxWriter(OutboxMessageRepository repository, OutboxProperties properties, ObjectMapper objectMapper,
-                        Clock clock) {
+                        Clock clock, Traces traces) {
         this.repository = repository;
         this.properties = properties;
         this.writer = writerFor(objectMapper);
         this.clock = clock;
+        this.traces = traces;
     }
 
     /**
@@ -57,6 +62,7 @@ public class OutboxWriter implements Outbox {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void append(Destination destination, DomainEvent event) {
+        event = withTraceContext(event);
         var message = new OutboxMessageEntity();
         message.binding = properties.bindingFor(destination);
         message.messageKey = event.partitionKey();
@@ -67,6 +73,25 @@ public class OutboxWriter implements Outbox {
             throw new IllegalStateException("Cannot serialise " + event, e);
         }
         message.createdAt = clock.instant();
+        var trace = traces.current();
+        message.traceparent = trace.get(Traces.TRACEPARENT);
+        message.tracestate = trace.get(Traces.TRACESTATE);
         repository.save(message);
+    }
+
+    /**
+     * A process the CRS asks the engine for joins the trace it was asked in: the current context goes
+     * in the request's {@code traceContext}. None does today; this keeps the one that comes doing so.
+     */
+    DomainEvent withTraceContext(DomainEvent event) {
+        if (event instanceof ProcessCreationRequested request && request.traceContext() == null) {
+            var current = traces.current();
+            var context = TraceContext.of(current.get(Traces.TRACEPARENT), current.get(Traces.TRACESTATE),
+                    current.get(Traces.BAGGAGE));
+            if (context != null) {
+                return request.withTraceContext(context);
+            }
+        }
+        return event;
     }
 }

@@ -224,6 +224,26 @@ class BookingApiTest {
     }
 
     @Test
+    void theNoShowContractIsServedByTheWorkerRuntimeAndAnsweredOnce() throws Exception {
+        var id = create(REQUEST);
+        var task = new io.mateu.workflow.dtos.events.integration.TaskExecutionRequested("TC-" + id, "PROC-" + id,
+                "registrar-no-show", "register-no-show", "register-no-show@1",
+                List.of(new io.mateu.workflow.dtos.Variable("bookingId", id),
+                        new io.mateu.workflow.dtos.Variable("reportedBy", "front office")));
+        try (var producer = new org.apache.kafka.clients.producer.KafkaProducer<String, String>(Map.of(
+                org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers()),
+                new org.apache.kafka.common.serialization.StringSerializer(), new org.apache.kafka.common.serialization.StringSerializer())) {
+            producer.send(new org.apache.kafka.clients.producer.ProducerRecord<>("booking", task.processId(),
+                    objectMapper.writerFor(io.mateu.workflow.ddd.DomainEvent.class).writeValueAsString(task))).get();
+        }
+
+        // The legacy consumer leaves a contract task alone: one answer, not two.
+        var replies = consume("upstream", null, 60).stream().filter(r -> r.value().contains("TC-" + id)).toList();
+        assertThat(replies).singleElement().satisfies(r -> assertThat(json(r.value()).get("status").asText()).isEqualTo("COMPLETED"));
+        assertThat(read(id).get("status").asText()).isEqualTo("Cancelled");
+    }
+
+    @Test
     void aRatePlanOpenedInAHotelIsListedSellableAndKeptAndOpeningItAgainChangesNothing() throws Exception {
         var plan = """
                 {"code":"STAFF-27","name":"Empleados de la cadena de vacaciones 2027","factor":0.5}""";

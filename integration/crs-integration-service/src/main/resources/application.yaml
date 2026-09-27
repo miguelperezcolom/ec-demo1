@@ -7,13 +7,22 @@ spring:
 
   cloud:
     function:
-      definition: consumeCrsEvents;routeIntegrationEvents;consumeTasks;consumeCustomerEvents;consumeProjectionRequests;consumeNoShowReports
+      definition: consumeCrsEvents;routeIntegrationEvents;consumeWorkerEvent;consumeLegacyTasks;consumeCustomerEvents;consumeProjectionRequests;consumeNoShowReports
     stream:
       kafka:
         binder:
           brokers: ${KAFKA_BROKERS:localhost:9192}
           auto-create-topics: true
+          # Every consumer continues the trace its record carries (traceparent header), and every
+          # record sent carries the trace it was sent in: the engine's tasks run inside the process's
+          # trace, and what the CRS publishes reaches the engine in the booking's.
+          enable-observation: true
         bindings:
+          # A group created at the end of the topic, not its beginning: it would otherwise run every
+          # task the topic ever held.
+          consumeLegacyTasks-in-0:
+            consumer:
+              start-offset: latest
           # The outbox's bindings are synchronous, so a message is marked published only once the
           # broker acknowledged it, and keyed with a String.
           integrationEvents:
@@ -76,10 +85,20 @@ spring:
             back-off-initial-interval: 1000
             back-off-max-interval: 60000
         # IN: the engine's tasks for this adapter — the steps whose definition says topic
-        # crs-integration. A group of its own, like every binding here.
-        consumeTasks-in-0:
+        # crs-integration, or whose task contract does. consumeWorkerEvent is the engine's worker
+        # runtime (worker-kafka): it runs each task by its contract, <id>@<version>, on the handler
+        # registered for it (worker.CrsTasks), and answers the engine. The group is the one the
+        # hand-written consumer had, so it goes on from the same offsets.
+        consumeWorkerEvent-in-0:
           destination: crs-integration
           group: ec-demo1-crs-integration-worker
+        # IN: the same tasks, for the ones the engine dispatches with no contract — the steps of
+        # proyectar-reserva and proyectar-interlocutor, which do not reference their tasks yet. It
+        # stamps the contract the step answers to and runs it through the same runtime; the rest it
+        # leaves to consumeWorkerEvent. Goes once those definitions name their tasks.
+        consumeLegacyTasks-in-0:
+          destination: crs-integration
+          group: ec-demo1-crs-integration-worker-legacy
         # OUT: business events (outbox), process starts (outbox), and replies to the engine.
         integrationEvents:
           destination: integration-events
@@ -128,6 +147,14 @@ crs:
     partner-changed: proyectar-interlocutor
 
 management:
+  # Traces to Tempo, as the engine's. Sampled at 0 unless TRACING_SAMPLING says otherwise (1.0 in
+  # the cluster); the service name comes from OTEL_SERVICE_NAME, set in the manifest.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
   endpoints:
     web:
       exposure:
@@ -141,3 +168,6 @@ logging:
   level:
     org.springframework.kafka: error
     org.springframework.cloud.stream: error
+    # Every task of proyectar-* reaches consumeWorkerEvent with no contract and is served by
+    # consumeLegacyTasks; the runtime would warn about each. Until those definitions name their tasks.
+    io.mateu.workflow.worker.api.TaskDispatcher: error

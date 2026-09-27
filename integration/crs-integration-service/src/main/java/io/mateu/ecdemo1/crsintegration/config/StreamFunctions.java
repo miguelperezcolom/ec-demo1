@@ -5,26 +5,20 @@ import io.mateu.ecdemo1.integration.model.customer.CustomerEvent;
 import io.mateu.ecdemo1.integration.model.customer.CustomersMerged;
 import io.mateu.ecdemo1.crsintegration.in.CrsEventHandler;
 import io.mateu.ecdemo1.crsintegration.router.ProcessRouter;
-import io.mateu.ecdemo1.crsintegration.worker.TaskHandlers;
 import io.mateu.ecdemo1.integration.model.command.ProjectReservation;
 import io.mateu.ecdemo1.integration.model.command.ReportNoShow;
 import io.mateu.ecdemo1.integration.model.events.IntegrationEvent;
-import io.mateu.workflow.ddd.DomainEvent;
-import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
-import io.mateu.workflow.worker.WorkerReply;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The six things this service consumes. Each on the consumer thread and synchronously: a failure
+ * Five of the things this service consumes (the engine's tasks are the worker runtime's: worker.CrsTasks). Each on the consumer thread and synchronously: a failure
  * leaves the offset uncommitted and the message is redelivered, which the inboxes make harmless.
  */
 @Configuration
@@ -35,8 +29,6 @@ public class StreamFunctions {
     final CrsEventHandler crsEventHandler;
     final ProcessRouter router;
     final io.mateu.ecdemo1.crsintegration.router.Integrations integrations;
-    final TaskHandlers tasks;
-    final StreamBridge streamBridge;
     final TolerantReader reader;
     final io.mateu.ecdemo1.crsintegration.noshow.NoShowReports noShows;
 
@@ -140,33 +132,6 @@ public class StreamFunctions {
                 router.route(reader.mapper().readValue(message.getPayload(), IntegrationEvent.class));
             } catch (IOException e) {
                 log.error("Unreadable business event, skipped: {}", new String(message.getPayload()), e);
-            }
-        };
-    }
-
-    /**
-     * The engine's tasks for this adapter. A step that throws is answered as an error, which the
-     * engine retries with backoff per the step's definition; an unknown step is left for whoever
-     * owns it.
-     */
-    @Bean
-    public Consumer<DomainEvent> consumeTasks() {
-        return event -> {
-            if (!(event instanceof TaskExecutionRequested task)) {
-                return;
-            }
-            var handler = tasks.handlers().get(task.stepId());
-            if (handler == null) {
-                log.debug("No handler for step {}", task.stepId());
-                return;
-            }
-            try {
-                WorkerReply.completed(streamBridge, task, handler.apply(task));
-            } catch (WorkerReply.ReplyNotAcceptedException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                log.warn("Step {} of process {} failed: {}", task.stepId(), task.processId(), e.getMessage());
-                WorkerReply.failed(streamBridge, task, List.of(), e.getMessage());
             }
         };
     }

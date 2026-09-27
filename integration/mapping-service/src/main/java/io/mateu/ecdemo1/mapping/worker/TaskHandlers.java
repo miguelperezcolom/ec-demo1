@@ -1,7 +1,7 @@
 package io.mateu.ecdemo1.mapping.worker;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
-import io.mateu.ecdemo1.integration.model.process.Definitions;
 import io.mateu.ecdemo1.integration.model.process.Outcome;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
 import io.mateu.ecdemo1.mapping.causes.Causes;
@@ -10,24 +10,79 @@ import io.mateu.ecdemo1.mapping.prepare.Preparation;
 import io.mateu.ecdemo1.mapping.store.PartnerProfile;
 import io.mateu.ecdemo1.mapping.store.PartnerProfileRepository;
 import io.mateu.workflow.dtos.Variable;
-import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
+import io.mateu.workflow.worker.api.TaskContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.function.Function;
 
 /**
- * The steps the mapping runs for the integration's processes, by step id. Every one idempotent.
+ * The steps the mapping runs for the integration's processes, one per task contract (ec-definitions,
+ * definitions/tasks). Every one idempotent.
+ *
+ * <p>Each input takes what its contract declares and ignores the rest: a task carries every variable
+ * of its process, not only the ones the step reads.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class TaskHandlers {
+
+    /**
+     * The input of the three preparations: what the process is about, and what its successor is
+     * started with should it have to wait (Causes' relaunch variables).
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Subject(String definitionId, String processKey, String hotelCode, String locator,
+                          String partnerCode, String version, String eventId, String origin) {
+
+        /** The relaunch variables the process carries, as the process has them. */
+        List<Variable> variables() {
+            var variables = new ArrayList<Variable>();
+            add(variables, ProcessVariables.DEFINITION_ID, definitionId);
+            add(variables, ProcessVariables.HOTEL_CODE, hotelCode);
+            add(variables, ProcessVariables.LOCATOR, locator);
+            add(variables, ProcessVariables.PARTNER_CODE, partnerCode);
+            add(variables, ProcessVariables.VERSION, version);
+            add(variables, ProcessVariables.EVENT_ID, eventId);
+            add(variables, ProcessVariables.ORIGIN, origin);
+            return variables;
+        }
+
+        private static void add(List<Variable> variables, String name, String value) {
+            if (value != null) {
+                variables.add(new Variable(name, value));
+            }
+        }
+    }
+
+    /** {@code record-partner-profile@1}'s input. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PartnerProfileRecorded(String partnerCode, String pmsProfileIds, String pmsProfileType,
+                                         String version) {
+    }
+
+    /** {@code resolve-projection@1}'s input. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Projected(String hotelCode, String locator) {
+    }
+
+    /** {@code relaunch-process@1}'s input. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Released(String processKey) {
+    }
+
+    /** The preparations' output: {@code prepareOutcome}. */
+    public record PrepareOutcome(String prepareOutcome) {
+    }
+
+    /** {@code relaunch-process@1}'s output: {@code successorKey}. */
+    public record Successor(String successorKey) {
+    }
 
     final Preparation preparation;
     final Causes causes;
@@ -35,42 +90,21 @@ public class TaskHandlers {
     final PartnerProfileRepository partnerProfiles;
     final Clock clock;
 
-    /**
-     * The handler for a task, by its definition and step: "prepare" is a step of every one of the
-     * integration's processes, and what it prepares depends on which. Empty for a step that is not
-     * the mapping's.
-     */
-    public Optional<Function<TaskExecutionRequested, List<Variable>>> handler(TaskExecutionRequested task) {
-        var step = task.stepId();
-        if (step.startsWith("relaunch")) {
-            return Optional.of(this::relaunch);
-        }
-        return Optional.ofNullable(switch (step) {
-            case "prepare" -> switch (task.workflowDefinitionId()) {
-                case Definitions.PROJECT_RESERVATION -> this::prepareReservation;
-                case Definitions.PROJECT_CANCELLATION -> this::prepareCancellation;
-                case Definitions.PROJECT_PARTNER -> this::preparePartner;
-                default -> null;
-            };
-            case "record-partner-profile" -> this::recordPartnerProfile;
-            case "resolve-projection" -> this::resolveProjection;
-            default -> null;
-        });
+    public PrepareOutcome prepareReservation(Subject input, TaskContext task) {
+        var reservation = clients.reservation(required(task, ProcessVariables.HOTEL_CODE, input.hotelCode()),
+                required(task, ProcessVariables.LOCATOR, input.locator()));
+        return outcome(preparation.reservation(reservation, waitContext(task, input, reservation.locator())));
     }
 
-    List<Variable> prepareReservation(TaskExecutionRequested task) {
-        var reservation = clients.reservation(var(task, ProcessVariables.HOTEL_CODE), var(task, ProcessVariables.LOCATOR));
-        return outcome(preparation.reservation(reservation, waitContext(task, reservation.locator())));
+    public PrepareOutcome prepareCancellation(Subject input, TaskContext task) {
+        var reservation = clients.reservation(required(task, ProcessVariables.HOTEL_CODE, input.hotelCode()),
+                required(task, ProcessVariables.LOCATOR, input.locator()));
+        return outcome(preparation.cancellation(reservation, waitContext(task, input, reservation.locator())));
     }
 
-    List<Variable> prepareCancellation(TaskExecutionRequested task) {
-        var reservation = clients.reservation(var(task, ProcessVariables.HOTEL_CODE), var(task, ProcessVariables.LOCATOR));
-        return outcome(preparation.cancellation(reservation, waitContext(task, reservation.locator())));
-    }
-
-    List<Variable> preparePartner(TaskExecutionRequested task) {
-        var partner = clients.partner(var(task, ProcessVariables.PARTNER_CODE));
-        return outcome(preparation.partner(partner, waitContext(task, partner.code())));
+    public PrepareOutcome preparePartner(Subject input, TaskContext task) {
+        var partner = clients.partner(required(task, ProcessVariables.PARTNER_CODE, input.partnerCode()));
+        return outcome(preparation.partner(partner, waitContext(task, input, partner.code())));
     }
 
     /**
@@ -78,49 +112,49 @@ public class TaskHandlers {
      * that was waiting for the partner to exist in the PMS.
      */
     @Transactional
-    List<Variable> recordPartnerProfile(TaskExecutionRequested task) {
-        var code = var(task, ProcessVariables.PARTNER_CODE);
+    public Void recordPartnerProfile(PartnerProfileRecorded input, TaskContext task) {
+        var code = required(task, ProcessVariables.PARTNER_CODE, input.partnerCode());
         var profile = partnerProfiles.findById(code).orElseGet(PartnerProfile::new);
         profile.setPartnerCode(code);
-        profile.setPmsProfileId(var(task, ProcessVariables.PMS_PROFILE_IDS));
-        profile.setProfileType(optional(task, "pmsProfileType"));
-        profile.setProjectedVersion(Long.parseLong(var(task, ProcessVariables.VERSION)));
+        profile.setPmsProfileId(required(task, ProcessVariables.PMS_PROFILE_IDS, input.pmsProfileIds()));
+        profile.setProfileType(blankAsNull(input.pmsProfileType()));
+        profile.setProjectedVersion(Long.parseLong(required(task, ProcessVariables.VERSION, input.version())));
         profile.setUpdatedAt(clock.instant());
         partnerProfiles.save(profile);
         causes.resolveIfOpen(Cause.missingPartner(code).key(), "proyectar-interlocutor");
-        return List.of();
+        return null;
     }
 
     /** The reservation is in the PMS: a cancellation waiting for that can go on. */
-    List<Variable> resolveProjection(TaskExecutionRequested task) {
-        causes.resolveIfOpen(Cause.notYetProjected(var(task, ProcessVariables.HOTEL_CODE),
-                var(task, ProcessVariables.LOCATOR)).key(), "proyectar-reserva");
-        return List.of();
+    public Void resolveProjection(Projected input, TaskContext task) {
+        causes.resolveIfOpen(Cause.notYetProjected(required(task, ProcessVariables.HOTEL_CODE, input.hotelCode()),
+                required(task, ProcessVariables.LOCATOR, input.locator())).key(), "proyectar-reserva");
+        return null;
     }
 
-    List<Variable> relaunch(TaskExecutionRequested task) {
-        return List.of(new Variable("successorKey", causes.relaunch(var(task, ProcessVariables.PROCESS_KEY))));
+    public Successor relaunch(Released input, TaskContext task) {
+        return new Successor(causes.relaunch(required(task, ProcessVariables.PROCESS_KEY, input.processKey())));
     }
 
-    static Preparation.WaitContext waitContext(TaskExecutionRequested task, String subject) {
-        return new Preparation.WaitContext(var(task, ProcessVariables.PROCESS_KEY), var(task, ProcessVariables.DEFINITION_ID),
-                subject, task.variables(), optional(task, ProcessVariables.ORIGIN));
+    static Preparation.WaitContext waitContext(TaskContext task, Subject input, String subject) {
+        return new Preparation.WaitContext(required(task, ProcessVariables.PROCESS_KEY, input.processKey()),
+                required(task, ProcessVariables.DEFINITION_ID, input.definitionId()), subject, input.variables(),
+                blankAsNull(input.origin()));
     }
 
-    static List<Variable> outcome(Outcome outcome) {
-        return List.of(new Variable(ProcessVariables.PREPARE_OUTCOME, outcome.name()));
+    static PrepareOutcome outcome(Outcome outcome) {
+        return new PrepareOutcome(outcome.name());
     }
 
-    static String var(TaskExecutionRequested task, String name) {
-        var value = optional(task, name);
-        if (value == null) {
+    static String required(TaskContext task, String name, String value) {
+        var present = blankAsNull(value);
+        if (present == null) {
             throw new IllegalArgumentException("Step %s needs the variable %s".formatted(task.stepId(), name));
         }
-        return value;
+        return present;
     }
 
-    static String optional(TaskExecutionRequested task, String name) {
-        return task.variables().stream().filter(v -> name.equals(v.name())).map(Variable::value)
-                .filter(v -> v != null && !v.isBlank()).findFirst().orElse(null);
+    static String blankAsNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

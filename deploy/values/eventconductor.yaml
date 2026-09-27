@@ -100,6 +100,12 @@ orchestrator:
     WORKFLOW_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-definitions.git"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/workflows"
+    # The task contracts (.ectask) the workflows' ACTION steps reference with `task: <id>`. Imported
+    # at startup, before the workflows, so a reference resolves to <id>@<latest>; the webhook reloads
+    # workflows only — a new contract needs a restart before a workflow that references it reloads.
+    TASKS_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-definitions.git"
+    TASKS_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
+    TASKS_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/tasks"
     OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
     TRACING_SAMPLING: "1.0"
     # Without this every span arrives as "unknown_service" and the three engines are

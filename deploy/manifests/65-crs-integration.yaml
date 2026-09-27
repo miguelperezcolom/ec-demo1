@@ -45,6 +45,14 @@ spec:
         - name: crs-integration-service
           image: miguelperezcolom/ec-demo1-crs-integration-service:0.29.0
           env:
+            # Traces to Tempo, the one the engine exports to: a booking's trace runs from the CRS through
+            # this service and the orchestrator (docs: deploy/observability, "Trazas de una reserva").
+            - name: OTEL_SERVICE_NAME
+              value: crs-integration
+            - name: OTLP_TRACING_ENDPOINT
+              value: http://tempo.observability.svc.cluster.local:4318/v1/traces
+            - name: TRACING_SAMPLING
+              value: "1.0"
             - name: SERVER_PORT
               value: "8121"
             - name: KAFKA_BROKERS

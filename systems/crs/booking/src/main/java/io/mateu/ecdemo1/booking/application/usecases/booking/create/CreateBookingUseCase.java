@@ -6,6 +6,7 @@ import io.mateu.ecdemo1.booking.application.usecases.booking.BookingTermsFactory
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.Booking;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingId;
 import io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog;
+import io.mateu.ecdemo1.booking.tracing.Traces;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class CreateBookingUseCase {
     final CrsCatalog catalog;
     final LocatorValueGenerator locatorValueGenerator;
     final Clock clock;
+    final Traces traces;
 
     /**
      * A channel's own reference names one booking: sent again — a front office retrying after a
@@ -33,6 +35,18 @@ public class CreateBookingUseCase {
      */
     @Transactional
     public String handle(CreateBookingCommand command) {
+        // The CRS entry of a booking's trace: whatever reaches the PMS for it continues from here, and
+        // it is found in Tempo by these attributes.
+        return traces.inSpan("booking.create", () -> {
+            var id = create(command);
+            traces.tag("booking.id", id);
+            traces.tag("booking.locator", id);
+            traces.tag("hotel.code", command.hotelCode());
+            return id;
+        });
+    }
+
+    private String create(CreateBookingCommand command) {
         var hotel = catalog.hotel(command.hotelCode());
         var terms = termsFactory.terms(hotel.code(), command.booking());
         if (terms.externalReference() != null) {

@@ -3,6 +3,12 @@ package io.mateu.ecdemo1.crsintegration.worker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.crsintegration.commands.SystemCommands;
 import io.mateu.ecdemo1.crsintegration.outbox.Outbox;
+import io.mateu.ecdemo1.crsintegration.worker.runtime.ExactStrings;
+import io.mateu.ecdemo1.crsintegration.worker.runtime.WorkerRuntime;
+import io.mateu.workflow.worker.api.Cancellations;
+import io.mateu.workflow.worker.api.TaskDispatcher;
+import io.mateu.workflow.worker.api.TaskRegistry;
+import io.mateu.workflow.worker.api.TaskReplySink;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import org.junit.jupiter.api.Test;
@@ -15,16 +21,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** The steps that write back to the CRS and the ERP: commands in the outbox — without a broker or a database. */
+/**
+ * The steps that write back to the CRS and the ERP, run through the engine's worker runtime as the
+ * contracts they serve: commands in the outbox — without a broker or a database.
+ */
 class TaskHandlersTest {
 
     static class RecordingOutbox extends Outbox {
         final List<Object> written = new ArrayList<>();
 
         RecordingOutbox() {
-            super(null, null, null);
+            super(null, null, null, null);
         }
 
         @Override
@@ -59,25 +67,61 @@ class TaskHandlersTest {
     final RecordingOutbox outbox = new RecordingOutbox();
     final NoTransactions transactions = new NoTransactions();
     final TaskHandlers handlers = new TaskHandlers(outbox, transactions);
+    final RecordingSink sink = new RecordingSink();
+    final CrsTasks tasks = new CrsTasks();
+    final TaskDispatcher dispatcher = new TaskDispatcher(new TaskRegistry(List.of(
+            tasks.annotatePmsReferenceTask(handlers), tasks.annotatePartnerProfileTask(handlers))),
+            sink, Cancellations.NONE, new ExactStrings(new ObjectMapper()), false);
+    final WorkerRuntime.LegacyTasks legacy = new WorkerRuntime.LegacyTasks(dispatcher, tasks.legacyTaskRefs());
 
-    static TaskExecutionRequested task(String step, Variable... variables) {
-        return new TaskExecutionRequested("TE-1", "PROC-1", "proyectar-reserva", step, "", List.of(variables));
+    /** What the runtime would answer the engine. */
+    static class RecordingSink implements TaskReplySink {
+        final List<String> replies = new ArrayList<>();
+
+        @Override
+        public void running(TaskExecutionRequested task) {
+        }
+
+        @Override
+        public void completed(TaskExecutionRequested task, List<Variable> variables) {
+            replies.add("COMPLETED " + task.taskExecutionId() + " " + variables);
+        }
+
+        @Override
+        public void failed(TaskExecutionRequested task, List<Variable> variables, String reason) {
+            replies.add("ERROR " + task.taskExecutionId() + " " + reason);
+        }
+    }
+
+    static TaskExecutionRequested task(String step, String taskId, Variable... variables) {
+        return new TaskExecutionRequested("TE-1", "PROC-1", "proyectar-reserva", step, taskId, List.of(variables));
+    }
+
+    @Test
+    void eachContractHasItsHandler() {
+        var registry = new TaskRegistry(List.of(tasks.annotatePmsReferenceTask(handlers),
+                tasks.annotatePartnerProfileTask(handlers)));
+
+        assertThat(registry.refs()).containsExactly("annotate-pms-reference@1", "annotate-partner-profile@1");
+        assertThat(tasks.annotatePmsReferenceTask(handlers).topic()).isEqualTo("crs-integration");
     }
 
     @Test
     void thePmsReferenceGoesToTheCrsAsACommandOfTheTask() throws Exception {
-        handlers.handlers().get("annotate-pms-reference").apply(task("annotate-pms-reference",
-                new Variable("locator", "LOC1"), new Variable("pmsReservationId", "OPERA-77")));
+        dispatcher.dispatch(task("annotate-pms-reference", "annotate-pms-reference@1",
+                new Variable("locator", "LOC1"), new Variable("pmsReservationId", "OPERA-77"),
+                new Variable("hotelCode", "PMI01"), new Variable("writeOutcome", "DONE")));
 
         assertThat(outbox.written).containsExactly(new SystemCommands.AnnotatePmsReference("TE-1", "LOC1", "OPERA-77"));
         assertThat(transactions.committed).isEqualTo(1);
+        assertThat(sink.replies).containsExactly("COMPLETED TE-1 []");
         assertThat(new ObjectMapper().writeValueAsString(outbox.written.getFirst()))
                 .contains("\"type\":\"annotate-pms-reference\"").contains("\"bookingId\":\"LOC1\"").doesNotContain("\"key\"");
     }
 
     @Test
     void thePartnersProfileGoesToTheErpAsACommandOfTheTask() throws Exception {
-        handlers.handlers().get("annotate-partner-profile").apply(task("annotate-partner-profile",
+        dispatcher.dispatch(task("annotate-partner-profile", "annotate-partner-profile@1",
                 new Variable("partnerCode", "NORDTRAVEL"), new Variable("pmsProfileIds", "16120699"),
                 new Variable("pmsProfileType", "Agent")));
 
@@ -87,9 +131,35 @@ class TaskHandlersTest {
     }
 
     @Test
-    void aStepWithoutWhatItNeedsWritesNothing() {
-        assertThatThrownBy(() -> handlers.handlers().get("annotate-pms-reference").apply(task("annotate-pms-reference",
-                new Variable("locator", "LOC1")))).isInstanceOf(IllegalArgumentException.class);
+    void aStepWithoutWhatItNeedsWritesNothingAndFailsWithTheReasonItAlwaysGave() {
+        dispatcher.dispatch(task("annotate-pms-reference", "annotate-pms-reference@1", new Variable("locator", "LOC1")));
+
         assertThat(outbox.written).isEmpty();
+        assertThat(sink.replies).containsExactly("ERROR TE-1 Step annotate-pms-reference needs the variable pmsReservationId");
+    }
+
+    @Test
+    void anIdThatLooksLikeANumberReachesTheHandlerAsItIs() {
+        dispatcher.dispatch(task("annotate-pms-reference", "annotate-pms-reference@1",
+                new Variable("locator", "12E45"), new Variable("pmsReservationId", "0.50")));
+
+        assertThat(outbox.written).containsExactly(new SystemCommands.AnnotatePmsReference("TE-1", "12E45", "0.50"));
+    }
+
+    @Test
+    void aStepWhoseDefinitionNamesNoContractRunsAsTheContractItAnswersTo() {
+        var taken = legacy.accept(task("annotate-pms-reference", "",
+                new Variable("locator", "LOC1"), new Variable("pmsReservationId", "OPERA-77")), null);
+
+        assertThat(taken).isTrue();
+        assertThat(sink.replies).containsExactly("COMPLETED TE-1 []");
+    }
+
+    @Test
+    void theLegacyBridgeLeavesContractTasksAndOtherServicesStepsAlone() {
+        assertThat(legacy.accept(task("annotate-pms-reference", "annotate-pms-reference@1",
+                new Variable("locator", "LOC1"), new Variable("pmsReservationId", "OPERA-77")), null)).isFalse();
+        assertThat(legacy.accept(task("upsert-reservation", ""), null)).isFalse();
+        assertThat(sink.replies).isEmpty();
     }
 }

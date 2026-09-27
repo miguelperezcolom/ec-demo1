@@ -79,7 +79,7 @@ class SingleApprovedInDatabaseTest {
 
         @Bean
         Outbox outbox() {
-            return new Outbox(null, null, null) {
+            return new Outbox(null, null, null, null) {
                 @Override
                 public void appendResolution(String subject, String resolvedBy) {
                 }

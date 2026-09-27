@@ -237,6 +237,20 @@ class CrsIntegrationTest {
     }
 
     @Test
+    void aContractTaskIsServedByTheWorkerRuntimeAndAnsweredOnce() throws Exception {
+        var task = new TaskExecutionRequested("TE-2", "PROC-2", "proyectar-reserva", "annotate-pms-reference",
+                "annotate-pms-reference@1",
+                List.of(new Variable("locator", "LOC2"), new Variable("pmsReservationId", "OPERA-78")));
+        send("crs-integration", "PROC-2", objectMapper.writerFor(DomainEvent.class).writeValueAsString(task));
+
+        // Waits for a second answer, which must not come: the legacy consumer leaves a contract task alone.
+        var replies = consume("upstream", r -> r.value().contains("TE-2"), 2, 15);
+        assertThat(replies).singleElement().satisfies(r -> assertThat(json(r.value()).get("status").asText())
+                .isEqualTo("COMPLETED"));
+        assertThat(consume("booking-commands", r -> r.value().contains("TE-2"), 1, 15)).hasSize(1);
+    }
+
+    @Test
     void aBackfillPagesThroughTheFutureReservationsAndSeesWhatTheyReallyUse() throws Exception {
         mvc.perform(get("/reservations/PMI01/future?limit=10"))
                 .andExpect(status().isOk())

@@ -45,4 +45,14 @@ public class OutboxMessageEntity {
 
     Instant publishedAt;
 
+    /**
+     * The W3C trace context the message was written in, so the relay puts it back on the record and
+     * whoever consumes it continues the same trace. Null when nothing was traced.
+     */
+    @Column(length = 64)
+    String traceparent;
+
+    @Column(length = 512)
+    String tracestate;
+
 }

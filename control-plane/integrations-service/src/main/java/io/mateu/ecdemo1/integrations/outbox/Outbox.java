@@ -8,7 +8,10 @@ import io.mateu.ecdemo1.integration.model.command.ProjectReservation;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationResolved;
 import io.mateu.ecdemo1.integrations.clients.PartnerCommand;
+import io.mateu.ecdemo1.integrations.tracing.Traces;
 import io.mateu.workflow.ddd.DomainEvent;
+import io.mateu.workflow.dtos.TraceContext;
+import io.mateu.workflow.dtos.events.integration.ProcessCreationRequested;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -39,10 +42,30 @@ public class Outbox {
     final OutboxMessageRepository repository;
     final ObjectMapper objectMapper;
     final Clock clock;
+    final Traces traces;
 
+    /**
+     * A request to the engine. A process started here joins the trace it was asked for in: the
+     * current context goes in the request's {@code traceContext}, which the engine keeps with the
+     * process and hands on to every task it dispatches for it.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public void appendToEngine(DomainEvent event) {
-        write(ENGINE, event.partitionKey(), event.getClass().getSimpleName(), serialise(DomainEvent.class, event));
+        write(ENGINE, event.partitionKey(), event.getClass().getSimpleName(),
+                serialise(DomainEvent.class, withTraceContext(event)));
+    }
+
+    /** The request, joining the current trace when it is a process creation that names none. */
+    DomainEvent withTraceContext(DomainEvent event) {
+        if (event instanceof ProcessCreationRequested request && request.traceContext() == null) {
+            var current = traces.current();
+            var context = TraceContext.of(current.get(Traces.TRACEPARENT), current.get(Traces.TRACESTATE),
+                    current.get(Traces.BAGGAGE));
+            if (context != null) {
+                return request.withTraceContext(context);
+            }
+        }
+        return event;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -104,6 +127,9 @@ public class Outbox {
         message.eventType = type;
         message.payload = payload;
         message.createdAt = clock.instant();
+        var trace = traces.current();
+        message.traceparent = trace.get(Traces.TRACEPARENT);
+        message.tracestate = trace.get(Traces.TRACESTATE);
         repository.save(message);
     }
 }
