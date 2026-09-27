@@ -54,12 +54,24 @@ public class OhipClient {
     /** One token per client of one gateway and enterprise: two hotels on the same tenant share it. */
     final Map<String, Token> tokens = new ConcurrentHashMap<>();
     final Map<String, RestClient> clients = new ConcurrentHashMap<>();
+    final RestClient.Builder builder;
 
     public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock) {
+        this(connections, properties, reader, clock, RestClient.builder());
+    }
+
+    /**
+     * Built from Boot's builder, which observes every call: each call to Opera is a span of the step
+     * that made it, in the booking's trace.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock,
+                      RestClient.Builder builder) {
         this.connections = connections;
         this.properties = properties;
         this.reader = reader;
         this.clock = clock;
+        this.builder = builder;
     }
 
     public Response get(String hotelId, String uri, Object... variables) {
@@ -233,7 +245,7 @@ public class OhipClient {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.timeout());
         factory.setReadTimeout(properties.timeout());
-        return RestClient.builder()
+        return builder.clone()
                 .baseUrl(connection.gatewayUrl())
                 .requestFactory(factory)
                 .messageConverters(converters -> {

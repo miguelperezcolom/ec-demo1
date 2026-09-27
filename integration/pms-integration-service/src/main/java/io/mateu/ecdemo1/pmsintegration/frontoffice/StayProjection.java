@@ -3,12 +3,9 @@ package io.mateu.ecdemo1.pmsintegration.frontoffice;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
-import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.config.PmsIntegrationProperties;
-import io.mateu.workflow.dtos.Variable;
-import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.function.StreamBridge;
@@ -18,7 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
 
 import java.util.HashSet;
-import java.util.List;
 
 /**
  * «Proyectar estancia» (pms-fo): an Opera reservation, as Opera holds it now, into the hotel's front
@@ -49,13 +45,11 @@ public class StayProjection {
     final StreamBridge streamBridge;
     final ObjectMapper objectMapper;
 
-    public List<Variable> project(TaskExecutionRequested task) {
-        var hotel = var(task, ProcessVariables.PMS_HOTEL_CODE);
-        var reservationId = var(task, ProcessVariables.PMS_RESERVATION_ID);
+    public void project(String hotel, String reservationId) {
         var found = stays.byId(hotel, reservationId);
         if (found.isEmpty()) {
             log.info("{}/{}: Opera does not have it; nothing for the front office", hotel, reservationId);
-            return List.of();
+            return;
         }
         var reservation = found.get();
         var profileId = StayMapper.person(firstGuest(reservation)).pmsProfileId();
@@ -75,7 +69,6 @@ public class StayProjection {
         if (customerId != null) {
             integration.xref(customerId, "FRONT_OFFICE", customerId, hotel + "/" + reservationId);
         }
-        return List.of();
     }
 
     static com.fasterxml.jackson.databind.JsonNode firstGuest(com.fasterxml.jackson.databind.JsonNode reservation) {
@@ -102,11 +95,5 @@ public class StayProjection {
         if (!sent) {
             throw new IllegalStateException("The front office's topic did not take " + command.key());
         }
-    }
-
-    static String var(TaskExecutionRequested task, String name) {
-        return task.variables().stream().filter(v -> name.equals(v.name())).map(Variable::value)
-                .filter(v -> v != null && !v.isBlank()).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Step %s needs the variable %s".formatted(task.stepId(), name)));
     }
 }

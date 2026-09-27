@@ -35,8 +35,15 @@ public class IntegrationsConnections implements Connections {
     final Map<String, Kept> kept = new ConcurrentHashMap<>();
 
     public IntegrationsConnections(PmsIntegrationProperties properties, TolerantReader reader, Clock clock) {
+        this(properties, reader, clock, RestClient.builder());
+    }
+
+    /** Built from Boot's builder, which observes every call: it carries the trace of the step that asked. */
+    @org.springframework.beans.factory.annotation.Autowired
+    public IntegrationsConnections(PmsIntegrationProperties properties, TolerantReader reader, Clock clock,
+                                   RestClient.Builder builder) {
         this.clock = clock;
-        this.integrations = RestClient.builder()
+        this.integrations = builder.clone()
                 .baseUrl(properties.integrationsUrl())
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
