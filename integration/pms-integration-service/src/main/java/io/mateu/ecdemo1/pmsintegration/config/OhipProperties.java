@@ -9,8 +9,11 @@ import java.time.Duration;
  * — gateway, application key, client, secret, enterprise — is not here: it is each hotel's
  * integration's (see {@code Connections}).
  *
- * @param externalSystemCode the code Opera knows the CRS by: it qualifies every external reference
- *                           this adapter writes and searches by
+ * @param externalSystemCode the context the CRS's locator goes under as a reservation's external
+ *                           reference: it qualifies every external reference this adapter writes and
+ *                           searches by. The demo's is {@code ECDEMO1}, or {@code ECDEMO1-<MMddHHmm>} — a new
+ *                           one each time ec1 is put back to zero (deploy/demo/zero.sh): Opera is never
+ *                           cleaned and a new locator must not find an old run's reservation
  * @param versionUdf         the numeric UDF of the reservation that carries the CRS version written
  *                           — the order guard (HLA R18, R28)
  * @param payAtHotelMethod   the payment method a reservation with no payment is recorded with.
@@ -38,7 +41,7 @@ public record OhipProperties(String externalSystemCode, String versionUdf, Strin
                              java.util.List<String> knownProperties, String customReference) {
 
     public OhipProperties {
-        if (externalSystemCode == null) externalSystemCode = "RIUCRS";
+        if (externalSystemCode == null) externalSystemCode = "ECDEMO1";
         if (versionUdf == null) versionUdf = "CRS_VERSION";
         if (payAtHotelMethod == null) payAtHotelMethod = "CA";
         if (timeout == null) timeout = Duration.ofSeconds(30);

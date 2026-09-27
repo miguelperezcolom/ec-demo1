@@ -6,9 +6,11 @@
 #   4. Salesforce: deletes the contacts and Cases the demo created (ec1's only — the org is shared
 #      with the local environment) and puts the baseline's contacts back as they were;
 #   5. the MDM resumes Salesforce's events from now: the demo's are not replayed;
-#   6. starts everything again.
+#   6. puts back the Opera context the baseline's reservations were written under (ec-demo-run);
+#   7. starts everything again.
 # Opera is not touched: nothing is cancelled or deleted there. The demo is built to repeat on top of
-# what it wrote (see docs/poc-acl/demo.md, «Resetear la demo»).
+# what it wrote (see docs/poc-acl/demo.md, «Resetear la demo»). A baseline taken before the context
+# was saved with it was written under ECDEMO1.
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./common.sh
@@ -39,6 +41,9 @@ python3 salesforce.py "$WORK"
 # The MDM resumes Salesforce's events from now, and its poll looks from now: what happened during
 # the demo has just been undone, and must not come back.
 echo "delete from salesforce_cursor where name like 'pubsub%'; update salesforce_cursor set until = now() where name = 'poll';" | psql_in customer_mdm
+
+echo "Opera"
+set_opera_context "$(cat "$BASELINE/opera-context" 2>/dev/null || echo "$OPERA_CONTEXT_DEFAULT")"
 
 echo "Starting the services and the engine"
 for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=1 >/dev/null; done
