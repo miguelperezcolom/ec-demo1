@@ -58,7 +58,9 @@ class BookingApiTest {
     // first with "BrokerNotAvailable". In memory it is also faster, and a test broker holds nothing
     // worth keeping.
     static RedpandaContainer redpanda = new RedpandaContainer("docker.redpanda.com/redpandadata/redpanda:v24.1.7")
-            .withTmpFs(java.util.Map.of("/var/lib/redpanda/data", "rw"));
+            // size=8g: unsized, a tmpfs gets half the Docker VM's memory, under Redpanda's 5 GiB free-space
+            // floor, and every write is refused. It is a ceiling, not an allocation.
+            .withTmpFs(java.util.Map.of("/var/lib/redpanda/data", "rw,size=8g"));
 
     @DynamicPropertySource
     static void kafka(DynamicPropertyRegistry registry) {

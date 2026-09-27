@@ -3,7 +3,7 @@ package io.mateu.ecdemo1.mapping.commands;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integration.model.command.MappingCommand;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
-import io.mateu.ecdemo1.mapping.inbox.Inbox;
+import io.mateu.ecdemo1.messaging.Inbox;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ class MappingCommandsTest {
         final Set<String> seen = new HashSet<>();
 
         MemoryInbox() {
-            super(null, null);
+            super(null, null, io.mateu.ecdemo1.messaging.MessagingProperties.defaults(), null, false);
         }
 
         @Override

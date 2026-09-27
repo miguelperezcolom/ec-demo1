@@ -4,7 +4,7 @@ import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIn;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
-import io.mateu.ecdemo1.frontoffice.infra.pms.CommandInbox;
+import io.mateu.ecdemo1.messaging.Inbox;
 import io.mateu.ecdemo1.frontoffice.infra.pms.PmsCatalogue;
 import io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
@@ -47,11 +47,14 @@ public class PmsStays {
   final StayWrites writes;
   final PmsCatalogue catalogue;
   final PmsLinks links;
-  final CommandInbox inbox;
+  /** Who the inbox knows these commands by; the ids the front office took before are kept under it. */
+  public static final String CONSUMER = "front-office";
+
+  final Inbox inbox;
   final Clock clock = Clock.systemUTC();
 
   public PmsStays(@Value("${frontoffice.pms-hotel:XMAR}") String pmsHotel, StayRepository stays, WalkIns walkIns,
-      StayWrites writes, PmsCatalogue catalogue, PmsLinks links, CommandInbox inbox) {
+      StayWrites writes, PmsCatalogue catalogue, PmsLinks links, Inbox inbox) {
     this.pmsHotel = pmsHotel;
     this.stays = stays;
     this.walkIns = walkIns;
@@ -76,7 +79,8 @@ public class PmsStays {
       log.debug("Command {} is for PMS property {}, not {}: not this front office's", command.commandId(), hotel, pmsHotel);
       return Outcome.OTHER_HOTEL;
     }
-    if (!inbox.take(command.commandId(), clock.instant())) {
+    if (command.commandId() != null && !command.commandId().isBlank()
+        && !inbox.firstTime(CONSUMER, command.commandId())) {
       log.debug("Command {} already taken", command.commandId());
       return Outcome.DUPLICATE;
     }

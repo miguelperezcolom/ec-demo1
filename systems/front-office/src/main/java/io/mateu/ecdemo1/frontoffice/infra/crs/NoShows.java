@@ -38,7 +38,7 @@ public class NoShows {
     var locator = walkIn == null ? stayId : walkIn.locator();
     var commandId = "NS-" + UUID.randomUUID();
     var report = new ReportNoShow(commandId, hotel, locator, "front office " + hotel);
-    outbox.append(CommandOutbox.NO_SHOW_REPORTS, report.key(), commandId, report);
+    outbox.append(CommandOutbox.NO_SHOW_REPORTS, report.key(), report);
     log.info("{}: reported to the CRS as a no-show ({})", stayId, commandId);
     return "Se comunica al CRS: si la reserva es suya, la cancela con su cargo de no show y la estancia lo mostrará.";
   }

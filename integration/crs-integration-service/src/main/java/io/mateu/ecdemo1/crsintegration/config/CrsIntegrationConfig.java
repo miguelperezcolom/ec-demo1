@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.crsintegration.config;
 
-import io.mateu.ecdemo1.crsintegration.outbox.OutboxProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,7 +9,7 @@ import java.time.Clock;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({CrsProperties.class, OutboxProperties.class})
+@EnableConfigurationProperties(CrsProperties.class)
 public class CrsIntegrationConfig {
 
     @Bean

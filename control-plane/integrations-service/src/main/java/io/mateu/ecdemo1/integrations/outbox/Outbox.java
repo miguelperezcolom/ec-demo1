@@ -8,10 +8,8 @@ import io.mateu.ecdemo1.integration.model.command.ProjectReservation;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationResolved;
 import io.mateu.ecdemo1.integrations.clients.PartnerCommand;
-import io.mateu.ecdemo1.integrations.tracing.Traces;
+import io.mateu.ecdemo1.messaging.engine.EngineOutbox;
 import io.mateu.workflow.ddd.DomainEvent;
-import io.mateu.workflow.dtos.TraceContext;
-import io.mateu.workflow.dtos.events.integration.ProcessCreationRequested;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,6 +23,9 @@ import java.time.Clock;
  * mapping, to the master of partners, to the CRS adapter. A decision rolled back asks nothing of
  * anyone; a decision saved has its commands on the way, and the other side takes each once (its
  * inbox deduplicates on the command's id).
+ *
+ * <p>This service's messages, in its words; the outbox itself — the table, the relay, the trace
+ * context carried to the record — is the shared one ({@link io.mateu.ecdemo1.messaging.Outbox}).
  */
 @Component
 @RequiredArgsConstructor
@@ -39,10 +40,10 @@ public class Outbox {
     public static final String PROJECTIONS = "projectionRequests";
     public static final String FRONT_OFFICE_COMMANDS = "frontOfficeCommands";
 
-    final OutboxMessageRepository repository;
+    final io.mateu.ecdemo1.messaging.Outbox outbox;
+    final EngineOutbox engine;
     final ObjectMapper objectMapper;
     final Clock clock;
-    final Traces traces;
 
     /**
      * A request to the engine. A process started here joins the trace it was asked for in: the
@@ -51,21 +52,7 @@ public class Outbox {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void appendToEngine(DomainEvent event) {
-        write(ENGINE, event.partitionKey(), event.getClass().getSimpleName(),
-                serialise(DomainEvent.class, withTraceContext(event)));
-    }
-
-    /** The request, joining the current trace when it is a process creation that names none. */
-    DomainEvent withTraceContext(DomainEvent event) {
-        if (event instanceof ProcessCreationRequested request && request.traceContext() == null) {
-            var current = traces.current();
-            var context = TraceContext.of(current.get(Traces.TRACEPARENT), current.get(Traces.TRACESTATE),
-                    current.get(Traces.BAGGAGE));
-            if (context != null) {
-                return request.withTraceContext(context);
-            }
-        }
-        return event;
+        engine.append(event);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -121,15 +108,6 @@ public class Outbox {
     }
 
     private void write(String binding, String key, String type, String payload) {
-        var message = new OutboxMessageEntity();
-        message.binding = binding;
-        message.messageKey = key;
-        message.eventType = type;
-        message.payload = payload;
-        message.createdAt = clock.instant();
-        var trace = traces.current();
-        message.traceparent = trace.get(Traces.TRACEPARENT);
-        message.tracestate = trace.get(Traces.TRACESTATE);
-        repository.save(message);
+        outbox.append(binding, key, type, payload, null);
     }
 }

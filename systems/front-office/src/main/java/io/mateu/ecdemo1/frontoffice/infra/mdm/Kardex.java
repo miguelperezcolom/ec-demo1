@@ -99,7 +99,7 @@ public class Kardex {
         : "CR-FO-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
     // A document the desk made up is not the guest's: the master's stays.
     var document = Guest.placeholderDocument(guest.document()) ? null : guest.document();
-    outbox.append(CommandOutbox.CUSTOMER_COMMANDS, guest.id(), requestId, new CustomerCommand.ProposeChange(requestId,
+    outbox.append(CommandOutbox.CUSTOMER_COMMANDS, guest.id(), new CustomerCommand.ProposeChange(requestId,
         guest.id(), guest.name(), guest.email(), guest.phone(), document, "front office " + hotel));
     return change.sent(requestId);
   }

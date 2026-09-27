@@ -145,7 +145,7 @@ class FrontDeskUseCasesTest {
     // The report is a command for the CRS adapter, in the outbox with the mark.
     assertThat(outbox.all(CommandOutbox.NO_SHOW_REPORTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
         .singleElement().satisfies(e -> assertThat(e.payload())
-            .contains("\"hotelCode\":\"MRU01\"", "\"locator\":\"" + a.stayId() + "\"", "\"commandId\":\"" + e.messageId() + "\""));
+            .contains("\"hotelCode\":\"MRU01\"", "\"locator\":\"" + a.stayId() + "\"", "\"commandId\":\"NS-"));
 
     var back = noShows.paxToggled(a.stayId(), 1);
     assertThat(back.noShow()).isFalse();

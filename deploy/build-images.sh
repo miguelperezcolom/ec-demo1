@@ -38,6 +38,10 @@ echo "── installing grpc-interface (the stubs users compiles against) ──
 echo "── installing integration-model (the integration's business model) ──"
 ( cd integration/integration-model && mvn -B -ntp -DskipTests install )
 
+# messaging likewise: the outbox, its relay and the inbox every service with a database shares.
+echo "── installing messaging (the shared outbox and inbox) ──"
+( cd supporting/messaging && mvn -B -ntp -DskipTests install )
+
 # ui-commons likewise: the shells, the front office and the control-plane UIs compile against it.
 echo "── installing ui-commons (what the UIs share) ──"
 ( cd supporting/ui-commons && mvn -B -ntp -DskipTests install )

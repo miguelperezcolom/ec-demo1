@@ -31,7 +31,7 @@ class TaskHandlersTest {
         final List<Object> written = new ArrayList<>();
 
         RecordingOutbox() {
-            super(null, null, null, null);
+            super(null, null, null);
         }
 
         @Override

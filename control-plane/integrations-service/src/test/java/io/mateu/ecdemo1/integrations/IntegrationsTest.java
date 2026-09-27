@@ -75,7 +75,9 @@ class IntegrationsTest {
 
     @Container
     static RedpandaContainer redpanda = new RedpandaContainer("docker.redpanda.com/redpandadata/redpanda:v24.1.7")
-            .withTmpFs(Map.of("/var/lib/redpanda/data", "rw"));
+            // size=8g: unsized, a tmpfs gets half the Docker VM's memory, under Redpanda's 5 GiB free-space
+            // floor, and every write is refused. It is a ceiling, not an allocation.
+            .withTmpFs(Map.of("/var/lib/redpanda/data", "rw,size=8g"));
 
     static HttpServer others;
     static final List<String> calls = new CopyOnWriteArrayList<>();

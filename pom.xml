@@ -49,5 +49,6 @@
         <!-- supporting -->
         <module>supporting/content</module>
         <module>supporting/ui-commons</module>
+        <module>supporting/messaging</module>
     </modules>
 </project>

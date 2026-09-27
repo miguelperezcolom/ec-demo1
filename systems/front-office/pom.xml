@@ -89,6 +89,13 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+        <!-- The outbox, its relay and the inbox, shared by the services. Installed from
+             ../../supporting/messaging first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>messaging</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>integration-model</artifactId>

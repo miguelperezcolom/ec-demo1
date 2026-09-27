@@ -105,6 +105,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- The outbox and its relay, shared by the services: here it delivers the identity changes
+             to Keycloak (IdentityTransport). Installed from ../../supporting/messaging first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>messaging</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
