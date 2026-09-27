@@ -49,12 +49,93 @@ final class JourneyMarkup {
     static String of(BookingJourney booking, Journey change, String grafanaUrl, ZoneId zone) {
         var html = new StringBuilder("<div style=\"width: 100%; font-size: .875rem; line-height: 1.35;\">");
         if (change != null) {
-            html.append(lanes(change, booking.business(), zone));
+            html.append(heading("Tiempos")).append(kpis(change, booking.business()));
+            html.append(heading("Recorrido por sistemas")).append(lanes(change, booking.business(), zone));
             html.append(links(change, grafanaUrl));
+            html.append(heading("Paso a paso")).append(steps(change, zone));
         }
         html.append(changes(booking, change, grafanaUrl, zone));
         html.append(causes(booking.business(), zone));
         return html.append("</div>").toString();
+    }
+
+    static String heading(String text) {
+        return "<h4 style=\"" + HEADING + "\">" + escape(text) + "</h4>";
+    }
+
+    // ── the figures ──────────────────────────────────────────────────────────────────────────────
+
+    /** What the business asks first, as tiles: how long until Opera had it, until the front office did. */
+    static String kpis(Journey change, BusinessData business) {
+        var tiles = List.of(
+                tile("Hasta Opera", change.crsToOpera(), change.crsToOpera() == null ? "No llegó a Opera en este cambio"
+                        : "Desde el cambio en el CRS hasta que Opera la tuvo", Lane.OPERA.color()),
+                tile("Hasta el front office", change.crsToFrontOffice(), change.crsToFrontOffice() == null
+                        ? "La recepción no la recibió en este cambio" : "Hasta que la recepción la vio", Lane.FRONT_OFFICE.color()),
+                tile("Todo el recorrido", change.total(), "De principio a fin, " + change.kind().label().toLowerCase(Locale.ROOT),
+                        Lane.ENGINE.color()),
+                // The change's hops already carry Salesforce's, when the MDM has sent the contact.
+                tileText("Sistemas", String.valueOf(change.lanes().size()),
+                        String.join(" → ", change.lanes().stream().map(Lane::label).toList()),
+                        Lane.CRS.color()));
+        return "<div style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; margin: .25rem 0 .5rem;\">"
+                + String.join("", tiles) + "</div>";
+    }
+
+    static String tile(String title, Duration duration, String caption, String color) {
+        return tileText(title, duration == null ? "—" : Durations.words(duration), caption, color);
+    }
+
+    static String tileText(String title, String value, String caption, String color) {
+        return "<div style=\"border: 1px solid rgba(128, 128, 128, .3); border-top: 3px solid " + color
+                + "; border-radius: .5rem; padding: .6rem .8rem;\">"
+                + "<div style=\"" + MUTED + " font-size: .8rem;\">" + escape(title) + "</div>"
+                + "<div style=\"font-size: 1.9rem; font-weight: 600; line-height: 1.2; margin: .15rem 0;\">" + escape(value) + "</div>"
+                + "<div style=\"" + MUTED + " font-size: .75rem;\">" + escape(caption) + "</div></div>";
+    }
+
+    // ── step by step ─────────────────────────────────────────────────────────────────────────────
+
+    /** Every hop, in order, as a timeline: a dot in its lane's colour, the system, what happened, when and for how long. */
+    static String steps(Journey change, ZoneId zone) {
+        var time = DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(zone);
+        var html = new StringBuilder("<div style=\"margin: .25rem 0 .5rem;\">");
+        var hops = change.hops();
+        for (int i = 0; i < hops.size(); i++) {
+            var hop = hops.get(i);
+            var color = hop.tone() == Tone.ERROR ? "#dc2626" : hop.lane().color();
+            var glyph = switch (hop.tone()) {
+                case OK -> "✓";
+                case WAIT -> "…";
+                case ERROR -> "!";
+                case INFO -> "i";
+            };
+            var when = hop.timed()
+                    ? time.format(instant(hop.startNanos())) + " · +" + Durations.words(Duration.ofNanos(hop.startNanos() - change.startNanos()))
+                    + (hop.durationMillis() > 0 ? " · dura " + Durations.words(Duration.ofMillis(hop.durationMillis())) : "")
+                    : "fuera de esta traza";
+            var badge = hop.tone() == Tone.WAIT ? badge("esperó", "#d97706") : hop.tone() == Tone.ERROR ? badge("falló", "#dc2626") : "";
+            html.append("<div style=\"display: grid; grid-template-columns: 1.6rem 1fr; gap: .6rem;\">")
+                    .append("<div style=\"display: flex; flex-direction: column; align-items: center;\">")
+                    .append("<div style=\"width: 1.5rem; height: 1.5rem; border-radius: 50%; background: ").append(color)
+                    .append("; color: #fff; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700;\">")
+                    .append(glyph).append("</div>")
+                    .append(i == hops.size() - 1 ? "" : "<div style=\"flex: 1; width: 2px; min-height: .5rem; background: rgba(128, 128, 128, .3);\"></div>")
+                    .append("</div><div style=\"padding-bottom: .8rem;\">")
+                    .append("<div style=\"display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .5rem;\">")
+                    .append(badge("" + hop.lane().label(), hop.lane().color()))
+                    .append("<span style=\"font-weight: 600;\">").append(link(hop.title(), hop.link())).append("</span>")
+                    .append(badge)
+                    .append("<span style=\"").append(MUTED).append(" font-size: .75rem;\">").append(escape(when)).append("</span></div>")
+                    .append(hop.detail() == null ? "" : "<div style=\"" + MUTED + " margin-top: .1rem;\">" + escape(hop.detail()) + "</div>")
+                    .append("</div></div>");
+        }
+        return html.append("</div>").toString();
+    }
+
+    static String badge(String text, String color) {
+        return "<span style=\"display: inline-block; padding: 0 .45rem; border-radius: 1rem; font-size: .72rem; font-weight: 600; "
+                + "border: 1px solid " + color + "; color: " + color + ";\">" + escape(text) + "</span>";
     }
 
     // ── the lanes ────────────────────────────────────────────────────────────────────────────────

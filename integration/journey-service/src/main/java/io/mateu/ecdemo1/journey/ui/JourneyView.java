@@ -19,13 +19,8 @@ import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Toolbar;
-import io.mateu.uidl.data.HorizontalLayout;
-import io.mateu.uidl.data.MetricCard;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
-import io.mateu.uidl.data.Text;
-import io.mateu.uidl.data.Timeline;
-import io.mateu.uidl.data.TimelineItem;
 import io.mateu.uidl.data.UICommand;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.fluent.OnLoadTrigger;
@@ -80,7 +75,7 @@ public class JourneyView implements Identifiable, TriggersSupplier {
     String hotel;
     @ReadOnly
     @Label("Cambio mostrado")
-    String change;
+    String shownChange;
     @ReadOnly
     @Label("Cómo acabó")
     String outcome;
@@ -97,20 +92,16 @@ public class JourneyView implements Identifiable, TriggersSupplier {
     @Label("En Salesforce")
     String salesforce;
 
-    @Section("Tiempos")
+    /**
+     * The figures, the lanes, the timeline, the changes and the causes: one block of markup, drawn
+     * alike by Vaadin and Redwood. Mateu's MetricCard and Timeline were the first choice, and Vaadin
+     * draws them; Redwood (Mateu 371) leaves them blank inside a form, so the screen would differ by
+     * renderer — the one thing the two consoles side by side must not do.
+     */
+    @Section("Recorrido")
     @Label("")
     @Colspan(2)
-    Callable<Component> times = this::times;
-
-    @Section("Recorrido por sistemas")
-    @Label("")
-    @Colspan(2)
-    Callable<Component> lanes = this::lanes;
-
-    @Section("Paso a paso")
-    @Label("")
-    @Colspan(2)
-    Callable<Component> steps = this::steps;
+    Callable<Component> journey = this::lanes;
 
     final Journeys journeys;
     final JourneyProperties properties;
@@ -133,7 +124,7 @@ public class JourneyView implements Identifiable, TriggersSupplier {
                 : business.stay().statusText();
         salesforce = salesforce(business);
         if (shown == null) {
-            change = "";
+            shownChange = "";
             outcome = booking.problem() != null ? booking.problem()
                     : "Todavía no hay recorrido: las trazas tardan unos segundos en llegar";
             status = new Status(booking.problem() != null ? StatusType.DANGER : StatusType.NONE,
@@ -141,7 +132,7 @@ public class JourneyView implements Identifiable, TriggersSupplier {
             settling = booking.problem() == null;
         } else {
             var when = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(zone());
-            change = "Cambio " + booking.ordinal(shown) + " de " + booking.changes().size() + " · " + shown.kind().label()
+            shownChange = "Cambio " + booking.ordinal(shown) + " de " + booking.changes().size() + " · " + shown.kind().label()
                     + (shown.version() == null ? "" : " · versión " + shown.version()) + " · "
                     + when.format(JourneyMarkup.instant(shown.startNanos()));
             outcome = shown.outcomeDetail();
@@ -159,77 +150,22 @@ public class JourneyView implements Identifiable, TriggersSupplier {
 
     // ── what the screen draws ────────────────────────────────────────────────────────────────────
 
-    Component times() {
-        var booking = booking();
-        var shown = shown(booking);
-        if (shown == null) {
-            return new Text(booking.problem() != null ? booking.problem()
-                    : "Todavía no hay recorrido para " + booking.locator() + ". Las trazas llegan a Tempo unos segundos "
-                    + "después del cambio: esta página vuelve a mirar sola, o pulsa «Actualizar».");
-        }
-        var start = shown.kind().label().toLowerCase();
-        var cards = new ArrayList<Component>();
-        cards.add(metric("hasta-opera", "Hasta Opera", shown.crsToOpera(),
-                shown.crsToOpera() == null ? "No llegó a Opera en este cambio" : "Desde el cambio en el CRS hasta que Opera la tuvo"));
-        cards.add(metric("hasta-fo", "Hasta el front office", shown.crsToFrontOffice(),
-                shown.crsToFrontOffice() == null ? "La recepción no la recibió en este cambio" : "Hasta que la recepción la vio"));
-        cards.add(metric("total", "Todo el recorrido", shown.total(), "De principio a fin, " + start));
-        cards.add(MetricCard.builder().id("sistemas").title("Sistemas").value(String.valueOf(shown.lanes().size()
-                        + (booking.business().passengers().stream().anyMatch(p -> p.salesforceContactId() != null) ? 1 : 0)))
-                .description(String.join(" → ", shown.lanes().stream().map(Lane::label).toList())).build());
-        return HorizontalLayout.builder().id("tiempos").content(cards).spacing(true).wrap(true).fullWidth(true).build();
-    }
-
-    static MetricCard metric(String id, String title, Duration duration, String description) {
-        return MetricCard.builder().id(id).title(title).value(duration == null ? "—" : Durations.words(duration))
-                .description(description).build();
-    }
-
     Component lanes() {
         var booking = booking();
         var shown = shown(booking);
         if (shown == null) {
-            return Html.block(booking.unreadTraces() > 0
-                    ? Html.muted("Tempo ya conoce " + booking.unreadTraces() + " traza(s) de esta reserva, pero aún las está guardando.")
-                    : Html.muted("Nada que dibujar todavía."));
+            return Html.block(booking.problem() != null ? Html.muted(booking.problem())
+                    : booking.unreadTraces() > 0
+                    ? Html.muted("Tempo ya conoce " + booking.unreadTraces() + " traza(s) de esta reserva, pero aún las está guardando: "
+                    + "esta página vuelve a mirar sola, o pulsa «Actualizar».")
+                    : Html.muted("Todavía no hay recorrido para " + booking.locator() + ". Las trazas llegan a Tempo unos segundos "
+                    + "después del cambio: esta página vuelve a mirar sola, o pulsa «Actualizar»."));
         }
         var story = new Journey(shown.traceId(), shown.locator(), shown.hotel(), shown.kind(), shown.version(),
                 shown.startNanos(), shown.endNanos(), shown.crsToOpera(), shown.crsToFrontOffice(), shown.outcome(),
                 shown.outcomeDetail(), shown.operaHotel(), shown.operaReservationId(), shown.operaAction(), shown.processes(),
                 story(shown, booking.business()), shown.translations(), shown.causes(), shown.identities());
         return Html.block(JourneyMarkup.of(booking, story, properties.grafanaUrl(), zone()));
-    }
-
-    Component steps() {
-        var booking = booking();
-        var shown = shown(booking);
-        if (shown == null) {
-            return new Text("Los pasos aparecerán aquí en cuanto llegue la traza.");
-        }
-        var time = DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(zone());
-        var items = new ArrayList<TimelineItem>();
-        var n = 0;
-        for (var hop : story(shown, booking.business())) {
-            var timestamp = hop.timed()
-                    ? time.format(JourneyMarkup.instant(hop.startNanos())) + " · +"
-                    + Durations.words(Duration.ofNanos(hop.startNanos() - shown.startNanos()))
-                    + (hop.durationMillis() > 0 ? " · dura " + Durations.words(Duration.ofMillis(hop.durationMillis())) : "")
-                    : "fuera de esta traza";
-            items.add(TimelineItem.builder()
-                    .id("paso-" + n++)
-                    .title(hop.lane().label() + " · " + hop.title())
-                    .description(hop.detail())
-                    .timestamp(timestamp)
-                    .icon(switch (hop.tone()) {
-                        case OK -> "✓";
-                        case WAIT -> "…";
-                        case ERROR -> "!";
-                        case INFO -> "i";
-                    })
-                    .color(hop.tone() == Tone.ERROR ? "#dc2626" : hop.lane().color())
-                    .build());
-        }
-        return Timeline.builder().id("pasos").items(items).build();
     }
 
     /**
