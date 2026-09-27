@@ -43,9 +43,25 @@ spring:
               sync: true
               configuration:
                 key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          notifications:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          resolutions:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
       bindings:
         customers:
           destination: customers
+        # OUT, through the outbox: a person told of what only a person can see to — Salesforce's daily
+        # API allowance spent — and, when it is over, the notice closed in every inbox.
+        notifications:
+          destination: notifications
+        resolutions:
+          destination: notification-resolutions
         # IN: what the hotels tell the MDM without waiting — a change the desk made to a customer, a
         # document it scanned. Taken once each (inbox); retried until it goes.
         consumeCustomerCommands-in-0:
@@ -74,7 +90,14 @@ mdm:
     pubsub-port: ${SF_PUBSUB_PORT:7443}
     subscribe: ${SF_SUBSCRIBE:true}
   projection-tick: ${PROJECTION_TICK:5s}
-  poll: ${CONSOLIDATION_POLL:60s}
+  # The nets under Salesforce's Pub/Sub events, which are what bring merges and decisions: a query
+  # each, out of the org's daily API allowance (15,000 calls in a rolling 24 h on a Base Edition).
+  poll: ${CONSOLIDATION_POLL:15m}
+  change-poll: ${CHANGE_POLL:5m}
+  # When Salesforce answers REQUEST_LIMIT_EXCEEDED, every call pauses this long, doubled on each
+  # refusal after that up to the longest; one inbox notice says so, and it closes when calls go again.
+  salesforce-pause: ${SALESFORCE_PAUSE:5m}
+  salesforce-pause-max: ${SALESFORCE_PAUSE_MAX:60m}
   # Where a customer's reservations are read from, for the data plane's Clientes screens, and where a
   # person opens each system. Read-only; a system that does not answer leaves its part empty.
   links:

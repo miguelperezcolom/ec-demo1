@@ -18,6 +18,11 @@ import java.time.format.DateTimeFormatter;
  * The safety net under the subscription (HLA CRM-MDM: «fallback / conciliación»): contacts with an
  * MDM id deleted since the last look, read from the recycle bin. An event lost while the MDM was
  * down, or older than the replay window, is found here.
+ *
+ * <p>A net, not the way merges arrive: every quarter of an hour, one query (two for a page past 200),
+ * about a hundred calls a day out of the org's allowance — a minute's poll was 1,440. Not while the
+ * allowance pauses calls; the cursor is only moved once what was found is applied, so nothing is
+ * skipped.
  */
 @Component
 @RequiredArgsConstructor
@@ -31,9 +36,9 @@ public class ConsolidationPoll {
     final CursorRepository cursors;
     final Clock clock;
 
-    @Scheduled(fixedDelayString = "${mdm.poll:60s}", initialDelayString = "${mdm.poll:60s}")
+    @Scheduled(fixedDelayString = "${mdm.poll:15m}", initialDelayString = "${mdm.poll-initial-delay:2m}")
     public void poll() {
-        if (!salesforce.enabled()) {
+        if (!salesforce.available()) {
             return;
         }
         try {
@@ -55,6 +60,8 @@ public class ConsolidationPoll {
             }
             cursor.until = until;
             cursors.save(cursor);
+        } catch (SalesforceClient.LimitExceeded e) {
+            log.debug("Polling Salesforce for merges waits for the allowance: {}", e.getMessage());
         } catch (RuntimeException e) {
             log.warn("Polling Salesforce for merges failed, next time: {}", e.getMessage());
         }

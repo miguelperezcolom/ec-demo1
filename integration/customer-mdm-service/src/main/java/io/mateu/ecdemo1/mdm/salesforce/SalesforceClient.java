@@ -33,22 +33,59 @@ public class SalesforceClient {
     public record Session(String instanceUrl, String accessToken, String orgId, String userId) {
     }
 
+    /** The most records one sObject Collections call takes. */
+    public static final int COLLECTION = 200;
+
+    /**
+     * Salesforce refuses for the daily API allowance, or the MDM is not asking while it recovers
+     * ({@link SalesforceBudget}): nothing is wrong with what was sent — it waits, and goes later.
+     */
+    public static class LimitExceeded extends RuntimeException {
+        public LimitExceeded(String message) {
+            super(message);
+        }
+    }
+
+    /** One record of a collection's answer: its contact, or why Salesforce refused it. */
+    public record Upserted(String mdmId, String contactId, String error) {
+        public boolean ok() {
+            return error == null;
+        }
+    }
+
     final MdmProperties.Salesforce properties;
+    final SalesforceBudget budget;
     final RestClient rest;
     volatile Session session;
 
-    public SalesforceClient(MdmProperties properties, TolerantReader reader) {
+    public SalesforceClient(MdmProperties properties, TolerantReader reader, SalesforceBudget budget) {
         this.properties = properties.salesforce();
+        this.budget = budget;
         this.rest = RestClient.builder()
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
                     converters.addFirst(new MappingJackson2HttpMessageConverter(reader.mapper()));
+                })
+                // Every answer says how much of the day's allowance is used: kept, for free.
+                .requestInterceptor((request, body, execution) -> {
+                    var response = execution.execute(request, body);
+                    budget.observe(response.getHeaders().getFirst("Sforce-Limit-Info"));
+                    return response;
                 })
                 .build();
     }
 
     public boolean enabled() {
         return properties.enabled();
+    }
+
+    /** Configured, and not pausing for the daily allowance: whether it is worth asking now. */
+    public boolean available() {
+        return enabled() && budget.open();
+    }
+
+    public SalesforceBudget budget() {
+        return budget;
     }
 
     public synchronized Session session() {
@@ -78,6 +115,68 @@ public class SalesforceClient {
      * are saved, not refused: finding them is what Salesforce is for, and a steward merges them.
      */
     public String upsertContact(Customer c) {
+        var fields = contactFields(c);
+        var answer = call(s -> rest.patch()
+                .uri(s.instanceUrl() + "/services/data/{v}/sobjects/Contact/MDM_Id__c/{id}", properties.apiVersion(), c.id)
+                .header("Authorization", "Bearer " + s.accessToken())
+                .header("Sforce-Duplicate-Rule-Header", "allowSave=true")
+                .contentType(MediaType.APPLICATION_JSON).body(fields)
+                .retrieve().body(JsonNode.class));
+        return answer == null ? null : answer.path("id").asText(null);
+    }
+
+    /**
+     * {@link #upsertContact} for up to {@value #COLLECTION} customers in one call — sObject
+     * Collections' upsert by the external id, not all or none: one Salesforce refuses does not keep the
+     * others back. One call, not one per customer, out of the org's daily allowance. The answer is in
+     * the order sent.
+     */
+    public List<Upserted> upsertContacts(List<Customer> customers) {
+        if (customers.isEmpty()) {
+            return List.of();
+        }
+        if (customers.size() > COLLECTION) {
+            throw new IllegalArgumentException("At most " + COLLECTION + " contacts in one call, not " + customers.size());
+        }
+        var records = new ArrayList<Map<String, Object>>();
+        for (var c : customers) {
+            var record = new LinkedHashMap<String, Object>();
+            record.put("attributes", Map.of("type", "Contact"));
+            record.put("MDM_Id__c", c.id);
+            record.putAll(contactFields(c));
+            records.add(record);
+        }
+        var body = new LinkedHashMap<String, Object>();
+        body.put("allOrNone", false);
+        body.put("records", records);
+        var answer = call(s -> rest.patch()
+                .uri(s.instanceUrl() + "/services/data/{v}/composite/sobjects/Contact/MDM_Id__c", properties.apiVersion())
+                .header("Authorization", "Bearer " + s.accessToken())
+                .header("Sforce-Duplicate-Rule-Header", "allowSave=true")
+                .contentType(MediaType.APPLICATION_JSON).body(body)
+                .retrieve().body(JsonNode.class));
+        return upserted(customers, answer);
+    }
+
+    static List<Upserted> upserted(List<Customer> sent, JsonNode answer) {
+        var result = new ArrayList<Upserted>();
+        for (int i = 0; i < sent.size(); i++) {
+            var r = answer == null ? null : answer.get(i);
+            var id = sent.get(i).id;
+            if (r == null) {
+                result.add(new Upserted(id, null, "no answer for this record"));
+            } else if (r.path("success").asBoolean(false)) {
+                result.add(new Upserted(id, r.path("id").asText(null), null));
+            } else {
+                var errors = new ArrayList<String>();
+                r.path("errors").forEach(e -> errors.add(e.path("statusCode").asText("") + " " + e.path("message").asText("")));
+                result.add(new Upserted(id, null, errors.isEmpty() ? "refused" : String.join("; ", errors).trim()));
+            }
+        }
+        return result;
+    }
+
+    static LinkedHashMap<String, Object> contactFields(Customer c) {
         var fields = new LinkedHashMap<String, Object>();
         fields.put("FirstName", c.firstName);
         fields.put("LastName", c.lastName == null || c.lastName.isBlank() ? "?" : c.lastName);
@@ -87,13 +186,7 @@ public class SalesforceClient {
         fields.put("Nationality__c", c.nationality);
         fields.put("Document_Type__c", c.documentType);
         fields.put("Document_Number__c", c.documentNumber);
-        var answer = call(s -> rest.patch()
-                .uri(s.instanceUrl() + "/services/data/{v}/sobjects/Contact/MDM_Id__c/{id}", properties.apiVersion(), c.id)
-                .header("Authorization", "Bearer " + s.accessToken())
-                .header("Sforce-Duplicate-Rule-Header", "allowSave=true")
-                .contentType(MediaType.APPLICATION_JSON).body(fields)
-                .retrieve().body(JsonNode.class));
-        return answer == null ? null : answer.path("id").asText(null);
+        return fields;
     }
 
     /** SOQL over live and deleted records alike: a merge's absorbed contact is only in the latter. */
@@ -216,12 +309,18 @@ public class SalesforceClient {
                 .header("SOAPAction", "\"\"")
                 .body(mergeEnvelope(s.accessToken(), master, absorbed))
                 .exchange((request, response) -> new String(response.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        ensureOpen();
         var answer = merge.apply(session());
         var outcome = mergeOutcome(answer);
         if (outcome != null && outcome.contains("INVALID_SESSION_ID")) {
             expire();
             outcome = mergeOutcome(merge.apply(session()));
         }
+        if (SalesforceBudget.isLimit(outcome)) {
+            budget.exceeded(outcome);
+            throw new LimitExceeded(outcome);
+        }
+        budget.succeeded();
         if (outcome != null) {
             throw new MergeRefused(outcome);
         }
@@ -291,15 +390,40 @@ public class SalesforceClient {
         return id;
     }
 
+    /**
+     * One call, with a new token if Salesforce stopped taking the one it had. Not made while the
+     * allowance pauses calls; an allowance refusal starts or lengthens the pause.
+     */
     <T> T call(Function<Session, T> request) {
+        ensureOpen();
         try {
-            return request.apply(session());
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() != HttpStatus.UNAUTHORIZED) {
-                throw e;
+            T answer;
+            try {
+                answer = request.apply(session());
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode() != HttpStatus.UNAUTHORIZED) {
+                    throw e;
+                }
+                expire();
+                answer = request.apply(session());
             }
-            expire();
-            return request.apply(session());
+            budget.succeeded();
+            return answer;
+        } catch (HttpClientErrorException e) {
+            var said = e.getResponseBodyAsString();
+            if (SalesforceBudget.isLimit(said)) {
+                budget.exceeded(said);
+                throw new LimitExceeded(e.getStatusCode().value() + " " + said);
+            }
+            // Salesforce answered: it is up, whatever it thought of this one.
+            budget.succeeded();
+            throw e;
+        }
+    }
+
+    void ensureOpen() {
+        if (!budget.open()) {
+            throw new LimitExceeded("Salesforce's daily API allowance is spent: not asking until " + budget.pausedUntil());
         }
     }
 }

@@ -54,7 +54,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * small double. The Pub/Sub subscription is off: the event's work is done by calling what it calls,
  * {@link Consolidations#received}, as the event and the poll both do.
  */
-@SpringBootTest(properties = {"mdm.projection-tick=1h", "mdm.poll=1h", "mdm.propagation-tick=1h",
+@SpringBootTest(properties = {"mdm.projection-tick=1h", "mdm.poll=1h", "mdm.propagation-tick=1h", "mdm.change-poll=1h",
+        "mdm.refresh-tick=1h", "mdm.change-tick=1h", "mdm.salesforce-merge-tick=1h",
+        "mdm.salesforce-pause=400ms", "mdm.salesforce-pause-max=400ms",
         "mdm.salesforce.client-id=test", "mdm.salesforce.client-secret=secret", "mdm.salesforce.subscribe=false"})
 @AutoConfigureMockMvc
 @Testcontainers
@@ -77,6 +79,8 @@ class MdmTest {
     static final Map<String, String> decisions = new ConcurrentHashMap<>();
     /** Why a Case was rejected (Motivo), by request id. */
     static final Map<String, String> reasons = new ConcurrentHashMap<>();
+    /** When set, Salesforce answers every call as an org whose daily API allowance is spent. */
+    static final java.util.concurrent.atomic.AtomicBoolean allowanceSpent = new java.util.concurrent.atomic.AtomicBoolean();
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) throws IOException {
@@ -89,9 +93,26 @@ class MdmTest {
             var base = "http://localhost:" + others.getAddress().getPort();
             String body;
             int code = 200;
-            if (path.equals("/services/oauth2/token")) {
+            if (allowanceSpent.get() && path.startsWith("/services/") && !path.equals("/services/oauth2/token")) {
+                code = 403;
+                body = "[{\"message\":\"TotalRequests Limit exceeded.\",\"errorCode\":\"REQUEST_LIMIT_EXCEEDED\"}]";
+            } else if (path.equals("/services/oauth2/token")) {
                 body = """
                         {"access_token":"t0k3n","instance_url":"%s","id":"%s/id/00DORG/005USER"}""".formatted(base, base);
+            } else if (path.equals("/services/data/v67.0/composite/sobjects/Contact/MDM_Id__c")) {
+                // sObject Collections' upsert: one answer per record, in the order sent.
+                var answers = new java.util.ArrayList<String>();
+                for (var record : new ObjectMapper().readTree(request).path("records")) {
+                    var mdmId = record.path("MDM_Id__c").asText();
+                    if (record.path("LastName").asText().equals("Refused")) {
+                        answers.add("{\"success\":false,\"errors\":[{\"statusCode\":\"INVALID_EMAIL_ADDRESS\",\"message\":\"Email: invalid\",\"fields\":[\"Email\"]}]}");
+                        continue;
+                    }
+                    var created = !contactByMdmId.containsKey(mdmId);
+                    var id = contactByMdmId.computeIfAbsent(mdmId, k -> "003" + String.format("%015d", nextContact.incrementAndGet()));
+                    answers.add("{\"id\":\"" + id + "\",\"success\":true,\"created\":" + created + ",\"errors\":[]}");
+                }
+                body = "[" + String.join(",", answers) + "]";
             } else if (path.startsWith("/services/data/v67.0/sobjects/Contact/MDM_Id__c/")) {
                 var mdmId = path.substring(path.lastIndexOf('/') + 1);
                 var created = !contactByMdmId.containsKey(mdmId);
@@ -507,6 +528,7 @@ class MdmTest {
 
     @BeforeEach
     void clean() {
+        budget.succeeded();
         outboxMessages.deleteAll();
         consolidationRecords.deleteAll();
         sources.deleteAll();
@@ -517,6 +539,7 @@ class MdmTest {
         contactJsonByMdmId.clear();
         cases.clear();
         decisions.clear();
+        allowanceSpent.set(false);
     }
 
     static Person person(String first, String last, String email, String docType, String doc) {
@@ -567,8 +590,9 @@ class MdmTest {
 
         var upsert = calls.stream().filter(c -> c.startsWith("PATCH")).toList();
         assertThat(upsert).singleElement().satisfies(c -> assertThat(c)
-                .startsWith("PATCH /services/data/v67.0/sobjects/Contact/MDM_Id__c/" + id)
-                .contains("\"LastName\":\"García\"", "\"Email\":\"ana@example.com\"", "\"Document_Number__c\":\"12345678Z\""));
+                .startsWith("PATCH /services/data/v67.0/composite/sobjects/Contact/MDM_Id__c")
+                .contains("\"MDM_Id__c\":\"" + id + "\"", "\"LastName\":\"García\"", "\"Email\":\"ana@example.com\"",
+                        "\"Document_Number__c\":\"12345678Z\""));
         var customer = customers.findById(id).orElseThrow();
         assertThat(customer.salesforceState).isEqualTo(SalesforceState.PROJECTED);
         assertThat(customer.salesforceContactId).isEqualTo(contactByMdmId.get(id));
@@ -626,6 +650,83 @@ class MdmTest {
         // The poll reports the same merge: it finds it done.
         consolidations.received(absorbed, absorbedContact, "POLL");
         assertThat(consolidationRecords.findById(absorbed).orElseThrow().via).isEqualTo("EVENT");
+    }
+
+    @Autowired
+    io.mateu.ecdemo1.mdm.salesforce.SalesforceBudget budget;
+    @Autowired
+    io.mateu.ecdemo1.mdm.salesforce.ConsolidationPoll consolidationPoll;
+
+    @Test
+    void pendingCustomersGoToSalesforceInOneCallAndOneRefusedDoesNotHoldTheOthers() throws Exception {
+        var ana = resolve("B1", person("Ana", "García", "ana@example.com", null, null)).get(0).customerId();
+        var leo = resolve("B2", person("Leo", "Refused", "leo@example", null, null)).get(0).customerId();
+        var eva = resolve("B3", person("Eva", "Martín", "eva@example.com", null, null)).get(0).customerId();
+
+        projection.projectPending();
+
+        // One call for the three: the org's allowance counts calls, not contacts.
+        assertThat(calls.stream().filter(c -> c.startsWith("PATCH"))).singleElement().asString()
+                .contains("\"allOrNone\":false", "\"MDM_Id__c\":\"" + ana + "\"", "\"MDM_Id__c\":\"" + leo + "\"",
+                        "\"MDM_Id__c\":\"" + eva + "\"");
+        assertThat(customers.findById(ana).orElseThrow().salesforceState).isEqualTo(SalesforceState.PROJECTED);
+        assertThat(customers.findById(eva).orElseThrow().salesforceContactId).isEqualTo(contactByMdmId.get(eva));
+        var refused = customers.findById(leo).orElseThrow();
+        assertThat(refused.salesforceState).isEqualTo(SalesforceState.FAILED);
+        assertThat(refused.projectionError).contains("INVALID_EMAIL_ADDRESS");
+    }
+
+    @Test
+    void whenTheDailyAllowanceIsSpentCallsPauseOneNoticeSaysSoAndNothingIsLost() throws Exception {
+        var ana = resolve("A1", person("Ana", "García", "ana@example.com", null, null)).get(0).customerId();
+        allowanceSpent.set(true);
+
+        projection.projectPending();
+
+        // Refused for the allowance, not for what she is: still pending, not failed.
+        var waiting = customers.findById(ana).orElseThrow();
+        assertThat(waiting.salesforceState).isEqualTo(SalesforceState.PENDING);
+        assertThat(waiting.projectionError).isNull();
+        assertThat(budget.open()).isFalse();
+        // Said once, to whoever sees to the integration.
+        assertThat(outboxMessages.findAll()).filteredOn(m -> m.getBinding().equals("notifications")).singleElement()
+                .satisfies(m -> assertThat(m.getPayload()).contains("INTEGRATION_NEEDS_ATTENTION", "salesforce/api-allowance",
+                        "daily API allowance spent"));
+
+        // While paused, nothing asks: not the projection, not the polls, not a changed contact.
+        calls.clear();
+        projection.projectPending();
+        consolidationPoll.poll();
+        salesforceInbox.poll();
+        salesforceInbox.contactChanged(ana);
+        assertThat(calls).isEmpty();
+        assertThat(customers.findById(ana).orElseThrow().salesforceRefreshPending).isTrue();
+
+        // The allowance back and the pause over: what waited goes, and the notice closes.
+        allowanceSpent.set(false);
+        Thread.sleep(450);
+        projection.projectPending();
+        assertThat(customers.findById(ana).orElseThrow().salesforceState).isEqualTo(SalesforceState.PROJECTED);
+        salesforceInbox.refreshPending();
+        assertThat(customers.findById(ana).orElseThrow().salesforceRefreshPending).isNull();
+        assertThat(calls).contains("GET /services/data/v67.0/queryAll");
+        assertThat(outboxMessages.findAll()).filteredOn(m -> m.getBinding().equals("resolutions")).singleElement()
+                .satisfies(m -> assertThat(m.getPayload()).contains("salesforce/api-allowance"));
+        assertThat(budget.open()).isTrue();
+    }
+
+    @Test
+    void aCustomerFailedOnlyForTheAllowanceIsPendingAgain() throws Exception {
+        var ana = resolve("R1", person("Ana", "García", "ana@example.com", null, null)).get(0).customerId();
+        var c = customers.findById(ana).orElseThrow();
+        c.salesforceState = SalesforceState.FAILED;
+        c.projectionError = "403 [{\"message\":\"TotalRequests Limit exceeded.\",\"errorCode\":\"REQUEST_LIMIT_EXCEEDED\"}]";
+        customers.save(c);
+
+        projection.requeueRefusedForTheAllowance();
+        projection.projectPending();
+
+        assertThat(customers.findById(ana).orElseThrow().salesforceState).isEqualTo(SalesforceState.PROJECTED);
     }
 
     @Test

@@ -15,7 +15,11 @@ public interface CustomerRepository extends JpaRepository<Customer, String>, Jpa
 
     List<Customer> findByAliasOf(String survivorId);
 
-    List<Customer> findTop50BySalesforceStateOrderByUpdatedAtAsc(SalesforceState state);
+    List<Customer> findTop200BySalesforceStateOrderByUpdatedAtAsc(SalesforceState state);
+
+    List<Customer> findBySalesforceStateAndProjectionErrorContaining(SalesforceState state, String error);
+
+    List<Customer> findTop50BySalesforceRefreshPendingTrue();
 
     List<Customer> findAllByOrderByUpdatedAtDesc();
 }

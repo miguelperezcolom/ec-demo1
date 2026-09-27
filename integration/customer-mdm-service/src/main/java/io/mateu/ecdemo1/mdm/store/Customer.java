@@ -58,6 +58,11 @@ public class Customer {
     public Instant projectedAt;
     @Column(length = 1000)
     public String projectionError;
+    /**
+     * Salesforce said its contact changed, and it could not be read then (the daily API allowance was
+     * spent): read it when Salesforce answers again, so the change is not lost. Null is false.
+     */
+    public Boolean salesforceRefreshPending;
 
     /** Which value won each field in the last merge, and why: to audit it, and to undo it. */
     @Column(length = 2000)

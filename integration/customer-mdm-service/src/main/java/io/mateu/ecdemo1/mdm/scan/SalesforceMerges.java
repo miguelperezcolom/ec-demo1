@@ -32,10 +32,18 @@ public class SalesforceMerges {
     final CustomerRepository customers;
     final TransactionTemplate tx;
     final Clock clock;
+    io.mateu.ecdemo1.mdm.salesforce.Backoff backoff;
+
+    io.mateu.ecdemo1.mdm.salesforce.Backoff backoff() {
+        if (backoff == null) {
+            backoff = new io.mateu.ecdemo1.mdm.salesforce.Backoff(clock, java.time.Duration.ofSeconds(10), java.time.Duration.ofMinutes(10));
+        }
+        return backoff;
+    }
 
     @Scheduled(fixedDelayString = "${mdm.salesforce-merge-tick:10s}")
     public void mergePending() {
-        if (!salesforce.enabled()) {
+        if (!salesforce.available() || !backoff().ready()) {
             return;
         }
         for (var pending : consolidations.findBySalesforceMergeOrderByReceivedAtAsc("PENDING")) {
@@ -58,14 +66,18 @@ public class SalesforceMerges {
             try {
                 salesforce.mergeContacts(survivor.salesforceContactId, absorbedContact);
                 mark(pending.absorbedId, "DONE", null);
+                backoff().succeeded();
                 log.info("{}'s contact {} merged into {}'s ({}) in Salesforce", pending.absorbedId, absorbedContact,
                         survivor.id, survivor.salesforceContactId);
             } catch (SalesforceClient.MergeRefused e) {
                 log.warn("Salesforce refused to merge {} into {}: {} — the duplicate is left for a steward",
                         absorbedContact, survivor.salesforceContactId, e.getMessage());
                 mark(pending.absorbedId, "FAILED", e.getMessage());
+            } catch (SalesforceClient.LimitExceeded e) {
+                return;
             } catch (RuntimeException e) {
-                log.warn("Salesforce unreachable, the merge of {} waits: {}", pending.absorbedId, e.getMessage());
+                backoff().failed();
+                log.warn("Salesforce unreachable, the merge of {} waits until {}: {}", pending.absorbedId, backoff().next(), e.getMessage());
                 return;
             }
         }

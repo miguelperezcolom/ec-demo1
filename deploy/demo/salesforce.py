@@ -31,6 +31,12 @@ def ids(soql):
     return [r["Id"] for r in call("GET", "/query?q=" + urllib.parse.quote(soql)).get("records", [])]
 
 
+def delete(records):
+    """Two hundred a call (sObject Collections), not one: the org's daily API allowance counts calls."""
+    for i in range(0, len(records), 200):
+        call("DELETE", "/composite/sobjects?allOrNone=false&ids=" + ",".join(records[i:i + 200]))
+
+
 def quoted(values):
     return ",".join("'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'" for v in values)
 
@@ -41,25 +47,25 @@ cases = ids(f"SELECT Id FROM Case WHERE MdmRequestId__c IN ({quoted(new_requests
 for i in range(0, len(new_customers), 100):
     chunk = new_customers[i:i + 100]
     cases += ids(f"SELECT Id FROM Case WHERE MdmId__c IN ({quoted(chunk)})")
-for case in sorted(set(cases)):
-    call("DELETE", f"/sobjects/Case/{case}")
+delete(sorted(set(cases)))
 contacts = []
 for i in range(0, len(new_customers), 100):
     contacts += ids(f"SELECT Id FROM Contact WHERE MDM_Id__c IN ({quoted(new_customers[i:i + 100])})")
-for contact in contacts:
-    call("DELETE", f"/sobjects/Contact/{contact}")
+delete(contacts)
 print(f"  deleted {len(set(cases))} Case(s) and {len(contacts)} contact(s) the demo created")
 
-restored = 0
 raw = (work / "contacts-baseline.json").read_text().strip()
-for c in json.loads(raw) if raw and raw != "" else []:
-    fields = {"FirstName": c["firstName"], "LastName": c["lastName"] or "?", "Email": c["email"], "Phone": c["phone"],
-              "Birthdate": c["birthDate"], "Nationality__c": c["nationality"], "Document_Type__c": c["documentType"],
-              "Document_Number__c": c["documentNumber"]}
-    req = urllib.request.Request(f"{instance}/services/data/v67.0/sobjects/Contact/MDM_Id__c/{urllib.parse.quote(c['id'])}",
-                                 json.dumps(fields).encode(), method="PATCH",
+baseline = [{"attributes": {"type": "Contact"}, "MDM_Id__c": c["id"], "FirstName": c["firstName"], "LastName": c["lastName"] or "?",
+             "Email": c["email"], "Phone": c["phone"], "Birthdate": c["birthDate"], "Nationality__c": c["nationality"],
+             "Document_Type__c": c["documentType"], "Document_Number__c": c["documentNumber"]}
+            for c in (json.loads(raw) or [] if raw else [])]
+restored = 0
+# Upserted by the MDM id two hundred a call (sObject Collections), as the MDM projects them.
+for i in range(0, len(baseline), 200):
+    req = urllib.request.Request(f"{instance}/services/data/v67.0/composite/sobjects/Contact/MDM_Id__c",
+                                 json.dumps({"allOrNone": False, "records": baseline[i:i + 200]}).encode(), method="PATCH",
                                  headers={"Authorization": "Bearer " + access, "Content-Type": "application/json",
                                           "Sforce-Duplicate-Rule-Header": "allowSave=true"})
-    urllib.request.urlopen(req).read()
-    restored += 1
-print(f"  {restored} baseline contact(s) written back as the baseline has them")
+    with urllib.request.urlopen(req) as r:
+        restored += sum(1 for result in json.loads(r.read()) if result.get("success"))
+print(f"  {restored} of {len(baseline)} baseline contact(s) written back as the baseline has them")
