@@ -97,7 +97,7 @@ integrations:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}
   pms-integration-url: ${PMS_INTEGRATION_URL:http://localhost:8123}
   mapping-url: ${MAPPING_URL:http://localhost:8122}
-  partners-url: ${PARTNERS_URL:http://localhost:8120}
+  partners-url: ${ERP_URL:http://localhost:8120}
   console-url: ${CONSOLE_URL:https://console.ec1.mateu.io}
   crypto-key: ${INTEGRATIONS_CRYPTO_KEY:}
   gate-check: ${GATE_CHECK:5s}

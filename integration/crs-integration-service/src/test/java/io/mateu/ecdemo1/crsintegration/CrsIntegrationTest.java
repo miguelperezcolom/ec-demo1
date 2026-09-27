@@ -123,7 +123,7 @@ class CrsIntegrationTest {
         crs.start();
         var url = "http://localhost:" + crs.getAddress().getPort();
         registry.add("BOOKING_URL", () -> url);
-        registry.add("PARTNERS_URL", () -> url);
+        registry.add("ERP_URL", () -> url);
         registry.add("INTEGRATIONS_URL", () -> url);
         registry.add("KAFKA_BROKERS", redpanda::getBootstrapServers);
     }

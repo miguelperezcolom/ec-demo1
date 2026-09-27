@@ -25,7 +25,7 @@ los del HLA *CRS-PMS Integration - Solution* y *CRM-MDM Integration - Solution*.
 | # | Diagrama | Qué contar | En la PoC |
 | -: | :------- | :--------- | :-------- |
 | 1 | Context Model AS-IS | De dónde partimos | — |
-| 2 | Context Model TO-BE | Rumbo (CRS) ↔ integración ↔ Opera Cloud por OHIP; el ERP como maestro de interlocutores; Salesforce como motor de limpieza del cliente | `booking` hace de Rumbo, `partners` de ERP; Opera y Salesforce son los reales |
+| 2 | Context Model TO-BE | Rumbo (CRS) ↔ integración ↔ Opera Cloud por OHIP; el ERP como maestro de interlocutores; Salesforce como motor de limpieza del cliente | `booking` hace de Rumbo, `erp` (antes `partners`) de ERP; Opera y Salesforce son los reales |
 | 3 | Container Model TO-BE | Los servicios: ACL del CRS, mapeado, conector PMS, integraciones, MDM, comunicación, auditoría, motor | Un servicio por contenedor, y el front office del hotel |
 | 4 | El modelo mental: dos planos | Plano de datos (lo que fluye) y plano de control (quién lo gobierna) | Dos consolas: `ec1` y `console.ec1` |
 | 5 | Grabar Reserva — System Model | El camino de una reserva de punta a punta | «Proyectar reserva», contra Opera real y el front office |
@@ -144,7 +144,7 @@ lleva el suyo como atributo. MRU01 vende solo con esos códigos; PMI01 y CUN01, 
 [`deploy/demo/crs-catalog/MRU01-expected-pairs.md`](../../deploy/demo/crs-catalog/MRU01-expected-pairs.md);
 el catálogo se regenera con `python3 deploy/demo/crs-catalog/generate.py --live` (lee XMAR por el
 conector, que ahora trae el nombre de cada tarifa) y queda versionado en
-`booking/src/main/resources/crs-catalog/MRU01.json` — el CRS no llama a Opera al arrancar.
+`systems/crs/booking/src/main/resources/crs-catalog/MRU01.json` — el CRS no llama a Opera al arrancar.
 
 ## 7. El backfill
 

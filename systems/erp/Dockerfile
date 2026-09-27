@@ -2,7 +2,7 @@
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S app && adduser -S -G app -u 10001 app
 WORKDIR /opt/app
-COPY --chown=app:app target/partners-*.jar app.jar
+COPY --chown=app:app target/erp-*.jar app.jar
 ENV SERVER_PORT=8120 JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/tmp
 USER app
 EXPOSE 8120

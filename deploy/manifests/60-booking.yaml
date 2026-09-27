@@ -71,8 +71,8 @@ spec:
             - name: DB_POOL_SIZE
               value: "8"
             # The ERP's master of partners, read by "+ 10 demo bookings" for the TTOO/OTA channels.
-            - name: PARTNERS_URL
-              value: "http://partners:8120"
+            - name: ERP_URL
+              value: "http://erp:8120"
             # The customer MDM: who a booking's people are in Clientes, Salesforce, Opera and the
             # front office, for the booking's page to link to. Read-only, and only for showing.
             - name: CUSTOMER_MDM_URL

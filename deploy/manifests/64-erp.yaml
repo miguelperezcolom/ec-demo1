@@ -1,25 +1,26 @@
-# CRS-PMS integration PoC (docs/poc-acl). The CRS end of the integration, an anti-corruption layer: it turns
-# what happens in booking and partners into business events, starts the process each calls for,
-# serves the CRS's data in the integration's terms, and writes the PMS reference back. No screens.
+# CRS-PMS integration PoC (docs/poc-acl). The ERP: the master of trading partners — tour operators,
+# agencies, companies — with its Mateu screens at /_erp, an MCP server, and partner-changed events
+# published through an outbox on the `partners` topic. Its database is still `partners`: the service
+# was renamed, its data was not moved.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: crs-integration-service
+  name: erp
   namespace: ec-demo1
-  labels: { app: crs-integration-service }
+  labels: { app: erp }
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: crs-integration-service }
+    matchLabels: { app: erp }
   template:
     metadata:
       labels:
-        app: crs-integration-service
-        app.kubernetes.io/component: crs-integration-service
+        app: erp
+        app.kubernetes.io/component: erp
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: /actuator/prometheus
-        prometheus.io/port: "8121"
+        prometheus.io/port: "8120"
     spec:
       nodeSelector:
         topology.kubernetes.io/region: hel1
@@ -42,29 +43,23 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: { drop: ["ALL"] }
       containers:
-        - name: crs-integration-service
-          image: miguelperezcolom/ec-demo1-crs-integration-service:0.27.0
+        - name: erp
+          image: miguelperezcolom/ec-demo1-erp:0.22.0
           env:
             - name: SERVER_PORT
-              value: "8121"
+              value: "8120"
             - name: KAFKA_BROKERS
               value: redpanda:19092
             - name: DB_URL
-              value: jdbc:postgresql://postgres:5432/crs_integration
+              value: jdbc:postgresql://postgres:5432/partners
             - name: DB_USERNAME
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
             - name: DB_PASSWORD
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
             - name: DB_POOL_SIZE
               value: "6"
-            - name: BOOKING_URL
-              value: "http://booking:8108"
-            - name: ERP_URL
-              value: "http://erp:8120"
-            - name: INTEGRATIONS_URL
-              value: "http://integrations-service:8126"
           ports:
-            - { name: http, containerPort: 8121 }
+            - { name: http, containerPort: 8120 }
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -75,12 +70,12 @@ spec:
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
           readinessProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8121 }
+            httpGet: { path: /actuator/health/readiness, port: 8120 }
             initialDelaySeconds: 20
             periodSeconds: 10
             failureThreshold: 30
           livenessProbe:
-            httpGet: { path: /actuator/health/liveness, port: 8121 }
+            httpGet: { path: /actuator/health/liveness, port: 8120 }
             initialDelaySeconds: 60
             periodSeconds: 20
       volumes:
@@ -89,10 +84,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: crs-integration-service
+  name: erp
   namespace: ec-demo1
-  labels: { app: crs-integration-service }
+  labels: { app: erp }
 spec:
-  selector: { app: crs-integration-service }
+  selector: { app: erp }
   ports:
-    - { name: http, port: 8121, targetPort: 8121 }
+    - { name: http, port: 8120, targetPort: 8120 }

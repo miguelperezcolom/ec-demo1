@@ -3,12 +3,12 @@ server:
 
 spring:
   application:
-    name: ec-demo1-partners
+    name: ec-demo1-erp
 
   ai:
     mcp:
       server:
-        name: partners
+        name: erp
         version: 1.0.0
 
   mvc:
@@ -58,7 +58,7 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 
 springdoc:
-  packages-to-scan: io.mateu.ecdemo1.partners.infra.in.rest
+  packages-to-scan: io.mateu.ecdemo1.erp.infra.in.rest
 
 management:
   endpoints:

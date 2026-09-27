@@ -73,13 +73,13 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_booking/**
 
-        # The CRS-PMS integration PoC (docs/poc-acl): the master of partners, and the double of
+        # The CRS-PMS integration PoC (docs/poc-acl): the ERP, the master of partners, and the double of
         # Opera's API the integration writes to instead of a real tenant.
-        - id: partners
-          uri: ${PARTNERS_URL:http://partners:8120}
+        - id: erp
+          uri: ${ERP_URL:http://erp:8120}
           predicates:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
-            - Path=/_partners/**
+            - Path=/_erp/**
 
         # Clientes: the customer master's business face — finding a customer, and its data, systems,
         # reservations and change requests — served by the MDM under a second @UI of its own, on the

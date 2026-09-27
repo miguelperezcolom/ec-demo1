@@ -137,7 +137,7 @@ public class SecurityConfig {
                         .pathMatchers("/_booking/**", "/_content/**").authenticated()
                         // The integration PoC's product-side screen: the partners master. Same
                         // reason as the two above.
-                        .pathMatchers("/_partners/**").authenticated()
+                        .pathMatchers("/_erp/**").authenticated()
                         // Clientes, the MDM's business face on the data plane: personal data, so never
                         // anonymous — read-only, and a signed-in user of the data plane is who it is for.
                         .pathMatchers("/_customers/**").authenticated()

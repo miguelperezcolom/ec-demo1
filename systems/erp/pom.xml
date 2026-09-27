@@ -15,9 +15,9 @@
     </parent>
 
     <groupId>io.mateu.ecdemo1</groupId>
-    <artifactId>partners</artifactId>
+    <artifactId>erp</artifactId>
     <version>0.1.0</version>
-    <name>ec-demo1 partners</name>
+    <name>ec-demo1 erp</name>
     <description>The master of trading partners (agencies, tour operators, companies) the CRS-PMS integration PoC projects to the PMS</description>
 
     <properties>

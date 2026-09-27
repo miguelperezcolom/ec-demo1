@@ -69,8 +69,8 @@ spec:
             # The demo asks the mapping agent live, from Mapping → Dictionary: the gate leaves a notice instead.
             - name: INTEGRATIONS_MAPPING_ASK_AGENT
               value: "false"
-            - name: PARTNERS_URL
-              value: "http://partners:8120"
+            - name: ERP_URL
+              value: "http://erp:8120"
             # The chain's connection to Opera: what a new integration starts from. OHIP UAT, from the
             # ec-opera Secret (deploy.sh, from credentials.env) — never in the repo.
             - name: OPERA_GATEWAY_URL

@@ -97,7 +97,7 @@ spring:
 # The ERP's master of partners: where the demo bookings pick the tour operators and agencies of
 # the channels that sell through one.
 partners:
-  url: ${PARTNERS_URL:http://localhost:8120}
+  url: ${ERP_URL:http://localhost:8120}
 
 # The customer MDM: who a booking's people are elsewhere — Clientes, Salesforce, Opera, the front
 # office — for the booking's screen to link to. Blank: the screen shows no links.

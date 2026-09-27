@@ -157,7 +157,7 @@ class IntegrationsTest {
         registry.add("CRS_INTEGRATION_URL", () -> url);
         registry.add("PMS_INTEGRATION_URL", () -> url);
         registry.add("MAPPING_URL", () -> url);
-        registry.add("PARTNERS_URL", () -> url);
+        registry.add("ERP_URL", () -> url);
         registry.add("KAFKA_BROKERS", redpanda::getBootstrapServers);
     }
 

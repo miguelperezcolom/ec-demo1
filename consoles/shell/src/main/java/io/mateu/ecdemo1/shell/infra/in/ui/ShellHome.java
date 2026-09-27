@@ -103,7 +103,7 @@ public class ShellHome implements WidgetSupplier {
      * through and the CRS-PMS integration projects to the PMS (PoC ACL, docs/poc-acl).
      */
     @Menu
-    RemoteMenu partners = new RemoteMenu("/_partners").withLabel("ERP");
+    RemoteMenu erp = new RemoteMenu("/_erp").withLabel("ERP");
 
     /**
      * The customers, as the business sees them: find one, and see its data, where it is known, its
