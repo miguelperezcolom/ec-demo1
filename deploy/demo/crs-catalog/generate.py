@@ -11,7 +11,7 @@ plans the CRS sells, which of its 26 packages are really a board, the CRS's code
 price for each. This script checks the selection against XMAR's catalog as the connector reads it —
 every Opera code it names has to be there — and writes:
 
-  booking/src/main/resources/crs-catalog/MRU01.json   the CRS side only, which the CRS loads at start
+  systems/crs/booking/src/main/resources/crs-catalog/MRU01.json   the CRS side only, which the CRS loads at start
   deploy/demo/crs-catalog/MRU01-expected-pairs.md     each CRS code and the XMAR code it should map to
   deploy/demo/crs-catalog/XMAR.json                   the XMAR catalog it was checked against (--live)
 
@@ -28,7 +28,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 HERE = pathlib.Path(__file__).resolve().parent
-CRS_FILE = ROOT / "booking/src/main/resources/crs-catalog/MRU01.json"
+CRS_FILE = ROOT / "systems/crs/booking/src/main/resources/crs-catalog/MRU01.json"
 PAIRS_FILE = HERE / "MRU01-expected-pairs.md"
 SNAPSHOT = HERE / "XMAR.json"
 

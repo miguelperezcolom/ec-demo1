@@ -20,18 +20,20 @@ cd "$(dirname "$0")/.."
 REGISTRY="${REGISTRY:-miguelperezcolom}"
 TAG="${1:-0.8.0}"
 
-APPS="shell shell-redwood gateway booking content users ia-agent ia-control-plane api-mcp control-shell control-shell-redwood partners crs-integration-service mapping-service pms-integration-service communication-service integrations-service customer-mdm-service front-office audit-service"
+# By path: the modules are grouped by system (README, "Layout"). The image is named after the
+# module's folder — systems/erp builds ec-demo1-erp.
+APPS="consoles/shell consoles/shell-redwood consoles/gateway systems/crs/booking supporting/content control-plane/users ai/ia-agent ai/ia-control-plane ai/api-mcp consoles/control-shell consoles/control-shell-redwood systems/erp integration/crs-integration-service integration/mapping-service integration/pms-integration-service control-plane/communication-service control-plane/integrations-service integration/customer-mdm-service systems/front-office control-plane/audit-service"
 
 # grpc-interface first, and installed rather than packaged: it is not an application and gets no
 # image, but `users` compiles against the protobuf stubs generated from its .proto, so it has to
 # be in the local repository before that module is built. It is also the one module that reaches
 # the network for something other than dependencies — the protobuf plugin downloads protoc.
 echo "── installing grpc-interface (the stubs users compiles against) ──"
-( cd grpc-interface && mvn -B -ntp -DskipTests install )
+( cd control-plane/grpc-interface && mvn -B -ntp -DskipTests install )
 
 # integration-model likewise: the CRS-PMS integration's services (docs/poc-acl) compile against it.
 echo "── installing integration-model (the integration's business model) ──"
-( cd integration-model && mvn -B -ntp -DskipTests install )
+( cd integration/integration-model && mvn -B -ntp -DskipTests install )
 
 for app in $APPS; do
   echo "── building $app ──"
@@ -55,9 +57,9 @@ for app in $APPS; do
   # generated controller.
   ( cd "$app" && mvn -B -ntp -DskipTests clean package )
   docker buildx build --platform linux/amd64 \
-    -t "$REGISTRY/ec-demo1-$app:$TAG" --push "$app"
+    -t "$REGISTRY/ec-demo1-$(basename "$app"):$TAG" --push "$app"
 done
 
 echo
-for app in $APPS; do echo "Pushed $REGISTRY/ec-demo1-$app:$TAG"; done
+for app in $APPS; do echo "Pushed $REGISTRY/ec-demo1-$(basename "$app"):$TAG"; done
 echo "Point the manifests in deploy/manifests/ at the tag if it is not $TAG."

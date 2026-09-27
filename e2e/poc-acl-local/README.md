@@ -21,7 +21,7 @@ The customer MDM (`customer-mdm-service`) cleans in a real Salesforce org when
 `~/.config/ec-demo1/salesforce.env` (or `SF_ENV`) holds its External Client App's client credentials
 — `SF_DOMAIN`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET` — and only that service gets them. Without the file
 it still resolves identities for the connector; nothing is sent to Salesforce. The org's side is
-deployed with `customer-mdm-service/salesforce/deploy.py`.
+deployed with `integration/customer-mdm-service/salesforce/deploy.py`.
 
 `infra.sh` imports the definitions from a local clone of `ec-definitions` next to this repository
 (`EC_DEFINITIONS` to point elsewhere), branch `EC_DEFINITIONS_BRANCH` (default `master`).

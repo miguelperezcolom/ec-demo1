@@ -43,7 +43,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: crs-integration-service
-          image: miguelperezcolom/ec-demo1-crs-integration-service:0.27.0
+          image: miguelperezcolom/ec-demo1-crs-integration-service:0.27.1
           env:
             - name: SERVER_PORT
               value: "8121"
@@ -59,8 +59,8 @@ spec:
               value: "6"
             - name: BOOKING_URL
               value: "http://booking:8108"
-            - name: PARTNERS_URL
-              value: "http://partners:8120"
+            - name: ERP_URL
+              value: "http://erp:8120"
             - name: INTEGRATIONS_URL
               value: "http://integrations-service:8126"
           ports:

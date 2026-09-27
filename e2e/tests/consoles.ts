@@ -61,7 +61,7 @@ const dataScreens: Screen[] = [
     { menu: 'Call center', entry: 'Bookings', route: '/booking/bookings' },
     // The CRS -> Opera integration PoC (docs/poc-acl): the partners master. The Opera double is no
     // longer deployed: the integration writes to the chain's real tenant.
-    { menu: 'ERP', entry: 'Partners', route: '/partners/partners' },
+    { menu: 'ERP', entry: 'Partners', route: '/erp/partners' },
     // The customer master's business face, served by the MDM under /_customers. Read-only; its
     // technical screens (golden records, consolidations) are on the control plane.
     { menu: 'Clientes', entry: 'Buscar clientes', route: '/customers/search', title: 'Clientes' },
@@ -220,7 +220,7 @@ export async function screenRendered(page: Page): Promise<{ ok: boolean; why: st
  * listing, a table is there.
  *
  * <p>{@link screenRendered} alone accepts any page that paints something, and a route that lands on
- * the WRONG screen paints plenty: a deep link to /partners/partners that opened the ERP section
+ * the WRONG screen paints plenty: a deep link to /erp/partners (then /partners/partners) that opened the ERP section
  * index (a heading and a link) passed it for as long as it was broken. Headings are read from both
  * renderers — Vaadin titles a page with an h2, Redwood with an h1 — and matched whole, without
  * case; the table is Vaadin's grid or JET's oj-table.

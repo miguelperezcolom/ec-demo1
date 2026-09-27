@@ -10,7 +10,7 @@ ENGINE_DB=workflow
 ENGINE_TABLES="process_entity step_execution_entity form_execution_entity process_lock process_lock_waiter resource_entity process_index task_override"
 
 # What stops while the state is put back, and starts again after.
-SERVICES="audit-service booking communication-service crs-integration-service customer-mdm-service front-office integrations-service mapping-service partners pms-integration-service ec-eventconductor-orchestrator ec-eventconductor-forms"
+SERVICES="audit-service booking communication-service crs-integration-service customer-mdm-service front-office integrations-service mapping-service erp pms-integration-service ec-eventconductor-orchestrator ec-eventconductor-forms"
 
 pg_pod() { kubectl -n $NS get pod -o name | grep eventconductor-postgres | head -1; }
 # psql against one database, reading SQL from stdin
