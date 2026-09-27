@@ -9,6 +9,7 @@ import io.mateu.ecdemo1.integration.model.reservation.Reservation;
 import io.mateu.ecdemo1.integration.model.reservation.Room;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
+import io.mateu.ecdemo1.pmsintegration.ohip.PmsRejectedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +35,7 @@ public class ReservationPayload {
 
     final ObjectMapper objectMapper;
     final OhipProperties properties;
+    final PackageRules packageRules;
 
     public ObjectNode build(Reservation r, IntegrationClients.Resolved codes, String pmsHotelId, String guestProfileId,
                             Partner partner, String partnerProfileId, String partnerProfileType) {
@@ -61,8 +63,12 @@ public class ReservationPayload {
                     .put("start", r.arrival().toString()).put("end", r.departure().toString())
                     .put("numberOfUnits", 1).put("fixedRate", true);
             var counts = rate.putObject("guestCounts").put("adults", room.adults()).put("children", room.childrenAges().size());
-            var ages = counts.putArray("childAges");
-            room.childrenAges().forEach(ages::add);
+            if (!room.childrenAges().isEmpty()) {
+                // Each age an object, as OHIP reads it back ({"childAges":[{"age":6}]}): a bare number is
+                // 400 OPERAWS-GEN01242 «Unknown property … guestCounts -> childAges -> null».
+                var ages = counts.putArray("childAges");
+                room.childrenAges().forEach(age -> ages.addObject().put("age", age));
+            }
             var nightly = rate.putObject("rates").putArray("rate");
             var total = BigDecimal.ZERO;
             for (var night : room.nightlyRates()) {
@@ -79,10 +85,8 @@ public class ReservationPayload {
                 .putObject("profileInfo").putArray("profileIdList").addObject().put("id", guestProfileId).put("type", "Profile");
 
         var packages = reservation.putArray("reservationPackages");
-        r.rooms().stream().map(room -> codes.target(CodeType.BOARD, room.boardCode())).distinct()
-                .filter(code -> !"NONE".equals(code))
-                .forEach(code -> packages.addObject().put("packageCode", code)
-                        .put("startDate", r.arrival().toString()).put("endDate", r.departure().toString()));
+        boardPackages(r, codes, pmsHotelId).forEach(code -> packages.addObject().put("packageCode", code)
+                .put("startDate", r.arrival().toString()).put("endDate", r.departure().toString()));
 
         var method = r.payments().isEmpty() ? properties.payAtHotelMethod()
                 : codes.target(CodeType.PAYMENT_METHOD, r.payments().getFirst().methodCode());
@@ -113,6 +117,42 @@ public class ReservationPayload {
                     .putObject("text").put("value", r.comments());
         }
         return body;
+    }
+
+    /**
+     * The boards that go on the reservation as packages of their own. None for room only, and none for
+     * a room whose rate plan already carries the board's package — Opera would post it twice. A board
+     * whose package the property does not sell separately, and whose rate plan does not carry, cannot be
+     * written: that is said here, before Opera answers it with RSV10047, in terms a person can act on.
+     */
+    java.util.List<String> boardPackages(Reservation r, IntegrationClients.Resolved codes, String pmsHotelId) {
+        var written = new java.util.LinkedHashSet<String>();
+        for (Room room : r.rooms()) {
+            var board = codes.target(CodeType.BOARD, room.boardCode());
+            if ("NONE".equals(board)) {
+                continue;
+            }
+            var ratePlan = codes.target(CodeType.RATE_PLAN, room.ratePlanCode());
+            if (packageRules.includedIn(pmsHotelId, ratePlan).contains(board)) {
+                continue;
+            }
+            if (!packageRules.soldSeparately(pmsHotelId, board)) {
+                throw notSoldSeparately(r, room, board, ratePlan, pmsHotelId);
+            }
+            written.add(board);
+        }
+        return java.util.List.copyOf(written);
+    }
+
+    /** The code a board refused before sending it is recorded with, in place of Opera's. */
+    public static final String BOARD_NOT_SOLD_SEPARATELY = "BOARD_NOT_SOLD_SEPARATELY";
+
+    static PmsRejectedException notSoldSeparately(Reservation r, Room room, String board, String ratePlan, String pmsHotelId) {
+        return new PmsRejectedException(422, BOARD_NOT_SOLD_SEPARATELY, ("not sent to Opera: board %s is package %s in %s, "
+                + "which %s does not sell separately — it only goes inside a rate plan — and rate plan %s (%s in Opera) "
+                + "does not include it. Map board %s of %s to a package %s sells separately, or sell it with a rate plan "
+                + "that includes %s; then resolve this cause").formatted(room.boardCode(), board, pmsHotelId, pmsHotelId,
+                room.ratePlanCode(), ratePlan, room.boardCode(), r.hotelCode(), pmsHotelId, board));
     }
 
     static String reservationProfileType(String profileType) {

@@ -11,6 +11,7 @@ import io.mateu.ecdemo1.pmsintegration.config.TolerantReader;
 import io.mateu.ecdemo1.pmsintegration.connections.Connections;
 import io.mateu.ecdemo1.pmsintegration.ohip.OhipClient;
 import io.mateu.ecdemo1.pmsintegration.ohip.OperaCatalog;
+import io.mateu.ecdemo1.pmsintegration.ohip.OperaPackages;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class OperaCatalogTest {
     HttpServer ohip;
     final List<String> calls = new ArrayList<>();
     OperaCatalog catalog;
+    OhipClient client;
 
     @BeforeEach
     void start() throws Exception {
@@ -49,7 +51,7 @@ class OperaCatalogTest {
         ohip.start();
         var gateway = "http://localhost:" + ohip.getAddress().getPort();
         var connection = new OhipConnection("XMAR", gateway, "app", "id", "secret", "RIUE");
-        var client = new OhipClient(new Connections() {
+        client = new OhipClient(new Connections() {
             @Override
             public Optional<OhipConnection> of(String pmsHotelCode) {
                 return Optional.of(connection);
@@ -93,6 +95,13 @@ class OperaCatalogTest {
                      "hasMore":false,"totalResults":3,"offset":3,"limit":2,"totalPages":2},"masterInfoList":[]}
                     """;
         }
+        if (uri.startsWith("/rtp/v1/hotels/XMAR/ratePlans/EXP_BB?fetchInstructions=Packages")) {
+            return """
+                    {"ratePlans":[{"hotelId":"XMAR","ratePlanCode":"EXP_BB","ratePackages":{
+                      "packages":[{"code":"BRKFST","description":"BRKFST","quantity":1}],
+                      "packageGroups":[{"code":"PENSION","packages":[{"code":"BEV"},{"code":"FOOD"}]}]}}]}
+                    """;
+        }
         if (uri.startsWith("/rtp/v1/hotels/")) {
             // The hotel's own list: codes, no description — what the connector no longer relies on.
             return "{\"ratePlans\":[{\"hotelId\":\"XMAR\",\"ratePlanCode\":\"406484DIRXM\"}]}";
@@ -107,7 +116,9 @@ class OperaCatalogTest {
         if (uri.startsWith("/rtp/v1/packages")) {
             return """
                     {"packageCodesList":{"packageCodes":[{"packageCodeShortInfo":[
-                      {"code":"PENSTI","primaryDetails":{"description":"Pensión Todo Incluido"}}]}]}}
+                      {"code":"PENSTI","primaryDetails":{"description":"Pensión Todo Incluido"}},
+                      {"code":"BKF","primaryDetails":{"description":"Pensión Desayuno Adulto"},"postingAttributes":{"sellSeparate":false}},
+                      {"code":"BRKFST","primaryDetails":{"description":"BRKFST"},"postingAttributes":{"sellSeparate":true}}]}]}}
                     """;
         }
         if (uri.startsWith("/lov/v1/listOfValues/hotels/XMAR/paymentMethods")) {
@@ -147,5 +158,24 @@ class OperaCatalogTest {
                 tuple(CodeType.BOARD, "PENSTI", "Pensión Todo Incluido"),
                 tuple(CodeType.PAYMENT_METHOD, "MC", "Master Card"));
         assertThat(entries).extracting(CodeEntry::code).doesNotContain("PM");
+    }
+
+    @Test
+    void aPackageThePropertyDoesNotSellSeparatelyIsNoBoard() {
+        var boards = catalog.catalog("XMAR").stream().filter(e -> e.type() == CodeType.BOARD).map(CodeEntry::code).toList();
+
+        assertThat(boards).containsExactly("NONE", "PENSTI", "BRKFST");
+    }
+
+    @Test
+    void theRulesOfPackagesAreReadFromTheListAndFromTheRatePlanWithItsGroups() {
+        var packages = new OperaPackages(client, Clock.systemUTC());
+
+        assertThat(packages.soldSeparately("XMAR", "BKF")).isFalse();
+        assertThat(packages.soldSeparately("XMAR", "BRKFST")).isTrue();
+        assertThat(packages.soldSeparately("XMAR", "PENSTI")).isTrue();
+        assertThat(packages.includedIn("XMAR", "EXP_BB")).containsExactlyInAnyOrder("BRKFST", "BEV", "FOOD");
+        packages.soldSeparately("XMAR", "FOOD");
+        assertThat(calls).filteredOn(c -> c.startsWith("/rtp/v1/packages")).hasSize(1);
     }
 }

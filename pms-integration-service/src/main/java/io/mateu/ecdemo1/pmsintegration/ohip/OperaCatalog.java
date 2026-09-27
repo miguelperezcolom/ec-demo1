@@ -49,11 +49,16 @@ public class OperaCatalog {
         }
         entries.addAll(ratePlans(hotelId));
         entries.add(entry(CodeType.BOARD, hotelId, "NONE", "No package: room only"));
-        // hotelId, not hotelIds: a real tenant answers 400 «Hotel Code is required» to the latter.
+        // hotelId, not hotelIds: a real tenant answers 400 «Hotel Code is required» to the latter. A board
+        // is written as a package of its own, so one the property does not sell separately (XMAR's BKF,
+        // «Pensión Desayuno Adulto») is no board: it only reaches a reservation inside a rate plan, and
+        // Opera refuses it on its own (RSV10047). Left out, a mapping to it shows as not in the catalog.
         for (var group : ohip.get(hotelId, "/rtp/v1/packages?hotelId={h}&limit=200", hotelId).body()
                 .path("packageCodesList").path("packageCodes")) {
             for (var r : group.path("packageCodeShortInfo")) {
-                entries.add(entry(CodeType.BOARD, hotelId, r.path("code").asText(), text(r.path("primaryDetails").path("description"))));
+                if (r.path("postingAttributes").path("sellSeparate").asBoolean(true)) {
+                    entries.add(entry(CodeType.BOARD, hotelId, r.path("code").asText(), text(r.path("primaryDetails").path("description"))));
+                }
             }
         }
         for (var r : ohip.get(hotelId, "/rsv/config/v1/hotels/{h}/sourceCodes/", hotelId).body().path("sourceCodes")) {
