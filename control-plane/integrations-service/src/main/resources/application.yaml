@@ -17,13 +17,22 @@ spring:
 
   cloud:
     function:
-      definition: consumeTasks;consumePmsReservations
+      definition: consumeWorkerEvent;consumeLegacyTasks;consumePmsReservations
     stream:
       kafka:
         binder:
           brokers: ${KAFKA_BROKERS:localhost:9192}
           auto-create-topics: true
+          # Every consumer continues the trace its record carries (traceparent header), and every
+          # record sent carries the trace it was sent in: the engine's tasks run inside the process's
+          # trace.
+          enable-observation: true
         bindings:
+          # A group created at the end of the topic, not its beginning: it would otherwise run every
+          # task the topic ever held.
+          consumeLegacyTasks-in-0:
+            consumer:
+              start-offset: latest
           outboxUpstream:
             producer:
               sync: true
@@ -67,10 +76,21 @@ spring:
                 # The PMS's catalogue goes whole: some hundred KB with every room of a big property.
                 max.request.size: 5242880
       bindings:
-        # IN: the engine's tasks for the integrations — the steps of «alta-integracion».
-        consumeTasks-in-0:
+        # IN: the engine's tasks for the integrations — the steps of «alta-integracion» and
+        # «alta-integracion-fo». consumeWorkerEvent is the engine's worker runtime (worker-kafka): it
+        # runs each task by its contract, <id>@<version>, on the handler registered for it
+        # (worker.IntegrationsTasks), and answers the engine. The group is the one the hand-written
+        # consumer had, so it goes on from the same offsets.
+        consumeWorkerEvent-in-0:
           destination: integrations
           group: ec-demo1-integrations-worker
+        # IN: the same tasks, for the ones the engine dispatches with no contract — a process started
+        # on a version of its definition from before it named its tasks. It stamps the contract the
+        # step answers to and runs it through the same runtime; the rest it leaves to
+        # consumeWorkerEvent. Goes once no such process is left.
+        consumeLegacyTasks-in-0:
+          destination: integrations
+          group: ec-demo1-integrations-worker-legacy
         # OUT: replies to the engine; and, through the outbox, the start of an onboarding, the
         # messages that open its gates, and notifications.
         upstream:
@@ -161,6 +181,14 @@ springdoc:
   packages-to-scan: io.mateu.ecdemo1.integrations.rest
 
 management:
+  # Traces to Tempo, as the engine's. Sampled at 0 unless TRACING_SAMPLING says otherwise (1.0 in
+  # the cluster); the service name comes from OTEL_SERVICE_NAME, set in the manifest.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
   endpoints:
     web:
       exposure:

@@ -22,7 +22,7 @@ class CommandsTest {
         final List<ProjectReservation> projections = new ArrayList<>();
 
         RecordingOutbox() {
-            super(null, null, null);
+            super(null, null, null, null);
         }
 
         @Override
