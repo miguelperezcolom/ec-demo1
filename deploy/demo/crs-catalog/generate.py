@@ -58,6 +58,9 @@ ROOM_TYPES = [
 # with: direct sale, online agencies and tour operators — XMAR has no refundable/non-refundable pair
 # and no early booking, so the CRS has none for this hotel either. Only plans whose name no other plan
 # of XMAR shares: several share one (three are «RC FLEX XMU A26»), and a pair has to be clear.
+#
+# Two carry a board: EXP_BB and AGRO include the package BRKFST, so they are sold with DESAYUNO (the
+# demo's generator does) and the connector does not add the package again. The rest carry none.
 RATE_PLANS = [
     ("DIRECTA", "Venta directa 2026 (web y call center)", "1.00", "406484DIRXM"),
     ("FLEX-LOCAL", "Flexible Riu Class residentes locales 2026", "0.95", "40648544"),
@@ -71,11 +74,16 @@ RATE_PLANS = [
 
 # (CRS code, CRS name, supplement per adult and night, XMAR package). Of XMAR's 26 packages only these
 # are a board: the rest are charges (cot, extra bed, parking, tourist tax, late checkout), discounts
-# (D5, DISC_12, FACTOR), day passes, the child's breakfast (BKFCH, the same board for a child), an
-# upsell, the food/drink breakdown of the all-inclusive (GENDTI, DPC, DPB20) and a drinks add-on (BEV).
+# (D5, DISC_12, FACTOR), day passes, an upsell, the food/drink breakdown of the all-inclusive (GENDTI,
+# DPC, DPB20) and a drinks add-on (BEV). A board is written to Opera as a package of its own, so it has
+# to be one XMAR sells separately (postingAttributes.sellSeparate): its breakfast BKF «Pensión Desayuno
+# Adulto» (and BKFCH, the child's) is not — Opera refuses it alone with RSV10047, and it only comes inside
+# rate plans the CRS does not sell (395600IN27/28, 399243TUUKX) — so breakfast is BRKFST, which XMAR
+# sells separately and which EXP_BB and AGRO carry (read on OHIP UAT, 2026-09-27). The connector's
+# catalog leaves the packages not sold separately out.
 BOARDS = [
     ("SOLO-ALOJAMIENTO", "Solo alojamiento", "0", "NONE"),
-    ("DESAYUNO", "Alojamiento y desayuno", "18", "BKF"),
+    ("DESAYUNO", "Alojamiento y desayuno", "18", "BRKFST"),
     ("COMIDAS", "Pensión con comidas, sin bebidas", "55", "FOOD"),
     ("TODO-INCLUIDO", "Todo incluido", "95", "PENSTI"),
 ]

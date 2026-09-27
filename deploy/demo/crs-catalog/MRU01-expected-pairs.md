@@ -30,7 +30,7 @@ is the mapping's (the agent's) job; this is the answer to check it against.
 | Tarifa | `TUI-FR` | Contrato TUI Francia 2026 | `406451TUFXM` | TUI FRANCE XMU A26 |
 | Tarifa | `DMC-MAURICIO` | Contrato receptivo DMC Mauricio (EUR) 2026 | `406477DMCEU` | DMC MAURITIUS EUR XMU A26 |
 | Régimen | `SOLO-ALOJAMIENTO` | Solo alojamiento | `NONE` | No package: room only |
-| Régimen | `DESAYUNO` | Alojamiento y desayuno | `BKF` | Pensión Desayuno Adulto |
+| Régimen | `DESAYUNO` | Alojamiento y desayuno | `BRKFST` | BRKFST |
 | Régimen | `COMIDAS` | Pensión con comidas, sin bebidas | `FOOD` | Pensión Comida |
 | Régimen | `TODO-INCLUIDO` | Todo incluido | `PENSTI` | Pensión Todo Incluido |
 | Canal | `WEB` | Web del hotel | `HWEB` | Hotel Website · mercado BAR «Best Available Rate» |

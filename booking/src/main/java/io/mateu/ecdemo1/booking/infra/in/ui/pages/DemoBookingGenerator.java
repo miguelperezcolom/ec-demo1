@@ -51,8 +51,13 @@ final class DemoBookingGenerator {
     /** Its call center's bookings carry no reference of their own: a web or a partner booking does. */
     static final String CALL_CENTER = "CALLCENTER";
 
-    /** A rate plan sold with its board — Expedia's is with breakfast. */
-    static final java.util.Map<String, String> BOARD_OF_RATE = java.util.Map.of("EXPEDIA-AD", "DESAYUNO");
+    /**
+     * A rate plan sold with its board: in XMAR, EXP_BB (Expedia's) and AGRO carry the breakfast package,
+     * so they are sold with breakfast and never as room only — the connector then writes no package of
+     * its own. Every other plan carries none, and takes any board (deploy/demo/crs-catalog/generate.py).
+     */
+    static final java.util.Map<String, String> BOARD_OF_RATE = java.util.Map.of("EXPEDIA-AD", "DESAYUNO",
+            "AGRO-MAYOR", "DESAYUNO");
 
     /** Accounts for flight delays and staff travel sell nothing: never a demo booking's partner. */
     static final Pattern NOT_A_SELLER = Pattern.compile("(?i)retraso|delay|staff|crew");
