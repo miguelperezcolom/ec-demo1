@@ -34,9 +34,14 @@ public class Pending {
      */
     public List<PendingCode> pendingCodes(String hotelCode) {
         var proposed = entries.findByStatusOrderByCreatedAtDesc(EntryStatus.PROPOSED);
-        return clients.crsCatalog().stream()
+        var catalog = clients.crsCatalog();
+        // A hotel with codes of its own of a type (MRU01's rate plans, boards…) emits those, never the
+        // chain's of that type: the chain's are not its to map.
+        var own = catalog.stream().filter(e -> hotelCode.equals(e.hotelCode())).map(CodeEntry::type)
+                .collect(java.util.stream.Collectors.toSet());
+        return catalog.stream()
                 .filter(e -> e.type() != CodeType.HOTEL || e.code().equals(hotelCode))
-                .filter(e -> e.hotelCode() == null || e.hotelCode().equals(hotelCode))
+                .filter(e -> e.hotelCode() == null ? !own.contains(e.type()) : e.hotelCode().equals(hotelCode))
                 .filter(e -> dictionary.resolve(hotelCode, e.type(), e.code()).isEmpty())
                 .map(e -> new PendingCode(e.type(), e.code(), e.description(),
                         proposed.stream().anyMatch(p -> matches(p, e, hotelCode))))

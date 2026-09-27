@@ -6,7 +6,12 @@ import java.util.List;
 public record CatalogView(List<Hotel> hotels, List<Code> ratePlans, List<Code> boards, List<Code> channels,
                           List<Code> cancellationReasons, List<Code> paymentMethods) {
 
-    public record Hotel(String code, String name, List<Code> roomTypes) {
+    /** {@code codes}: the hotel's own rate plans, boards, channels, reasons and methods; null, the chain's. */
+    public record Hotel(String code, String name, List<Code> roomTypes, Codes codes) {
+    }
+
+    public record Codes(List<Code> ratePlans, List<Code> boards, List<Code> channels,
+                        List<Code> cancellationReasons, List<Code> paymentMethods) {
     }
 
     public record Code(String code, String name) {

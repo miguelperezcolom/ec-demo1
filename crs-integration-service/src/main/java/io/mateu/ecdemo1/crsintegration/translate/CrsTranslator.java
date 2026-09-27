@@ -90,7 +90,9 @@ public final class CrsTranslator {
 
     /**
      * The CRS's catalog as the mapping pairs it. Room types belong to a hotel; everything else is
-     * chain-wide. Partner types are the integration's own and have no catalog in the CRS.
+     * chain-wide, except for a hotel with codes of its own (MRU01, imported from its Opera property's):
+     * those carry the hotel, and stand for it in place of the chain's. Partner types are the
+     * integration's own and have no catalog in the CRS.
      */
     public static List<CodeEntry> catalog(CatalogView c) {
         var entries = new ArrayList<CodeEntry>();
@@ -98,14 +100,24 @@ public final class CrsTranslator {
             entries.add(new CodeEntry(CodeType.HOTEL, null, hotel.code(), hotel.name()));
             hotel.roomTypes().forEach(r -> entries.add(new CodeEntry(CodeType.ROOM_TYPE, hotel.code(), r.code(), r.name())));
         }
-        c.ratePlans().forEach(x -> entries.add(new CodeEntry(CodeType.RATE_PLAN, null, x.code(), x.name())));
-        c.boards().forEach(x -> entries.add(new CodeEntry(CodeType.BOARD, null, x.code(), x.name())));
-        c.channels().forEach(x -> entries.add(new CodeEntry(CodeType.CHANNEL, null, x.code(), x.name())));
-        c.cancellationReasons().forEach(x -> entries.add(new CodeEntry(CodeType.CANCELLATION_REASON, null, x.code(), x.name())));
-        c.paymentMethods().forEach(x -> entries.add(new CodeEntry(CodeType.PAYMENT_METHOD, null, x.code(), x.name())));
+        codes(entries, null, new CatalogView.Codes(c.ratePlans(), c.boards(), c.channels(), c.cancellationReasons(),
+                c.paymentMethods()));
+        for (var hotel : c.hotels()) {
+            if (hotel.codes() != null) {
+                codes(entries, hotel.code(), hotel.codes());
+            }
+        }
         for (var type : PartnerType.values()) {
             entries.add(new CodeEntry(CodeType.PARTNER_TYPE, null, type.name(), type.name().replace('_', ' ').toLowerCase()));
         }
         return entries;
+    }
+
+    static void codes(List<CodeEntry> entries, String hotelCode, CatalogView.Codes c) {
+        c.ratePlans().forEach(x -> entries.add(new CodeEntry(CodeType.RATE_PLAN, hotelCode, x.code(), x.name())));
+        c.boards().forEach(x -> entries.add(new CodeEntry(CodeType.BOARD, hotelCode, x.code(), x.name())));
+        c.channels().forEach(x -> entries.add(new CodeEntry(CodeType.CHANNEL, hotelCode, x.code(), x.name())));
+        c.cancellationReasons().forEach(x -> entries.add(new CodeEntry(CodeType.CANCELLATION_REASON, hotelCode, x.code(), x.name())));
+        c.paymentMethods().forEach(x -> entries.add(new CodeEntry(CodeType.PAYMENT_METHOD, hotelCode, x.code(), x.name())));
     }
 }
