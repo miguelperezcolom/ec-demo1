@@ -20,6 +20,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -166,10 +167,16 @@ public class Inbox {
 
     /** The ids of the items this person has seen. */
     public Set<String> seenBy(String username) {
+        return seenAtBy(username).keySet();
+    }
+
+    /** When this person saw each item they have seen, by item id. */
+    public Map<String, Instant> seenAtBy(String username) {
         if (username == null || username.isBlank()) {
-            return Set.of();
+            return Map.of();
         }
-        return seen.findByUsername(username).stream().map(s -> s.itemId).collect(Collectors.toSet());
+        return seen.findByUsername(username).stream()
+                .collect(Collectors.toMap(s -> s.itemId, s -> s.seenAt == null ? Instant.EPOCH : s.seenAt, (a, b) -> a));
     }
 
     public static boolean visibleTo(InboxItem item, Collection<String> roles, String username) {
