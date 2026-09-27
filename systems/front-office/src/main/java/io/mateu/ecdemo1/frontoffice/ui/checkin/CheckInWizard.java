@@ -45,6 +45,8 @@ import reactor.core.publisher.Mono;
 @Title("Check-In")
 @Style(StyleConstants.CONTAINER)
 @WizardProgress(WizardProgressStyle.STEPS)
+// the screens are written in Spanish; without this the wizard's own buttons read Back / Next
+@WizardLabels(back = "Atrás", next = "Siguiente")
 // a scan changes the registroPax colors (per-pax green + band theme) — re-render the step
 @SubscribeTo(event = "documento-escaneado", action = "refrescarIdentidad")
 // the tablet-signature and pre-authorization SSE fluxes end by dispatching these events: a
