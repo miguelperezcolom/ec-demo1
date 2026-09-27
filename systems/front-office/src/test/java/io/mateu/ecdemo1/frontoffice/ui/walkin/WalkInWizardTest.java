@@ -70,12 +70,11 @@ class WalkInWizardTest {
   }
 
   @Autowired ObjectProvider<WalkInWizard> wizards;
-  @Autowired ObjectProvider<EstanciaWalkIn> estancias;
   @Autowired StayRepository stays;
 
   WalkInWizard wizard() {
     var wizard = wizards.getObject();
-    wizard.estancia = estancias.getObject();
+    wizard.estancia = new EstanciaWalkIn();
     wizard.estancia.setLlegada(LocalDate.now());
     wizard.estancia.setSalida(LocalDate.now().plusDays(2));
     wizard.estancia.setHabitacion("STD-KING");

@@ -14,7 +14,7 @@ import lombok.Setter;
 
 /**
  * Paso 2 del walk-in — el precio del CRS, pedido al entrar en el paso: las noches, el precio por
- * noche y el total. Si el CRS no la vende así, lo dice, y «Back» vuelve a la estancia para cambiarla.
+ * noche y el total. Si el CRS no la vende así, lo dice, y se vuelve al paso Estancia para cambiarla.
  */
 @Getter
 @Setter
@@ -33,7 +33,7 @@ public class PrecioWalkIn implements WizardStep {
       ? Notice.builder().theme("info").slim(true).fullWidth(true)
           .text("Precio del CRS para esta estancia: es el que se le cobra al huésped.").build()
       : Notice.builder().theme("danger").fullWidth(true)
-          .text("El CRS no da precio: " + errorCrs + " Vuelve atrás («Back») y cambia la estancia.").build();
+          .text("El CRS no da precio: " + errorCrs + " Vuelve al paso «Estancia» y cámbiala.").build();
 
   @Section(value = "Precio del CRS", propertyList = true)
   @ReadOnly

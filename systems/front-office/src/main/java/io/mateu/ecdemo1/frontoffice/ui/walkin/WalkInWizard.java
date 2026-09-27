@@ -28,8 +28,9 @@ import org.springframework.stereotype.Service;
  * walk-in» abre la estancia aquí mismo — para hacer el check-in ya — y pide al CRS la reserva a ese
  * precio, que baja después a Opera y vuelve a esta estancia (el caso de uso {@link WalkInService}).
  *
- * <p>Un bean prototipo, como su primer paso: Mateu los toma de Spring y los hidrata en cada petición.
- * El estado del asistente es un mapa plano: los campos de los pasos no repiten nombre.
+ * <p>Un bean prototipo: Mateu lo toma de Spring y lo hidrata en cada petición. Sus pasos no — Mateu
+ * los re-crea desde el estado, con {@code new} —; el primero pide el catálogo del CRS al proveedor de
+ * beans de Mateu. El estado del asistente es un mapa plano: los campos de los pasos no repiten nombre.
  */
 @Service
 @Scope("prototype")
@@ -39,16 +40,16 @@ import org.springframework.stereotype.Service;
 public class WalkInWizard extends Wizard {
 
   @Label("Estancia")
-  EstanciaWalkIn estancia;
+  EstanciaWalkIn estancia = new EstanciaWalkIn();
 
   @Label("Precio del CRS")
-  PrecioWalkIn precio;
+  PrecioWalkIn precio = new PrecioWalkIn();
 
   @Label("Titular")
-  TitularWalkIn titular;
+  TitularWalkIn titular = new TitularWalkIn();
 
   @Label("Confirmar")
-  ConfirmarWalkIn confirmar;
+  ConfirmarWalkIn confirmar = new ConfirmarWalkIn();
 
   @Label("Walk-in abierto")
   AbiertaWalkIn abierta;
@@ -84,7 +85,7 @@ public class WalkInWizard extends Wizard {
     return switch (paso) {
       case "estancia" -> estancia == null ? null : estancia.problema();
       case "precio" -> precio != null && precio.cotizado() && vigente() ? null
-          : "Sin precio del CRS no se puede seguir: vuelve atrás y cambia la estancia.";
+          : "Sin precio del CRS no se puede seguir: vuelve al paso «Estancia» y cámbiala.";
       case "titular" -> {
         if (titular == null) {
           yield "Falta del titular: nombre, apellidos, documento.";
