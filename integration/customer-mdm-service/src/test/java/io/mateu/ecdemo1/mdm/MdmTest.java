@@ -120,6 +120,10 @@ class MdmTest {
                 var id = soql.replaceAll(".*WHERE Id = '([^']+)'.*", "$1");
                 var record = contacts.get(id);
                 body = "{\"done\":true,\"records\":[" + (record == null ? "" : record) + "]}";
+            } else if (path.startsWith("/services/Soap/u/")) {
+                body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" "
+                        + "xmlns=\"urn:partner.soap.sforce.com\"><soapenv:Body><mergeResponse><result><id>x</id><success>true</success>"
+                        + "</result></mergeResponse></soapenv:Body></soapenv:Envelope>";
             } else if (path.equals("/projections")) {
                 body = "";
             } else {
@@ -171,6 +175,186 @@ class MdmTest {
     io.mateu.ecdemo1.mdm.outbox.OutboxMessageRepository outboxMessages;
     @Autowired
     io.mateu.ecdemo1.mdm.change.SalesforceInbox salesforceInbox;
+    @Autowired
+    io.mateu.ecdemo1.mdm.commands.CustomerCommands customerCommands;
+    @Autowired
+    io.mateu.ecdemo1.mdm.scan.SalesforceMerges salesforceMerges;
+    @Autowired
+    io.mateu.ecdemo1.mdm.store.ChangeRequestRepository changeRequestRecords;
+
+    static io.mateu.ecdemo1.integration.model.command.CustomerCommand.RecordScannedIdentity scan(String locator, int pax,
+            String customerId, String first, String last, String documentNumber, java.time.LocalDate birthDate) {
+        return new io.mateu.ecdemo1.integration.model.command.CustomerCommand.RecordScannedIdentity(
+                java.util.UUID.randomUUID().toString(), "PMI01", locator, locator, pax, customerId, first, last, "DNI",
+                documentNumber, birthDate, "ES", "front office PMI01");
+    }
+
+    List<io.mateu.ecdemo1.mdm.store.ChangeRequest> requestsOf(String customerId) {
+        return changeRequestRecords.findByCustomerIdOrderByRequestedAtDesc(customerId);
+    }
+
+    @Test
+    void aScannedDocumentFillsWhatTheCustomerLacksAndGoesToSalesforceWithoutACase() throws Exception {
+        var ana = resolve("S1", person("Ana", "Ruiz", "ana.ruiz@example.com", null, null)).get(0).customerId();
+        projection.projectPending();
+        outboxMessages.deleteAll();
+        calls.clear();
+
+        customerCommands.handle(scan("S1", 1, ana, "Ana", "Ruiz", "12345678Z", java.time.LocalDate.of(1984, 3, 2)));
+
+        var customer = customers.findById(ana).orElseThrow();
+        assertThat(customer.documentNumber).isEqualTo("12345678Z");
+        assertThat(customer.documentType).isEqualTo("DNI");
+        assertThat(customer.birthDate).isEqualTo(java.time.LocalDate.of(1984, 3, 2));
+        assertThat(customer.salesforceState).isEqualTo(SalesforceState.PENDING);
+        assertThat(requestsOf(ana)).isEmpty();
+        // The hotels learn it as any change of the golden record.
+        assertThat(changes(ana)).singleElement().satisfies(e -> {
+            assertThat(e.dataChanged()).isTrue();
+            assertThat(e.data().documentNumber()).isEqualTo("12345678Z");
+        });
+
+        // To Salesforce as the contact's own fields: no Case.
+        projection.projectPending();
+        changeRequests.send();
+        assertThat(calls).filteredOn(c -> c.startsWith("PATCH")).singleElement().asString()
+                .contains("\"Document_Type__c\":\"DNI\"", "\"Document_Number__c\":\"12345678Z\"", "\"Birthdate\":\"1984-03-02\"",
+                        "\"Nationality__c\":\"ES\"");
+        assertThat(calls).noneMatch(c -> c.contains("/Case/"));
+
+        // Scanned again: nothing new.
+        customerCommands.handle(scan("S1", 1, ana, "Ana", "Ruiz", "12345678Z", java.time.LocalDate.of(1984, 3, 2)));
+        assertThat(changes(ana)).hasSize(1);
+    }
+
+    @Test
+    void aCompanionIsFoundAmongTheReservationsPassengersAndOneTheReservationDidNotListBecomesACustomer() throws Exception {
+        var ids = resolve("S2", person("Eva", "Mas", "eva@example.com", null, null), person("Eva", "Mas", null, null, null),
+                person("Pau", "Mas", null, null, null));
+        var pau = ids.get(2).customerId();
+
+        var found = customerCommands.handle(scan("S2", 2, null, "Pau", "Mas", "87654321X", java.time.LocalDate.of(2015, 6, 1)));
+        assertThat(found).isTrue();
+        assertThat(customers.findById(pau).orElseThrow().documentNumber).isEqualTo("87654321X");
+
+        // Pax 3, whom the reservation did not name: a customer of its own, found again when scanned again.
+        customerCommands.handle(scan("S2", 3, null, "Iu", "Mas", "11111111H", null));
+        var iu = customers.findByDocumentKeyAndStatusIn("DNI:11111111H", java.util.EnumSet.of(CustomerStatus.PROVISIONAL)).get(0);
+        assertThat(iu.fullName()).isEqualTo("Iu Mas");
+        assertThat(iu.salesforceState).isEqualTo(SalesforceState.PENDING);
+        customerCommands.handle(scan("S2", 3, null, "Iu", "Mas", "11111111H", null));
+        assertThat(customers.findByDocumentKeyAndStatusIn("DNI:11111111H", java.util.EnumSet.of(CustomerStatus.PROVISIONAL))).hasSize(1);
+    }
+
+    @Test
+    void whatTheDocumentContradictsIsProposedToSalesforceOnce() throws Exception {
+        var born = java.time.LocalDate.of(1970, 1, 1);
+        var leo = resolve("S3", new Person("Leo", "Vidal", GuestType.ADULT, null, "leo.vidal@example.com", null, "ES", born,
+                null, null)).get(0).customerId();
+        projection.projectPending();
+
+        customerCommands.handle(scan("S3", 1, leo, "Leo", "Vidal", "22222222J", java.time.LocalDate.of(1975, 5, 5)));
+
+        var customer = customers.findById(leo).orElseThrow();
+        // The document it lacked is filled; the birth date it has is not overwritten, but proposed.
+        assertThat(customer.documentNumber).isEqualTo("22222222J");
+        assertThat(customer.birthDate).isEqualTo(born);
+        assertThat(requestsOf(leo)).singleElement().satisfies(r -> {
+            assertThat(r.status).isEqualTo("PENDING");
+            assertThat(r.changes).isEqualTo("fecha de nacimiento 1970-01-01 → 1975-05-05");
+            assertThat(r.origin).contains("documento escaneado");
+        });
+        changeRequests.send();
+        assertThat(cases).hasSize(1);
+
+        // Scanned again: the same proposal is still waiting — not a second Case.
+        customerCommands.handle(scan("S3", 1, leo, "Leo", "Vidal", "22222222J", java.time.LocalDate.of(1975, 5, 5)));
+        assertThat(requestsOf(leo)).hasSize(1);
+    }
+
+    @Test
+    void aDocumentThatIsAnotherCustomersConsolidatesThePaxIntoItAndMergesTheirContacts() throws Exception {
+        var holder = resolve("S4", person("Marta", "Soler", "marta@example.com", "DNI", "33333333P")).get(0).customerId();
+        // She comes back with another email: nothing certain, so a provisional customer — a duplicate.
+        var provisional = resolve("S5", person("Marta", "Soler", "marta.soler@work.example.com", null, null)).get(0).customerId();
+        assertThat(provisional).isNotEqualTo(holder);
+        projection.projectPending();
+        var holderContact = contactByMdmId.get(holder);
+        var provisionalContact = contactByMdmId.get(provisional);
+        outboxMessages.deleteAll();
+
+        // At the desk, her document: the one the MDM already knows her by.
+        var outcome = customerCommands.handle(scan("S5", 1, provisional, "Marta", "Soler", "33.333.333-P", java.time.LocalDate.of(1990, 2, 3)));
+        assertThat(outcome).isTrue();
+
+        var absorbed = customers.findById(provisional).orElseThrow();
+        var survivor = customers.findById(holder).orElseThrow();
+        assertThat(absorbed.status).isEqualTo(CustomerStatus.MERGED);
+        assertThat(absorbed.aliasOf).isEqualTo(holder);
+        assertThat(survivor.status).isEqualTo(CustomerStatus.CONSOLIDATED);
+        assertThat(survivor.birthDate).isEqualTo(java.time.LocalDate.of(1990, 2, 3));
+        assertThat(sources.findById(io.mateu.ecdemo1.mdm.store.Source.key("PMI01", "S5", 0)).orElseThrow().customerId).isEqualTo(holder);
+        assertThat(events(holder)).filteredOn(CustomersMerged.class::isInstance).singleElement()
+                .satisfies(e -> assertThat(((CustomersMerged) e).reservations()).contains("PMI01/S4", "PMI01/S5"));
+        var consolidation = consolidationRecords.findById(provisional).orElseThrow();
+        assertThat(consolidation.via).isEqualTo("SCAN");
+        assertThat(consolidation.salesforceMerge).isEqualTo("PENDING");
+        assertThat(requestsOf(holder)).isEmpty();
+
+        // In Salesforce too: the provisional's contact merged into hers, by the SOAP API's merge().
+        calls.clear();
+        salesforceMerges.mergePending();
+        assertThat(calls).filteredOn(c -> c.startsWith("POST /services/Soap/u/67.0")).singleElement().asString()
+                .contains("<sobj:Id>" + holderContact + "</sobj:Id>", "<urn:recordToMergeIds>" + provisionalContact + "</urn:recordToMergeIds>");
+        assertThat(consolidationRecords.findById(provisional).orElseThrow().salesforceMerge).isEqualTo("DONE");
+
+        // Salesforce announces that merge like any other: found applied, nothing more.
+        calls.clear();
+        consolidations.received(provisional, provisionalContact, "EVENT");
+        assertThat(calls).isEmpty();
+        salesforceMerges.mergePending();
+        assertThat(calls).isEmpty();
+    }
+
+    @Test
+    void aDocumentThatIsAnotherCustomersUnderAnotherNameIsDoubtAndIsNotMerged() throws Exception {
+        var holder = resolve("S6", person("Joan", "Pujol", "joan@example.com", "DNI", "44444444A")).get(0).customerId();
+        var pax = resolve("S7", person("Pere", "Pujol", "pere@example.com", null, null)).get(0).customerId();
+
+        customerCommands.handle(scan("S7", 1, pax, "Pere", "Pujol", "44444444A", null));
+
+        assertThat(customers.findById(pax).orElseThrow().status).isEqualTo(CustomerStatus.PROVISIONAL);
+        assertThat(customers.findById(pax).orElseThrow().documentNumber).isNull();
+        assertThat(customers.findById(holder).orElseThrow().status).isEqualTo(CustomerStatus.PROVISIONAL);
+        assertThat(requestsOf(pax)).singleElement().satisfies(r -> {
+            assertThat(r.documentNumber).isEqualTo("44444444A");
+            assertThat(r.origin).contains("ya es de " + holder);
+        });
+    }
+
+    @Test
+    void theDesksChangeIsTakenOnceByItsOwnIdAndOneThatChangesNothingIsApprovedToTheDesk() throws Exception {
+        var eva = resolve("S8", person("Eva", "Serra", "eva.serra@example.com", null, null)).get(0).customerId();
+        outboxMessages.deleteAll();
+        var change = new io.mateu.ecdemo1.integration.model.command.CustomerCommand.ProposeChange("CR-FO-TEST1", eva,
+                "Eva Serra", "eva.serra@example.com", "+34 600 111 222", null, "front office MRU01");
+
+        assertThat(customerCommands.handle(change)).isTrue();
+        assertThat(customerCommands.handle(change)).isFalse();
+        // Even past the inbox — the same id is the same request.
+        changeRequests.submit(eva, new io.mateu.ecdemo1.mdm.change.ChangeRequests.Proposal(null, null, "Eva Serra", null,
+                "+34 600 111 222", null, null, null, null, "front office MRU01"), "CR-FO-TEST1");
+        assertThat(requestsOf(eva)).singleElement().satisfies(r -> {
+            assertThat(r.id).isEqualTo("CR-FO-TEST1");
+            assertThat(r.status).isEqualTo("PENDING");
+        });
+
+        var nothing = new io.mateu.ecdemo1.integration.model.command.CustomerCommand.ProposeChange("CR-FO-TEST2", eva,
+                "Eva Serra", "eva.serra@example.com", null, null, "front office MRU01");
+        customerCommands.handle(nothing);
+        assertThat(changeRequests.get("CR-FO-TEST2").status).isEqualTo("APPROVED");
+        assertThat(changes(eva)).anyMatch(e -> "CR-FO-TEST2".equals(e.changeRequestId()) && "APPROVED".equals(e.decision()));
+    }
 
     @Test
     void anApprovalArrivingTwiceAtOnceIsProjectedOnce() throws Exception {

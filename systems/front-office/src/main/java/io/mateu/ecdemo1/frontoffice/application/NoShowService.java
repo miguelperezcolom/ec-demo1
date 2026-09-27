@@ -12,8 +12,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The desk marks a pax as not arrived — or takes the mark back. When nobody of an arriving
- * reservation came, it is a no-show of the reservation, and that is the CRS's to decide (HLA F006): it
- * is told once the mark is saved, never from inside the transaction.
+ * reservation came, it is a no-show of the reservation, and that is the CRS's to decide (HLA F006): the
+ * report goes into the outbox in the mark's own transaction, and reaches the CRS by Kafka.
  */
 @Service
 public class NoShowService {
@@ -39,12 +39,12 @@ public class NoShowService {
   }
 
   public Outcome paxToggled(String stayId, int pax) {
-    var marked = transaction.execute(status -> {
+    return transaction.execute(status -> {
       var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
       var ops = checkInOps.save(stayId, checkInOps.of(stayId).toggleNoShow(pax));
-      return new Outcome(ops.isNoShow(pax),
-          stay.status() == StayStatus.ARRIVING && CheckInChecklist.nobodyArrived(stay, ops), null);
+      var nobodyArrived = stay.status() == StayStatus.ARRIVING && CheckInChecklist.nobodyArrived(stay, ops);
+      // The report leaves with the mark: both saved, or neither.
+      return new Outcome(ops.isNoShow(pax), nobodyArrived, nobodyArrived ? crs.report(stayId) : null);
     });
-    return marked.nobodyArrived() ? new Outcome(true, true, crs.report(stayId)) : marked;
   }
 }

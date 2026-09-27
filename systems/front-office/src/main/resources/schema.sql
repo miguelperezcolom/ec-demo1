@@ -186,3 +186,16 @@ create table if not exists audit_outbox (
     created_at   timestamp     not null,
     published_at timestamp
 );
+
+-- What the front office asks of other services — a change to a customer, a scanned document for the
+-- MDM, a no-show for the CRS — written in the same transaction as the desk's decision and relayed to
+-- its Kafka topic by CommandRelay: the desk never waits for the other service, and nothing is lost if
+-- the broker is down.
+create table if not exists command_outbox (
+    message_id   varchar(64)   primary key,
+    topic        varchar(64)   not null,
+    message_key  varchar(200),
+    payload      varchar(8000) not null,
+    created_at   timestamp     not null,
+    published_at timestamp
+);

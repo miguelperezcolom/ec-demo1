@@ -16,6 +16,7 @@ import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
 import io.mateu.ecdemo1.frontoffice.infra.crs.WalkInDesk;
+import io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -42,6 +43,7 @@ class FrontDeskUseCasesTest {
   @Autowired FolioRepository folios;
   @Autowired CheckInOpsRepository ops;
   @Autowired WalkIns walkInStore;
+  @Autowired CommandOutbox outbox;
 
   @Test
   void aCheckInMovesTheStayInOccupiesTheRoomOpensTheFolioAndClosesTheExtras() {
@@ -139,12 +141,46 @@ class FrontDeskUseCasesTest {
 
     var all = noShows.paxToggled(a.stayId(), 2);
     assertThat(all.nobodyArrived()).isTrue();
-    // this front office is not connected to the CRS in the test
-    assertThat(all.crsNotice()).contains("no está conectado al CRS");
+    assertThat(all.crsNotice()).contains("Se comunica al CRS");
+    // The report is a command for the CRS adapter, in the outbox with the mark.
+    assertThat(outbox.all(CommandOutbox.NO_SHOW_REPORTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
+        .singleElement().satisfies(e -> assertThat(e.payload())
+            .contains("\"hotelCode\":\"MRU01\"", "\"locator\":\"" + a.stayId() + "\"", "\"commandId\":\"" + e.messageId() + "\""));
 
     var back = noShows.paxToggled(a.stayId(), 1);
     assertThat(back.noShow()).isFalse();
     assertThat(ops.of(a.stayId()).noShowPax()).containsExactly(2);
+  }
+
+  @Test
+  void aScanOfTheHolderAndOfACompanionSendsTheirDocumentsToTheMdm() {
+    var a = Fixtures.arrival(guests, stays, rooms, 2);
+
+    var holder = kardex.scanned(a.stayId(), 1);
+    var companion = kardex.scanned(a.stayId(), 2);
+
+    // The holder's document is the one the stay has; the companion's, made up — and seen.
+    assertThat(holder.documentNumber()).isEqualTo(guests.findById(a.guestId()).orElseThrow().document());
+    assertThat(guests.findById(a.guestId()).orElseThrow().identityComplete()).isTrue();
+    var registered = stays.findById(a.stayId()).orElseThrow().companionAt(2);
+    assertThat(registered.identityComplete()).isTrue();
+    assertThat(registered.document()).isEqualTo(companion.documentNumber());
+    assertThat(companion.birthDate()).isNotNull();
+    assertThat(companion.nationality()).isNotBlank();
+
+    // Both to the MDM as commands: the holder by its customer, the companion by the reservation and its pax.
+    var commands = outbox.all(CommandOutbox.CUSTOMER_COMMANDS).stream()
+        .filter(e -> e.payload().contains("\"stayId\":\"" + a.stayId() + "\"")).toList();
+    assertThat(commands).hasSize(2);
+    assertThat(commands.get(0).key()).isEqualTo(a.guestId());
+    assertThat(commands.get(0).payload()).contains("\"type\":\"record-scanned-identity\"", "\"pax\":1",
+        "\"customerId\":\"" + a.guestId() + "\"", "\"documentNumber\":\"" + holder.documentNumber() + "\"");
+    assertThat(commands.get(1).key()).isEqualTo("MRU01/" + a.stayId());
+    assertThat(commands.get(1).payload()).contains("\"pax\":2", "\"customerId\":null", "\"locator\":\"" + a.stayId() + "\"",
+        "\"documentNumber\":\"" + companion.documentNumber() + "\"", "\"birthDate\":\"" + companion.birthDate() + "\"");
+
+    // Scanned again: the same document.
+    assertThat(kardex.scanned(a.stayId(), 2)).isEqualTo(companion);
   }
 
   @Test

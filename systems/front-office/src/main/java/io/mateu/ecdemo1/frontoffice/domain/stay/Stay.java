@@ -177,26 +177,15 @@ public record Stay(
   }
 
   /**
-   * The desk's demo scanner read the document of companion {@code paxNumber}: the identity is seen —
-   * with a made-up {@code ESC-…} document if none was known — and a contact filled where there was none.
+   * The desk's scanner read the document of companion {@code paxNumber}: the identity is seen, with the
+   * document it read. A document carries no contact: that stays as it was.
    */
-  public Stay scanCompanion(int paxNumber) {
+  public Stay scanCompanion(int paxNumber, String document) {
     var companion = companionAt(paxNumber);
     if (companion == null) {
       companion = Companion.pending(paxNumber);
     }
-    if (!companion.identityComplete()) {
-      var document = companion.document() == null || companion.document().isBlank()
-          ? "ESC-" + id.toUpperCase() + "-P" + paxNumber
-          : companion.document();
-      companion = companion.verifyIdentity(document);
-    }
-    if (companion.email() == null || companion.email().isBlank()) {
-      companion = companion.updateContact(
-          companion.name().toLowerCase().replace(' ', '.').replace("é", "e") + "@email.com",
-          companion.phone() == null || companion.phone().isBlank() ? "+00 000 000 000" : companion.phone());
-    }
-    return registerCompanion(paxNumber, companion);
+    return registerCompanion(paxNumber, companion.verifyIdentity(document));
   }
 
   /**

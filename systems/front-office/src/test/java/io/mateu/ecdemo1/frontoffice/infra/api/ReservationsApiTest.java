@@ -56,6 +56,20 @@ class ReservationsApiTest {
   }
 
   @Test
+  void whenTheChainNamesAnotherCustomerForTheGuestTheIdentityTheDeskSawGoesOn() throws Exception {
+    mvc.perform(put("/api/reservations/RES5").contentType(MediaType.APPLICATION_JSON)
+        .content(reservation("Doble", "2026-11-13").replace("C-ANA", "C-PROV"))).andExpect(status().isOk());
+    guests.save(guests.findById("C-PROV").orElseThrow().scanned("12345678Z"));
+
+    // The scanned document was another customer's: the MDM consolidated them, and the reservation comes
+    // back with the survivor.
+    mvc.perform(put("/api/reservations/RES5").contentType(MediaType.APPLICATION_JSON)
+        .content(reservation("Doble", "2026-11-13").replace("C-ANA", "C-SURV").replace("\"document\":null", "\"document\":\"12345678Z\"")))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.guestId").value("C-SURV"));
+    assertThat(guests.findById("C-SURV").orElseThrow().identityComplete()).isTrue();
+  }
+
+  @Test
   void aChangeFromTheCrsDoesNotUndoWhatTheDeskDid() throws Exception {
     mvc.perform(put("/api/reservations/RES2").contentType(MediaType.APPLICATION_JSON)
         .content(reservation("Suite Junior Standard Balcón", "2026-11-13"))).andExpect(status().isOk());

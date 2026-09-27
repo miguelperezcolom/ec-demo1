@@ -33,7 +33,7 @@ public record Guest(
 
   /**
    * Whether a document is one the desk made up to mark the identity as seen — a scan simulated
-   * ({@code ESC-…}) or a registration by hand without one ({@code MAN-…}) — and not the guest's.
+   * ({@code ESC-…}, before the scanner read documents) or a registration by hand without one ({@code MAN-…}) — and not the guest's.
    */
   public static boolean placeholderDocument(String document) {
     return document != null && (document.startsWith("MAN-") || document.startsWith("ESC-"));
@@ -123,20 +123,11 @@ public record Guest(
   }
 
   /**
-   * The desk's demo scanner read the guest's document: the identity is seen — with a made-up
-   * {@code ESC-…} document if none was known — and a contact filled where there was none.
+   * The desk's scanner read the guest's document: the identity is seen, with the document it read.
+   * A document carries no email or phone: the contact stays as it was.
    */
-  public Guest scanned() {
-    var guest = this;
-    if (!guest.identityComplete()) {
-      guest = guest.verifyIdentity(document == null || document.isBlank() ? "ESC-" + id.toUpperCase() : document);
-    }
-    if (guest.email() == null || guest.email().isBlank()) {
-      guest = guest.updateContact(
-          name.toLowerCase().replace(' ', '.').replace("í", "i").replace("é", "e") + "@email.com",
-          phone == null || phone.isBlank() ? "+00 000 000 000" : phone);
-    }
-    return guest;
+  public Guest scanned(String document) {
+    return verifyIdentity(document);
   }
 
   /**

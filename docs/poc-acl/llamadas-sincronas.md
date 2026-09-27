@@ -20,9 +20,12 @@ el otro sistema la ha aplicado.
 | `partner-commands` | integrations-service, crs-integration-service | erp (`consumePartnerCommands`, grupo `ec-demo1-erp-partner-commands`) | `resync-partner` (sincronizar interlocutores del alta), `import-partner` (importación desde Opera: crea o actualiza conservando lo que solo sabe el ERP, y registra el perfil de Opera), `record-pms-profile` (paso `annotate-partner-profile`) |
 | `booking-commands` | crs-integration-service | booking (`consumeBookingCommands`, grupo `ec-demo1-booking-commands`) | `annotate-pms-reference` (paso `annotate-pms-reference`) |
 | `projection-requests` | integrations-service (backfill) | crs-integration-service (`consumeProjectionRequests`, grupo `ec-demo1-crs-integration-projections`) | proyectar una reserva por «Proyectar Reserva». El backfill escribe las órdenes de una página y mueve su cursor en la misma transacción. |
+| `customer-commands` | front-office (`command_outbox`) | customer-mdm-service (`consumeCustomerCommands`, grupo `ec-demo1-customer-mdm-commands`) | `propose-change` (un cambio del kárdex, para que Salesforce lo decida; su `commandId` es el id de la solicitud, `CR-FO-…`), `record-scanned-identity` (el documento escaneado de un pax: dato de confianza, ver abajo) |
+| `no-show-reports` | front-office (`command_outbox`) | crs-integration-service (`consumeNoShowReports`, grupo `ec-demo1-crs-integration-no-shows`) | `ReportNoShow`: nadie de la reserva ha llegado; arranca `registrar-no-show` una vez por reserva |
 
-- **El contrato es del receptor.** El formato de `mapping-commands` y `projection-requests` está en
-  `integration-model` (`command/MappingCommand`, `command/ProjectReservation`). El ERP y el CRS son
+- **El contrato es del receptor.** El formato de `mapping-commands`, `projection-requests`,
+  `customer-commands` y `no-show-reports` está en `integration-model` (`command/MappingCommand`,
+  `command/ProjectReservation`, `command/CustomerCommand`, `command/ReportNoShow`). El ERP y el CRS son
   sistemas, no conocen el modelo de la integración: sus órdenes están en sus propios términos
   (`PartnerCommands`, `BookingCommands`) y el emisor las escribe así.
 - **Cada orden lleva su id** (`commandId`). La deduplicación va por ese id. En los pasos del motor
@@ -37,6 +40,22 @@ el otro sistema la ha aplicado.
 - **Sustituye al outbox HTTP** de integrations-service (tabla `remote_call` y su relay, PR #55). Al
   arrancar, lo que esa tabla aún tuviera sin enviar pasa al outbox de Kafka y la tabla se borra, en
   una sola transacción (`RemoteCallTableRetired`).
+- **El outbox del front office** es la tabla `command_outbox` (tema, clave, JSON), junto a su
+  `audit_outbox` y con el mismo patrón: la orden se escribe en la transacción de la decisión de
+  recepción (el cambio del kárdex, el escaneo, la marca de no show) y `CommandRelay` la publica. Las
+  órdenes sobre un cliente van con su código como clave; las de una reserva, con `hotel/localizador`.
+- **Consecuencias en recepción.** El front office ya no espera al MDM ni al CRS. Un cambio del kárdex
+  que no cambia nada lo aprueba el MDM al momento y la decisión llega por la vía de siempre
+  (`customers` → pms-integration → kárdex). Un no show sale con el aviso «Se comunica al CRS…»; si el
+  CRS no la tiene o ya estaba cancelada, se registra en crs-integration y la estancia no cambia.
+- **Un documento escaneado es dato de confianza.** El MDM rellena lo que el cliente no tiene
+  (documento, fecha de nacimiento, nacionalidad) y lo proyecta al contacto de Salesforce **sin Case**.
+  Lo que contradice (otro nombre, otra fecha de nacimiento, otro documento) va como solicitud de cambio
+  (Case), como un cambio del kárdex. Si el documento ya es de otro cliente, es la misma persona: el MDM
+  consolida el provisional en el que tiene el documento (supervivencia, alias, reservas re-apuntadas,
+  `CustomersMerged`) y fusiona los dos contactos en Salesforce con `merge()` de la API SOAP. Solo si es
+  seguro: el documento es de un único cliente, el pax no tenía otro y el nombre coincide. Si no, va como
+  Case.
 - **Consecuencia en el alta.** Tras «Importar interlocutores», los perfiles llegan al mapping de
   forma asíncrona. La puerta de interlocutores los ve en su siguiente relectura (`GATE_RECHECK`,
   30 s), no en la misma acción.
@@ -72,6 +91,7 @@ el otro sistema la ha aplicado.
 | booking, front-office → mdm | `GET /reservations/{h}/{loc}/links` | consulta | Los enlaces a otros sistemas en la ficha de la reserva. |
 | booking → erp | `GET /partners` | consulta | El formulario de reservas de demo. |
 | front-office → crs-integration | `GET /walk-ins/offer`, `POST /walk-ins/quote` | UI | La recepción elige habitación y ve el precio. |
+| front-office → crs-integration, mdm | `GET /reservations/{h}/{loc}`, `GET /customers?q=` | consulta de UI | El escáner de demo lee la reserva (nacionalidad, edad del niño) y si el pax ya es un cliente con documento. Si no contestan, se inventa el documento igual. |
 | front-office → crs-integration → booking | `POST /walk-ins` → `POST /bookings` | orden que necesita respuesta | La recepción necesita el localizador del CRS para abrir la estancia. Es idempotente por la referencia `FO-…`, y el reenvío programado del front office cubre la caída. |
 | ia-agent → servidores MCP, api-mcp → APIs | herramientas | ida y vuelta de UI | Una persona conversa con el agente: cada herramienta es parte de su respuesta. |
 | ia-agent, api-mcp → ia-control-plane | configuración del agente, RAG, catálogo | consulta | |
@@ -84,9 +104,7 @@ servidor a servidor.
 
 | De → a | Llamada | Qué falta |
 |---|---|---|
-| front-office → crs-integration | `POST /no-shows` | El front office no tiene Kafka (ni binder ni outbox) y otro agente lo está refactorizando. Hoy la respuesta se usa para el mensaje de recepción («no está en el CRS», «ya cancelada»). Con Kafka ese aviso llegaría después, por notificación. |
-| front-office → customer-mdm | `POST /customers/{id}/change-requests` (cambio de kardex) | Kafka en el front office. Además la solicitud no es idempotente en el MDM (cada llamada crea un `CR-<uuid>`), así que un reenvío tras un *timeout* duplica: necesita el id del front office como clave. |
-| pms-integration → front-office | `PUT /api/guests/{id}/kardex`, `PUT /api/reservations/{loc}`, `POST …/cancellation` | El front office no consume Kafka. Las tres son sobrescrituras idempotentes. La del kardex ya es un *relay* de `customers`: el front office podría suscribirse directamente. |
+| pms-integration → front-office | `PUT /api/guests/{id}/kardex`, `PUT /api/reservations/{loc}`, `POST …/cancellation` | El front office publica en Kafka pero aún no consume. Las tres son sobrescrituras idempotentes. La del kardex ya es un *relay* de `customers`: el front office podría suscribirse directamente. |
 | pms-integration → mapping | `POST /causes/wait` | pms-integration no tiene base de datos ni outbox. La registra el paso antes de contestar al motor, que la reintenta si falla. Moverla pide un outbox en el conector, o enviar a `mapping-commands` antes de la respuesta. |
-| pms-integration → customer-mdm | `PUT /customers/{id}/xrefs` | El MDM no consume Kafka. Es de mejor esfuerzo e idempotente por clave. |
+| pms-integration → customer-mdm | `PUT /customers/{id}/xrefs` | El MDM ya consume `customer-commands`, pero pms-integration no tiene outbox. Es de mejor esfuerzo e idempotente por clave. |
 | ia-agent → ia-control-plane | `POST /internal/usage` | Telemetría de uso, *fire-and-forget* sin reintento: fuera de la PoC. |

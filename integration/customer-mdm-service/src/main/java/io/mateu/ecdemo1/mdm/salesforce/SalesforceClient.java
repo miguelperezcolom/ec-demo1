@@ -190,6 +190,90 @@ public class SalesforceClient {
                 .retrieve().toBodilessEntity());
     }
 
+    /** Salesforce refused a merge, and would again: said why, not retried. */
+    public static class MergeRefused extends RuntimeException {
+        public MergeRefused(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Merges a contact into another, as a steward would: the absorbed one goes to the recycle bin with
+     * {@code MasterRecordId} naming the master, its Cases move to the master, and the master keeps its
+     * own values. Salesforce's REST API has no merge — this is the SOAP API's {@code merge()}, the one
+     * {@code salesforce/dedup.py} uses on this org (Base Edition has the SOAP API). The flow
+     * {@code Mdm_Announce_Merge} then announces it (ClienteConsolidado__e), as it does any merge.
+     *
+     * @throws MergeRefused when Salesforce answers it will not (a contact that is gone, one already merged)
+     */
+    public void mergeContacts(String masterContactId, String absorbedContactId) {
+        var master = safe(masterContactId);
+        var absorbed = safe(absorbedContactId);
+        var version = properties.apiVersion().startsWith("v") ? properties.apiVersion().substring(1) : properties.apiVersion();
+        java.util.function.Function<Session, String> merge = s -> rest.post()
+                .uri(s.instanceUrl() + "/services/Soap/u/" + version)
+                .contentType(MediaType.parseMediaType("text/xml; charset=UTF-8"))
+                .header("SOAPAction", "\"\"")
+                .body(mergeEnvelope(s.accessToken(), master, absorbed))
+                .exchange((request, response) -> new String(response.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        var answer = merge.apply(session());
+        var outcome = mergeOutcome(answer);
+        if (outcome != null && outcome.contains("INVALID_SESSION_ID")) {
+            expire();
+            outcome = mergeOutcome(merge.apply(session()));
+        }
+        if (outcome != null) {
+            throw new MergeRefused(outcome);
+        }
+    }
+
+    static String mergeEnvelope(String sessionId, String master, String absorbed) {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" "
+                + "xmlns:urn=\"urn:partner.soap.sforce.com\" xmlns:sobj=\"urn:sobject.partner.soap.sforce.com\">"
+                + "<soapenv:Header><urn:SessionHeader><urn:sessionId>" + xml(sessionId) + "</urn:sessionId></urn:SessionHeader></soapenv:Header>"
+                + "<soapenv:Body><urn:merge><urn:request><urn:masterRecord><sobj:type>Contact</sobj:type><sobj:Id>" + master
+                + "</sobj:Id></urn:masterRecord><urn:recordToMergeIds>" + absorbed + "</urn:recordToMergeIds>"
+                + "</urn:request></urn:merge></soapenv:Body></soapenv:Envelope>";
+    }
+
+    /** Null if the merge succeeded; otherwise what Salesforce said (a fault, or the result's errors). */
+    static String mergeOutcome(String answer) {
+        try {
+            var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            var doc = factory.newDocumentBuilder().parse(new org.xml.sax.InputSource(new java.io.StringReader(answer)));
+            var fault = doc.getElementsByTagNameNS("*", "Fault");
+            if (fault.getLength() > 0) {
+                return text(doc, "faultcode") + ": " + text(doc, "faultstring");
+            }
+            if ("true".equals(text(doc, "success"))) {
+                return null;
+            }
+            var errors = doc.getElementsByTagNameNS("*", "errors");
+            var said = new ArrayList<String>();
+            for (int i = 0; i < errors.getLength(); i++) {
+                said.add(errors.item(i).getTextContent().trim().replaceAll("\\s+", " "));
+            }
+            return said.isEmpty() ? "merge not done: " + cut(answer, 300) : String.join("; ", said);
+        } catch (Exception e) {
+            return "unreadable answer: " + cut(answer, 300);
+        }
+    }
+
+    static String text(org.w3c.dom.Document doc, String localName) {
+        var nodes = doc.getElementsByTagNameNS("*", localName);
+        if (nodes.getLength() == 0) {
+            nodes = doc.getElementsByTagName(localName);
+        }
+        return nodes.getLength() == 0 ? null : nodes.item(0).getTextContent().trim();
+    }
+
+    static String xml(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     /** Record ids are fifteen or eighteen letters and digits; anything else is not put in a query. */
     /** A value inside a SOQL string literal: quotes and backslashes escaped. */
     static String literal(String value) {

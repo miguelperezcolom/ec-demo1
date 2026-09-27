@@ -7,6 +7,7 @@ import io.mateu.ecdemo1.crsintegration.in.CrsEventHandler;
 import io.mateu.ecdemo1.crsintegration.router.ProcessRouter;
 import io.mateu.ecdemo1.crsintegration.worker.TaskHandlers;
 import io.mateu.ecdemo1.integration.model.command.ProjectReservation;
+import io.mateu.ecdemo1.integration.model.command.ReportNoShow;
 import io.mateu.ecdemo1.integration.model.events.IntegrationEvent;
 import io.mateu.workflow.ddd.DomainEvent;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
@@ -23,7 +24,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The five things this service consumes. Each on the consumer thread and synchronously: a failure
+ * The six things this service consumes. Each on the consumer thread and synchronously: a failure
  * leaves the offset uncommitted and the message is redelivered, which the inboxes make harmless.
  */
 @Configuration
@@ -37,6 +38,7 @@ public class StreamFunctions {
     final TaskHandlers tasks;
     final StreamBridge streamBridge;
     final TolerantReader reader;
+    final io.mateu.ecdemo1.crsintegration.noshow.NoShowReports noShows;
 
     /** What happened in the CRS and in the master of partners. */
     @Bean
@@ -105,6 +107,28 @@ public class StreamFunctions {
                 return;
             }
             router.project(request.hotelCode(), request.locator(), request.origin());
+        };
+    }
+
+    /**
+     * What the hotels report as no-shows ({@code no-show-reports}), each by «Registrar no-show». Taken
+     * once by the command's id; one the CRS cannot take is logged and dropped.
+     */
+    @Bean
+    public Consumer<Message<byte[]>> consumeNoShowReports() {
+        return message -> {
+            ReportNoShow report;
+            try {
+                report = reader.mapper().readValue(message.getPayload(), ReportNoShow.class);
+            } catch (IOException e) {
+                log.error("Unreadable no-show report, dropped: {}", new String(message.getPayload()), e);
+                return;
+            }
+            try {
+                noShows.handle(report);
+            } catch (IllegalArgumentException e) {
+                log.error("No-show report refused, dropped: {}", e.getMessage());
+            }
         };
     }
 

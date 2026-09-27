@@ -4,7 +4,15 @@ import io.mateu.ecdemo1.frontoffice.domain.guest.Guest;
 import io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository;
 import io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
+import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
+import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
 import io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex;
+import io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox;
+import io.mateu.ecdemo1.frontoffice.infra.scanner.DemoDocuments;
+import io.mateu.ecdemo1.frontoffice.infra.scanner.DemoScanner;
+import io.mateu.ecdemo1.integration.model.command.CustomerCommand;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
@@ -15,7 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * The kárdex of each pax of a stay, as the desk edits it: pax 1 is the stay's guest, the others its
  * companions. What the chain's master keeps of the guest — name, document, contact — is proposed to it
- * as a pending change in the same transaction as the edit, and sent to the MDM once it committed.
+ * as a pending change; a document the desk scans goes to the chain's MDM as trusted data. Either one as
+ * a command in the outbox, in the same transaction as the edit: the desk never waits for the MDM.
  */
 @Service
 public class KardexService {
@@ -23,26 +32,59 @@ public class KardexService {
   final StayRepository stays;
   final GuestRepository guests;
   final Kardex kardex;
+  final DemoScanner scanner;
+  final WalkIns walkIns;
+  final CommandOutbox outbox;
+  final String hotel;
   final TransactionTemplate transaction;
 
-  public KardexService(StayRepository stays, GuestRepository guests, Kardex kardex,
+  public KardexService(StayRepository stays, GuestRepository guests, Kardex kardex, DemoScanner scanner,
+                       WalkIns walkIns, CommandOutbox outbox, @Value("${frontoffice.hotel:MRU01}") String hotel,
                        PlatformTransactionManager transactions) {
     this.stays = stays;
     this.guests = guests;
     this.kardex = kardex;
+    this.scanner = scanner;
+    this.walkIns = walkIns;
+    this.outbox = outbox;
+    this.hotel = hotel;
     this.transaction = new TransactionTemplate(transactions);
   }
 
-  /** The desk's demo scanner read the pax's document. */
-  public void scanned(String stayId, int pax) {
-    // A scan never tells the master anything: it only marks the identity as seen.
+  /**
+   * The desk's scanner read the pax's document: the identity is seen, with that document, and the
+   * document — number, name, birth date, nationality — goes to the chain's MDM, with the reservation
+   * and the pax it belongs to. Holder and companions alike.
+   */
+  public DemoDocuments.Scanned scanned(String stayId, int pax) {
+    var stay = stay(stayId);
+    var guest = pax <= 1 ? guestOf(stayId) : null;
+    var companion = pax <= 1 ? null : stay.companionAt(pax);
+    var name = pax <= 1 ? guest.name() : companion == null ? Companion.pending(pax).name() : companion.name();
+    var current = pax <= 1 ? guest.document() : companion == null ? null : companion.document();
+    var customerId = pax <= 1 ? guest.id() : companion == null ? null : companion.companionId();
+    var locator = locatorOf(stayId);
+    // The scanner reads before the transaction: it may ask the booking and the MDM, and nobody waits on a lock for it.
+    var document = scanner.scan(new DemoScanner.Pax(locator, pax, name, current, customerId, stay.checkIn()));
     transaction.executeWithoutResult(status -> {
       if (pax <= 1) {
-        guests.save(guestOf(stayId).scanned());
+        guests.save(guestOf(stayId).scanned(document.documentNumber()));
       } else {
-        stays.save(stay(stayId).scanCompanion(pax));
+        stays.save(stay(stayId).scanCompanion(pax, document.documentNumber()));
       }
+      var commandId = "SCAN-" + UUID.randomUUID();
+      var command = new CustomerCommand.RecordScannedIdentity(commandId, hotel, locator, stayId, pax,
+          customerId != null && customerId.startsWith("C-") ? customerId : null, document.firstName(),
+          document.lastName(), document.documentType(), document.documentNumber(), document.birthDate(),
+          document.nationality(), "front office " + hotel + " · " + stayId + " pax " + pax);
+      outbox.append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), commandId, command);
     });
+    return document;
+  }
+
+  /** The CRS's locator of a stay: its id, or — for a walk-in — the one the CRS gave it (the stay's own until then). */
+  String locatorOf(String stayId) {
+    return walkIns.of(stayId).map(w -> w.locator() == null ? stayId : w.locator()).orElse(stayId);
   }
 
   /** The pax registered — or corrected — by hand: document, name and contact. */
@@ -71,12 +113,11 @@ public class KardexService {
   }
 
   void guestEdited(String stayId, UnaryOperator<Guest> edit) {
-    var change = transaction.execute(status -> {
+    transaction.executeWithoutResult(status -> {
       var before = guestOf(stayId);
       var after = guests.save(edit.apply(before));
-      return kardex.record(before, after);
+      kardex.record(before, after);
     });
-    change.ifPresent(kardex::send);
   }
 
   Guest guestOf(String stayId) {

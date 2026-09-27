@@ -9,4 +9,6 @@ public interface ConsolidationRepository extends JpaRepository<Consolidation, St
     List<Consolidation> findBySurvivorIdIsNotNullAndPropagatedAtIsNullOrderByReceivedAtAsc();
 
     List<Consolidation> findAllByOrderByReceivedAtDesc();
+
+    List<Consolidation> findBySalesforceMergeOrderByReceivedAtAsc(String salesforceMerge);
 }

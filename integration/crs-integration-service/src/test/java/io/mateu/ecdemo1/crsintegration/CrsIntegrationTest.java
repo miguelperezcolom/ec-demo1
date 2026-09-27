@@ -286,6 +286,26 @@ class CrsIntegrationTest {
     }
 
     @Test
+    void theFrontOfficesNoShowReportsArriveOverKafkaAndStartTheProcessOnce() {
+        // The same report delivered twice, a second report of the same reservation, and one the CRS does not have.
+        send("no-show-reports", "PMI01/LOC1", """
+                {"commandId":"NS-1","hotelCode":"PMI01","locator":"LOC1","reportedBy":"front office PMI01"}""");
+        send("no-show-reports", "PMI01/LOC1", """
+                {"commandId":"NS-1","hotelCode":"PMI01","locator":"LOC1","reportedBy":"front office PMI01"}""");
+        send("no-show-reports", "PMI01/LOC1", """
+                {"commandId":"NS-2","hotelCode":"PMI01","locator":"LOC1","reportedBy":"front office PMI01"}""");
+        send("no-show-reports", "PMI01/NOPE", """
+                {"commandId":"NS-3","hotelCode":"PMI01","locator":"NOPE","reportedBy":"front office PMI01"}""");
+
+        var starts = consume("upstream", r -> r.value().contains("registrar-no-show"), 2, 20);
+        assertThat(starts).singleElement().satisfies(r -> {
+            var start = json(r.value());
+            assertThat(start.get("businessKey").asText()).isEqualTo("registrar-no-show:PMI01/LOC1");
+            assertThat(variables(start)).containsEntry("reportedBy", "front office PMI01");
+        });
+    }
+
+    @Test
     void theReservationIsReadInTheIntegrationsTerms() throws Exception {
         mvc.perform(get("/reservations/PMI01/LOC1"))
                 .andExpect(status().isOk())

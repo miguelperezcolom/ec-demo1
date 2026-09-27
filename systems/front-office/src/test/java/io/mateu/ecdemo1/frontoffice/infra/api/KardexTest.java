@@ -1,61 +1,37 @@
 package io.mateu.ecdemo1.frontoffice.infra.api;
 
-import com.sun.net.httpserver.HttpServer;
 import io.mateu.ecdemo1.frontoffice.domain.guest.Guest;
 import io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository;
 import io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange;
 import io.mateu.ecdemo1.frontoffice.infra.mdm.Kardex;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
+import io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The desk changes a guest; the chain's master decides. The MDM is played by a small server that
- * keeps what it is sent and answers with a change request id.
+ * The desk changes a guest; the chain's master decides. The proposal is a command in the outbox, for the
+ * MDM's topic, with the front office's own request id: what these tests read is that outbox.
  */
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:kardex;DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE")
 @AutoConfigureMockMvc
 class KardexTest {
 
-  static final List<String> sent = new CopyOnWriteArrayList<>();
-  static HttpServer mdm;
+  @Autowired CommandOutbox outbox;
 
-  @DynamicPropertySource
-  static void properties(DynamicPropertyRegistry registry) throws IOException {
-    mdm = HttpServer.create(new InetSocketAddress(0), 0);
-    mdm.createContext("/", exchange -> {
-      sent.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath() + " "
-          + new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-      var body = "{\"id\":\"CR-" + sent.size() + "\",\"status\":\"PENDING\"}";
-      var bytes = body.getBytes(StandardCharsets.UTF_8);
-      exchange.getResponseHeaders().add("Content-Type", "application/json");
-      exchange.sendResponseHeaders(200, bytes.length);
-      exchange.getResponseBody().write(bytes);
-      exchange.close();
-    });
-    mdm.start();
-    registry.add("frontoffice.mdm-url", () -> "http://localhost:" + mdm.getAddress().getPort());
-  }
-
-  @AfterAll
-  static void stop() {
-    mdm.stop(0);
+  /** What the kardex proposed to the MDM for a guest, oldest first. */
+  List<String> sent(String guestId) {
+    return outbox.all(CommandOutbox.CUSTOMER_COMMANDS).stream().filter(e -> guestId.equals(e.key()))
+        .map(CommandOutbox.Entry::payload).toList();
   }
 
   @Autowired MockMvc mvc;
@@ -87,7 +63,6 @@ class KardexTest {
   @Test
   void aChangeAtTheDeskShowsPendingAndGoesToTheMasterWhichApprovesIt() throws Exception {
     guests.save(Guest.fromReservation("C-KX1", "Ana García", "12345678Z", "ana@example.com", null));
-    sent.clear();
 
     edit("C-KX1", "Ana María García", "ana.maria@example.com");
 
@@ -97,10 +72,13 @@ class KardexTest {
     assertThat(change.status()).isEqualTo(KardexChange.KardexStatus.PENDING);
     assertThat(change.changes()).contains("email ana@example.com → ana.maria@example.com");
     assertThat(change.fields()).extracting(KardexChange.FieldChange::field).containsExactly("nombre", "email");
-    assertThat(sent).singleElement().asString().startsWith("POST /customers/C-KX1/change-requests")
-        .contains("\"email\":\"ana.maria@example.com\"").contains("\"name\":\"Ana María García\"");
     var requestId = change.requestId();
-    assertThat(requestId).isNotNull();
+    assertThat(requestId).startsWith("CR-FO-");
+    // The request's id is the command's: delivered twice, the MDM takes it once, as one request.
+    assertThat(sent("C-KX1")).singleElement().asString().contains("\"type\":\"propose-change\"")
+        .contains("\"commandId\":\"" + requestId + "\"").contains("\"customerId\":\"C-KX1\"")
+        .contains("\"email\":\"ana.maria@example.com\"").contains("\"name\":\"Ana María García\"");
+    assertThat(change.synced()).isTrue();
 
     // A change made in the master meanwhile does not hide the desk's pending one.
     mvc.perform(put("/api/guests/C-KX1/kardex").contentType(MediaType.APPLICATION_JSON)
@@ -142,9 +120,8 @@ class KardexTest {
   @Test
   void aGuestTheChainDoesNotKnowIsNotProposedAndAnUnknownGuestIsNotFound() throws Exception {
     guests.save(Guest.fromReservation("crs-LOCAL1", "Sin Cliente", null, "x@example.com", null));
-    sent.clear();
     edit("crs-LOCAL1", "Sin Cliente", "y@example.com");
-    assertThat(sent).isEmpty();
+    assertThat(sent("crs-LOCAL1")).isEmpty();
     assertThat(kardex.of("crs-LOCAL1")).isEmpty();
 
     mvc.perform(put("/api/guests/C-NOBODY/kardex").contentType(MediaType.APPLICATION_JSON)
@@ -154,7 +131,6 @@ class KardexTest {
   @Test
   void aDocumentTheDeskMadeUpIsNotProposedAndSurvivesTheMastersEmptyOne() throws Exception {
     guests.save(Guest.fromReservation("C-KX3", "Eva Ruiz", null, "eva@example.com", "+34 600000001"));
-    sent.clear();
 
     // Registered by hand without a document: the desk marks the identity with a made-up one.
     var before = guests.findById("C-KX3").orElseThrow();
@@ -164,7 +140,7 @@ class KardexTest {
 
     var change = kardex.of("C-KX3").orElseThrow();
     assertThat(change.fields()).singleElement().extracting(KardexChange.FieldChange::field).isEqualTo("teléfono");
-    assertThat(sent).singleElement().asString().contains("\"documentNumber\":null").doesNotContain("MAN-");
+    assertThat(sent("C-KX3")).singleElement().asString().contains("\"documentNumber\":null").doesNotContain("MAN-");
 
     mvc.perform(put("/api/guests/C-KX3/kardex").contentType(MediaType.APPLICATION_JSON)
         .content(kardex("Eva Ruiz", "eva@example.com", null, change.requestId(), "APPROVED", null)))
@@ -175,13 +151,29 @@ class KardexTest {
   @Test
   void onlyADocumentMadeUpIsNoChangeForTheMaster() {
     guests.save(Guest.fromReservation("C-KX4", "Iker Sanz", null, "iker@example.com", null));
-    sent.clear();
     var before = guests.findById("C-KX4").orElseThrow();
     var after = before.verifyIdentity("ESC-C-KX4");
     guests.save(after);
     kardex.edited(before, after);
 
-    assertThat(sent).isEmpty();
+    assertThat(sent("C-KX4")).isEmpty();
     assertThat(kardex.of("C-KX4")).isEmpty();
   }
+
+  @Test
+  void aChangeKeptBeforeTheOutboxGoesOnceWithItsOwnId() {
+    guests.save(Guest.fromReservation("C-KX5", "Rosa Gil", null, "rosa@example.com", null));
+    // As the kardex kept it when the MDM did not answer: pending, never sent.
+    changes.save(KardexChange.pending("C-KX5", List.of(new KardexChange.FieldChange("email", "x@example.com",
+        "rosa@example.com")), java.time.Instant.now()));
+
+    kardex.resend();
+    kardex.resend();
+
+    var requestId = kardex.of("C-KX5").orElseThrow().requestId();
+    assertThat(requestId).isNotNull();
+    assertThat(sent("C-KX5")).singleElement().asString().contains("\"commandId\":\"" + requestId + "\"");
+  }
+
+  @Autowired io.mateu.ecdemo1.frontoffice.domain.guest.KardexChanges changes;
 }

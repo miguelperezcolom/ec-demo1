@@ -11,7 +11,7 @@ siguiente desde el trabajo.
   evidencias**: una página local con el estilo de la presentación, que Claude genera en cada paso
   con lo que devuelven sus APIs, consultadas fuera del navegador para que ningún token llegue a la
   página. Cada panel lleva el título «Salesforce (API)» u «Opera Cloud (API)» y la hora de la
-  consulta. En este modo la fusión del flujo 2 se hace con `dedup.py` y la aprobación del Case del
+  consulta. En este modo la fusión del flujo 2 la hace el escaneo en recepción (plan B: `dedup.py`) y la aprobación del Case del
   flujo 3 con la API REST (*Decisión* = Aprobada), que dispara el mismo flow que la interfaz. No
   hace falta que el usuario entre en ninguna parte.
 - **Modo interfaces.** El usuario entra en Salesforce y en Opera Cloud en un perfil de navegador de
@@ -62,8 +62,8 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
 5. **Qué se hace en cada sistema:**
    - **Opera:** solo lectura. Se busca y se enseña, nunca se modifica nada desde su interfaz.
    - **Salesforce:** se navega. **La aprobación del Case del flujo 3 se hace en su interfaz**, lo
-     acordamos con el usuario. La fusión del flujo 2 también se hace en su interfaz (Contacts →
-     duplicados → Merge). Si la interfaz no deja fusionar, el plan B es `python3 dedup.py --execute
+     acordamos con el usuario. La fusión del flujo 2 la hace el escaneo en recepción; si no
+     fusiona, se hace en su interfaz (Contacts → duplicados → Merge). Si la interfaz no deja fusionar, el plan B es `python3 dedup.py --execute
      --include "<nombre>"` fuera de cámara.
 6. Al terminar, se borra el perfil (`rm -rf` del directorio), para que no quede ninguna sesión en
    disco.
@@ -144,10 +144,19 @@ en XMAR: hay que evitar repetir tomas sin necesidad.
    - **Rótulo:** «El MDM no está seguro: crea un cliente provisional. En Salesforce, un duplicado.»
    - **Se enseña:** Salesforce, con los dos contactos iguales y el aviso de posible duplicado de
      la regla `MDM_Possible_Duplicate`.
-4. **Fusión en Salesforce**, en su interfaz.
-   - **Rótulo:** «Salesforce limpia: se fusionan. La fusión vuelve al MDM (ClienteConsolidado__e).»
+4. **Escaneo en recepción.** Front office → la reserva nueva → *Escanear* en el titular.
+   - **Rótulo:** «Recepción escanea su documento. Es el que la cadena ya conoce: la misma persona.»
+   - **Se enseña:** el diálogo del escaneo y el titular con el documento verificado.
+   - **Rótulo:** «El MDM consolida el provisional y fusiona los dos contactos en Salesforce.»
+   - **Se enseña:** Salesforce con un solo contacto, con documento, nacionalidad y fecha de
+     nacimiento, y ningún Case nuevo.
+   - Si el cliente original aún no tenía documento, antes se escanea el titular de su primera
+     reserva, que rellena su contacto sin Case, y después el de la nueva. Plan B, si el escaneo no
+     fusiona: la fusión en la interfaz de Salesforce («Salesforce limpia: se fusionan. La fusión
+     vuelve al MDM (ClienteConsolidado__e).»).
 5. **Evidencias.**
-   - **Consola:** Clientes, con el cliente CONSOLIDATED y el absorbido como alias.
+   - **Consola:** Clientes, con el cliente CONSOLIDATED y el absorbido como alias; en
+     Consolidaciones, la vía `SCAN`.
    - **Front office:** las dos reservas con el mismo cliente, abriendo cada una.
    - **Rótulo:** «Un solo cliente en todas partes.»
 
