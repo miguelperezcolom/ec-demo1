@@ -146,10 +146,40 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
                 + (answer == null ? "" : answer.lines().findFirst().orElse("")));
     }
 
-    @ListToolbarButton
+    /**
+     * The selected proposals — or, with none selected, every proposal the filters show: approving the
+     * agent's proposal for a hotel is one decision, not five pages of ticks. The confirmation says which.
+     */
+    @ListToolbarButton(rowsSelectedRequired = false, confirmationRequired = true)
     @Toolbar(order = 1)
+    @Action(confirmationTitle = "Approve?",
+            confirmationMessage = "The selected proposals — or, if none is selected, every proposal the filters show"
+                    + " (all of them, if nothing is filtered). Each one comes into force and what waited on it resumes.",
+            confirmationText = "Approve", confirmationDenialText = "Cancel")
     public Object approve(List<EntryRow> selection, HttpRequest httpRequest) {
+        if (selection == null || selection.isEmpty()) {
+            var state = httpRequest.runActionRq().componentState();
+            var proposals = proposalsShown(text(state.get("integration")), text(state.get("type")));
+            if (proposals.isEmpty()) {
+                return refreshed(httpRequest, "No proposal to approve in what the filters show");
+            }
+            return onSelected(proposals, httpRequest, dictionary::approve, "approved");
+        }
         return onSelected(selection, httpRequest, dictionary::approve, "approved");
+    }
+
+    /** The proposals the listing shows for these filters — the hotel's own and the chain's, as search() does. */
+    List<EntryRow> proposalsShown(String hotel, String type) {
+        return entries.findAll().stream()
+                .filter(e -> e.status == EntryStatus.PROPOSED)
+                .filter(e -> hotel == null || e.hotelCode == null || e.hotelCode.equals(hotel))
+                .filter(e -> type == null || type.equals(e.type.name()))
+                .map(DictionaryCrud::row)
+                .toList();
+    }
+
+    static String text(Object value) {
+        return value == null || blank(value.toString()) ? null : value.toString();
     }
 
     @ListToolbarButton(confirmationRequired = true)
