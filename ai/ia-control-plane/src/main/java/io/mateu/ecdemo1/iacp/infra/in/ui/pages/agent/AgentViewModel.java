@@ -92,7 +92,7 @@ public class AgentViewModel implements CatalogueEditor<AgentDto>, OptionsSupplie
 
     @Section("Other agents")
     @Stereotype(FieldStereotype.checkbox)
-    @Label("Agentes a los que puede llamar (A2A)")
+    @Label("Agents it may call (A2A)")
     @Help("Each one is offered to this agent's model as a tool that sends it a request over A2A "
             + "and returns its answer. Its description is what the model reads to decide when to "
             + "delegate. Disabled or deleted ones are dropped when the configuration is served.")

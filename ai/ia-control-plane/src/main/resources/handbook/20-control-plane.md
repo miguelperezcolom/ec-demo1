@@ -34,7 +34,7 @@ is verified, or what the `ai-admin` role is for — and the agent should answer 
 
 ## Agents calling agents (A2A)
 
-An agent can be allowed to call other agents of the catalogue — "Agentes a los que puede llamar
+An agent can be allowed to call other agents of the catalogue — "Agents it may call
 (A2A)" in its editor, `peers:` in its YAML. Each one becomes a tool of the calling agent,
 `ask_<agent-id>`, described with the called agent's own description, so a good description is what
 makes delegation happen. The call uses the A2A protocol: every ia-agent pod serves every agent at
