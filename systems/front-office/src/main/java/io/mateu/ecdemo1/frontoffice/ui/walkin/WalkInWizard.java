@@ -8,6 +8,7 @@ import io.mateu.ecdemo1.frontoffice.ui.common.GuestHeaders;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Style;
+import io.mateu.uidl.annotations.Subtitle;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.WizardCompletionAction;
 import io.mateu.uidl.annotations.WizardLabels;
@@ -36,9 +37,15 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @Title("Walk-in")
+@Subtitle("Un cliente sin reserva: la estancia, el precio del CRS, el titular y la confirmación")
 @Style(StyleConstants.CONTAINER)
-@WizardProgress(WizardProgressStyle.STEPS)
+// Redwood's Guided Process: the walk-in opens on its overview — the four steps side by side, each
+// marked completed once done — and «Inicio» goes through them with the step list on the right. It
+// is a process started from nothing, where seeing the whole of it first helps; the check-in keeps
+// the steps across the top (it opens from a stay, and its steps need the full width)
+@WizardProgress(WizardProgressStyle.RAIL)
 // the screens are written in Spanish; without this the wizard's own buttons read Back / Next
+// (Vaadin's — the guided process brings its own, in the browser's language)
 @WizardLabels(back = "Atrás", next = "Siguiente")
 public class WalkInWizard extends Wizard {
 
