@@ -16,6 +16,7 @@ import io.mateu.ecdemo1.iacp.domain.aggregates.rag.Rag;
 import io.mateu.ecdemo1.iacp.domain.aggregates.rag.vo.RagId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.rag.vo.RagKind;
 import io.mateu.uidl.annotations.Action;
+import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInList;
@@ -23,11 +24,15 @@ import io.mateu.uidl.annotations.Multiline;
 import io.mateu.uidl.annotations.Notice;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
+import io.mateu.uidl.data.State;
+import io.mateu.uidl.data.Message;
 import io.mateu.uidl.interfaces.HttpRequest;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * A retrieval source, and the two things you can do to one from here.
@@ -118,28 +123,32 @@ public class RagViewModel implements CatalogueEditor<RagDto> {
                 embeddingLlmId, topK, description, enabled));
     }
 
+    @Toolbar
     @Action(idempotent = true)
-    public String testConnection(HttpRequest httpRequest) {
+    public Object testConnection(HttpRequest httpRequest) {
         var stored = repository.findById(new RagId(id))
                 .orElseThrow(() -> new IllegalStateException("Save this source before probing it"));
         var result = probe.probe(stored);
         lastProbe = (result.reachable() ? "OK — " : "Unreachable — ") + result.detail();
-        return lastProbe;
+        return List.of(result.reachable() ? new Message(lastProbe) : Message.error(lastProbe),
+                new State(this));
     }
 
+    @Toolbar
     @Action(confirmationRequired = true,
             confirmationTitle = "Ingest this text?",
             confirmationMessage = "It is embedded and stored. Ingesting the same text twice "
                     + "stores it twice, and nothing here can take it out again.")
-    public String ingestText(HttpRequest httpRequest) {
+    public Object ingestText(HttpRequest httpRequest) {
         int chunks = ingestTextUseCase.handle(new IngestTextCommand(id, textToIngest));
         textToIngest = null;
         lastProbe = "Ingested " + chunks + " chunk(s).";
-        return lastProbe;
+        return List.of(new Message(lastProbe), new State(this));
     }
 
+    @Toolbar
     @Action(idempotent = true)
-    public String tryAQuery(HttpRequest httpRequest) {
+    public Object tryAQuery(HttpRequest httpRequest) {
         var passages = searchRagUseCase.handle(new SearchRagCommand(id, testQuery, null));
         if (passages.isEmpty()) {
             // Not an error, and the distinction matters: an empty collection and a query that
@@ -147,13 +156,13 @@ public class RagViewModel implements CatalogueEditor<RagDto> {
             // rather than showing as a blank box.
             lastProbe = "The store answered, and nothing matched. Either this collection is "
                     + "empty or the query is far from everything in it.";
-            return lastProbe;
+            return List.of(new Message(lastProbe), new State(this));
         }
         var sb = new StringBuilder(passages.size() + " passage(s):\n");
         passages.forEach(p -> sb.append(String.format("  [%.3f] %s%n", p.score(),
                 p.text().length() > 200 ? p.text().substring(0, 200) + "…" : p.text())));
         lastProbe = sb.toString();
-        return lastProbe;
+        return List.of(new Message(lastProbe), new State(this));
     }
 
     @Override

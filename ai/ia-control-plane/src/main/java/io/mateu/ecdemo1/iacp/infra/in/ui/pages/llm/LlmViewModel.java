@@ -10,6 +10,7 @@ import io.mateu.ecdemo1.iacp.application.usecases.llm.update.UpdateLlmCommand;
 import io.mateu.ecdemo1.iacp.application.usecases.llm.update.UpdateLlmUseCase;
 import io.mateu.ecdemo1.iacp.domain.aggregates.llm.vo.LlmProvider;
 import io.mateu.uidl.annotations.Action;
+import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInList;
@@ -17,11 +18,15 @@ import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.data.FieldStereotype;
+import io.mateu.uidl.data.State;
+import io.mateu.uidl.data.Message;
 import io.mateu.uidl.interfaces.HttpRequest;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * The editor for a model and its key.
@@ -101,16 +106,22 @@ public class LlmViewModel implements CatalogueEditor<LlmDto> {
                 temperature, maxTokens, enabled));
     }
 
+    @Toolbar
     @Action(confirmationRequired = true,
             confirmationTitle = "Replace this model's credential?",
-            confirmationMessage = "The stored key is overwritten and cannot be recovered. "
-                    + "An empty field clears it, which leaves the model catalogued and unusable.")
-    public String replaceCredential(HttpRequest httpRequest) {
+            confirmationMessage = "The stored key is overwritten and cannot be recovered.")
+    public Object replaceCredential(HttpRequest httpRequest) {
+        if (newApiKey == null || newApiKey.isBlank()) {
+            // The button is in the header of the view as well as the editor, where this field is
+            // always empty. Clearing on an empty field made one misclick there erase the key; a
+            // model that should not be used is disabled instead.
+            return Message.error("Type the new key in 'New api key' first (Edit). To stop using "
+                    + "this model, disable it.");
+        }
         replaceLlmCredentialUseCase.handle(new ReplaceLlmCredentialCommand(id, newApiKey));
-        var cleared = newApiKey == null || newApiKey.isBlank();
         newApiKey = null;
-        credentialStatus = cleared ? "missing" : "set";
-        return cleared ? "Credential cleared" : "Credential replaced";
+        credentialStatus = "set";
+        return List.of(new Message("Credential replaced"), new State(this));
     }
 
     @Override

@@ -13,6 +13,7 @@ import io.mateu.ecdemo1.iacp.application.usecases.apimcp.update.UpdateApiMcpComm
 import io.mateu.ecdemo1.iacp.application.usecases.apimcp.update.UpdateApiMcpUseCase;
 import io.mateu.ecdemo1.iacp.domain.aggregates.apimcp.vo.ApiKind;
 import io.mateu.uidl.annotations.Action;
+import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
@@ -23,6 +24,8 @@ import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.data.FieldStereotype;
+import io.mateu.uidl.data.State;
+import io.mateu.uidl.data.Message;
 import io.mateu.uidl.interfaces.HttpRequest;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -138,8 +141,9 @@ public class ApiMcpViewModel implements CatalogueEditor<ApiMcpDto> {
      * descriptions in this table were written by a person — wiping them because the spec grew an
      * endpoint would be losing the only part of this that cannot be regenerated.
      */
+    @Toolbar
     @Action(idempotent = true)
-    public String importOperations(HttpRequest httpRequest) {
+    public Object importOperations(HttpRequest httpRequest) {
         if (id == null || id.isBlank()) {
             throw new IllegalStateException("Save this API before importing its operations");
         }
@@ -163,20 +167,25 @@ public class ApiMcpViewModel implements CatalogueEditor<ApiMcpDto> {
         }
         tools = current;
         lastImport = operations.size() + " operation(s) declared, " + added + " new";
-        return lastImport;
+        return List.of(new Message(lastImport), new State(this));
     }
 
+    @Toolbar
     @Action(confirmationRequired = true,
             confirmationTitle = "Replace this API's credential?",
-            confirmationMessage = "The stored secret is overwritten and cannot be recovered. "
-                    + "An empty field clears it, which leaves the API catalogued and unable to "
-                    + "answer anything that needs one.")
-    public String replaceCredential(HttpRequest httpRequest) {
+            confirmationMessage = "The stored secret is overwritten and cannot be recovered.")
+    public Object replaceCredential(HttpRequest httpRequest) {
+        if (newSecret == null || newSecret.isBlank()) {
+            // The button is in the header of the view as well as the editor, where this field is
+            // always empty. Clearing on an empty field made one misclick there erase the key; a
+            // API that should not be used is disabled instead.
+            return Message.error("Type the new secret in 'New secret' first (Edit). To stop using "
+                    + "this API, disable it.");
+        }
         replaceApiMcpCredentialUseCase.handle(new ReplaceApiMcpCredentialCommand(id, newSecret));
-        var cleared = newSecret == null || newSecret.isBlank();
         newSecret = null;
-        credentialStatus = cleared ? "missing" : "set";
-        return cleared ? "Credential cleared" : "Credential replaced";
+        credentialStatus = "set";
+        return List.of(new Message("Credential replaced"), new State(this));
     }
 
     @Override
