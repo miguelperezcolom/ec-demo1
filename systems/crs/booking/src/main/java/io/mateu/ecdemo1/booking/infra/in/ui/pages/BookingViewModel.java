@@ -10,6 +10,7 @@ import io.mateu.ecdemo1.booking.application.usecases.booking.create.CreateBookin
 import io.mateu.ecdemo1.booking.application.usecases.booking.payment.RegisterPaymentUseCase;
 import io.mateu.ecdemo1.booking.application.usecases.booking.update.UpdateBookingCommand;
 import io.mateu.ecdemo1.booking.application.usecases.booking.update.UpdateBookingUseCase;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingStatus;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.Holder;
 import io.mateu.ecdemo1.booking.infra.in.ui.suppliers.CatalogLookup;
 import io.mateu.ecdemo1.booking.infra.out.mdm.CustomerLinks;
@@ -34,6 +35,7 @@ import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
+import io.mateu.uidl.interfaces.VisibilitySupplier;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +59,7 @@ import java.util.concurrent.Callable;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class BookingViewModel implements Identifiable {
+public class BookingViewModel implements Identifiable, VisibilitySupplier {
 
     static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
             .withZone(ZoneId.systemDefault());
@@ -199,6 +201,25 @@ public class BookingViewModel implements Identifiable {
     @Label("Ver recorrido")
     public Object verRecorrido(HttpRequest httpRequest) {
         return UICommand.navigateTo(OtherSystems.journey(requireSaved()));
+    }
+
+    /**
+     * Each action only where it can do something: confirming is for a pending booking — a confirmed
+     * one would be confirmed again to no effect — and a cancelled booking can be neither confirmed
+     * nor cancelled again. A new one has none of them, the journey included: it is saved first.
+     */
+    @Override
+    public boolean isHidden(String memberName, HttpRequest httpRequest) {
+        return switch (memberName) {
+            case "confirmBooking" -> !is(BookingStatus.Pending);
+            case "cancelBooking" -> id == null || is(BookingStatus.Cancelled);
+            case "verRecorrido" -> id == null;
+            default -> false;
+        };
+    }
+
+    private boolean is(BookingStatus state) {
+        return id != null && status != null && state.name().equals(status.message());
     }
 
     private String requireSaved() {
