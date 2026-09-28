@@ -13,7 +13,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -54,6 +56,10 @@ public class AgentConfigClient {
 
     private final String url;
     private final String agentId;
+    private final String controlPlaneUrl;
+
+    /** Other agents' configurations, for the A2A calls this pod answers on their behalf. */
+    private final Map<String, Cached> others = new ConcurrentHashMap<>();
 
     /** Last good configuration and when it was fetched. Null until the first success. */
     private final AtomicReference<Cached> cache = new AtomicReference<>();
@@ -65,8 +71,8 @@ public class AgentConfigClient {
             @Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl,
             @Value("${ia.agent-id:console-agent}") String agentId) {
         this.agentId = agentId;
-        this.url = controlPlaneUrl.replaceAll("/+$", "")
-                + "/internal/agents/" + agentId + "/config";
+        this.controlPlaneUrl = controlPlaneUrl.replaceAll("/+$", "");
+        this.url = this.controlPlaneUrl + "/internal/agents/" + agentId + "/config";
         log.info("Agent configuration comes from {}", url);
     }
 
@@ -126,6 +132,70 @@ public class AgentConfigClient {
                 + "This pod cannot answer prompts until the control plane is reachable and the "
                 + "agent is servable.", agentId, reason);
         return null;
+    }
+
+    /**
+     * Any agent's configuration, by id — what the A2A endpoint answers with, since every pod serves
+     * every agent there. Its own agent goes through {@link #current()}; the others get the same TTL
+     * and the same last-good fallback, one entry each.
+     *
+     * @throws Unavailable with the control plane's reason when there is nothing to serve — a 409
+     *         (disabled, no usable model) or never reachable. A 409 is not papered over with a
+     *         stale copy: the catalogue said no, and an A2A caller should hear that.
+     */
+    public AgentConfig configOf(String requestedAgentId) {
+        if (agentId.equals(requestedAgentId)) {
+            return current().orElseThrow(() -> new Unavailable(lastFetchFailed()));
+        }
+        var cached = others.get(requestedAgentId);
+        if (cached != null && Duration.between(cached.fetchedAt(), Instant.now()).compareTo(TTL) < 0) {
+            return cached.config();
+        }
+        String reason;
+        try {
+            var response = http.send(
+                    HttpRequest.newBuilder(URI.create(controlPlaneUrl + "/internal/agents/"
+                                    + java.net.URLEncoder.encode(requestedAgentId,
+                                    java.nio.charset.StandardCharsets.UTF_8) + "/config"))
+                            .timeout(REQUEST_TIMEOUT)
+                            .header("Accept", "application/json")
+                            .GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                var config = mapper.readValue(response.body(), AgentConfig.class);
+                others.put(requestedAgentId, new Cached(config, Instant.now()));
+                return config;
+            }
+            if (response.statusCode() == 409) {
+                others.remove(requestedAgentId);
+                throw new Unavailable(reasonOf(response.body()));
+            }
+            reason = "control plane answered " + response.statusCode();
+        } catch (Unavailable e) {
+            throw e;
+        } catch (Exception e) {
+            reason = e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage());
+        }
+        if (cached != null) {
+            log.warn("Could not refresh agent {} configuration ({}). Serving the copy from {}.",
+                    requestedAgentId, reason, cached.fetchedAt());
+            return cached.config();
+        }
+        throw new Unavailable("Agent '" + requestedAgentId + "' has no configuration: " + reason);
+    }
+
+    private String reasonOf(String body) {
+        try {
+            var reason = mapper.readTree(body).path("reason").asText(null);
+            return reason != null ? reason : body;
+        } catch (Exception e) {
+            return body;
+        }
+    }
+
+    /** No configuration to answer with, and the sentence that says why. */
+    public static class Unavailable extends RuntimeException {
+        public Unavailable(String message) { super(message); }
     }
 
     public String agentId() {

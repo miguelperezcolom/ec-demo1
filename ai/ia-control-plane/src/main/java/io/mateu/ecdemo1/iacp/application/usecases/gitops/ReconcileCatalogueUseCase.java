@@ -344,15 +344,16 @@ public class ReconcileCatalogueUseCase {
             var name = orId(m.name(), m.id());
             var mcpIds = m.mcp() == null ? List.<String>of() : m.mcp();
             var ragIds = m.rag() == null ? List.<String>of() : m.rag();
+            var peerIds = m.peers() == null ? List.<String>of() : m.peers();
             if (exists) {
                 updateAgent.handle(new UpdateAgentCommand(m.id(), name, m.systemPrompt(), m.llm(),
-                        mcpIds, ragIds, m.description(), enabled(m.enabled())));
+                        mcpIds, ragIds, peerIds, m.description(), enabled(m.enabled())));
             } else {
                 createAgent.handle(new CreateAgentCommand(m.id(), name, m.systemPrompt(), m.llm(),
-                        mcpIds, ragIds, m.description()));
+                        mcpIds, ragIds, peerIds, m.description()));
                 if (!enabled(m.enabled())) {
                     updateAgent.handle(new UpdateAgentCommand(m.id(), name, m.systemPrompt(), m.llm(),
-                            mcpIds, ragIds, m.description(), false));
+                            mcpIds, ragIds, peerIds, m.description(), false));
                 }
             }
         });
@@ -379,15 +380,20 @@ public class ReconcileCatalogueUseCase {
         guardAndRun(ROUTE, m.id(), () -> routeQuery.getById(m.id()).isPresent(), report, exists -> {
             var name = orId(m.name(), m.id());
             var priority = m.priority() == null ? 100 : m.priority();
+            var input = m.inputGuardrails() == null ? List.<String>of() : m.inputGuardrails();
+            var output = m.outputGuardrails() == null ? List.<String>of() : m.outputGuardrails();
             if (exists) {
                 updateRoute.handle(new UpdateRouteCommand(m.id(), name, priority, m.role(),
-                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), enabled(m.enabled())));
+                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), input, output,
+                        m.guardrailFailure(), enabled(m.enabled())));
             } else {
                 createRoute.handle(new CreateRouteCommand(m.id(), name, priority, m.role(),
-                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent()));
+                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), input, output,
+                        m.guardrailFailure()));
                 if (!enabled(m.enabled())) {
                     updateRoute.handle(new UpdateRouteCommand(m.id(), name, priority, m.role(),
-                            m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), false));
+                            m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), input, output,
+                            m.guardrailFailure(), false));
                 }
             }
         });

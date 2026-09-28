@@ -45,12 +45,19 @@ public class Agent extends AggregateRoot {
     LlmId llmId;
     List<McpId> mcpIds;
     List<RagId> ragIds;
+    /**
+     * The other agents this one may call over A2A, each offered to its model as one tool. Never
+     * itself: an agent that delegates to itself is a loop with extra steps, and a model given the
+     * option will take it.
+     */
+    List<AgentId> peerAgentIds;
     String description;
     Enabled enabled;
     Time created;
 
     public static Agent of(AgentId id, Name name, SystemPrompt systemPrompt, LlmId llmId,
-                           List<McpId> mcpIds, List<RagId> ragIds, String description) {
+                           List<McpId> mcpIds, List<RagId> ragIds, List<AgentId> peerAgentIds,
+                           String description) {
         var agent = new Agent();
         agent.id = id;
         agent.name = name;
@@ -58,6 +65,7 @@ public class Agent extends AggregateRoot {
         agent.llmId = llmId;
         agent.mcpIds = dedupe(mcpIds);
         agent.ragIds = dedupe(ragIds);
+        agent.peerAgentIds = peers(id, peerAgentIds);
         agent.description = description;
         agent.enabled = Enabled.yes();
         agent.created = new Time(LocalDateTime.now());
@@ -65,12 +73,16 @@ public class Agent extends AggregateRoot {
     }
 
     public void update(Name name, SystemPrompt systemPrompt, LlmId llmId,
-                       List<McpId> mcpIds, List<RagId> ragIds, String description, Enabled enabled) {
+                       List<McpId> mcpIds, List<RagId> ragIds, List<AgentId> peerAgentIds,
+                       String description, Enabled enabled) {
+        // First, so a refused update leaves nothing half-applied.
+        var peers = peers(id, peerAgentIds);
         this.name = name;
         this.systemPrompt = systemPrompt;
         this.llmId = llmId;
         this.mcpIds = dedupe(mcpIds);
         this.ragIds = dedupe(ragIds);
+        this.peerAgentIds = peers;
         this.description = description;
         this.enabled = enabled;
     }
@@ -83,6 +95,22 @@ public class Agent extends AggregateRoot {
      */
     private static <T> List<T> dedupe(List<T> ids) {
         return ids == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(ids));
+    }
+
+    /**
+     * Refused rather than silently dropped: the editor never offers the agent itself, so reaching
+     * this is a hand-written manifest or a direct API call, and whoever wrote it should hear so.
+     */
+    private static List<AgentId> peers(AgentId self, List<AgentId> peerAgentIds) {
+        var peers = dedupe(peerAgentIds);
+        if (peers.contains(self)) {
+            throw new IllegalArgumentException("Agent '" + self + "' cannot call itself over A2A");
+        }
+        return peers;
+    }
+
+    public List<AgentId> getPeerAgentIds() {
+        return peerAgentIds == null ? List.of() : peerAgentIds;
     }
 
     public boolean isUsable() {

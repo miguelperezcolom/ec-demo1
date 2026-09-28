@@ -56,12 +56,13 @@ public class AgentDBQueryService implements AgentQueryService {
     static AgentDto toDto(AgentEntity e) {
         return new AgentDto(e.getId(), e.getName(), e.getSystemPrompt(), e.getLlmId(),
                 IdList.split(e.getMcpIds()), IdList.split(e.getRagIds()),
-                e.getDescription(), e.isEnabled(), e.getCreated());
+                IdList.split(e.getPeerAgentIds()), e.getDescription(), e.isEnabled(), e.getCreated());
     }
 
     static AgentRow toRow(AgentEntity e) {
         return new AgentRow(e.getId(), e.getName(), e.getLlmId(),
                 IdList.split(e.getMcpIds()).size(), IdList.split(e.getRagIds()).size(),
+                IdList.split(e.getPeerAgentIds()).size(),
                 StatusBadge.enabled(e.isEnabled()));
     }
 }

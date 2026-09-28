@@ -130,7 +130,7 @@ public class CatalogueSeeder {
             // none — a tool that always answers "nothing found" — which is exactly why the ingest
             // and the attach happen together and only here.
             createAgent.handle(new CreateAgentCommand(agentId, "Console agent",
-                    defaultPrompt(), "anthropic", mcpIds, ragIds,
+                    defaultPrompt(), "anthropic", mcpIds, ragIds, List.of(),
                     "The agent behind the demo console's chat panel. Seeded on first start."));
 
             // Fill the source in the background: the embedding pod may still be starting, so this

@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.iacp.infra.out.persistence;
 
 import io.mateu.ecdemo1.iacp.application.out.repository.RouteRepository;
 import io.mateu.ecdemo1.iacp.domain.aggregates.route.Route;
+import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.Guardrails;
 import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.RouteId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Enabled;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Name;
@@ -29,6 +30,9 @@ public class RouteDBRepository implements RouteRepository {
         e.setLocale(route.getLocale());
         e.setRoutePrefix(route.getRoutePrefix());
         e.setTargetAgentId(route.getTargetAgentId());
+        e.setInputGuardrailAgentIds(IdList.join(route.getGuardrails().input()));
+        e.setOutputGuardrailAgentIds(IdList.join(route.getGuardrails().output()));
+        e.setGuardrailFailure(route.getGuardrails().failure().name());
         e.setEnabled(route.getEnabled().value());
         e.setCreated(route.getCreated().value());
         entities.save(e);
@@ -71,6 +75,9 @@ public class RouteDBRepository implements RouteRepository {
                 e.getLocale(),
                 e.getRoutePrefix(),
                 e.getTargetAgentId(),
+                new Guardrails(IdList.split(e.getInputGuardrailAgentIds()),
+                        IdList.split(e.getOutputGuardrailAgentIds()),
+                        Guardrails.Failure.parse(e.getGuardrailFailure())),
                 new Enabled(e.isEnabled()),
                 new Time(e.getCreated()));
     }

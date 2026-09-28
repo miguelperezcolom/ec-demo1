@@ -32,6 +32,7 @@ public class UpdateAgentUseCase {
         agent.update(new Name(command.name()), new SystemPrompt(command.systemPrompt()), llmId,
                 CreateAgentUseCase.ids(command.mcpIds(), McpId::new),
                 CreateAgentUseCase.ids(command.ragIds(), RagId::new),
+                CreateAgentUseCase.ids(command.peerAgentIds(), AgentId::new),
                 command.description(), new Enabled(command.enabled()));
         repository.save(agent);
     }

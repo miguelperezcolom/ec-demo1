@@ -7,6 +7,10 @@ mcp:
   - orchestrator
 rag:
   - handbook
+# Other agents it may delegate to over A2A. Each is one tool, described by the peer's own
+# description — here, questions about the CRS-PMS code mapping go to the mapping agent.
+peers:
+  - mapping-agent
 enabled: true
 systemPrompt: |
   Eres el asistente de la consola de este despliegue. Respondes únicamente llamando a las

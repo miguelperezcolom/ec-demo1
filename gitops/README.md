@@ -37,6 +37,58 @@ same convention `credentialEnv` follows, so editing a base url in a hurry cannot
 somebody wrote. **An empty list empties it**, which is the repo saying so on purpose, and leaves the
 entry catalogued and visibly unusable.
 
+## Agents that call agents (A2A)
+
+An `agent` entry may list, under `peers`, other agents it is allowed to call:
+
+```yaml
+kind: agent
+id: console-agent
+llm: anthropic
+peers:
+  - mapping-agent     # becomes the tool ask_mapping_agent, described by mapping-agent's description
+```
+
+Each peer is offered to the agent's model as one tool that sends it a message over the
+[A2A protocol](https://a2a-protocol.org) (`message/send`, JSON-RPC 2.0) and returns its answer. The
+peer's `description` is the tool description the calling model reads, so write it for that reader.
+The resolved configuration carries each peer's A2A address, built from the control plane's
+`cp.a2a-base-url` (`A2A_BASE_URL`, `http://ia-agent:8095` by default) plus `/a2a/<id>`: every
+ia-agent pod serves every agent there, with its Agent Card at `/a2a/<id>/.well-known/agent-card.json`.
+
+The rules: an agent cannot list itself (the sync reports it as an error); peers are references like
+`mcp` and `rag`, so one that is missing or disabled is dropped at read time with a warning; the
+caller's token is forwarded, so the peer acts for the same person and spends against the same
+budgets; a chain of calls stops at `IA_A2A_MAX_DEPTH` hops (2) and a call back to an agent already
+on the chain is refused. Supported subset: text in, text out, blocking. No streaming, no push
+notifications, no tasks, no agents outside this deployment.
+
+## Guardrails on a route
+
+A `route` can put agents around the agent it picks: `inputGuardrails` read the user's text before
+it does, `outputGuardrails` read its answer before the user does. They are ordinary `agent` entries,
+called over A2A, one hop each, without peer tools.
+
+```yaml
+kind: route
+id: support-to-console-agent
+role: support
+targetAgent: console-agent
+inputGuardrails: [content-guardrail]
+outputGuardrails: [content-guardrail]
+guardrailFailure: CLOSED    # or OPEN
+```
+
+The contract: a guardrail is sent the text alone (`message/send`) and answers JSON
+`{"verdict":"ALLOW"|"BLOCK"|"REWRITE","reason":"...","text":"..."}` — read tolerantly, so a code
+fence or a sentence around it is fine. They run in the order listed. `BLOCK` stops there: a blocked
+input never reaches the agent, a blocked answer never reaches the user, and the reason is shown.
+`REWRITE` replaces the text and the next guardrail reads the rewrite. A guardrail that cannot be
+reached or does not answer a verdict (a `REWRITE` without `text` counts) blocks under `CLOSED`, the
+default, and is skipped with a warning under `OPEN`. The target agent cannot be its own guardrail;
+a missing or disabled one is dropped at read time with a warning. An answer is never sent in pieces
+while output guardrails exist — it goes out once checked. See `example/ia/agents/content-guardrail.yaml`.
+
 ## The rules that matter
 
 - **Git owns only what git created.** An entry the reconciler writes is remembered as git-managed;

@@ -90,6 +90,14 @@ public class AgentViewModel implements CatalogueEditor<AgentDto>, OptionsSupplie
     @Help("RAG sources the agent may search. Same handling as the MCP servers above.")
     List<String> ragIds;
 
+    @Section("Other agents")
+    @Stereotype(FieldStereotype.checkbox)
+    @Label("Agents it may call (A2A)")
+    @Help("Each one is offered to this agent's model as a tool that sends it a request over A2A "
+            + "and returns its answer. Its description is what the model reads to decide when to "
+            + "delegate. Disabled or deleted ones are dropped when the configuration is served.")
+    List<String> peerAgentIds;
+
     @Section("Status")
     boolean enabled;
 
@@ -106,12 +114,12 @@ public class AgentViewModel implements CatalogueEditor<AgentDto>, OptionsSupplie
 
     public String create(HttpRequest httpRequest) {
         return createAgentUseCase.handle(new CreateAgentCommand(newId, name, systemPrompt, llmId,
-                mcpIds, ragIds, description));
+                mcpIds, ragIds, peerAgentIds, description));
     }
 
     public void save(HttpRequest httpRequest) {
         updateAgentUseCase.handle(new UpdateAgentCommand(id, name, systemPrompt, llmId,
-                mcpIds, ragIds, description, enabled));
+                mcpIds, ragIds, peerAgentIds, description, enabled));
     }
 
     /**
@@ -134,6 +142,9 @@ public class AgentViewModel implements CatalogueEditor<AgentDto>, OptionsSupplie
             sb.append("RAG sources served: ").append(resolved.rags().size()).append('\n');
             resolved.rags().forEach(r -> sb.append("  - ").append(r.name())
                     .append(" / ").append(r.collection()).append('\n'));
+            sb.append("Peer agents (A2A): ").append(resolved.peers().size()).append('\n');
+            resolved.peers().forEach(p -> sb.append("  - ").append(p.name())
+                    .append(" ").append(p.a2aUrl()).append('\n'));
             if (resolved.warnings().isEmpty()) {
                 sb.append("No warnings.");
             } else {
@@ -148,11 +159,17 @@ public class AgentViewModel implements CatalogueEditor<AgentDto>, OptionsSupplie
         return List.of(new Message(lastPreview), new State(this));
     }
 
-    /** The checkboxes' options: every MCP server and RAG source, see {@link CatalogueReferenceOptions}. */
+    /**
+     * The checkboxes' options: every MCP server and RAG source, and every agent but this one — see
+     * {@link CatalogueReferenceOptions}.
+     */
     @Override
     public List<Option> options(String fieldName, HttpRequest httpRequest) {
         return switch (fieldName) {
             case "mcpIds", "ragIds" -> referenceOptions.all(fieldName, httpRequest);
+            case "peerAgentIds" -> referenceOptions.all(fieldName, httpRequest).stream()
+                    .filter(o -> id == null || !id.equals(o.value()))
+                    .toList();
             default -> List.of();
         };
     }
@@ -171,6 +188,7 @@ public class AgentViewModel implements CatalogueEditor<AgentDto>, OptionsSupplie
         systemPrompt = dto.systemPrompt();
         mcpIds = new ArrayList<>(dto.mcpIds());
         ragIds = new ArrayList<>(dto.ragIds());
+        peerAgentIds = new ArrayList<>(dto.peerAgentIds());
         enabled = dto.enabled();
         lastPreview = null;
         return this;

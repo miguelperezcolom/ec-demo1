@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.iacp.application.usecases.route.update;
 
 import io.mateu.ecdemo1.iacp.application.out.repository.RouteRepository;
+import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.Guardrails;
 import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.RouteId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Enabled;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Name;
@@ -20,6 +21,8 @@ public class UpdateRouteUseCase {
                 .orElseThrow(() -> new IllegalArgumentException("No route with id '" + command.id() + "'"));
         route.update(new Name(command.name()), command.priority(), command.role(), command.tenant(),
                 command.locale(), command.routePrefix(), command.targetAgentId(),
+                new Guardrails(command.inputGuardrailAgentIds(), command.outputGuardrailAgentIds(),
+                        Guardrails.Failure.parse(command.guardrailFailure())),
                 new Enabled(command.enabled()));
         repository.save(route);
     }
