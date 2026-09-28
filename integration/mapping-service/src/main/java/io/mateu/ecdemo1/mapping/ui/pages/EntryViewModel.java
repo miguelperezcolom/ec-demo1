@@ -45,10 +45,12 @@ import java.util.List;
  * saving it with a PMS code defines the equivalence. While a code waits for a decision, what Opera
  * offers for its type is shown beside it.
  *
- * <p>Once it exists — an entry, or an unmapped code — only its PMS side is to decide: the PMS code
- * (and a channel's market code) is a select of what the PMS offers for that type at that hotel —
- * at every integrated property, for a chain-level one — and the rest is read-only. Created by hand,
- * the type, hotel and CRS code are chosen too, and the PMS code is typed.
+ * <p>Once it exists — an entry, or an unmapped code — its PMS side and its attributes are to
+ * decide: the PMS code (and a channel's market code) is a select of what the PMS offers for that
+ * type at that hotel — at every integrated property, for a chain-level one — and what identifies it
+ * is read-only. The decision on the version being edited (who proposed it, who approved it) is the
+ * detail's, not the edit form's. Created by hand, the type, hotel and CRS code are chosen too, and
+ * the PMS code is typed.
  */
 @Service
 @Scope("prototype")
@@ -76,9 +78,9 @@ public class EntryViewModel implements Identifiable, VisibilitySupplier, Options
     String pmsCode;
     /** A CHANNEL is, in Opera, a source code and a market code: the second one, chosen the same way. */
     String marketCode;
+    /** Editable: saving defines the next version, attributes included. */
     @MasterDetail(minHeightWhenDetailVisible = "14rem;")
     @Colspan(2)
-    @EditableOnlyWhenCreating
     List<AttributeRow> attributes;
 
     @Section("Decision")
@@ -200,8 +202,20 @@ public class EntryViewModel implements Identifiable, VisibilitySupplier, Options
             case "pmsCodes" -> pmsCodes == null || pmsCodes.isEmpty();
             // Created by hand, a channel's market code goes among the attributes, as any other.
             case "marketCode" -> creating() || type != CodeType.CHANNEL;
+            // Who proposed and decided this version: what the detail is for, and noise while
+            // defining the next one — which gets a decision of its own.
+            case "id", "version", "proposedBy", "confidence", "rationale", "decided" -> editing(httpRequest);
             default -> false;
         };
+    }
+
+    /** The edit form, as opposed to the detail: the route ends in /edit. */
+    static boolean editing(HttpRequest httpRequest) {
+        try {
+            return "edit".equals(httpRequest.lastPathItem());
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     public EntryViewModel load(MappingEntry e) {

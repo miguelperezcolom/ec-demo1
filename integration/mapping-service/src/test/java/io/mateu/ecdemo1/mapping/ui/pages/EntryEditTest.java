@@ -16,8 +16,10 @@ import io.mateu.ecdemo1.mapping.store.MappingEntry;
 import io.mateu.ecdemo1.mapping.store.MappingEntryRepository;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.data.Option;
+import io.mateu.uidl.interfaces.HttpRequest;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,9 +31,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Editing an equivalence decides only its PMS side: the PMS code (and a channel's market code) is
- * chosen among what the PMS offers for that type at that hotel; the rest is read-only. Created by
- * hand, the type, hotel and CRS code are chosen too.
+ * Editing an equivalence decides its PMS side and its attributes: the PMS code (and a channel's
+ * market code) is chosen among what the PMS offers for that type at that hotel; what identifies it
+ * is read-only, and the decision on the version being replaced is not shown. Created by hand, the
+ * type, hotel and CRS code are chosen too.
  */
 class EntryEditTest {
 
@@ -106,13 +109,39 @@ class EntryEditTest {
     }
 
     @Test
-    void editingAnEntryLeavesOnlyItsPmsSideEditable() throws Exception {
+    void editingAnEntryLeavesItsPmsSideAndAttributesEditable() throws Exception {
         var vm = viewModel().load(channel());
-        for (var field : List.of("type", "hotelCode", "crsCode", "attributes", "status", "version", "proposedBy", "decided")) {
+        for (var field : List.of("type", "hotelCode", "crsCode", "status", "version", "proposedBy", "decided")) {
             assertThat(readOnly(vm, field, false)).as(field).isTrue();
         }
-        assertThat(readOnly(vm, "pmsCode", false)).isFalse();
-        assertThat(readOnly(vm, "marketCode", false)).isFalse();
+        for (var field : List.of("pmsCode", "marketCode", "attributes")) {
+            assertThat(readOnly(vm, field, false)).as(field).isFalse();
+        }
+    }
+
+    @Test
+    void theDecisionIsShownInTheDetailAndNotWhileEditing() {
+        var vm = viewModel().load(channel());
+        for (var field : List.of("id", "version", "proposedBy", "confidence", "rationale", "decided")) {
+            assertThat(vm.isHidden(field, at("/mapping/dictionary/e1"))).as(field).isFalse();
+            assertThat(vm.isHidden(field, at("/mapping/dictionary/e1/edit"))).as(field).isTrue();
+        }
+    }
+
+    @Test
+    void savingAnEditedEntryKeepsItsEditedAttributes() {
+        var vm = viewModel().load(approved(CodeType.RATE_PLAN, "MRU01", "RACK"));
+        assertThat(vm.attributes).containsExactly(new AttributeRow("marketCode", "TOUR"));
+        vm.attributes = List.of(new AttributeRow("marketCode", "LEIS"), new AttributeRow("board", "AI"));
+        vm.save(null);
+        assertThat(defined.get().attributes()).containsExactly(Map.entry("marketCode", "LEIS"), Map.entry("board", "AI"));
+    }
+
+    /** A request for this route; everything else it is asked is the interface's default or null. */
+    static HttpRequest at(String path) {
+        return (HttpRequest) Proxy.newProxyInstance(EntryEditTest.class.getClassLoader(), new Class<?>[]{HttpRequest.class},
+                (proxy, method, args) -> "path".equals(method.getName()) ? path
+                        : method.isDefault() ? InvocationHandler.invokeDefault(proxy, method, args) : null);
     }
 
     @Test
