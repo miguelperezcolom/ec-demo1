@@ -163,7 +163,7 @@ class NewBookingWizardTest {
                     }
                     return Optional.ofNullable(statuses.get((String) args[0])).map(NewBookingWizardTest::booking);
                 });
-        var form = new BookingCancellationForm(cancel, query);
+        var form = new BookingCancellationForm(cancel, query, null);
         form.cancellationReasonCode = "CLI";
 
         var outcome = form.cancel(List.of("A", "B", "C", "D"));
@@ -172,6 +172,21 @@ class NewBookingWizardTest {
         assertThat(outcome.alreadyCancelled()).containsExactly("B");
         assertThat(outcome.refused()).containsExactly("C (refused)");
         assertThat(asked).extracting(CancelBookingCommand::id).containsExactly("A", "C", "D");
+    }
+
+    @Test
+    void theCancellationDialogIsWordedForOneBookingOrSeveral() {
+        var one = new BookingCancellationForm(null, null, null);
+        one.bookingIds = "79RE8S";
+        assertThat(one.buttons()).extracting(b -> ((io.mateu.uidl.data.Button) b).label())
+                .containsExactly("Cancel booking", "Keep it");
+        assertThat(one.isHidden("bookingIds", null)).isTrue();
+
+        var several = new BookingCancellationForm(null, null, null);
+        several.bookingIds = "79RE8S, DPUQKZ";
+        assertThat(several.buttons()).extracting(b -> ((io.mateu.uidl.data.Button) b).label())
+                .containsExactly("Cancel bookings", "Keep them");
+        assertThat(several.isHidden("bookingIds", null)).isFalse();
     }
 
     static BookingDto booking(BookingStatus status) {
