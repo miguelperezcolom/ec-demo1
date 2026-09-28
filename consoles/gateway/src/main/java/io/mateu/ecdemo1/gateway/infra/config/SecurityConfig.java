@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
@@ -132,6 +133,9 @@ public class SecurityConfig {
                         // The external APIs' usage (the header widget and its page), on every host
                         // like the inbox: counts, no personal data, but not for anonymous callers.
                         // Only these screens: the services' /usage endpoints have no route at all.
+                        // Except the page's own path typed in the address bar: a GET with no token,
+                        // which the route api-usage-page only redirects to the shell's route for it.
+                        .pathMatchers(HttpMethod.GET, "/_api-usage/apis").permitAll()
                         .pathMatchers("/_api-usage/**").authenticated()
                         // The two demo CRUD services, guarded the same way and for the same
                         // reason: none of them authenticates anything of its own, so this is

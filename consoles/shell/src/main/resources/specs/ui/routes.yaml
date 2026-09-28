@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/mateu/refs/heads/master/backend/shared/uidl/routes-schema.json
+# The shell's own pages. Every other screen is a RemoteMenu in ShellHome, served by its pod.
+# The home is routed here, and not as a hidden menu: a renderer that asks for the home route
+# without naming the shell's class (Redwood) is answered by a route, and a menu entry is not one.
+type: Routes
+routes:
+  - route: inicio
+    viewModel: io.mateu.ecdemo1.shell.infra.in.ui.Inicio

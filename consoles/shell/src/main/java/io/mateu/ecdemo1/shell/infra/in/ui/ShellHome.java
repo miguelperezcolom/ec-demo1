@@ -9,16 +9,13 @@ import io.mateu.uidl.annotations.Script;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.Menu;
-import io.mateu.uidl.annotations.PageTemplate;
 import io.mateu.uidl.annotations.PageTitle;
 import io.mateu.uidl.annotations.Title;
-import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
-import io.mateu.uidl.annotations.WelcomeBanner;
-import io.mateu.uidl.data.MicroFrontend;
 import io.mateu.uidl.data.RemoteMenu;
 import io.mateu.uidl.fluent.Component;
+import io.mateu.uidl.interfaces.HomeRouteSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.WidgetSupplier;
 
@@ -66,22 +63,25 @@ import java.util.List;
 // Edge-to-edge: the pages behind these menus are listings and workflow graphs, and capping the
 // content at the default ~900px container squeezes them into cards for lack of horizontal room.
 @Style(StyleConstants.FULL_WIDTH)
-// This is a home, so it declares the landing template: Mateu tags the wire pageType as "landing"
-// and the renderer lays the page out as one. The welcome banner is what LANDING is for — Mateu
-// turns it into a HeroSection at the top of the content: an image, a title and a subtitle above
-// the menus. The image is a Redwood illustration served from src/main/resources/static like the
-// logo, so it arrives through the gateway's catch-all with no route and no token of its own.
-@PageTemplate(PageType.LANDING)
-@WelcomeBanner(
-        title = "EventConductor demo",
-        subtitle = "Reservas y workflows, en una sola plataforma.",
-        image = "/images/redwood-header-texture.png")
+// The home is a page of its own, Inicio (homeRoute below): a welcome — hero and KPI tiles — which
+// both renderers draw. It used to be this class's own page, as a landing template with a welcome
+// banner, but Redwood asks for a home route with no class to build it from, and was answered
+// "Not found": its home stayed on "…".
 // The chat panel. Mateu's client POSTs the prompt here and reads the answer as a stream; the
 // gateway routes /ai/** to the agent pod and requires a token on it, which this client sends.
 // The agent itself knows nothing about these menus: it reaches the orchestrator, the forms engine
 // and the booking service over MCP, and each of those decides what it is willing to expose.
 @AI(sse = "/ai/api/agent/stream")
-public class ShellHome implements WidgetSupplier {
+public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
+
+    /**
+     * The welcome page, not the first menu: see {@link Inicio}. Routed in specs/ui/routes.yaml, so
+     * the route answers whether or not the renderer names this class; the logo leads back to it.
+     */
+    @Override
+    public String homeRoute() {
+        return "/inicio";
+    }
 
     // Every entry names its label, and that is not decoration.
     //
@@ -146,13 +146,6 @@ public class ShellHome implements WidgetSupplier {
     @Menu
     @Hidden
     RemoteMenu apiUsage = new RemoteMenu("/_api-usage").withLabel("APIs externas");
-
-    /**
-     * Under the welcome banner: Salesforce's calls left of the org's daily allowance, whether they go
-     * down, our pace, and Opera's calls today — what to look at before a meeting or a demo. Served
-     * by integrations-service from numbers already held: a page view costs Salesforce nothing.
-     */
-    MicroFrontend apiUsageTiles = ApiUsageWidget.tiles();
 
     /**
      * Running the platform: Workflow and Forms, behind one entry — last on the bar: it is

@@ -67,6 +67,19 @@ spring:
         # How much of Salesforce and Opera is spent — the header widget and its page, in every shell
         # like the inbox — served by integrations-service, which asks the services that call them.
         # Only the screens: the services' own /usage endpoints stay inside the cluster.
+        #
+        # A browser that opens the page by the service's own path (/_api-usage/apis) is sent to the
+        # shell's route for it (/usage/apis): typed in the address bar, the service path is a GET with
+        # no token, which the rule on /_api-usage refuses — a blank page. The shell's route loads it
+        # after the login, like any other. First, so it wins over the route below.
+        - id: api-usage-page
+          uri: no://op
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_api-usage/apis
+            - Method=GET
+          filters:
+            - RedirectTo=302, /usage/apis
         - id: api-usage
           uri: ${INTEGRATIONS_URL:http://integrations-service:8126}
           predicates:
