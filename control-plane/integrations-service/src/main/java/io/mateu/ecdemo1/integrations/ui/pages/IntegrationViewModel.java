@@ -215,7 +215,13 @@ public class IntegrationViewModel implements Identifiable {
     }
 
     Object act(HttpRequest httpRequest, String done, Function<String, Integration> action) {
-        load(action.apply(id));
+        try {
+            load(action.apply(id));
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            // An action the integration's state does not allow (activate before READY_TO_ACTIVATE…):
+            // the person reads why, instead of an error in the log and nothing on screen.
+            return Message.error(e.getMessage());
+        }
         return List.of(new Message(done), new State(this));
     }
 
