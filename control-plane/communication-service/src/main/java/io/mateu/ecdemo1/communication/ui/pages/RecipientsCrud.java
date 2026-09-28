@@ -4,6 +4,8 @@ import io.mateu.ecdemo1.communication.application.RecipientQueries;
 import io.mateu.ecdemo1.communication.application.Recipients;
 import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
+import io.mateu.uidl.annotations.PageWidth;
+import io.mateu.uidl.annotations.PageWidthStyle;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.NoFilters;
@@ -26,6 +28,7 @@ import java.util.NoSuchElementException;
 @RequiredArgsConstructor
 @Scope("prototype")
 @Title("Recipients")
+@PageWidth(PageWidthStyle.EDGE_TO_EDGE)
 public class RecipientsCrud extends Crud<RecipientViewModel, RecipientViewModel, RecipientViewModel, NoFilters, RecipientRow, String> {
 
     /** Grid column → recipient property: what a click on a column's header sorts by. */
