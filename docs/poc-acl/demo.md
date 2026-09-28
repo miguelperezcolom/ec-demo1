@@ -690,6 +690,20 @@ desde su cursor. Qué hacer:
     cada una con su perfil de huésped.
   - `ECDEMO1-<MMddHHmm>`: lo que escriba cada ejecución desde su `zero.sh` (sus reservas y sus perfiles
     de huésped); ampliar esta lista al estrenarlo.
+  - `ECDEMO1-09280207`, el ensayo de la grabación (2026-09-28, 02:07–04:05Z), cada una con su perfil de
+    huésped: flujo 1, 39484308 (87J8RP), 39484623 (2FJWNE), 39484622 (AYGMUM), 39484620 (9PFB85),
+    39484624 (3N4YCX), 39484621 (MS5DRX), 39484311 (3SERFS), 39484309 (6EYQ6Q), 39484619 (X35U7X) y
+    39484631 (EQ3GJT, rechazada primero por falta de habitaciones y movida al 24 de noviembre); flujo 2,
+    39484315 (RJ3T5V); flujo 4, 39484632 (77SAJF, cancelada como no show); flujo 5, 39484633 (7T8AX8,
+    walk-in FO-A3NVW4); flujos 6–7, 39484634 (WMBH5M, modificada y cancelada); flujo 8, 39484316
+    (7HHHWD, tarifa `432040HLXMU`).
+  - `ECDEMO1-09280410`, la grabación del vídeo (2026-09-28, 04:10–05:30Z), cada una con su perfil de
+    huésped: flujo 1, 39484641 (CDETQY), 39484636 (MD33Y5), 39484639 (FT5KSW), 39484317 (VR6QV2),
+    39484638 (S5PQJS), 39484640 (S5YRAR), 39484318 (Y4G937), 39484643 (A9W5HH), 39484644 (MRKKM8) y
+    39484645 (2CNCYB) — las tres últimas, rechazadas primero por falta de habitaciones (RSV00138) y
+    cambiadas de tipo en el CRS; flujo 2, 39484646 (AKCBNY); flujo 4, 39484647 (KMNQ28, cancelada como no
+    show); flujo 5, 39484320 (N529R5, walk-in FO-3FSJ7G); flujos 6–7, 39484648 (DPUQKZ, modificada y
+    cancelada); flujo 8, 39484649 (79RE8S, tarifa `432040HLXMU`).
   - `CRS`, de antes de poner ec1 a cero: reservas 39481284, 39481745, 39481775, 39481943, 39481944,
     39482155 (y dos canceladas, y las `E2E-<fecha>` de cada `npm run demo`, canceladas como no show),
     sin Custom Reference.
