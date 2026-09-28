@@ -1,0 +1,38 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:notification-resolutions:v1",
+  "title" : "notification-resolutions v1",
+  "description" : "What a notification was about is resolved: its subject's notifications close.",
+  "x-topic" : "notification-resolutions",
+  "x-version" : 1,
+  "x-owner" : "communication-service",
+  "x-key" : "subject (none from pms-integration's retry watch)",
+  "x-producers" : [ "integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service" ],
+  "x-consumers" : [ "communication-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.notification.NotificationResolved",
+  "$ref" : "#/$defs/NotificationResolved",
+  "$defs" : {
+    "NotificationResolved" : {
+      "type" : "object",
+      "properties" : {
+        "subject" : {
+          "type" : [ "string", "null" ]
+        },
+        "resolvedBy" : {
+          "type" : [ "string", "null" ]
+        },
+        "resolvedAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        }
+      },
+      "required" : [ "subject", "resolvedBy", "resolvedAt" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "subject" : "MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING",
+    "resolvedBy" : "ana",
+    "resolvedAt" : "2026-11-12T09:30:00Z"
+  } ]
+}

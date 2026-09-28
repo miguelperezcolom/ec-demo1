@@ -27,7 +27,7 @@
              deploy/values/eventconductor.yaml — the events on the wire are defined there, so a
              mismatch is a deserialization failure at runtime and not a compile error. -->
         <mateu.version>3.0-alpha.372</mateu.version>
-        <eventconductor.version>2.23.0</eventconductor.version>
+        <eventconductor.version>2.23.1</eventconductor.version>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
         <spring-ai.version>1.0.0</spring-ai.version>
         <!-- Ahead of what Boot 3.4.3 manages (1.18.36), which does not run on a JDK 25 javac and
@@ -76,11 +76,44 @@
 
         <!-- The engine's event DTOs — TaskExecutionRequested, WorkerReply, Variable. Published to
              Maven Central by the engine, so nothing here needs eventconductor checked out. -->
-        <!-- The integration's business model. Installed from ../integration-model first. -->
+        <!-- The contracts this service speaks (contracts/, installed first): one library per context,
+             only the contexts it talks to. -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
-            <artifactId>integration-model</artifactId>
-            <version>0.1.0</version>
+            <artifactId>contracts-reservation</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-customer</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-partner</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-mapping</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-integration</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-process</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- Its messages checked against the topics' schemas (contracts/schemas). -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-testing</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
         </dependency>
         <!-- The outbox, its relay and the inbox, shared by the services. Installed from
              ../../supporting/messaging first. -->

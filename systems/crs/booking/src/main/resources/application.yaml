@@ -21,7 +21,7 @@ spring:
       # runs in the orchestrator pod, so consumeOutbox and consumeUpstream do not belong here —
       # naming them left two phantom bindings, one of them sharing a consumer group with the
       # engine's own.
-      definition: consumeWorkerEvent;consumeLegacyTasks;consumeBookingCommands
+      definition: consumeWorkerEvent;consumeBookingCommands
     stream:
       kafka:
         binder:
@@ -32,11 +32,6 @@ spring:
           # in the booking's trace, and the engine's tasks run inside the process's.
           enable-observation: true
         bindings:
-          # A group created at the end of the topic, not its beginning: it would otherwise run every
-          # task the topic ever held.
-          consumeLegacyTasks-in-0:
-            consumer:
-              start-offset: latest
           # Synchronous, so the relay marks a message published only once the broker acknowledged
           # it. The key is the booking id, as a String: the events of one booking go to one
           # partition and keep their order there.
@@ -69,13 +64,9 @@ spring:
         consumeWorkerEvent-in-0:
           destination: booking
           group: ec-demo1-booking
-        # IN: the same tasks, for the ones the engine dispatches with no contract — a «Registrar
-        # no-show» started on a version of its definition from before it named its task. It stamps
-        # the contract the step answers to and runs it through the same runtime; the rest it leaves
-        # to consumeWorkerEvent. Goes once no such process is left.
-        consumeLegacyTasks-in-0:
-          destination: booking
-          group: ec-demo1-booking-legacy
+          consumer:
+            # «booking» has one partition, and a no-show a minute is its load.
+            concurrency: 1
         # IN: what other services ask of the CRS without waiting — the integration writing back where a
         # booking landed in the PMS. Taken once each (inbox); retried until it goes.
         consumeBookingCommands-in-0:

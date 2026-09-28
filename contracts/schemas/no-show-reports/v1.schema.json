@@ -1,0 +1,41 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:no-show-reports:v1",
+  "title" : "no-show-reports v1",
+  "description" : "The hotel says a reservation's guests have not arrived; the CRS cancels it as a no-show.",
+  "x-topic" : "no-show-reports",
+  "x-version" : 1,
+  "x-owner" : "crs-integration-service",
+  "x-key" : "hotelCode/locator",
+  "x-producers" : [ "front-office" ],
+  "x-consumers" : [ "crs-integration-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.command.ReportNoShow",
+  "$ref" : "#/$defs/ReportNoShow",
+  "$defs" : {
+    "ReportNoShow" : {
+      "type" : "object",
+      "properties" : {
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "locator" : {
+          "type" : [ "string", "null" ]
+        },
+        "reportedBy" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "commandId", "hotelCode", "locator", "reportedBy" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "commandId" : "CMD-4",
+    "hotelCode" : "MRU01",
+    "locator" : "12E45",
+    "reportedBy" : "front office"
+  } ]
+}

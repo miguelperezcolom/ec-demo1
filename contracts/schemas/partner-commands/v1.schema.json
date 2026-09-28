@@ -1,0 +1,119 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:partner-commands:v1",
+  "title" : "partner-commands v1",
+  "description" : "What other services ask of the master of partners without waiting: announce a partner again, bring one in as the PMS has it, record which PMS profile it is. Taken once each (inbox).",
+  "x-topic" : "partner-commands",
+  "x-version" : 1,
+  "x-owner" : "erp",
+  "x-key" : "partnerCode",
+  "x-producers" : [ "integrations-service", "crs-integration-service" ],
+  "x-consumers" : [ "erp" ],
+  "x-java-type" : "io.mateu.ecdemo1.erp.application.usecases.PartnerCommands$Command",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/PartnerCommands.Resync"
+  }, {
+    "$ref" : "#/$defs/PartnerCommands.Import"
+  }, {
+    "$ref" : "#/$defs/PartnerCommands.RecordPmsProfile"
+  } ],
+  "$defs" : {
+    "PartnerCommands.Import" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "import-partner"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "partnerCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "partnerType" : {
+          "$ref" : "#/$defs/PartnerType-nullable"
+        },
+        "name" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsProfileId" : {
+          "type" : [ "string", "null" ]
+        },
+        "profileType" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "partnerCode", "partnerType", "name", "pmsProfileId", "profileType" ],
+      "additionalProperties" : false
+    },
+    "PartnerCommands.RecordPmsProfile" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "record-pms-profile"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "partnerCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "profileId" : {
+          "type" : [ "string", "null" ]
+        },
+        "profileType" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "partnerCode", "profileId", "profileType" ],
+      "additionalProperties" : false
+    },
+    "PartnerCommands.Resync" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "resync-partner"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "partnerCode" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "partnerCode" ],
+      "additionalProperties" : false
+    },
+    "PartnerType" : {
+      "type" : "string",
+      "enum" : [ "TravelAgent", "TourOperator", "OnlineAgency", "Company" ]
+    },
+    "PartnerType-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/PartnerType"
+      } ]
+    }
+  },
+  "examples" : [ {
+    "type" : "resync-partner",
+    "commandId" : "CMD-1",
+    "partnerCode" : "NORDTRAVEL"
+  }, {
+    "type" : "import-partner",
+    "commandId" : "CMD-2",
+    "partnerCode" : "SUNTOURS",
+    "partnerType" : "TourOperator",
+    "name" : "Sun Tours",
+    "pmsProfileId" : "16120700",
+    "profileType" : "Wholesaler"
+  }, {
+    "type" : "record-pms-profile",
+    "commandId" : "CMD-3",
+    "partnerCode" : "NORDTRAVEL",
+    "profileId" : "16120699",
+    "profileType" : "Agent"
+  } ]
+}

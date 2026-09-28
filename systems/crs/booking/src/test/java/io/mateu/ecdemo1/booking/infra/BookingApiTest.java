@@ -239,7 +239,7 @@ class BookingApiTest {
                     objectMapper.writerFor(io.mateu.workflow.ddd.DomainEvent.class).writeValueAsString(task))).get();
         }
 
-        // The legacy consumer leaves a contract task alone: one answer, not two.
+        // One consumer on the topic, one answer.
         var replies = consume("upstream", null, 60).stream().filter(r -> r.value().contains("TC-" + id)).toList();
         assertThat(replies).singleElement().satisfies(r -> assertThat(json(r.value()).get("status").asText()).isEqualTo("COMPLETED"));
         assertThat(read(id).get("status").asText()).isEqualTo("Cancelled");

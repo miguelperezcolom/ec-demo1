@@ -64,11 +64,19 @@
             <artifactId>spring-cloud-starter-stream-kafka</artifactId>
         </dependency>
 
-        <!-- AuditedAction, the event as the services publish it. -->
+        <!-- The contracts this service speaks (contracts/, installed first): one library per context,
+             only the contexts it talks to. -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
-            <artifactId>integration-model</artifactId>
-            <version>0.1.0</version>
+            <artifactId>contracts-audit</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- Its messages checked against the topics' schemas (contracts/schemas). -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-testing</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>

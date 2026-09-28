@@ -1,0 +1,54 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:pms-reservations:v1",
+  "title" : "pms-reservations v1",
+  "description" : "A reservation written in the PMS — for whoever follows the PMS (the pms-fo integration).",
+  "x-topic" : "pms-reservations",
+  "x-version" : 1,
+  "x-owner" : "pms-integration-service",
+  "x-key" : "pmsHotelCode/pmsReservationId",
+  "x-producers" : [ "pms-integration-service" ],
+  "x-consumers" : [ "integrations-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.pms.PmsReservationChanged",
+  "$ref" : "#/$defs/PmsReservationChanged",
+  "$defs" : {
+    "PmsReservationChanged" : {
+      "type" : "object",
+      "properties" : {
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "locator" : {
+          "type" : [ "string", "null" ]
+        },
+        "origin" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        }
+      },
+      "required" : [ "eventId", "pmsHotelCode", "pmsReservationId", "crsHotelCode", "locator", "origin", "occurredAt" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "eventId" : "E-3",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "crsHotelCode" : "MRU01",
+    "locator" : "12E45",
+    "origin" : null,
+    "occurredAt" : "2026-11-12T09:30:00Z"
+  } ]
+}

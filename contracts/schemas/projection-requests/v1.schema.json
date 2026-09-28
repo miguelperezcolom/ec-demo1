@@ -1,0 +1,41 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:projection-requests:v1",
+  "title" : "projection-requests v1",
+  "description" : "A reservation to project again by the same path a change in the CRS takes — a backfill's, once per reservation.",
+  "x-topic" : "projection-requests",
+  "x-version" : 1,
+  "x-owner" : "crs-integration-service",
+  "x-key" : "hotelCode/locator",
+  "x-producers" : [ "integrations-service" ],
+  "x-consumers" : [ "crs-integration-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.command.ProjectReservation",
+  "$ref" : "#/$defs/ProjectReservation",
+  "$defs" : {
+    "ProjectReservation" : {
+      "type" : "object",
+      "properties" : {
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "locator" : {
+          "type" : [ "string", "null" ]
+        },
+        "origin" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "commandId", "hotelCode", "locator", "origin" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "commandId" : "CMD-3",
+    "hotelCode" : "MRU01",
+    "locator" : "12E45",
+    "origin" : "backfill:R1"
+  } ]
+}

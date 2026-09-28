@@ -1,14 +1,12 @@
 package io.mateu.ecdemo1.booking.worker;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.booking.application.usecases.booking.noshow.RegisterNoShowUseCase;
-import io.mateu.ecdemo1.booking.worker.runtime.ExactStrings;
-import io.mateu.ecdemo1.booking.worker.runtime.WorkerRuntime;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import io.mateu.workflow.worker.api.Cancellations;
 import io.mateu.workflow.worker.api.TaskDispatcher;
 import io.mateu.workflow.worker.api.TaskRegistry;
+import io.mateu.workflow.worker.api.TaskTracing;
 import io.mateu.workflow.worker.api.TaskReplySink;
 import org.junit.jupiter.api.Test;
 
@@ -34,8 +32,7 @@ class BookingTasksTest {
     final BookingTasks tasks = new BookingTasks();
     final RecordingSink sink = new RecordingSink();
     final TaskDispatcher dispatcher = new TaskDispatcher(new TaskRegistry(List.of(tasks.registerNoShowTask(handlers))),
-            sink, Cancellations.NONE, new ExactStrings(new ObjectMapper()), false);
-    final WorkerRuntime.LegacyTasks legacy = new WorkerRuntime.LegacyTasks(dispatcher, tasks.legacyTaskRefs());
+            sink, Cancellations.NONE, false, TaskTracing.NOOP);
 
     static class RecordingSink implements TaskReplySink {
         final List<String> replies = new ArrayList<>();
@@ -92,10 +89,12 @@ class BookingTasksTest {
     }
 
     @Test
-    void aNoShowFromADefinitionThatNamesNoContractRunsAsTheContract() {
-        assertThat(legacy.accept(task("", new Variable("bookingId", "LOC1")), null)).isTrue();
-        assertThat(legacy.accept(task("register-no-show@1", new Variable("bookingId", "LOC1")), null)).isFalse();
+    void aNoShowFromADefinitionThatNamesNoContractRunsAsTheContractItsStepIsNamedAfter() {
+        // The engine sends no taskId for an ACTION with no task:; the runtime (2.23.1) then serves the
+        // step id as a contract id — the bridge this service used to carry itself.
+        dispatcher.dispatch(task("", new Variable("bookingId", "LOC1")));
 
         assertThat(noShows).containsExactly("LOC1");
+        assertThat(sink.replies).hasSize(1);
     }
 }

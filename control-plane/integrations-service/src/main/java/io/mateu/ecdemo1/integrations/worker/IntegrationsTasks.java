@@ -2,7 +2,6 @@ package io.mateu.ecdemo1.integrations.worker;
 
 import io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
-import io.mateu.ecdemo1.integrations.worker.runtime.LegacyTaskRefs;
 import io.mateu.ecdemo1.integrations.worker.runtime.Reasons;
 import io.mateu.workflow.worker.api.TaskHandler;
 import io.mateu.workflow.worker.api.TaskRegistration;
@@ -105,15 +104,5 @@ public class IntegrationsTasks {
     @Bean
     public TaskRegistration<TaskHandlers.Onboarding, Void> foActivateTask(TaskHandlers handlers) {
         return task("fo-activate", handlers.frontOffice(FrontOfficeIntegrations::stepActivate));
-    }
-
-    /**
-     * The contract a step answers to when the engine dispatches it with no {@code taskId}: a process
-     * of «alta-integracion» or «alta-integracion-fo» started on a version of the definition from
-     * before it named its tasks. Goes once none of those is left.
-     */
-    @Bean
-    public LegacyTaskRefs legacyTaskRefs() {
-        return (definitionId, stepId) -> IDS.contains(stepId) ? stepId + "@1" : null;
     }
 }

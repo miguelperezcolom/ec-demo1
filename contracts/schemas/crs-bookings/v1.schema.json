@@ -1,0 +1,145 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:crs-bookings:v1",
+  "title" : "crs-bookings v1",
+  "description" : "A booking created, changed or cancelled in the CRS. Thin: whoever needs the booking reads it (its version tells a reader whether what it holds is older).",
+  "x-topic" : "crs-bookings",
+  "x-version" : 1,
+  "x-owner" : "booking",
+  "x-key" : "bookingId (the CRS locator)",
+  "x-producers" : [ "booking" ],
+  "x-consumers" : [ "crs-integration-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingCreated",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/BookingCreated"
+  }, {
+    "$ref" : "#/$defs/BookingModified"
+  }, {
+    "$ref" : "#/$defs/BookingCancelled"
+  } ],
+  "$defs" : {
+    "BookingCancelled" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "booking-cancelled"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "bookingId" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "reasonCode" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "bookingId", "hotelCode", "version", "occurredAt", "reasonCode" ],
+      "additionalProperties" : false
+    },
+    "BookingChange" : {
+      "type" : "string",
+      "enum" : [ "TermsUpdated", "Confirmed", "PaymentRegistered" ]
+    },
+    "BookingChange-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/BookingChange"
+      } ]
+    },
+    "BookingCreated" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "booking-created"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "bookingId" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        }
+      },
+      "required" : [ "type", "eventId", "bookingId", "hotelCode", "version", "occurredAt" ],
+      "additionalProperties" : false
+    },
+    "BookingModified" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "booking-modified"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "bookingId" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "change" : {
+          "$ref" : "#/$defs/BookingChange-nullable"
+        }
+      },
+      "required" : [ "type", "eventId", "bookingId", "hotelCode", "version", "occurredAt", "change" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "booking-created",
+    "eventId" : "E-1",
+    "bookingId" : "12E45",
+    "hotelCode" : "MRU01",
+    "version" : 1,
+    "occurredAt" : "2026-11-12T09:30:00Z"
+  }, {
+    "type" : "booking-modified",
+    "eventId" : "E-2",
+    "bookingId" : "12E45",
+    "hotelCode" : "MRU01",
+    "version" : 2,
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "change" : "Confirmed"
+  }, {
+    "type" : "booking-cancelled",
+    "eventId" : "E-3",
+    "bookingId" : "12E45",
+    "hotelCode" : "MRU01",
+    "version" : 3,
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "reasonCode" : "NOS"
+  } ]
+}

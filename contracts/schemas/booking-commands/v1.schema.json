@@ -1,0 +1,44 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:booking-commands:v1",
+  "title" : "booking-commands v1",
+  "description" : "What other services ask of the CRS without waiting: today, the integration writing back where a booking landed in the PMS. Taken once each (inbox).",
+  "x-topic" : "booking-commands",
+  "x-version" : 1,
+  "x-owner" : "booking",
+  "x-key" : "bookingId",
+  "x-producers" : [ "crs-integration-service" ],
+  "x-consumers" : [ "booking" ],
+  "x-java-type" : "io.mateu.ecdemo1.booking.application.usecases.commands.BookingCommands$Command",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/BookingCommands.AnnotatePmsReference"
+  } ],
+  "$defs" : {
+    "BookingCommands.AnnotatePmsReference" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "annotate-pms-reference"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "bookingId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "bookingId", "pmsReservationId" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "annotate-pms-reference",
+    "commandId" : "CMD-1",
+    "bookingId" : "12E45",
+    "pmsReservationId" : "123456"
+  } ]
+}

@@ -71,7 +71,10 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `integration/mapping-service/` | The CRS → Opera code dictionary with approval, and the causes a process waits on |
 | `integration/customer-mdm-service/` | The customer hub: identity resolution, cross-references, distribution; Salesforce cleans and decides |
 | `integration/journey-service/` | A booking's journey across the chain, hop by hop, from its traces in Tempo, told in business words ("Ver recorrido" on the data plane). Owns no data |
-| `integration/integration-model/` | The integration's business model, a library the services compile against. No image |
+| **`contracts/`** | **The language the services speak — [contracts/README.md](contracts/README.md)** |
+| `contracts/contracts-*/` | One published-language library per context (reservation, customer, partner, mapping, integration, frontoffice, communication, audit, process); each service depends on the ones it speaks. No image |
+| `contracts/schemas/` | Every Kafka topic's JSON Schema, versioned, generated from the records, with examples; producers validate against them, consumers parse their examples |
+| `contracts/workers/` | The tasks each worker serves, generated from its registrations; `deploy/demo/check-contracts.sh` matches them against ec-definitions |
 | **`control-plane/`** | **Who governs the flow** |
 | `control-plane/integrations-service/` | One integration per hotel and its onboarding, gate by gate, to activation |
 | `control-plane/audit-service/` | Who did what (F016) |

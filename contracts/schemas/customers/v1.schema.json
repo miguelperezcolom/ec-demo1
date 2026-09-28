@@ -1,0 +1,181 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:customers:v1",
+  "title" : "customers v1",
+  "description" : "The MDM's customers: a golden record created or changed, two customers merged. Carries the reservations the customer is on, so a reader can re-project them.",
+  "x-topic" : "customers",
+  "x-version" : 1,
+  "x-owner" : "customer-mdm-service",
+  "x-key" : "customerId",
+  "x-producers" : [ "customer-mdm-service" ],
+  "x-consumers" : [ "crs-integration-service", "front-office" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.customer.CustomerEvent",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/CustomerChanged"
+  }, {
+    "$ref" : "#/$defs/CustomersMerged"
+  } ],
+  "$defs" : {
+    "CustomerChanged" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "customer-changed"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "customerId" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "data" : {
+          "$ref" : "#/$defs/GoldenRecord-nullable"
+        },
+        "dataChanged" : {
+          "type" : "boolean"
+        },
+        "changeRequestId" : {
+          "type" : [ "string", "null" ]
+        },
+        "decision" : {
+          "type" : [ "string", "null" ]
+        },
+        "reason" : {
+          "type" : [ "string", "null" ]
+        },
+        "reservations" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        }
+      },
+      "required" : [ "type", "eventId", "occurredAt", "customerId", "version", "data", "dataChanged", "changeRequestId", "decision", "reason", "reservations" ],
+      "additionalProperties" : false
+    },
+    "CustomersMerged" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "customers-merged"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "customerId" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "data" : {
+          "$ref" : "#/$defs/GoldenRecord-nullable"
+        },
+        "absorbedId" : {
+          "type" : [ "string", "null" ]
+        },
+        "reservations" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        }
+      },
+      "required" : [ "type", "eventId", "occurredAt", "customerId", "version", "data", "absorbedId", "reservations" ],
+      "additionalProperties" : false
+    },
+    "GoldenRecord" : {
+      "type" : "object",
+      "properties" : {
+        "firstName" : {
+          "type" : [ "string", "null" ]
+        },
+        "lastName" : {
+          "type" : [ "string", "null" ]
+        },
+        "email" : {
+          "type" : [ "string", "null" ]
+        },
+        "phone" : {
+          "type" : [ "string", "null" ]
+        },
+        "nationality" : {
+          "type" : [ "string", "null" ]
+        },
+        "birthDate" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "documentType" : {
+          "type" : [ "string", "null" ]
+        },
+        "documentNumber" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "firstName", "lastName", "email", "phone", "nationality", "birthDate", "documentType", "documentNumber" ],
+      "additionalProperties" : false
+    },
+    "GoldenRecord-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/GoldenRecord"
+      } ]
+    }
+  },
+  "examples" : [ {
+    "type" : "customer-changed",
+    "eventId" : "E-1",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "customerId" : "C-00042",
+    "version" : 3,
+    "data" : {
+      "firstName" : "Ana",
+      "lastName" : "García",
+      "email" : "ana@example.com",
+      "phone" : "+34600000000",
+      "nationality" : "ES",
+      "birthDate" : "1990-05-17",
+      "documentType" : "PASSPORT",
+      "documentNumber" : "X1234567"
+    },
+    "dataChanged" : true,
+    "changeRequestId" : "CR-7",
+    "decision" : "APPROVED",
+    "reason" : null,
+    "reservations" : [ "MRU01/12E45" ]
+  }, {
+    "type" : "customers-merged",
+    "eventId" : "E-2",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "customerId" : "C-00042",
+    "version" : 4,
+    "data" : {
+      "firstName" : "Ana",
+      "lastName" : "García",
+      "email" : "ana@example.com",
+      "phone" : null,
+      "nationality" : "ES",
+      "birthDate" : null,
+      "documentType" : null,
+      "documentNumber" : null
+    },
+    "absorbedId" : "C-00051",
+    "reservations" : [ "MRU01/12E45", "MRU01/0099" ]
+  } ]
+}

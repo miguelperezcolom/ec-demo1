@@ -1,18 +1,17 @@
 package io.mateu.ecdemo1.pmsintegration.worker;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integration.model.partner.Partner;
 import io.mateu.ecdemo1.integration.model.partner.PartnerType;
 import io.mateu.ecdemo1.pmsintegration.clients.IntegrationClients;
 import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
 import io.mateu.ecdemo1.pmsintegration.frontoffice.StayProjection;
 import io.mateu.ecdemo1.pmsintegration.ohip.PmsTransientException;
-import io.mateu.ecdemo1.pmsintegration.worker.runtime.ExactStrings;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import io.mateu.workflow.worker.api.Cancellations;
 import io.mateu.workflow.worker.api.TaskDispatcher;
 import io.mateu.workflow.worker.api.TaskRegistry;
+import io.mateu.workflow.worker.api.TaskTracing;
 import io.mateu.workflow.worker.api.TaskReplySink;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +46,7 @@ class PmsTasksTest {
             tasks.ensureGuestProfileTask(handlers, watch), tasks.upsertReservationTask(handlers, watch),
             tasks.cancelReservationTask(handlers, watch), tasks.ensurePartnerProfileTask(handlers, watch),
             tasks.projectStayTask(handlers, watch))),
-            sink, Cancellations.NONE, new ExactStrings(new ObjectMapper()), false);
+            sink, Cancellations.NONE, false, TaskTracing.NOOP);
 
     static class RecordingSink implements TaskReplySink {
         final List<String> replies = new ArrayList<>();

@@ -70,10 +70,29 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- The contracts this service speaks (contracts/, installed first): one library per context,
+             only the contexts it talks to. -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
-            <artifactId>integration-model</artifactId>
-            <version>0.1.0</version>
+            <artifactId>contracts-customer</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-reservation</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-communication</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- Its messages checked against the topics' schemas (contracts/schemas). -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-testing</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.mateu</groupId>

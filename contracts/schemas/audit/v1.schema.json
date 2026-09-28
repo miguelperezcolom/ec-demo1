@@ -1,0 +1,62 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:audit:v1",
+  "title" : "audit v1",
+  "description" : "An action someone (or an agent) took through a service's API or console.",
+  "x-topic" : "audit",
+  "x-version" : 1,
+  "x-owner" : "audit-service",
+  "x-key" : "actionId",
+  "x-producers" : [ "integrations-service", "mapping-service", "front-office" ],
+  "x-consumers" : [ "audit-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.audit.AuditedAction",
+  "$ref" : "#/$defs/AuditedAction",
+  "$defs" : {
+    "AuditedAction" : {
+      "type" : "object",
+      "properties" : {
+        "actionId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "service" : {
+          "type" : [ "string", "null" ]
+        },
+        "action" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        },
+        "parameters" : {
+          "type" : [ "string", "null" ]
+        },
+        "succeeded" : {
+          "type" : "boolean"
+        },
+        "response" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "actionId", "at", "service", "action", "hotelCode", "by", "parameters", "succeeded", "response" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "actionId" : "A-1",
+    "at" : "2026-11-12T09:30:00Z",
+    "service" : "mapping-service",
+    "action" : "approve-proposal",
+    "hotelCode" : "MRU01",
+    "by" : "ana",
+    "parameters" : "{\"proposal\":\"P-3\"}",
+    "succeeded" : true,
+    "response" : "approved"
+  } ]
+}

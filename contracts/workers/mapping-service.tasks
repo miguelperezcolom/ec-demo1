@@ -1,0 +1,7 @@
+# mapping-service: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
+prepare-cancellation@1 mapping
+prepare-partner@1 mapping
+prepare-reservation@1 mapping
+record-partner-profile@1 mapping
+relaunch-process@1 mapping
+resolve-projection@1 mapping

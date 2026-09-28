@@ -8,12 +8,12 @@ import io.mateu.ecdemo1.mapping.clients.IntegrationClients;
 import io.mateu.ecdemo1.mapping.config.MappingProperties;
 import io.mateu.ecdemo1.mapping.config.TolerantReader;
 import io.mateu.ecdemo1.mapping.prepare.Preparation;
-import io.mateu.ecdemo1.mapping.worker.runtime.ExactStrings;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import io.mateu.workflow.worker.api.Cancellations;
 import io.mateu.workflow.worker.api.TaskDispatcher;
 import io.mateu.workflow.worker.api.TaskRegistry;
+import io.mateu.workflow.worker.api.TaskTracing;
 import io.mateu.workflow.worker.api.TaskReplySink;
 import org.junit.jupiter.api.Test;
 
@@ -76,8 +76,7 @@ class TaskHandlersTest {
             tasks.prepareCancellationTask(handlers), tasks.preparePartnerTask(handlers),
             tasks.relaunchProcessTask(handlers), tasks.recordPartnerProfileTask(handlers),
             tasks.resolveProjectionTask(handlers)));
-    final TaskDispatcher dispatcher = new TaskDispatcher(registry, sink, Cancellations.NONE,
-            new ExactStrings(new ObjectMapper()), false);
+    final TaskDispatcher dispatcher = new TaskDispatcher(registry, sink, Cancellations.NONE, false, TaskTracing.NOOP);
 
     static class RecordingSink implements TaskReplySink {
         final List<String> replies = new ArrayList<>();

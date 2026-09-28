@@ -1,0 +1,2 @@
+# booking: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
+register-no-show@1 booking

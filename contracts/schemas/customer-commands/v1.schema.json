@@ -1,0 +1,128 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:customer-commands:v1",
+  "title" : "customer-commands v1",
+  "description" : "What the MDM is asked without waiting: a change to a customer proposed, an identity scanned at check-in recorded.",
+  "x-topic" : "customer-commands",
+  "x-version" : 1,
+  "x-owner" : "customer-mdm-service",
+  "x-key" : "customerId, or hotelCode/locator for a scan with no customer",
+  "x-producers" : [ "front-office" ],
+  "x-consumers" : [ "customer-mdm-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.command.CustomerCommand",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/CustomerCommand.ProposeChange"
+  }, {
+    "$ref" : "#/$defs/CustomerCommand.RecordScannedIdentity"
+  } ],
+  "$defs" : {
+    "CustomerCommand.ProposeChange" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "propose-change"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "customerId" : {
+          "type" : [ "string", "null" ]
+        },
+        "name" : {
+          "type" : [ "string", "null" ]
+        },
+        "email" : {
+          "type" : [ "string", "null" ]
+        },
+        "phone" : {
+          "type" : [ "string", "null" ]
+        },
+        "documentNumber" : {
+          "type" : [ "string", "null" ]
+        },
+        "origin" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "customerId", "name", "email", "phone", "documentNumber", "origin" ],
+      "additionalProperties" : false
+    },
+    "CustomerCommand.RecordScannedIdentity" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "record-scanned-identity"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "locator" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pax" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "customerId" : {
+          "type" : [ "string", "null" ]
+        },
+        "firstName" : {
+          "type" : [ "string", "null" ]
+        },
+        "lastName" : {
+          "type" : [ "string", "null" ]
+        },
+        "documentType" : {
+          "type" : [ "string", "null" ]
+        },
+        "documentNumber" : {
+          "type" : [ "string", "null" ]
+        },
+        "birthDate" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "nationality" : {
+          "type" : [ "string", "null" ]
+        },
+        "origin" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "hotelCode", "locator", "stayId", "pax", "customerId", "firstName", "lastName", "documentType", "documentNumber", "birthDate", "nationality", "origin" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "propose-change",
+    "commandId" : "CMD-1",
+    "customerId" : "C-00042",
+    "name" : "Ana García",
+    "email" : "ana@example.com",
+    "phone" : "+34600000000",
+    "documentNumber" : "X1234567",
+    "origin" : "front-office"
+  }, {
+    "type" : "record-scanned-identity",
+    "commandId" : "CMD-2",
+    "hotelCode" : "MRU01",
+    "locator" : "12E45",
+    "stayId" : "ST-9",
+    "pax" : 1,
+    "customerId" : null,
+    "firstName" : "Ana",
+    "lastName" : "García",
+    "documentType" : "PASSPORT",
+    "documentNumber" : "X1234567",
+    "birthDate" : "1990-05-17",
+    "nationality" : "ES",
+    "origin" : "front-office"
+  } ]
+}

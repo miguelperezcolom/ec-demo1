@@ -1,0 +1,236 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:front-office-commands:v1",
+  "title" : "front-office-commands v1",
+  "description" : "What the front office is told: a stay written as the PMS has it, a property's catalogue replaced whole.",
+  "x-topic" : "front-office-commands",
+  "x-version" : 1,
+  "x-owner" : "front-office",
+  "x-key" : "pmsHotelCode/pmsReservationId, or pmsHotelCode for a catalogue",
+  "x-producers" : [ "pms-integration-service", "integrations-service" ],
+  "x-consumers" : [ "front-office" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/FrontOfficeCommand.WriteStay"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeCommand.ReplaceCatalogue"
+  } ],
+  "$defs" : {
+    "FrontOfficeCommand.CatalogueEntry" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "$ref" : "#/$defs/FrontOfficeCommand.CatalogueType-nullable"
+        },
+        "code" : {
+          "type" : [ "string", "null" ]
+        },
+        "description" : {
+          "type" : [ "string", "null" ]
+        },
+        "extra" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "code", "description", "extra" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeCommand.CatalogueType" : {
+      "type" : "string",
+      "enum" : [ "ROOM_TYPE", "RATE_PLAN", "PACKAGE", "ROOM" ]
+    },
+    "FrontOfficeCommand.CatalogueType-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/FrontOfficeCommand.CatalogueType"
+      } ]
+    },
+    "FrontOfficeCommand.Person" : {
+      "type" : "object",
+      "properties" : {
+        "customerId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsProfileId" : {
+          "type" : [ "string", "null" ]
+        },
+        "name" : {
+          "type" : [ "string", "null" ]
+        },
+        "document" : {
+          "type" : [ "string", "null" ]
+        },
+        "email" : {
+          "type" : [ "string", "null" ]
+        },
+        "phone" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "customerId", "pmsProfileId", "name", "document", "email", "phone" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeCommand.Person-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/FrontOfficeCommand.Person"
+      } ]
+    },
+    "FrontOfficeCommand.PmsStatus" : {
+      "type" : "string",
+      "enum" : [ "RESERVED", "CANCELLED", "NO_SHOW" ]
+    },
+    "FrontOfficeCommand.PmsStatus-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/FrontOfficeCommand.PmsStatus"
+      } ]
+    },
+    "FrontOfficeCommand.ReplaceCatalogue" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "replace-catalogue"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "entries" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/FrontOfficeCommand.CatalogueEntry"
+          }
+        }
+      },
+      "required" : [ "type", "commandId", "pmsHotelCode", "entries" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeCommand.WriteStay" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "write-stay"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "confirmationNumber" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "externalReferences" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "pmsVersion" : {
+          "type" : [ "string", "null" ]
+        },
+        "status" : {
+          "$ref" : "#/$defs/FrontOfficeCommand.PmsStatus-nullable"
+        },
+        "holder" : {
+          "$ref" : "#/$defs/FrontOfficeCommand.Person-nullable"
+        },
+        "companions" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/FrontOfficeCommand.Person"
+          }
+        },
+        "roomTypeCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "ratePlanCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "boardCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "checkIn" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "checkOut" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "pax" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "agency" : {
+          "type" : [ "string", "null" ]
+        },
+        "total" : {
+          "type" : [ "number", "null" ]
+        },
+        "currency" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "pmsHotelCode", "pmsReservationId", "confirmationNumber", "crsLocator", "externalReferences", "pmsVersion", "status", "holder", "companions", "roomTypeCode", "ratePlanCode", "boardCode", "checkIn", "checkOut", "pax", "agency", "total", "currency" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "write-stay",
+    "commandId" : "CMD-9",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "confirmationNumber" : "987654",
+    "crsLocator" : "12E45",
+    "externalReferences" : [ "12E45" ],
+    "pmsVersion" : "3",
+    "status" : "RESERVED",
+    "holder" : {
+      "customerId" : "C-00042",
+      "pmsProfileId" : "P-1",
+      "name" : "Ana García",
+      "document" : "X1234567",
+      "email" : "ana@example.com",
+      "phone" : "+34600000000"
+    },
+    "companions" : [ ],
+    "roomTypeCode" : "KNG",
+    "ratePlanCode" : "BAR",
+    "boardCode" : "BKF",
+    "checkIn" : "2026-11-05",
+    "checkOut" : "2026-11-07",
+    "pax" : 2,
+    "agency" : null,
+    "total" : 312.4,
+    "currency" : "EUR"
+  }, {
+    "type" : "replace-catalogue",
+    "commandId" : "CMD-10",
+    "pmsHotelCode" : "XMAR",
+    "entries" : [ {
+      "type" : "ROOM_TYPE",
+      "code" : "KNG",
+      "description" : "King",
+      "extra" : null
+    }, {
+      "type" : "ROOM",
+      "code" : "101",
+      "description" : "Room 101",
+      "extra" : "KNG"
+    } ]
+  } ]
+}

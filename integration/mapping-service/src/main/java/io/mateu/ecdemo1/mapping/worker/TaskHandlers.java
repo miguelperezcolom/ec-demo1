@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.mapping.worker;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.mateu.ecdemo1.integration.model.mapping.Cause;
 import io.mateu.ecdemo1.integration.model.process.Outcome;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
@@ -36,7 +35,6 @@ public class TaskHandlers {
      * The input of the three preparations: what the process is about, and what its successor is
      * started with should it have to wait (Causes' relaunch variables).
      */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Subject(String definitionId, String processKey, String hotelCode, String locator,
                           String partnerCode, String version, String eventId, String origin) {
 
@@ -61,18 +59,15 @@ public class TaskHandlers {
     }
 
     /** {@code record-partner-profile@1}'s input. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record PartnerProfileRecorded(String partnerCode, String pmsProfileIds, String pmsProfileType,
                                          String version) {
     }
 
     /** {@code resolve-projection@1}'s input. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Projected(String hotelCode, String locator) {
     }
 
     /** {@code relaunch-process@1}'s input. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Released(String processKey) {
     }
 

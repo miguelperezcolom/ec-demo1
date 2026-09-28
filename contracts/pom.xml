@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      The contracts between the services: the published language they speak over Kafka and HTTP, one
+      small library per context, so a service depends on the contexts it talks to and on nothing
+      else. They replace integration-model, the one shared kernel every service used to take whole;
+      the packages (io.mateu.ecdemo1.integration.model.*) and the JSON are the same, so nothing on
+      the wire changed.
+
+        contracts-reservation    reservation, projection-requests, no-show-reports, pms-reservations
+        contracts-customer       customers, customer-commands, identity resolution
+        contracts-partner        the partner and its PMS profile
+        contracts-mapping        codes, translations, causes, mapping-commands
+        contracts-integration    an integration's lifecycle (control plane API)
+        contracts-frontoffice    front-office-commands
+        contracts-communication  notifications, notification-resolutions
+        contracts-audit          audit
+        contracts-process        definition ids, gates, variable names, outcomes (ec-definitions)
+        contracts-testing        test scope only: JSON Schema generation, validation and examples
+        contracts-schemas        the schemas of the topics above, generated from these records
+
+      The schemas live in contracts/schemas; see contracts/README.md. Libraries, not applications: no image.
+      `mvn install` here before building a service — see deploy/build-images.sh.
+    -->
+    <groupId>io.mateu.ecdemo1</groupId>
+    <artifactId>contracts</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>ec-demo1 contracts</name>
+
+    <modules>
+        <module>contracts-reservation</module>
+        <module>contracts-customer</module>
+        <module>contracts-partner</module>
+        <module>contracts-mapping</module>
+        <module>contracts-integration</module>
+        <module>contracts-frontoffice</module>
+        <module>contracts-communication</module>
+        <module>contracts-audit</module>
+        <module>contracts-process</module>
+        <module>contracts-testing</module>
+        <module>contracts-schemas</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Jackson 2: the Boot 3 services' own. Annotations only in the contracts themselves —
+             every service brings its ObjectMapper (and front-office, on Boot 4, Jackson 3, which
+             reads these annotations too). -->
+        <jackson.version>2.18.2</jackson.version>
+        <victools.version>4.38.0</victools.version>
+        <json-schema-validator.version>1.5.9</json-schema-validator.version>
+        <junit.version>5.11.4</junit.version>
+        <assertj.version>3.27.3</assertj.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.2</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

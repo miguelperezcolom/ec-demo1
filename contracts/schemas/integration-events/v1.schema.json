@@ -1,0 +1,158 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:integration-events:v1",
+  "title" : "integration-events v1",
+  "description" : "The integration's business events — a reservation created, changed or cancelled in the CRS, a partner changed — in its own terms, each routed to the process it calls for. Internal: crs-integration writes them (outbox) and reads them itself.",
+  "x-topic" : "integration-events",
+  "x-version" : 1,
+  "x-owner" : "crs-integration-service",
+  "x-key" : "hotelCode/locator, or partner/<partnerCode>",
+  "x-producers" : [ "crs-integration-service" ],
+  "x-consumers" : [ "crs-integration-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.events.IntegrationEvent",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/ReservationCreated"
+  }, {
+    "$ref" : "#/$defs/ReservationModified"
+  }, {
+    "$ref" : "#/$defs/ReservationCancelled"
+  }, {
+    "$ref" : "#/$defs/PartnerChanged"
+  } ],
+  "$defs" : {
+    "PartnerChanged" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "partner-changed"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "partnerCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
+      "required" : [ "type", "eventId", "occurredAt", "partnerCode", "version" ],
+      "additionalProperties" : false
+    },
+    "ReservationCancelled" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "reservation-cancelled"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "locator" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
+      "required" : [ "type", "eventId", "occurredAt", "hotelCode", "locator", "version" ],
+      "additionalProperties" : false
+    },
+    "ReservationCreated" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "reservation-created"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "locator" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
+      "required" : [ "type", "eventId", "occurredAt", "hotelCode", "locator", "version" ],
+      "additionalProperties" : false
+    },
+    "ReservationModified" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "reservation-modified"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "locator" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
+      "required" : [ "type", "eventId", "occurredAt", "hotelCode", "locator", "version" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "reservation-created",
+    "eventId" : "E-1",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "locator" : "12E45",
+    "version" : 1
+  }, {
+    "type" : "reservation-modified",
+    "eventId" : "E-2",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "locator" : "12E45",
+    "version" : 2
+  }, {
+    "type" : "reservation-cancelled",
+    "eventId" : "E-3",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "locator" : "12E45",
+    "version" : 3
+  }, {
+    "type" : "partner-changed",
+    "eventId" : "E-4",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "partnerCode" : "NORDTRAVEL",
+    "version" : 4
+  } ]
+}

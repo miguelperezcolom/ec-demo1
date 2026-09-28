@@ -1,0 +1,145 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:mapping-commands:v1",
+  "title" : "mapping-commands v1",
+  "description" : "What the mapping is asked without waiting: an equivalence defined, an agent's proposal requested, a cause resolved if still open, a partner's PMS profile recorded.",
+  "x-topic" : "mapping-commands",
+  "x-version" : 1,
+  "x-owner" : "mapping-service",
+  "x-key" : "hotelCode (\"chain\" for a chain-wide one), causeKey or partnerCode",
+  "x-producers" : [ "integrations-service" ],
+  "x-consumers" : [ "mapping-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.command.MappingCommand",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/MappingCommand.DefineEquivalence"
+  }, {
+    "$ref" : "#/$defs/MappingCommand.RequestAgentProposal"
+  }, {
+    "$ref" : "#/$defs/MappingCommand.ResolveCauseIfOpen"
+  }, {
+    "$ref" : "#/$defs/MappingCommand.RecordPartnerProfile"
+  } ],
+  "$defs" : {
+    "CodeType" : {
+      "type" : "string",
+      "enum" : [ "HOTEL", "ROOM_TYPE", "RATE_PLAN", "BOARD", "CHANNEL", "PAYMENT_METHOD", "CANCELLATION_REASON", "PARTNER_TYPE", "MARKET" ]
+    },
+    "CodeType-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/CodeType"
+      } ]
+    },
+    "MappingCommand.DefineEquivalence" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "define-equivalence"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "codeType" : {
+          "$ref" : "#/$defs/CodeType-nullable"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "sourceCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "targetCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "codeType", "hotelCode", "sourceCode", "targetCode", "by" ],
+      "additionalProperties" : false
+    },
+    "MappingCommand.RecordPartnerProfile" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "record-partner-profile"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "partnerCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsProfileId" : {
+          "type" : [ "string", "null" ]
+        },
+        "profileType" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "partnerCode", "pmsProfileId", "profileType" ],
+      "additionalProperties" : false
+    },
+    "MappingCommand.RequestAgentProposal" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "request-agent-proposal"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "hotelCode" ],
+      "additionalProperties" : false
+    },
+    "MappingCommand.ResolveCauseIfOpen" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "resolve-cause-if-open"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "causeKey" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "causeKey", "by" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "define-equivalence",
+    "commandId" : "CMD-5",
+    "codeType" : "ROOM_TYPE",
+    "hotelCode" : "MRU01",
+    "sourceCode" : "STD-KING",
+    "targetCode" : "KNG",
+    "by" : "ana"
+  }, {
+    "type" : "request-agent-proposal",
+    "commandId" : "CMD-6",
+    "hotelCode" : "MRU01"
+  }, {
+    "type" : "resolve-cause-if-open",
+    "commandId" : "CMD-7",
+    "causeKey" : "MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING",
+    "by" : "ana"
+  }, {
+    "type" : "record-partner-profile",
+    "commandId" : "CMD-8",
+    "partnerCode" : "NORDTRAVEL",
+    "pmsProfileId" : "16120699",
+    "profileType" : "Agent"
+  } ]
+}
