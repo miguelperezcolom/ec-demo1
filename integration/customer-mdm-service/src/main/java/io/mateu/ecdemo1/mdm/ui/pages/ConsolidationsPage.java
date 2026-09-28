@@ -11,7 +11,9 @@ import io.mateu.uidl.fluent.OnLoadTrigger;
 import io.mateu.uidl.fluent.Trigger;
 import io.mateu.uidl.fluent.TriggersSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.interfaces.Filterable;
 import io.mateu.uidl.interfaces.Listing;
+import io.mateu.uidl.interfaces.Searchable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.data.domain.PageRequest;
@@ -19,13 +21,18 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-/** What Salesforce's cleaning concluded, newest first, and whether the new codes reached the PMS. */
+/**
+ * What Salesforce's cleaning concluded, newest first, and whether the new codes reached the PMS.
+ * The search box looks in both codes and the detail.
+ */
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Consolidations")
-public class ConsolidationsPage implements Listing<ConsolidationRow>, TriggersSupplier {
+public class ConsolidationsPage implements Listing<ConsolidationRow>, Searchable, Filterable<ConsolidationFilters>,
+        TriggersSupplier {
 
     /** Grid column → consolidation property: what a click on a column's header sorts by. */
     static final Map<String, String> SORTABLE = Map.of("absorbed", "absorbedId", "survivor", "survivorId", "via", "via",
@@ -35,7 +42,12 @@ public class ConsolidationsPage implements Listing<ConsolidationRow>, TriggersSu
 
     @Override
     public ListingData<ConsolidationRow> search(SearchRequest request, HttpRequest httpRequest) {
-        return DbPaging.page(request, p -> consolidations.page(PageRequest.of(p.getPageNumber(), p.getPageSize(),
+        var filters = filters(request);
+        var search = new ConsolidationQueries.Search(request.searchText(),
+                filters == null || filters.via == null ? null
+                        : filters.via.stream().map(Enum::name).collect(Collectors.toSet()),
+                filters == null ? null : filters.propagation);
+        return DbPaging.page(request, p -> consolidations.page(search, PageRequest.of(p.getPageNumber(), p.getPageSize(),
                         DbPaging.pageable(request.pageable(), SORTABLE).getSort())),
                 c -> new ConsolidationRow(c.absorbedId, c.survivorId == null ? "—" : c.survivorId, c.via,
                         String.valueOf(c.receivedAt), c.reservations,

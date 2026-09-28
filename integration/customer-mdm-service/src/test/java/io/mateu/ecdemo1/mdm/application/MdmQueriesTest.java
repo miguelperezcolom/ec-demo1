@@ -3,9 +3,11 @@ package io.mateu.ecdemo1.mdm.application;
 import io.mateu.ecdemo1.integration.model.customer.CustomerStatus;
 import io.mateu.ecdemo1.mdm.store.ChangeRequest;
 import io.mateu.ecdemo1.mdm.store.ChangeRequestRepository;
+import io.mateu.ecdemo1.mdm.store.Consolidation;
 import io.mateu.ecdemo1.mdm.store.ConsolidationRepository;
 import io.mateu.ecdemo1.mdm.store.Customer;
 import io.mateu.ecdemo1.mdm.store.CustomerRepository;
+import io.mateu.ecdemo1.mdm.store.SalesforceState;
 import io.mateu.ecdemo1.mdm.store.Source;
 import io.mateu.ecdemo1.mdm.store.SourceRepository;
 import io.mateu.ecdemo1.mdm.store.XrefRepository;
@@ -172,11 +174,41 @@ class MdmQueriesTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void consolidationsAreReadAPageAtATimeNewestFirst() {
         var captor = ArgumentCaptor.forClass(Pageable.class);
-        when(consolidationRepository.findAll(captor.capture())).thenReturn(Page.empty());
-        consolidations.page(PageRequest.of(1, 20));
+        when(consolidationRepository.findAll(any(Specification.class), captor.capture())).thenReturn(Page.empty());
+        consolidations.page(ConsolidationQueries.Search.all(), PageRequest.of(1, 20));
         assertThat(captor.getValue().getPageNumber()).isEqualTo(1);
         assertThat(captor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "receivedAt"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void consolidationsAreSearchedInBothCodesAndTheDetailAndKeptToTheViaAndPropagationAskedFor() {
+        Root<Consolidation> root = mock(Root.class, RETURNS_DEEP_STUBS);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
+        ConsolidationQueries.matching(new ConsolidationQueries.Search(" C01 ", Set.of("EVENT"),
+                        Set.of(ConsolidationQueries.Propagation.REMOVED, ConsolidationQueries.Propagation.PENDING)))
+                .toPredicate(root, mock(CriteriaQuery.class), cb);
+        verify(cb, times(3)).like(any(), eq("%c01%"));
+        verify(root.get("via")).in(Set.of("EVENT"));
+        // REMOVED: no survivor; PENDING: a survivor, not propagated yet
+        verify(cb, atLeastOnce()).isNull(root.get("survivorId"));
+        verify(cb, atLeastOnce()).isNull(root.get("propagatedAt"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void goldenRecordsAreKeptToTheSalesforceStatesAndStatusesAskedFor() {
+        var captor = ArgumentCaptor.forClass(Specification.class);
+        when(customerRepository.findAll(captor.capture(), any(Pageable.class))).thenReturn(Page.empty());
+        customers.goldenRecords(null, Set.of(SalesforceState.FAILED), Set.of(CustomerStatus.PROVISIONAL), PageRequest.of(0, 20));
+
+        Root<Customer> root = mock(Root.class, RETURNS_DEEP_STUBS);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
+        captor.getValue().toPredicate(root, mock(CriteriaQuery.class), cb);
+        verify(root.get("salesforceState")).in(Set.of(SalesforceState.FAILED));
+        verify(root.get("status")).in(Set.of(CustomerStatus.PROVISIONAL));
     }
 }
