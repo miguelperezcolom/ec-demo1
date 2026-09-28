@@ -198,7 +198,13 @@ public class FrontOfficeIntegrationViewModel implements Identifiable {
     }
 
     Object act(HttpRequest httpRequest, String done, Function<String, FrontOfficeIntegration> action) {
-        load(action.apply(id));
+        try {
+            load(action.apply(id));
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            // An action the integration's state does not allow (activate before READY_TO_ACTIVATE…):
+            // the person reads why, instead of an error in the log and nothing on screen.
+            return Message.error(e.getMessage());
+        }
         return List.of(new Message(done), new State(this));
     }
 
