@@ -64,7 +64,7 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_inbox/**
 
-        # How much of Salesforce and Opera is spent — the header widget and its page, in every shell
+        # How much of Salesforce and Opera is spent — the page behind the home pages' tiles, in every shell
         # like the inbox — served by integrations-service, which asks the services that call them.
         # Only the screens: the services' own /usage endpoints stay inside the cluster.
         #

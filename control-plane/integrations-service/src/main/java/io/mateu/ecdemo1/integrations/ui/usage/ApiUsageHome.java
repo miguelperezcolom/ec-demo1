@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * The external APIs' usage, federated into every shell — the data plane's and the control console's —
- * behind the header widget ({@link ApiUsageBadge}), like the inbox. Its own base URL, not
+ * behind the KPI tiles of their home pages. Its own base URL, not
  * {@code /_integrations}: that one is the control host's alone, and this is on both.
  */
 @UI("/_api-usage")

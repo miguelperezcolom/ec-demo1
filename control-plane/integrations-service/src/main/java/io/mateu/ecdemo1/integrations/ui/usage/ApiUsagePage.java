@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 /**
- * How much of Salesforce and Opera the platform spends — the page behind the header widget.
+ * How much of Salesforce and Opera the platform spends — the page behind the home pages' tiles.
  *
  * <p>Salesforce: the org's calls in the rolling 24 hours against its daily allowance (15,000 on a
  * Base Edition, for everyone using the org together), how many of them were the MDM's and on what,

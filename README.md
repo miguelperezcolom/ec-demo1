@@ -279,8 +279,7 @@ once spent all of it. So every call is counted where it is made:
   `OhipClient` (`opera_api_calls_total{service,purpose,outcome}`, 429 = `limited`) and keeps any
   rate-limit header OHIP sends. `GET /usage/opera`.
 - **integrations-service** adds them up (`integrations.usage.*`, cached 15 s) and serves, under
-  `/_api-usage` on every console host: the header widget ("Salesforce 335 libres · Opera 320 hoy",
-  warning from 80 % used, error from 95 % or paused), the home pages' tiles (calls left, the trend
+  `/_api-usage` on every console host: the home pages' tiles (calls left, the trend
   against an hour ago, our pace, when it was seen, the pause) and the page behind them. A page view
   costs Salesforce nothing.
 - Grafana: **External APIs** (`deploy/observability/dashboards/external-apis.json`); alerts in
