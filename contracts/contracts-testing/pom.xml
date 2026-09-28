@@ -7,7 +7,12 @@
     <!-- For tests only (scope test wherever it is used): generates a topic's JSON Schema from the
          records that are its messages, keeps it in contracts/schemas/<topic>/v<N>.schema.json (writes
          it with -Dcontracts.write=true, otherwise fails when the committed one differs), validates a
-         produced message against it and hands a consumer the schema's examples to parse. -->
+         produced message against it and hands a consumer the schema's examples to parse.
+
+         victools and networknt (and what they bring) are shaded in, relocated: the services' own
+         Spring AI MCP servers depend on other versions of them, and a test-scoped dependency nearer
+         in the tree would replace those in the packaged application. Only Jackson stays a
+         dependency, and every service's Boot manages its version. -->
     <parent>
         <groupId>io.mateu.ecdemo1</groupId>
         <artifactId>contracts</artifactId>
@@ -26,6 +31,11 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
+        <!-- networknt reads YAML schemas with it: a Jackson module, so it stays a dependency. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.github.victools</groupId>
             <artifactId>jsonschema-generator</artifactId>
@@ -42,4 +52,68 @@
             <version>${json-schema-validator.version}</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <dependencyReducedPomLocation>${project.build.directory}/dependency-reduced-pom.xml</dependencyReducedPomLocation>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.github.victools:*</include>
+                                    <include>com.networknt:*</include>
+                                    <include>com.fasterxml:classmate</include>
+                                    <include>com.ethlo.time:itu</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>com.github.victools</pattern>
+                                    <shadedPattern>io.mateu.ecdemo1.contracts.shaded.victools</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.networknt</pattern>
+                                    <shadedPattern>io.mateu.ecdemo1.contracts.shaded.networknt</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml.classmate</pattern>
+                                    <shadedPattern>io.mateu.ecdemo1.contracts.shaded.classmate</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.ethlo</pattern>
+                                    <shadedPattern>io.mateu.ecdemo1.contracts.shaded.ethlo</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/versions/*/module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

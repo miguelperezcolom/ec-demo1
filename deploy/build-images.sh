@@ -34,9 +34,10 @@ APPS="consoles/shell consoles/gateway systems/crs/booking supporting/content con
 echo "── installing grpc-interface (the stubs users compiles against) ──"
 ( cd control-plane/grpc-interface && mvn -B -ntp -DskipTests install )
 
-# integration-model likewise: the CRS-PMS integration's services (docs/poc-acl) compile against it.
-echo "── installing integration-model (the integration's business model) ──"
-( cd integration/integration-model && mvn -B -ntp -DskipTests install )
+# The contracts likewise: the published-language libraries the services compile against, one per
+# context, and contracts-testing, their tests' schema tooling (contracts/README.md).
+echo "── installing the contracts (the language the services speak) ──"
+( cd contracts && mvn -B -ntp -DskipTests install )
 
 # messaging likewise: the outbox, its relay and the inbox every service with a database shares.
 echo "── installing messaging (the shared outbox and inbox) ──"

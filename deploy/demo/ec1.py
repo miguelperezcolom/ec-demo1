@@ -6,6 +6,7 @@ PostgreSQL pod; Opera through opera.py (GET only); Salesforce through the MDM's 
 credential is printed.
 
   ec1.py health                             # PASS/FAIL table; exit 1 if anything FAILs
+  ec1.py contracts                          # only the task contracts check (check_contracts.py --cluster)
   ec1.py book [--arrival D] [--nights N] [--room C] [--rate C] [--board C] [--channel C]
               [--first F --last L --email E --phone P] [--tag T]
                                             # a booking in the CRS (booking API); prints its locator
@@ -396,8 +397,19 @@ def health():
         catalogue = psql("front_office", "select count(*) from pms_catalogue")[0][0]
         return "INFO", f"{free} free room(s), {stays} stay(s) ({from_opera} from Opera), {catalogue} PMS catalogue entries"
 
+    def task_contracts():
+        # Every task a definition the engine imported references has a worker, on its topic, and every
+        # task topic a live consumer group (check_contracts.py).
+        import check_contracts
+        contracts, definitions, source = check_contracts.from_cluster()
+        served, gaps, _ = check_contracts.check(contracts, definitions, source, cluster=True)
+        if gaps:
+            return "FAIL", f"{len(gaps)} gap(s): " + "; ".join(gaps[:3]) + (" …" if len(gaps) > 3 else "")
+        return "PASS", f"{len(served)} task steps, each served by a live worker on its topic"
+
     check("Deployments", deployments)
     check("Engine", engine)
+    check("Task contracts", task_contracts)
     check("Opera token", opera_token)
     check("Opera XMAR (GET)", opera_property)
     check("Salesforce token", salesforce)
@@ -493,6 +505,7 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="ec1.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("health")
+    sub.add_parser("contracts")
     for name in ("book", "modify"):
         p = sub.add_parser(name)
         if name == "modify":
@@ -537,6 +550,9 @@ def main(argv):
 
     if a.cmd == "health":
         return health()
+    if a.cmd == "contracts":
+        import check_contracts
+        return check_contracts.main(["--cluster"])
     if a.cmd == "book":
         locator = create_booking(hotel=a.hotel, channel=a.channel or "WEB", room=a.room or "STD-KING",
                                  rate=a.rate or "DIRECTA", board=a.board or "DESAYUNO", arrival=a.arrival,

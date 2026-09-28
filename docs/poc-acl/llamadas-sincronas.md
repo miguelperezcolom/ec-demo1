@@ -32,8 +32,9 @@ el otro sistema la ha aplicado.
 | `customers` | customer-mdm-service | pms-integration **ya no**; front-office (`CustomerEvents`, grupo `ec-demo1-front-office-customers`) y crs-integration | El golden record del cliente cambió o dos clientes eran uno: el kárdex del front office lo toma directamente del MDM |
 
 - **El contrato es del receptor.** El formato de `mapping-commands`, `projection-requests`,
-  `customer-commands` y `no-show-reports` está en `integration-model` (`command/MappingCommand`,
-  `command/ProjectReservation`, `command/CustomerCommand`, `command/ReportNoShow`). El ERP y el CRS son
+  `customer-commands` y `no-show-reports` está en los contratos (`contracts/`: `MappingCommand` en
+  `contracts-mapping`, `ProjectReservation` y `ReportNoShow` en `contracts-reservation`,
+  `CustomerCommand` en `contracts-customer`), con su esquema en `contracts/schemas`. El ERP y el CRS son
   sistemas, no conocen el modelo de la integración: sus órdenes están en sus propios términos
   (`PartnerCommands`, `BookingCommands`) y el emisor las escribe así.
 - **Cada orden lleva su id** (`commandId`). La deduplicación va por ese id. En los pasos del motor

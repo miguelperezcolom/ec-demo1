@@ -5,3 +5,4 @@ e2e/test-results
 node_modules
 target
 integration/customer-mdm-service/salesforce/dedup-out
+__pycache__

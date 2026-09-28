@@ -23,7 +23,7 @@
         contracts-testing        test scope only: JSON Schema generation, validation and examples
         contracts-schemas        the schemas of the topics above, generated from these records
 
-      The schemas live in contracts/schemas (README there). Libraries, not applications: no image.
+      The schemas live in contracts/schemas; see contracts/README.md. Libraries, not applications: no image.
       `mvn install` here before building a service — see deploy/build-images.sh.
     -->
     <groupId>io.mateu.ecdemo1</groupId>
