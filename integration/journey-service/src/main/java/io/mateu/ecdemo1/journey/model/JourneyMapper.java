@@ -613,7 +613,10 @@ public final class JourneyMapper {
             var toFrontOffice = frontOfficeAt > 0 ? Duration.ofNanos(frontOfficeAt - start) : null;
             Outcome outcome;
             String detail;
-            if (error != null) {
+            // An error the engine retried past is not how it ended: a write that failed while Opera was
+            // unreachable and went in on a later attempt is DONE, and says it took retries.
+            var retried = error != null && toOpera != null;
+            if (error != null && !retried) {
                 outcome = Outcome.FAILED;
                 detail = error;
             } else if (waiting || (!causes.isEmpty() && toOpera == null)) {
@@ -626,10 +629,11 @@ public final class JourneyMapper {
                         : "No arrancó ningún proceso: el hotel no tenía una integración activa";
             } else if (toOpera != null && processes.values().stream().allMatch(p -> "COMPLETED".equals(p.status()))) {
                 outcome = Outcome.DONE;
-                detail = toFrontOffice != null ? "En Opera y en el front office" : "En Opera";
+                detail = (toFrontOffice != null ? "En Opera y en el front office" : "En Opera")
+                        + (retried ? ", tras reintentos (" + error + ")" : "");
             } else if (toOpera != null) {
                 outcome = Outcome.DONE;
-                detail = "En Opera";
+                detail = "En Opera" + (retried ? ", tras reintentos (" + error + ")" : "");
             } else {
                 outcome = Outcome.IN_PROGRESS;
                 detail = nowNanos - end < SETTLING.toNanos() ? "En curso: la traza sigue llegando" : "Sin llegar a Opera en esta traza";
