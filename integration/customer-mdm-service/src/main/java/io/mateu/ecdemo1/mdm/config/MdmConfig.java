@@ -24,4 +24,14 @@ public class MdmConfig {
             @org.springframework.beans.factory.annotation.Value("${mdm.salesforce-pause-max:60m}") java.time.Duration longest) {
         return new io.mateu.ecdemo1.mdm.salesforce.SalesforceBudget(clock, first, longest);
     }
+
+    /** The MDM's own calls to Salesforce, by purpose: salesforce_api_calls_total, and the header's breakdown. */
+    @Bean
+    public io.mateu.ecdemo1.integration.model.usage.ApiCalls salesforceCalls(Clock clock, io.micrometer.core.instrument.MeterRegistry registry) {
+        return new io.mateu.ecdemo1.integration.model.usage.ApiCalls(clock, (purpose, outcome) ->
+                io.micrometer.core.instrument.Counter.builder("salesforce.api.calls")
+                        .description("The MDM's calls to Salesforce, by purpose and outcome")
+                        .tag("purpose", purpose).tag("outcome", outcome.tag())
+                        .register(registry).increment());
+    }
 }

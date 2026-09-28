@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.mdm.salesforce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.mateu.ecdemo1.integration.model.usage.ApiCalls;
 import io.mateu.ecdemo1.mdm.config.MdmProperties;
 import io.mateu.ecdemo1.mdm.config.TolerantReader;
 import io.mateu.ecdemo1.mdm.store.Customer;
@@ -37,6 +38,28 @@ public class SalesforceClient {
     public static final int COLLECTION = 200;
 
     /**
+     * What a call is for — the tag every call is counted under ({@link ApiCalls}), so the org's
+     * allowance can be told apart by who spent it.
+     */
+    public static final class Purpose {
+        public static final String PROJECTION = "projection";
+        public static final String CHANGE_CASE = "change-case";
+        public static final String DECISIONS = "decisions";
+        public static final String REASON = "reason";
+        public static final String REFRESH = "refresh";
+        public static final String POLL = "poll";
+        public static final String MERGE = "merge";
+        public static final String CONSOLIDATION_READ = "consolidation-read";
+        public static final String CONSOLIDATION_WRITE = "consolidation-write";
+        public static final String LIMITS = "limits";
+        /** An OAuth token: counted, but not a call the org's allowance counts. */
+        public static final String TOKEN = "token";
+
+        private Purpose() {
+        }
+    }
+
+    /**
      * Salesforce refuses for the daily API allowance, or the MDM is not asking while it recovers
      * ({@link SalesforceBudget}): nothing is wrong with what was sent — it waits, and goes later.
      */
@@ -55,13 +78,21 @@ public class SalesforceClient {
 
     final MdmProperties.Salesforce properties;
     final SalesforceBudget budget;
+    final ApiCalls calls;
     final RestClient rest;
     volatile Session session;
 
-    public SalesforceClient(MdmProperties properties, TolerantReader reader, SalesforceBudget budget) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public SalesforceClient(MdmProperties properties, TolerantReader reader, SalesforceBudget budget, ApiCalls calls) {
+        this(properties, reader, budget, calls, RestClient.builder());
+    }
+
+    SalesforceClient(MdmProperties properties, TolerantReader reader, SalesforceBudget budget, ApiCalls calls,
+                     RestClient.Builder builder) {
         this.properties = properties.salesforce();
         this.budget = budget;
-        this.rest = RestClient.builder()
+        this.calls = calls;
+        this.rest = builder
                 .messageConverters(converters -> {
                     converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
                     converters.addFirst(new MappingJackson2HttpMessageConverter(reader.mapper()));
@@ -88,6 +119,10 @@ public class SalesforceClient {
         return budget;
     }
 
+    public ApiCalls calls() {
+        return calls;
+    }
+
     public synchronized Session session() {
         if (session == null) {
             var form = new LinkedMultiValueMap<String, String>();
@@ -95,8 +130,15 @@ public class SalesforceClient {
             form.add("client_id", properties.clientId());
             form.add("client_secret", properties.clientSecret());
             var domain = properties.domain().startsWith("http") ? properties.domain() : "https://" + properties.domain();
-            var token = rest.post().uri(domain + "/services/oauth2/token")
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form).retrieve().body(JsonNode.class);
+            JsonNode token;
+            try {
+                token = rest.post().uri(domain + "/services/oauth2/token")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form).retrieve().body(JsonNode.class);
+                calls.record(Purpose.TOKEN, ApiCalls.Outcome.OK);
+            } catch (RuntimeException e) {
+                calls.record(Purpose.TOKEN, ApiCalls.Outcome.ERROR);
+                throw e;
+            }
             var identity = token.path("id").asText().split("/");
             session = new Session(token.path("instance_url").asText(), token.path("access_token").asText(),
                     identity[identity.length - 2], identity[identity.length - 1]);
@@ -116,7 +158,7 @@ public class SalesforceClient {
      */
     public String upsertContact(Customer c) {
         var fields = contactFields(c);
-        var answer = call(s -> rest.patch()
+        var answer = call(Purpose.PROJECTION, s -> rest.patch()
                 .uri(s.instanceUrl() + "/services/data/{v}/sobjects/Contact/MDM_Id__c/{id}", properties.apiVersion(), c.id)
                 .header("Authorization", "Bearer " + s.accessToken())
                 .header("Sforce-Duplicate-Rule-Header", "allowSave=true")
@@ -149,7 +191,7 @@ public class SalesforceClient {
         var body = new LinkedHashMap<String, Object>();
         body.put("allOrNone", false);
         body.put("records", records);
-        var answer = call(s -> rest.patch()
+        var answer = call(Purpose.PROJECTION, s -> rest.patch()
                 .uri(s.instanceUrl() + "/services/data/{v}/composite/sobjects/Contact/MDM_Id__c", properties.apiVersion())
                 .header("Authorization", "Bearer " + s.accessToken())
                 .header("Sforce-Duplicate-Rule-Header", "allowSave=true")
@@ -189,10 +231,13 @@ public class SalesforceClient {
         return fields;
     }
 
-    /** SOQL over live and deleted records alike: a merge's absorbed contact is only in the latter. */
-    public List<JsonNode> queryAll(String soql) {
+    /**
+     * SOQL over live and deleted records alike: a merge's absorbed contact is only in the latter. One
+     * call per page, each counted under the purpose.
+     */
+    public List<JsonNode> queryAll(String purpose, String soql) {
         var records = new ArrayList<JsonNode>();
-        var page = call(s -> rest.get()
+        var page = call(purpose, s -> rest.get()
                 .uri(s.instanceUrl() + "/services/data/{v}/queryAll?q={q}", properties.apiVersion(), soql)
                 .header("Authorization", "Bearer " + s.accessToken()).retrieve().body(JsonNode.class));
         while (true) {
@@ -201,7 +246,7 @@ public class SalesforceClient {
             if (next == null || page.path("done").asBoolean(true)) {
                 return records;
             }
-            page = call(s -> rest.get().uri(s.instanceUrl() + next)
+            page = call(purpose, s -> rest.get().uri(s.instanceUrl() + next)
                     .header("Authorization", "Bearer " + s.accessToken()).retrieve().body(JsonNode.class));
         }
     }
@@ -228,7 +273,7 @@ public class SalesforceClient {
         fields.put("Origen__c", cut(r.origin, 255));
         fields.put("Cambios__c", cut(r.changes, 255));
         fields.put("Decision__c", "Pendiente");
-        var answer = call(s -> rest.patch()
+        var answer = call(Purpose.CHANGE_CASE, s -> rest.patch()
                 .uri(s.instanceUrl() + "/services/data/{v}/sobjects/Case/MdmRequestId__c/{id}", properties.apiVersion(), r.id)
                 .header("Authorization", "Bearer " + s.accessToken())
                 .contentType(MediaType.APPLICATION_JSON).body(fields)
@@ -243,7 +288,7 @@ public class SalesforceClient {
             return decided;
         }
         var in = requestIds.stream().map(id -> "'" + literal(id) + "'").collect(java.util.stream.Collectors.joining(","));
-        for (var c : queryAll("SELECT MdmRequestId__c, Decision__c FROM Case WHERE MdmRequestId__c IN (" + in + ")")) {
+        for (var c : queryAll(Purpose.DECISIONS, "SELECT MdmRequestId__c, Decision__c FROM Case WHERE MdmRequestId__c IN (" + in + ")")) {
             var decision = c.path("Decision__c").asText("");
             if ("Aprobada".equals(decision) || "Rechazada".equals(decision)) {
                 decided.put(c.path("MdmRequestId__c").asText(), decision);
@@ -254,7 +299,7 @@ public class SalesforceClient {
 
     /** Why a change request was rejected, as its Case says (Motivo), if it says. */
     public Optional<String> reason(String requestId) {
-        return queryAll("SELECT Motivo__c FROM Case WHERE MdmRequestId__c = '%s'".formatted(literal(requestId))).stream()
+        return queryAll(Purpose.REASON, "SELECT Motivo__c FROM Case WHERE MdmRequestId__c = '%s'".formatted(literal(requestId))).stream()
                 .map(c -> c.path("Motivo__c"))
                 .filter(m -> !m.isMissingNode() && !m.isNull() && !m.asText().isBlank())
                 .map(m -> m.asText().trim())
@@ -263,20 +308,20 @@ public class SalesforceClient {
 
     /** The contact that carries this MDM id, as Salesforce has it now. */
     public Optional<JsonNode> contactByMdmId(String mdmId) {
-        return queryAll(("SELECT Id, IsDeleted, MasterRecordId, MDM_Id__c, FirstName, LastName, Email, Phone, Birthdate, "
+        return queryAll(Purpose.REFRESH, ("SELECT Id, IsDeleted, MasterRecordId, MDM_Id__c, FirstName, LastName, Email, Phone, Birthdate, "
                 + "Nationality__c, Document_Type__c, Document_Number__c FROM Contact WHERE MDM_Id__c = '%s' AND IsDeleted = false")
                 .formatted(literal(mdmId))).stream().findFirst();
     }
 
     public Optional<JsonNode> contact(String contactId) {
-        var found = queryAll(("SELECT Id, IsDeleted, MasterRecordId, MDM_Id__c, FirstName, LastName, Email, Phone, Birthdate, "
+        var found = queryAll(Purpose.CONSOLIDATION_READ, ("SELECT Id, IsDeleted, MasterRecordId, MDM_Id__c, FirstName, LastName, Email, Phone, Birthdate, "
                 + "Nationality__c, Document_Type__c, Document_Number__c FROM Contact WHERE Id = '%s'").formatted(safe(contactId)));
         return found.stream().findFirst();
     }
 
     /** Gives a contact the MDM id of the customer it now stands for. */
     public void assignMdmId(String contactId, String mdmId) {
-        call(s -> rest.patch()
+        call(Purpose.CONSOLIDATION_WRITE, s -> rest.patch()
                 .uri(s.instanceUrl() + "/services/data/{v}/sobjects/Contact/{id}", properties.apiVersion(), contactId)
                 .header("Authorization", "Bearer " + s.accessToken())
                 .contentType(MediaType.APPLICATION_JSON).body(Map.of("MDM_Id__c", mdmId))
@@ -310,11 +355,10 @@ public class SalesforceClient {
                 .body(mergeEnvelope(s.accessToken(), master, absorbed))
                 .exchange((request, response) -> new String(response.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
         ensureOpen();
-        var answer = merge.apply(session());
-        var outcome = mergeOutcome(answer);
+        var outcome = merged(merge);
         if (outcome != null && outcome.contains("INVALID_SESSION_ID")) {
             expire();
-            outcome = mergeOutcome(merge.apply(session()));
+            outcome = merged(merge);
         }
         if (SalesforceBudget.isLimit(outcome)) {
             budget.exceeded(outcome);
@@ -323,6 +367,35 @@ public class SalesforceClient {
         budget.succeeded();
         if (outcome != null) {
             throw new MergeRefused(outcome);
+        }
+    }
+
+    /** One SOAP merge call, counted: null if it merged, else what Salesforce said. */
+    String merged(Function<Session, String> merge) {
+        String outcome;
+        try {
+            outcome = mergeOutcome(merge.apply(session()));
+        } catch (RuntimeException e) {
+            calls.record(Purpose.MERGE, ApiCalls.Outcome.ERROR);
+            throw e;
+        }
+        calls.record(Purpose.MERGE, outcome == null ? ApiCalls.Outcome.OK
+                : SalesforceBudget.isLimit(outcome) ? ApiCalls.Outcome.LIMITED : ApiCalls.Outcome.ERROR);
+        return outcome;
+    }
+
+    /**
+     * Asks the org how much of its daily allowance is used — one call, itself counted. Every answer
+     * already says it in a header; this is for when nothing has been asked for a while.
+     */
+    public void refreshLimits() {
+        var limits = call(Purpose.LIMITS, s -> rest.get()
+                .uri(s.instanceUrl() + "/services/data/{v}/limits", properties.apiVersion())
+                .header("Authorization", "Bearer " + s.accessToken()).retrieve().body(JsonNode.class));
+        var daily = limits == null ? null : limits.path("DailyApiRequests");
+        if (daily != null && daily.has("Max") && daily.has("Remaining")) {
+            var max = daily.path("Max").asLong();
+            budget.observed(max - daily.path("Remaining").asLong(), max);
         }
     }
 
@@ -394,18 +467,18 @@ public class SalesforceClient {
      * One call, with a new token if Salesforce stopped taking the one it had. Not made while the
      * allowance pauses calls; an allowance refusal starts or lengthens the pause.
      */
-    <T> T call(Function<Session, T> request) {
+    <T> T call(String purpose, Function<Session, T> request) {
         ensureOpen();
         try {
             T answer;
             try {
-                answer = request.apply(session());
+                answer = counted(purpose, request);
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode() != HttpStatus.UNAUTHORIZED) {
                     throw e;
                 }
                 expire();
-                answer = request.apply(session());
+                answer = counted(purpose, request);
             }
             budget.succeeded();
             return answer;
@@ -417,6 +490,23 @@ public class SalesforceClient {
             }
             // Salesforce answered: it is up, whatever it thought of this one.
             budget.succeeded();
+            throw e;
+        }
+    }
+
+    /** One call, counted under its purpose with how it went. */
+    <T> T counted(String purpose, Function<Session, T> request) {
+        var session = session();
+        try {
+            T answer = request.apply(session);
+            calls.record(purpose, ApiCalls.Outcome.OK);
+            return answer;
+        } catch (HttpClientErrorException e) {
+            calls.record(purpose, SalesforceBudget.isLimit(e.getResponseBodyAsString())
+                    ? ApiCalls.Outcome.LIMITED : ApiCalls.Outcome.ERROR);
+            throw e;
+        } catch (RuntimeException e) {
+            calls.record(purpose, ApiCalls.Outcome.ERROR);
             throw e;
         }
     }

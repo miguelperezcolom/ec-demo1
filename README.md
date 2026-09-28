@@ -263,6 +263,30 @@ plane is for.
   observe anything because `ChatClientRegistry` hands them the `ObservationRegistry` — a model
   built without it gets the no-op one, silently.
 
+### Watching the external APIs (Salesforce, Opera)
+
+The Salesforce org is a Base Edition: 15,000 API calls in a rolling 24 h, shared by everyone using
+it — ec1, any local stack with the same credentials, scripts, people. A local MDM polling every 20 s
+once spent all of it. So every call is counted where it is made:
+
+- **customer-mdm-service** tags each Salesforce call with its purpose (projection, change-case,
+  decisions, reason, refresh, poll, merge, consolidation-read/write, limits, token) — hourly buckets
+  saved in `salesforce_api_calls`, and `salesforce_api_calls_total{purpose,outcome}` — and keeps the
+  org's total from the `Sforce-Limit-Info` header (`salesforce_org_api_used/max`,
+  `salesforce_budget_paused`). If no answer said it for 15 min it asks `/limits`, one call. It warns at
+  startup when `mdm.poll` is under 5 min. `GET /usage/salesforce` (in-cluster only).
+- **pms-integration-service** counts every OHIP call by module and endpoint with an interceptor on
+  `OhipClient` (`opera_api_calls_total{service,purpose,outcome}`, 429 = `limited`) and keeps any
+  rate-limit header OHIP sends. `GET /usage/opera`.
+- **integrations-service** adds them up (`integrations.usage.*`, cached 15 s) and serves, under
+  `/_api-usage` on every console host: the header widget ("Salesforce 335 libres · Opera 320 hoy",
+  warning from 80 % used, error from 95 % or paused), the home pages' tiles (calls left, the trend
+  against an hour ago, our pace, when it was seen, the pause) and the page behind them. A page view
+  costs Salesforce nothing.
+- Grafana: **External APIs** (`deploy/observability/dashboards/external-apis.json`); alerts in
+  `deploy/observability/prometheus-rules.yaml` (org ≥ 80 % / ≥ 95 % or paused, our pace projected over
+  10k/day, others spending > 5k, OHIP 429s).
+
 ### Propagating users to Keycloak
 
 `users` is the source of truth for who a person is; Keycloak holds the copy that authenticates

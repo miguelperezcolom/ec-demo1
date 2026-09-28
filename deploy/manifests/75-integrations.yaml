@@ -83,6 +83,10 @@ spec:
             # (backfill and polling) and how often Opera is polled for what changed there.
             - name: FRONT_OFFICE_URL
               value: "http://front-office:8128"
+            # The external APIs' usage in the consoles' header: who counts Salesforce's calls (the MDM)
+            # and Opera's (the connector, PMS_INTEGRATION_URL above, by default). /usage is in-cluster only.
+            - name: USAGE_SALESFORCE_URLS
+              value: "http://customer-mdm-service:8127"
             - name: FO_HORIZON_DAYS
               value: "60"
             - name: FO_POLL

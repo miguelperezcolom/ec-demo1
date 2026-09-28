@@ -167,6 +167,13 @@ integrations:
     # Whether the mapping gate asks the mapping agent on its own, or leaves a person a notice to ask it
     # from Mapping → Dictionary (the demo, where asking it is a step shown live).
     ask-agent: ${INTEGRATIONS_MAPPING_ASK_AGENT:true}
+  # The external APIs' usage in the consoles' header: each service that calls Salesforce or Opera says
+  # its own at GET /usage/{api}; comma-separated when more than one calls the same API. Inside the cluster.
+  usage:
+    salesforce: ${USAGE_SALESFORCE_URLS:${CUSTOMER_MDM_URL:http://localhost:8127}}
+    opera: ${USAGE_OPERA_URLS:${PMS_INTEGRATION_URL:http://localhost:8123}}
+    timeout: ${USAGE_TIMEOUT:2s}
+    cache: ${USAGE_CACHE:15s}
 
 springdoc:
   packages-to-scan: io.mateu.ecdemo1.integrations.rest

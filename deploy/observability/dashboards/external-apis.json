@@ -1,0 +1,622 @@
+{
+  "title": "External APIs",
+  "uid": "external-apis",
+  "tags": [
+    "integration",
+    "salesforce",
+    "opera"
+  ],
+  "timezone": "",
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Salesforce \u2014 the org's daily API allowance (15,000 calls in a rolling 24 h, shared by everyone on the org)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Org allowance used",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 95
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * max(salesforce_org_api_used) / max(salesforce_org_api_max)",
+          "legendFormat": "used",
+          "refId": "A"
+        }
+      ],
+      "description": "Sforce-Limit-Info as Salesforce last said it, on any answer to the MDM (or its limits resource, asked at most every 15 min). 80% warns, 95% is critical."
+    },
+    {
+      "type": "stat",
+      "title": "Org used / max",
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 6,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(salesforce_org_api_used)",
+          "legendFormat": "used",
+          "refId": "A"
+        },
+        {
+          "expr": "max(salesforce_org_api_max)",
+          "legendFormat": "max",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Calls paused",
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 10,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Calls going",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "PAUSED",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(salesforce_budget_paused)",
+          "legendFormat": "paused",
+          "refId": "A"
+        }
+      ],
+      "description": "1 while the MDM holds its calls because Salesforce answered REQUEST_LIMIT_EXCEEDED.",
+      "options": {
+        "colorMode": "background"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Ours, projected per day",
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 14,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(salesforce_api_calls_total{purpose!=\"token\"}[1h])) * 86400",
+          "legendFormat": "calls/day at the last hour's rate",
+          "refId": "A"
+        }
+      ],
+      "description": "The MDM's call rate over the last hour, times a day. Above 10k it alone would spend most of the org's allowance."
+    },
+    {
+      "type": "stat",
+      "title": "Others (org \u2212 ours, 24 h)",
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 19,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(salesforce_org_api_used) - sum(increase(salesforce_api_calls_total{purpose!=\"token\"}[24h]))",
+          "legendFormat": "others",
+          "refId": "A"
+        }
+      ],
+      "description": "Approximation: the org's total minus the MDM's own increase over 24 h. Scripts, other environments on the same org (a local stack), people. Overstated after a Prometheus restart (24 h retention, emptyDir)."
+    },
+    {
+      "type": "timeseries",
+      "title": "Org used vs max",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(salesforce_org_api_used)",
+          "legendFormat": "org used",
+          "refId": "A"
+        },
+        {
+          "expr": "max(salesforce_org_api_max)",
+          "legendFormat": "max",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(salesforce_api_calls_total{purpose!=\"token\"}[24h]))",
+          "legendFormat": "ours (24 h)",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Ours vs others (rolling 24 h)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(salesforce_api_calls_total{purpose!=\"token\"}[24h]))",
+          "legendFormat": "ours",
+          "refId": "A"
+        },
+        {
+          "expr": "max(salesforce_org_api_used) - sum(increase(salesforce_api_calls_total{purpose!=\"token\"}[24h]))",
+          "legendFormat": "others",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Our calls per hour, by purpose",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (purpose) (rate(salesforce_api_calls_total[5m])) * 3600",
+          "legendFormat": "{{purpose}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Our calls per hour, by outcome",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 17
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(salesforce_api_calls_total[5m])) * 3600",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "state-timeline",
+      "title": "Pause state",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 17
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "going",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "paused",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(salesforce_budget_paused)",
+          "legendFormat": "paused",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Opera (OHIP) \u2014 calls by the services that call it",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Calls, last 24 h",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(opera_api_calls_total[24h]))",
+          "legendFormat": "calls",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "429s, last 24 h",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(opera_api_calls_total{outcome=\"limited\"}[24h]))",
+          "legendFormat": "429",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Errors, last 24 h",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(opera_api_calls_total{outcome=\"error\"}[24h]))",
+          "legendFormat": "errors",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Rate limit remaining (if OHIP says)",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "min by (service) (opera_api_ratelimit_remaining)",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "description": "X-RateLimit-Remaining / RateLimit-Remaining, when OHIP sends it. The UAT tenant has not been seen to: then there is no value."
+    },
+    {
+      "type": "timeseries",
+      "title": "Calls per minute, by service",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(opera_api_calls_total[5m])) * 60",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Calls per minute, by purpose (OHIP module)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (purpose) (rate(opera_api_calls_total[5m])) * 60",
+          "legendFormat": "{{purpose}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors and 429s per minute",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (service, outcome) (rate(opera_api_calls_total{outcome!=\"ok\"}[5m])) * 60",
+          "legendFormat": "{{service}} {{outcome}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate limit, as OHIP says it",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 8,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max by (service) (opera_api_ratelimit_limit)",
+          "legendFormat": "limit {{service}}",
+          "refId": "A"
+        },
+        {
+          "expr": "min by (service) (opera_api_ratelimit_remaining)",
+          "legendFormat": "remaining {{service}}",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

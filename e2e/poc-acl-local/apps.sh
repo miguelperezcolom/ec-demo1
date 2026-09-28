@@ -34,9 +34,15 @@ start control-plane/integrations-service DB_URL=$DB/integrations CRS_INTEGRATION
   OPERA_CLIENT_SECRET=mock-secret OPERA_ENTERPRISE_ID=RIUE
 # The customer MDM cleans in the Salesforce org whose client credentials are in SF_ENV — only this
 # service gets them. Without the file it still resolves identities; cleaning just waits.
+#
+# That org is the one ec1 uses too, and a Base Edition allows 15,000 API calls in a rolling 24 hours
+# for everyone together. So the merge poll keeps its default (15 min, ~100 calls a day): the Pub/Sub
+# events are what bring the merges, the poll is only a net. It was 20s here once — 4,320 polls a day,
+# each stuck on a customer this stack did not have — and it spent the org's whole allowance, ec1's
+# demo included. The MDM warns at startup below 5 min; /usage/salesforce says who spends what.
 SF_ENV=${SF_ENV:-$HOME/.config/ec-demo1/salesforce.env}
 SF=$([ -f "$SF_ENV" ] && grep -E '^SF_[A-Z_]+=' "$SF_ENV" | tr '\n' ' ')
-start integration/customer-mdm-service DB_URL=$DB/customer_mdm CRS_INTEGRATION_URL=http://localhost:8121 CONSOLIDATION_POLL=20s $SF
+start integration/customer-mdm-service DB_URL=$DB/customer_mdm CRS_INTEGRATION_URL=http://localhost:8121 $SF
 start control-plane/audit-service DB_URL=$DB/audit
 # The hotel's front office (MRU01's reservations are written into it too). Its UI logs in with the
 # chain's Keycloak; its /api is what the connector calls.

@@ -1,6 +1,6 @@
 package io.mateu.ecdemo1.shell.infra.in.ui;
 
-import io.mateu.ecdemo1.uicommons.user.UserWidget;
+import io.mateu.ecdemo1.uicommons.user.ApiUsageWidget;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.AI;
 import io.mateu.uidl.annotations.FavIcon;
@@ -16,6 +16,7 @@ import io.mateu.uidl.annotations.PageType;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
 import io.mateu.uidl.annotations.WelcomeBanner;
+import io.mateu.uidl.data.MicroFrontend;
 import io.mateu.uidl.data.RemoteMenu;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HttpRequest;
@@ -141,6 +142,18 @@ public class ShellHome implements WidgetSupplier {
     @Hidden
     RemoteMenu inbox = new RemoteMenu("/_inbox");
 
+    /** The external APIs' usage, hidden from the bar like the inbox: its header widget is the way in. */
+    @Menu
+    @Hidden
+    RemoteMenu apiUsage = new RemoteMenu("/_api-usage").withLabel("APIs externas");
+
+    /**
+     * Under the welcome banner: Salesforce's calls left of the org's daily allowance, whether they go
+     * down, our pace, and Opera's calls today — what to look at before a meeting or a demo. Served
+     * by integrations-service from numbers already held: a page view costs Salesforce nothing.
+     */
+    MicroFrontend apiUsageTiles = ApiUsageWidget.tiles();
+
     /**
      * Running the platform: Workflow and Forms, behind one entry — last on the bar: it is
      * what runs the product, not the product.
@@ -152,11 +165,12 @@ public class ShellHome implements WidgetSupplier {
     AdminMenu admin;
 
     /**
-     * The inbox badge and who is signed in — the widget every console shares (ui-commons). Nothing
-     * for an anonymous call: the bootstrap page is about to redirect to Keycloak.
+     * How much of Salesforce and Opera is spent, the inbox badge and who is signed in — the widgets
+     * every console shares (ui-commons). Nothing for an anonymous call: the bootstrap page is about
+     * to redirect to Keycloak.
      */
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
-        return UserWidget.withInboxBadge(httpRequest);
+        return ApiUsageWidget.withInboxBadge(httpRequest);
     }
 }

@@ -55,6 +55,12 @@ public class SalesforceBudget {
     String reason;
     volatile long used = -1;
     volatile long max = -1;
+    volatile Instant seenAt;
+    /** What the org's total was, and when, over the last few hours: whether it fills up or comes back. */
+    final java.util.Deque<Seen> history = new java.util.concurrent.ConcurrentLinkedDeque<>();
+
+    record Seen(Instant at, long used) {
+    }
 
     public SalesforceBudget(Clock clock, Duration first, Duration longest) {
         this.clock = clock;
@@ -128,9 +134,52 @@ public class SalesforceBudget {
         }
         var m = USAGE.matcher(limitInfo);
         if (m.find()) {
-            used = Long.parseLong(m.group(1));
-            max = Long.parseLong(m.group(2));
+            observed(Long.parseLong(m.group(1)), Long.parseLong(m.group(2)));
         }
+    }
+
+    /** The org's usage as Salesforce said it just now — a header, or its limits resource. */
+    public void observed(long used, long max) {
+        var now = clock.instant();
+        this.used = used;
+        this.max = max;
+        this.seenAt = now;
+        history.addLast(new Seen(now, used));
+        while (!history.isEmpty() && history.peekFirst().at().isBefore(now.minus(Duration.ofHours(3)))) {
+            history.pollFirst();
+        }
+    }
+
+    /**
+     * The org's total as it was said about an hour ago — the observation nearest to then, within 20
+     * minutes of it — or null if nothing was said around then (a restart, a quiet MDM).
+     */
+    public Long usedAnHourAgo() {
+        var then = clock.instant().minus(Duration.ofHours(1));
+        Seen nearest = null;
+        for (var seen : history) {
+            var off = Duration.between(seen.at(), then).abs();
+            if (off.compareTo(Duration.ofMinutes(20)) <= 0
+                    && (nearest == null || off.compareTo(Duration.between(nearest.at(), then).abs()) < 0)) {
+                nearest = seen;
+            }
+        }
+        return nearest == null ? null : nearest.used();
+    }
+
+    /** The org's calls in the rolling 24 hours as last seen, or null when none has been seen yet. */
+    public Long used() {
+        return max < 0 ? null : used;
+    }
+
+    /** The org's allowance as last seen, or null. */
+    public Long max() {
+        return max < 0 ? null : max;
+    }
+
+    /** When Salesforce last said how much is used; null if it never has since this started. */
+    public Instant seenAt() {
+        return seenAt;
     }
 
     /** Calls left in the rolling 24 hours as last seen, or -1 when none has been seen yet. */
