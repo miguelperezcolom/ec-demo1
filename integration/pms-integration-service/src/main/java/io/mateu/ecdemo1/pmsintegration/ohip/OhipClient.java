@@ -55,23 +55,32 @@ public class OhipClient {
     final Map<String, Token> tokens = new ConcurrentHashMap<>();
     final Map<String, RestClient> clients = new ConcurrentHashMap<>();
     final RestClient.Builder builder;
+    /** Counts every call to Opera, by what it was for; null counts nothing. */
+    final OperaUsage usage;
 
     public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock) {
         this(connections, properties, reader, clock, RestClient.builder());
     }
 
+    public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock,
+                      RestClient.Builder builder) {
+        this(connections, properties, reader, clock, builder, null);
+    }
+
     /**
      * Built from Boot's builder, which observes every call: each call to Opera is a span of the step
-     * that made it, in the booking's trace.
+     * that made it, in the booking's trace. And counted ({@link OperaUsage}): the consoles' header
+     * says how much of Opera the platform spends, and on what.
      */
     @org.springframework.beans.factory.annotation.Autowired
     public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock,
-                      RestClient.Builder builder) {
+                      RestClient.Builder builder, OperaUsage usage) {
         this.connections = connections;
         this.properties = properties;
         this.reader = reader;
         this.clock = clock;
         this.builder = builder;
+        this.usage = usage;
     }
 
     public Response get(String hotelId, String uri, Object... variables) {
@@ -245,7 +254,11 @@ public class OhipClient {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.timeout());
         factory.setReadTimeout(properties.timeout());
-        return builder.clone()
+        var clone = builder.clone();
+        if (usage != null) {
+            clone = clone.requestInterceptor(usage);
+        }
+        return clone
                 .baseUrl(connection.gatewayUrl())
                 .requestFactory(factory)
                 .messageConverters(converters -> {

@@ -53,16 +53,28 @@ public final class UserWidget {
      * and the forms engine's tasks of their roles — and then the greeting.
      */
     public static List<Component> withInboxBadge(HttpRequest httpRequest) {
+        return withInboxBadge(httpRequest, List.of());
+    }
+
+    /**
+     * The same, with other widgets before the inbox badge ({@link ApiUsageWidget}). One layout for all
+     * of them: the header puts each widget in its "widgets" slot, and a bare MicroFrontend does not
+     * carry the slot through — it would render outside the header, invisible.
+     */
+    public static List<Component> withInboxBadge(HttpRequest httpRequest, List<Component> before) {
         return DisplayOnlyTokenClaims.of(httpRequest)
-                .map(claims -> List.<Component>of(HorizontalLayout.builder()
-                        .content(List.of(
-                                MicroFrontend.builder()
-                                        .baseUrl("/_inbox")
-                                        .route("/badge")
-                                        .build(),
-                                popover(claims)))
-                        .style("align-items: flex-end;")
-                        .build()))
+                .map(claims -> {
+                    var content = new java.util.ArrayList<Component>(before);
+                    content.add(MicroFrontend.builder()
+                            .baseUrl("/_inbox")
+                            .route("/badge")
+                            .build());
+                    content.add(popover(claims));
+                    return List.<Component>of(HorizontalLayout.builder()
+                            .content(content)
+                            .style("align-items: flex-end;")
+                            .build());
+                })
                 .orElse(List.of());
     }
 

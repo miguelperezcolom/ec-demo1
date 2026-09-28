@@ -264,12 +264,15 @@ helm upgrade --install loki grafana/loki -n "$OBS_NS" -f deploy/observability/lo
 helm upgrade --install tempo grafana/tempo --version 1.24.4 -n "$OBS_NS" -f deploy/observability/tempo.yaml --timeout 15m
 helm upgrade --install alloy grafana/alloy -n "$OBS_NS" -f deploy/observability/alloy.yaml --timeout 15m
 kubectl apply -f deploy/observability/servicemonitors.yaml
+# The external APIs' alerts (Salesforce's allowance, OHIP's 429s): a PrometheusRule the operator picks
+# up by its release: kps label, like the ServiceMonitors above.
+kubectl apply -f deploy/observability/prometheus-rules.yaml
 
-# The two dashboards written for this deployment, as ConfigMaps the Grafana sidecar picks up —
-# never imported through the UI. Grafana keeps its database on an emptyDir here, so a dashboard
-# imported by hand lives exactly as long as the pod does: any upgrade that recreates it takes them
-# with it, without a word, and the first anyone knows is a panel that is not there any more. It
-# happened once, to both of them.
+# The dashboards written for this deployment, as ConfigMaps the Grafana sidecar picks up — never
+# imported through the UI. Grafana keeps its database on an emptyDir here, so a dashboard imported
+# by hand lives exactly as long as the pod does: any upgrade that recreates it takes them with it,
+# without a word, and the first anyone knows is a panel that is not there any more. It happened
+# once, to the first two of them.
 #
 # The key each is filed under has to be unique across every dashboard ConfigMap in the cluster, not
 # merely within its own. The sidecar writes all of them into one flat /tmp/dashboards, and Grafana
@@ -288,6 +291,7 @@ apply_dashboard eventconductor-nodes eventconductor-nodes.json nodes.json
 apply_dashboard ia-tokens            ia-tokens.json            ia-tokens.json
 apply_dashboard ia-agents            ia-agents.json            ia-agents.json
 apply_dashboard booking-traces       booking-traces.json       booking-traces.json
+apply_dashboard external-apis        external-apis.json        external-apis.json
 
 echo "══ 6/6  Waiting for the workloads ══"
 kubectl rollout status deployment/ec-eventconductor-orchestrator -n "$NS" --timeout=10m

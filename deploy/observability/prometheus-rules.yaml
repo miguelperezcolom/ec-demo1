@@ -1,0 +1,71 @@
+# Alerts on the external APIs the platform spends: Salesforce's daily allowance (15,000 calls in a
+# rolling 24 h on a Base Edition, shared by everyone on the org — ec1, any local stack with the same
+# credentials, scripts, people) and Opera's rate (OHIP answers 429).
+#
+# The metrics are the services' own (Micrometer, scraped by the annotated-pods job):
+#   salesforce_api_calls_total{purpose,outcome}   customer-mdm-service, one per call it makes
+#   salesforce_org_api_used / _max                the org's total, as Salesforce last said it
+#   salesforce_budget_paused                      1 while the MDM holds its calls (REQUEST_LIMIT_EXCEEDED)
+#   opera_api_calls_total{service,purpose,outcome} pms-integration-service, one per call to OHIP
+#
+# `release: kps` is what the kube-prometheus-stack operator selects rules by (ruleSelector defaults to
+# the chart's release label), as it does ServiceMonitors — see servicemonitors.yaml. Alertmanager is
+# off in this deployment, so these fire in Prometheus and in Grafana's alert list; nobody is paged.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: external-apis
+  namespace: observability
+  labels: { release: kps }
+spec:
+  groups:
+    - name: external-apis.salesforce
+      rules:
+        - alert: SalesforceAllowanceHigh
+          expr: max(salesforce_org_api_used) / max(salesforce_org_api_max) >= 0.80
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "Salesforce org at {{ $value | humanizePercentage }} of its daily API allowance"
+            description: >-
+              The org's calls in the rolling 24 h are at 80% or more of its allowance. Check who spends
+              them (dashboard External APIs: ours vs others) before the MDM has to pause.
+        - alert: SalesforceAllowanceCritical
+          expr: (max(salesforce_org_api_used) / max(salesforce_org_api_max) >= 0.95) or (max(salesforce_budget_paused) == 1)
+          for: 1m
+          labels: { severity: critical }
+          annotations:
+            summary: "Salesforce allowance at 95% or spent: the MDM holds its calls"
+            description: >-
+              At 95% of the org's daily allowance, or Salesforce already answers REQUEST_LIMIT_EXCEEDED
+              and the MDM has paused its calls. Customers wait to be projected, merges and decisions to
+              be read; nothing is lost. Look for another spender on the same org.
+        - alert: SalesforceOurCallRateHigh
+          expr: sum(rate(salesforce_api_calls_total{purpose!="token"}[1h])) * 86400 > 10000
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: "The MDM is on course for {{ $value | humanize }} Salesforce calls a day"
+            description: >-
+              At the last hour's rate the MDM alone would spend more than 10,000 of the org's 15,000
+              daily calls — a poll set too short, or a loop. See its calls by purpose.
+        - alert: SalesforceOthersSpending
+          expr: max(salesforce_org_api_used) - sum(increase(salesforce_api_calls_total{purpose!="token"}[24h])) > 5000
+          for: 30m
+          labels: { severity: warning }
+          annotations:
+            summary: "{{ $value | humanize }} of the org's Salesforce calls in 24 h are not ec1's MDM"
+            description: >-
+              Someone else on the same org is spending its allowance: a local stack with the same
+              credentials (a 20 s merge poll once spent all of it), a script, another environment.
+              Approximate: after a Prometheus restart the MDM's own increase is undercounted.
+    - name: external-apis.opera
+      rules:
+        - alert: OperaThrottled
+          expr: sum by (service) (increase(opera_api_calls_total{outcome="limited"}[15m])) > 0
+          labels: { severity: warning }
+          annotations:
+            summary: "OHIP answered 429 to {{ $labels.service }}"
+            description: >-
+              Opera's gateway is throttling our calls: they are retried, but the service goes faster
+              than OHIP allows. See the dashboard External APIs for which module.

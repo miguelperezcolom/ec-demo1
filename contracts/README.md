@@ -16,7 +16,7 @@ each service depends on the contexts it speaks and nothing else. The packages
 | `contracts-customer` | `CustomerEvent`, `GoldenRecord`, identity resolution, `CustomerCommand` (needs `contracts-reservation`: a passenger is a `Person`) | customers, customer-commands | crs-integration, pms-integration, customer-mdm, front-office |
 | `contracts-partner` | The partner and its PMS profile | — (HTTP) | crs-integration, pms-integration, mapping, integrations |
 | `contracts-mapping` | Code types, translations, causes, `MappingCommand` | mapping-commands | crs-integration, pms-integration, mapping, integrations |
-| `contracts-integration` | An integration's lifecycle: status, connection, connectivity, future reservations and their codes (needs `contracts-mapping`) | — (HTTP) | crs-integration, pms-integration, mapping, integrations |
+| `contracts-integration` | An integration's lifecycle: status, connection, connectivity, future reservations and their codes (needs `contracts-mapping`); `ApiUsage`, what an external API (Salesforce, Opera) is spent | — (HTTP) | crs-integration, pms-integration, mapping, integrations, customer-mdm |
 | `contracts-frontoffice` | `FrontOfficeCommand` (stays, catalogues), the catalogue summary | front-office-commands | pms-integration, integrations, front-office |
 | `contracts-communication` | Notifications asked for and resolved | notifications, notification-resolutions | pms-integration, customer-mdm, mapping, integrations, communication |
 | `contracts-audit` | `AuditedAction` | audit | mapping, integrations, front-office, audit |

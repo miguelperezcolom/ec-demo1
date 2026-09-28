@@ -87,6 +87,12 @@
             <artifactId>contracts-communication</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <!-- ApiUsage: what it spends of Salesforce's allowance, for the consoles' header. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-integration</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <!-- Its messages checked against the topics' schemas (contracts/schemas). -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>

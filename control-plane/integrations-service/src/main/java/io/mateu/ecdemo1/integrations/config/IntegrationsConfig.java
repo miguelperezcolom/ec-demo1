@@ -9,7 +9,7 @@ import java.time.Clock;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(IntegrationsProperties.class)
+@EnableConfigurationProperties({IntegrationsProperties.class, io.mateu.ecdemo1.integrations.usage.UsageProperties.class})
 public class IntegrationsConfig {
 
     @Bean

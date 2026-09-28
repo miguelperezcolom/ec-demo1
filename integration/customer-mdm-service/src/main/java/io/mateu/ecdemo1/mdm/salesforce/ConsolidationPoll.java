@@ -50,7 +50,7 @@ public class ConsolidationPoll {
                 return fresh;
             });
             var since = OffsetDateTime.ofInstant(cursor.until, ZoneOffset.UTC).format(SOQL);
-            var deleted = salesforce.queryAll(("SELECT Id, MDM_Id__c, SystemModstamp FROM Contact WHERE IsDeleted = true "
+            var deleted = salesforce.queryAll(SalesforceClient.Purpose.POLL, ("SELECT Id, MDM_Id__c, SystemModstamp FROM Contact WHERE IsDeleted = true "
                     + "AND MDM_Id__c != null AND SystemModstamp >= %s ORDER BY SystemModstamp ASC LIMIT 200").formatted(since));
             var until = cursor.until;
             for (var contact : deleted) {
