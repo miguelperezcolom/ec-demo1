@@ -85,12 +85,33 @@
             <artifactId>spring-cloud-starter-stream-kafka</artifactId>
         </dependency>
 
-        <!-- The engine's event DTOs — TaskExecutionRequested, WorkerReply, Variable. Published to
-             Maven Central by the engine, so nothing here needs eventconductor checked out. -->
+        <!-- The contracts this service speaks (contracts/, installed first): one library per context,
+             only the contexts it talks to. -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
-            <artifactId>integration-model</artifactId>
-            <version>0.1.0</version>
+            <artifactId>contracts-communication</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- human-tasks is the forms engine's topic: its schema is generated from the engine's own
+             record (HumanTaskChanged), the jar alone. -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>shared</artifactId>
+            <version>${eventconductor.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Its messages checked against the topics' schemas (contracts/schemas). -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-testing</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.mateu.workflow</groupId>

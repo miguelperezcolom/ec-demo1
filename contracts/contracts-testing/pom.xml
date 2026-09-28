@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- For tests only (scope test wherever it is used): generates a topic's JSON Schema from the
+         records that are its messages, keeps it in contracts/schemas/<topic>/v<N>.schema.json (writes
+         it with -Dcontracts.write=true, otherwise fails when the committed one differs), validates a
+         produced message against it and hands a consumer the schema's examples to parse. -->
+    <parent>
+        <groupId>io.mateu.ecdemo1</groupId>
+        <artifactId>contracts</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>contracts-testing</artifactId>
+    <name>ec-demo1 contracts-testing</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-generator</artifactId>
+            <version>${victools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-module-jackson</artifactId>
+            <version>${victools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>${json-schema-validator.version}</version>
+        </dependency>
+    </dependencies>
+</project>

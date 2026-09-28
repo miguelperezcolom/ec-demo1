@@ -1,0 +1,65 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:human-tasks:v1",
+  "title" : "human-tasks v1",
+  "description" : "A human task opened, completed or cancelled in EventConductor's forms engine (HumanTaskChanged, engine 2.19+). Best effort: an inbox may lag, a task never fails for it.",
+  "x-topic" : "human-tasks",
+  "x-version" : 1,
+  "x-owner" : "eventconductor-forms",
+  "x-key" : "taskId",
+  "x-producers" : [ "eventconductor-forms" ],
+  "x-consumers" : [ "communication-service" ],
+  "x-java-type" : "io.mateu.workflow.dtos.events.integration.HumanTaskChanged",
+  "$ref" : "#/$defs/HumanTaskChanged",
+  "$defs" : {
+    "HumanTaskChanged" : {
+      "type" : "object",
+      "properties" : {
+        "taskId" : {
+          "type" : [ "string", "null" ]
+        },
+        "formId" : {
+          "type" : [ "string", "null" ]
+        },
+        "formName" : {
+          "type" : [ "string", "null" ]
+        },
+        "processId" : {
+          "type" : [ "string", "null" ]
+        },
+        "stepId" : {
+          "type" : [ "string", "null" ]
+        },
+        "status" : {
+          "type" : [ "string", "null" ]
+        },
+        "requiredRoles" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "userId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        }
+      },
+      "required" : [ "taskId", "formId", "formName", "processId", "stepId", "status", "requiredRoles", "userId", "at" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "taskId" : "T-1",
+    "formId" : "approve-mapping",
+    "formName" : "Aprobar equivalencias",
+    "processId" : "P-1",
+    "stepId" : "approve",
+    "status" : "PENDING",
+    "requiredRoles" : [ "mapping-approver" ],
+    "userId" : null,
+    "at" : "2026-11-12T09:30:00Z"
+  } ]
+}

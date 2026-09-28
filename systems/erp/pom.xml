@@ -147,6 +147,14 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- The schemas of the topics this system owns, generated from its records, and its
+             messages checked against them (contracts/schemas). -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-testing</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

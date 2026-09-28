@@ -24,8 +24,9 @@
         <module>systems/erp</module>
         <module>systems/front-office</module>
         <module>systems/pms/opera-mock</module>
+        <!-- contracts: the language they speak, one library per context, and its schemas -->
+        <module>contracts</module>
         <!-- integration: what flows between them -->
-        <module>integration/integration-model</module>
         <module>integration/crs-integration-service</module>
         <module>integration/pms-integration-service</module>
         <module>integration/mapping-service</module>

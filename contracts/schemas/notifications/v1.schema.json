@@ -1,0 +1,73 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:notifications:v1",
+  "title" : "notifications v1",
+  "description" : "A notification for the people who look after a hotel: a cause opened, a proposal ready, a write retrying too long… Deduplicated by dedupKey.",
+  "x-topic" : "notifications",
+  "x-version" : 1,
+  "x-owner" : "communication-service",
+  "x-key" : "dedupKey (none from pms-integration's retry watch)",
+  "x-producers" : [ "integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service" ],
+  "x-consumers" : [ "communication-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.notification.NotificationRequested",
+  "$ref" : "#/$defs/NotificationRequested",
+  "$defs" : {
+    "NotificationRequested" : {
+      "type" : "object",
+      "properties" : {
+        "notificationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "type" : {
+          "$ref" : "#/$defs/NotificationType-nullable"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "subject" : {
+          "type" : [ "string", "null" ]
+        },
+        "title" : {
+          "type" : [ "string", "null" ]
+        },
+        "body" : {
+          "type" : [ "string", "null" ]
+        },
+        "link" : {
+          "type" : [ "string", "null" ]
+        },
+        "dedupKey" : {
+          "type" : [ "string", "null" ]
+        },
+        "requestedAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        }
+      },
+      "required" : [ "notificationId", "type", "hotelCode", "subject", "title", "body", "link", "dedupKey", "requestedAt" ],
+      "additionalProperties" : false
+    },
+    "NotificationType" : {
+      "type" : "string",
+      "enum" : [ "CAUSE_OPENED", "PROPOSAL_READY", "RETRYING_TOO_LONG", "PMS_REJECTED", "INTEGRATION_NEEDS_ATTENTION" ]
+    },
+    "NotificationType-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/NotificationType"
+      } ]
+    }
+  },
+  "examples" : [ {
+    "notificationId" : "N-1",
+    "type" : "CAUSE_OPENED",
+    "hotelCode" : "MRU01",
+    "subject" : "MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING",
+    "title" : "STD-KING has no equivalent",
+    "body" : "ROOM_TYPE STD-KING of hotel MRU01 has no approved equivalent in the PMS",
+    "link" : "/mapping/causes",
+    "dedupKey" : "cause:MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING",
+    "requestedAt" : "2026-11-12T09:30:00Z"
+  } ]
+}

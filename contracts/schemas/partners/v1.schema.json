@@ -1,0 +1,50 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:partners:v1",
+  "title" : "partners v1",
+  "description" : "A partner was created or changed, or someone asked for it to be synchronised again. Thin: whoever needs the partner reads it.",
+  "x-topic" : "partners",
+  "x-version" : 1,
+  "x-owner" : "erp",
+  "x-key" : "partnerCode",
+  "x-producers" : [ "erp" ],
+  "x-consumers" : [ "crs-integration-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.erp.domain.partner.PartnerChanged",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/PartnerChanged"
+  } ],
+  "$defs" : {
+    "PartnerChanged" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "partner-changed"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "partnerCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        }
+      },
+      "required" : [ "type", "eventId", "partnerCode", "version", "occurredAt" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "partner-changed",
+    "eventId" : "E-1",
+    "partnerCode" : "NORDTRAVEL",
+    "version" : 4,
+    "occurredAt" : "2026-11-12T09:30:00Z"
+  } ]
+}

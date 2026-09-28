@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- The canonical reservation — the one crs-integration serves and the PMS side reads — and what
+         moves it between systems: a projection asked for (projection-requests), a no-show reported
+         (no-show-reports), a reservation changed in the PMS (pms-reservations). -->
+    <parent>
+        <groupId>io.mateu.ecdemo1</groupId>
+        <artifactId>contracts</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>contracts-reservation</artifactId>
+    <name>ec-demo1 contracts-reservation</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+    </dependencies>
+</project>
