@@ -1,9 +1,11 @@
 package io.mateu.ecdemo1.mdm.application;
 
+import io.mateu.ecdemo1.integration.model.customer.CustomerStatus;
 import io.mateu.ecdemo1.mdm.store.ChangeRequest;
 import io.mateu.ecdemo1.mdm.store.ChangeRequestRepository;
 import io.mateu.ecdemo1.mdm.store.Customer;
 import io.mateu.ecdemo1.mdm.store.CustomerRepository;
+import io.mateu.ecdemo1.mdm.store.SalesforceState;
 import io.mateu.ecdemo1.mdm.store.Source;
 import io.mateu.ecdemo1.mdm.store.SourceRepository;
 import io.mateu.ecdemo1.mdm.store.Xref;
@@ -26,6 +28,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The read side of the customers, for the screens that list and open them: a page of those a search
@@ -56,7 +59,20 @@ public class CustomerQueries {
      * whole, ignoring case.
      */
     public Page<Customer> goldenRecords(String text, Pageable pageable) {
-        return customers.findAll(containing(text), ordered(pageable));
+        return goldenRecords(text, null, null, pageable);
+    }
+
+    /** The same, kept to the Salesforce states and statuses asked for; null or empty keeps every one. */
+    public Page<Customer> goldenRecords(String text, Set<SalesforceState> salesforce, Set<CustomerStatus> statuses,
+                                        Pageable pageable) {
+        var spec = containing(text);
+        if (salesforce != null && !salesforce.isEmpty()) {
+            spec = spec.and((root, query, cb) -> root.get("salesforceState").in(salesforce));
+        }
+        if (statuses != null && !statuses.isEmpty()) {
+            spec = spec.and((root, query, cb) -> root.get("status").in(statuses));
+        }
+        return customers.findAll(spec, ordered(pageable));
     }
 
     public Optional<Customer> find(String id) {

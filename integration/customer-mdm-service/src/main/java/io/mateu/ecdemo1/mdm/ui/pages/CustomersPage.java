@@ -10,6 +10,7 @@ import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
+import io.mateu.uidl.interfaces.Filterable;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
 import io.mateu.uidl.interfaces.Navigable;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * The golden records: who the customers are, as the MDM holds them. Absorbed ones are not listed —
@@ -30,7 +32,8 @@ import java.util.Map;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Golden records")
-public class CustomersPage implements Listing<CustomerRow>, Searchable, Navigable<CustomerViewModel, String> {
+public class CustomersPage implements Listing<CustomerRow>, Searchable, Filterable<GoldenRecordFilters>,
+        Navigable<CustomerViewModel, String> {
 
     /** Grid column → customer property: what a click on a column's header sorts by. */
     static final Map<String, String> SORTABLE = Map.of("id", "id", "email", "email", "document", "documentNumber",
@@ -42,7 +45,11 @@ public class CustomersPage implements Listing<CustomerRow>, Searchable, Navigabl
 
     @Override
     public ListingData<CustomerRow> search(SearchRequest request, HttpRequest httpRequest) {
-        return DbPaging.page(request, p -> customers.goldenRecords(request.searchText(), PageRequest.of(p.getPageNumber(),
+        var filters = filters(request);
+        var salesforce = filters == null ? null : filters.salesforce;
+        var statuses = filters == null || filters.status == null ? null
+                : filters.status.stream().map(GoldenRecordFilters.Status::customerStatus).collect(Collectors.toSet());
+        return DbPaging.page(request, p -> customers.goldenRecords(request.searchText(), salesforce, statuses, PageRequest.of(p.getPageNumber(),
                         p.getPageSize(), DbPaging.pageable(request.pageable(), SORTABLE).getSort())),
                 c -> new CustomerRow(c.id, c.fullName(), c.email == null ? "" : c.email,
                         c.documentNumber == null ? "" : c.documentType + " " + c.documentNumber,
