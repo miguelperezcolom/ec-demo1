@@ -4,6 +4,8 @@ import io.mateu.ecdemo1.communication.application.NotificationQueries;
 import io.mateu.ecdemo1.uicommons.paging.DbPaging;
 import io.mateu.ecdemo1.communication.store.DeliveryStatus;
 import io.mateu.ecdemo1.communication.store.Notification;
+import io.mateu.uidl.annotations.PageWidth;
+import io.mateu.uidl.annotations.PageWidthStyle;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
@@ -31,6 +33,7 @@ import java.util.NoSuchElementException;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Notifications")
+@PageWidth(PageWidthStyle.EDGE_TO_EDGE)
 public class NotificationsPage implements Listing<NotificationRow>, Searchable, Navigable<NotificationViewModel, String> {
 
     /** When, as a person reads it: local time to the minute — the year short, since history spans more than one. */
