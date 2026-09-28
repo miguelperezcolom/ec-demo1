@@ -12,17 +12,22 @@ import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.Mcp;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.mcp.vo.McpTransport;
 import io.mateu.uidl.annotations.Action;
+import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInList;
 import io.mateu.uidl.annotations.Multiline;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
+import io.mateu.uidl.data.State;
+import io.mateu.uidl.data.Message;
 import io.mateu.uidl.interfaces.HttpRequest;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @Scope("prototype")
@@ -84,13 +89,15 @@ public class McpViewModel implements CatalogueEditor<McpDto> {
      * Probes what is stored, not what is on screen. An unsaved edit reporting "reachable" about
      * the previous URL is the one result that would actively mislead.
      */
+    @Toolbar
     @Action(idempotent = true)
-    public String testConnection(HttpRequest httpRequest) {
+    public Object testConnection(HttpRequest httpRequest) {
         var stored = repository.findById(new McpId(id))
                 .orElseThrow(() -> new IllegalStateException("Save this server before probing it"));
         var result = probe.probe(stored);
         lastProbe = (result.reachable() ? "OK — " : "Unreachable — ") + result.detail();
-        return lastProbe;
+        return List.of(result.reachable() ? new Message(lastProbe) : Message.error(lastProbe),
+                new State(this));
     }
 
     @Override

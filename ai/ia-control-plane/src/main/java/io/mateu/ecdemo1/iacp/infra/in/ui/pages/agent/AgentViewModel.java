@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.agent;
 
+import io.mateu.ecdemo1.iacp.infra.in.ui.pages.CatalogueReferenceOptions;
 import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.AgentDto;
 import io.mateu.ecdemo1.iacp.application.usecases.agent.ResolveAgentConfigUseCase;
@@ -8,33 +9,43 @@ import io.mateu.ecdemo1.iacp.application.usecases.agent.create.CreateAgentUseCas
 import io.mateu.ecdemo1.iacp.application.usecases.agent.update.UpdateAgentCommand;
 import io.mateu.ecdemo1.iacp.application.usecases.agent.update.UpdateAgentUseCase;
 import io.mateu.uidl.annotations.Action;
+import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInList;
+import io.mateu.uidl.annotations.Label;
+import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.Multiline;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
+import io.mateu.uidl.annotations.Stereotype;
+import io.mateu.uidl.data.FieldStereotype;
+import io.mateu.uidl.data.Option;
+import io.mateu.uidl.data.Message;
+import io.mateu.uidl.data.State;
 import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.interfaces.OptionsSupplier;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * The composition: a prompt, one model, and the servers and sources it may reach.
  *
- * <p>The two id lists are comma-separated text rather than pickers, and that is a real limitation
- * worth stating rather than hiding: a typo here is not refused on save — it becomes a reference
- * that {@code ResolveAgentConfigUseCase} drops at read time with a warning. "Preview resolved
- * configuration" is the button that surfaces that before a user does.
+ * <p>The references are picked from the catalogues ({@link CatalogueReferenceOptions}), so a typo can
+ * no longer make one up. What picking cannot prevent is an entry being disabled or deleted after
+ * the agent was composed from it — {@code ResolveAgentConfigUseCase} drops those at read time with
+ * a warning, and "Preview resolved configuration" is the button that surfaces that before a user
+ * does.
  */
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class AgentViewModel implements CatalogueEditor<AgentDto> {
+public class AgentViewModel implements CatalogueEditor<AgentDto>, OptionsSupplier {
 
     @Section("Agent")
     @ReadOnly
@@ -54,8 +65,10 @@ public class AgentViewModel implements CatalogueEditor<AgentDto> {
 
     @Section("Model")
     @NotEmpty
-    @Help("The id of an LLM from the LLM catalogue. Refused on save if it does not exist: "
-            + "unlike a missing tool, a missing model leaves nothing to answer with.")
+    @Lookup(search = CatalogueReferenceOptions.class, label = CatalogueReferenceOptions.class)
+    @Label("LLM")
+    @Help("An LLM from the LLM catalogue. Unlike a missing tool, a missing model leaves "
+            + "nothing to answer with, so an agent is not served without a usable one.")
     String llmId;
 
     @Section("Instructions")
@@ -66,12 +79,16 @@ public class AgentViewModel implements CatalogueEditor<AgentDto> {
     String systemPrompt;
 
     @Section("Tools and sources")
-    @Help("Comma-separated MCP server ids. Ones that are missing or disabled are dropped when "
-            + "the configuration is served, and reported — they do not stop the agent.")
-    String mcpIds;
+    @Stereotype(FieldStereotype.checkbox)
+    @Label("MCP servers")
+    @Help("MCP servers the agent may call. Disabled ones are dropped when the configuration is "
+            + "served, and reported — they do not stop the agent.")
+    List<String> mcpIds;
 
-    @Help("Comma-separated RAG source ids. Same handling as the MCP servers above.")
-    String ragIds;
+    @Stereotype(FieldStereotype.checkbox)
+    @Label("RAG sources")
+    @Help("RAG sources the agent may search. Same handling as the MCP servers above.")
+    List<String> ragIds;
 
     @Section("Status")
     boolean enabled;
@@ -85,15 +102,16 @@ public class AgentViewModel implements CatalogueEditor<AgentDto> {
     final CreateAgentUseCase createAgentUseCase;
     final UpdateAgentUseCase updateAgentUseCase;
     final ResolveAgentConfigUseCase resolveAgentConfigUseCase;
+    final CatalogueReferenceOptions referenceOptions;
 
     public String create(HttpRequest httpRequest) {
         return createAgentUseCase.handle(new CreateAgentCommand(newId, name, systemPrompt, llmId,
-                split(mcpIds), split(ragIds), description));
+                mcpIds, ragIds, description));
     }
 
     public void save(HttpRequest httpRequest) {
         updateAgentUseCase.handle(new UpdateAgentCommand(id, name, systemPrompt, llmId,
-                split(mcpIds), split(ragIds), description, enabled));
+                mcpIds, ragIds, description, enabled));
     }
 
     /**
@@ -101,8 +119,9 @@ public class AgentViewModel implements CatalogueEditor<AgentDto> {
      * credential, which is the one field the preview must not print. What it is really for is the
      * warnings: a dropped MCP server is invisible in the catalogue and obvious here.
      */
+    @Toolbar
     @Action(idempotent = true)
-    public String previewResolvedConfiguration(HttpRequest httpRequest) {
+    public Object previewResolvedConfiguration(HttpRequest httpRequest) {
         try {
             var resolved = resolveAgentConfigUseCase.handle(id);
             var sb = new StringBuilder();
@@ -124,13 +143,18 @@ public class AgentViewModel implements CatalogueEditor<AgentDto> {
             lastPreview = sb.toString();
         } catch (ResolveAgentConfigUseCase.AgentNotUsableException e) {
             lastPreview = "Would not be served: " + e.getMessage();
+            return List.of(Message.error(lastPreview), new State(this));
         }
-        return lastPreview;
+        return List.of(new Message(lastPreview), new State(this));
     }
 
-    static List<String> split(String raw) {
-        return raw == null || raw.isBlank() ? List.of()
-                : Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+    /** The checkboxes' options: every MCP server and RAG source, see {@link CatalogueReferenceOptions}. */
+    @Override
+    public List<Option> options(String fieldName, HttpRequest httpRequest) {
+        return switch (fieldName) {
+            case "mcpIds", "ragIds" -> referenceOptions.all(fieldName, httpRequest);
+            default -> List.of();
+        };
     }
 
     @Override
@@ -145,8 +169,8 @@ public class AgentViewModel implements CatalogueEditor<AgentDto> {
         description = dto.description();
         llmId = dto.llmId();
         systemPrompt = dto.systemPrompt();
-        mcpIds = String.join(", ", dto.mcpIds());
-        ragIds = String.join(", ", dto.ragIds());
+        mcpIds = new ArrayList<>(dto.mcpIds());
+        ragIds = new ArrayList<>(dto.ragIds());
         enabled = dto.enabled();
         lastPreview = null;
         return this;

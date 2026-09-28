@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.infra.in.ui.pages.route;
 
+import io.mateu.ecdemo1.iacp.infra.in.ui.pages.CatalogueReferenceOptions;
 import io.mateu.ecdemo1.uicommons.crud.CatalogueEditor;
 import io.mateu.ecdemo1.iacp.application.out.query.dto.RouteDto;
 import io.mateu.ecdemo1.iacp.application.usecases.route.create.CreateRouteCommand;
@@ -8,6 +9,8 @@ import io.mateu.ecdemo1.iacp.application.usecases.route.update.UpdateRouteComman
 import io.mateu.ecdemo1.iacp.application.usecases.route.update.UpdateRouteUseCase;
 import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
+import io.mateu.uidl.annotations.Label;
+import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.interfaces.HttpRequest;
@@ -62,7 +65,9 @@ public class RouteViewModel implements CatalogueEditor<RouteDto> {
 
     @Section("Target")
     @NotEmpty
-    @Help("The id of the agent that answers when this rule matches.")
+    @Lookup(search = CatalogueReferenceOptions.class, label = CatalogueReferenceOptions.class)
+    @Label("Target agent")
+    @Help("The agent that answers when this rule matches.")
     String targetAgentId;
 
     @Section("Status")
