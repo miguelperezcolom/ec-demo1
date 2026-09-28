@@ -11,6 +11,8 @@ import io.mateu.uidl.data.Option;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.OptionsSupplier;
 import io.mateu.uidl.interfaces.StereotypeSupplier;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +22,10 @@ import io.mateu.uidl.di.MateuBeanProvider;
 
 /**
  * Paso 1 del walk-in — la estancia: fechas, lo que el CRS vende (habitación, tarifa, régimen, en
- * desplegables con sus códigos y nombres) y quién duerme.
+ * desplegables con sus códigos y nombres) y quién duerme. Fechas, habitación, tarifa y régimen son
+ * obligatorios: vacíos, «Continuar» los marca en su campo y el paso no se deja (lo comprueban el
+ * navegador y Mateu); lo que un campo no ve solo — la salida después de la llegada — lo dice
+ * {@link #problema()}.
  */
 @Getter
 @Setter
@@ -30,18 +35,23 @@ public class EstanciaWalkIn implements WizardStep, OptionsSupplier, StereotypeSu
 
   @Section(value = "Estancia", columns = 2)
   @Label("Llegada")
+  @NotNull
   LocalDate llegada = LocalDate.now();
 
   @Label("Salida")
+  @NotNull
   LocalDate salida = LocalDate.now().plusDays(1);
 
   @Label("Habitación")
+  @NotBlank
   String habitacion;
 
   @Label("Tarifa")
+  @NotBlank
   String tarifa;
 
   @Label("Régimen")
+  @NotBlank
   String regimen;
 
   @Label("Adultos")

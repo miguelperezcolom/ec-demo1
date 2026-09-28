@@ -9,6 +9,7 @@ import io.mateu.uidl.data.Option;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.OptionsSupplier;
 import io.mateu.uidl.interfaces.StereotypeSupplier;
+import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -20,9 +21,11 @@ public class TitularWalkIn implements WizardStep, OptionsSupplier, StereotypeSup
 
   @Section(value = "Titular", columns = 2)
   @Label("Nombre")
+  @NotBlank
   String nombre;
 
   @Label("Apellidos")
+  @NotBlank
   String apellidos;
 
   @Label("Email")
@@ -39,6 +42,7 @@ public class TitularWalkIn implements WizardStep, OptionsSupplier, StereotypeSup
   String tipoDocumento = "PASSPORT";
 
   @Label("Documento")
+  @NotBlank
   String documento;
 
   @Override
