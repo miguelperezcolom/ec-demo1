@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.iaagent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.iaagent.a2a.A2aHop;
+import io.mateu.ecdemo1.iaagent.a2a.GuardrailRunner;
 import io.mateu.ecdemo1.iaagent.a2a.PeerToolFactory;
 import io.mateu.ecdemo1.iaagent.config.AgentConfig;
 import io.mateu.ecdemo1.iaagent.config.AgentConfigClient;
@@ -51,6 +52,7 @@ public class IaAgentController {
     private final PromptObservations prompts;
     private final AgentTurn agentTurn;
     private final PeerToolFactory peerTools;
+    private final GuardrailRunner guardrails;
 
     public IaAgentController(AgentConfigClient configClient,
                              ChatClientRegistry chatClients,
@@ -65,7 +67,8 @@ public class IaAgentController {
                              ObservationRegistry observationRegistry,
                              PromptObservations prompts,
                              AgentTurn agentTurn,
-                             PeerToolFactory peerTools) {
+                             PeerToolFactory peerTools,
+                             GuardrailRunner guardrails) {
         this.configClient = configClient;
         this.chatClients = chatClients;
         this.mcpFactory = mcpFactory;
@@ -80,6 +83,7 @@ public class IaAgentController {
         this.prompts = prompts;
         this.agentTurn = agentTurn;
         this.peerTools = peerTools;
+        this.guardrails = guardrails;
     }
 
     // ── Observation ──────────────────────────────────────────────────────────
@@ -148,6 +152,51 @@ public class IaAgentController {
             throw new NoConfigurationException(resolution.deniedReason());
         }
         return resolution.config();
+    }
+
+    // ── Guardrails ───────────────────────────────────────────────────────────
+
+    /**
+     * The route's input guardrails, over A2A, before the agent sees anything: the text to answer
+     * — the user's, or a guardrail's rewrite of it — or a refusal, recorded on the observation.
+     */
+    private GuardrailRunner.Outcome checkInput(Observation observation, AgentConfig config, String message,
+                                               String authorization) {
+        var outcome = guardrails.check(GuardrailRunner.Side.INPUT, config, message, authorization, A2aHop.origin());
+        if (outcome.blocked()) {
+            var refusal = GuardrailRunner.refusal(GuardrailRunner.Side.INPUT, outcome);
+            tagResponse(observation, refusal);
+            outcome(observation, "blocked_input");
+        }
+        return outcome;
+    }
+
+    /**
+     * The route's output guardrails on the whole answer, before any of it leaves: what the user
+     * gets. This is why an answer is never sent in pieces while a route has output guardrails — a
+     * token already on the wire cannot be taken back. (Neither endpoint streams tokens today: /stream
+     * sends placeholders while the agent works and the answer in one event, after this.)
+     *
+     * <p>They read the answer as the user would, without navigation markers; one they allow
+     * unchanged keeps its markers, one they rewrite loses them.
+     */
+    private Checked checkOutput(AgentConfig config, String raw, String authorization) {
+        if (config.guardrailsOrNone().output().isEmpty()) {
+            return new Checked(raw, false);
+        }
+        var clean = parseNavigation(raw).cleanText();
+        var outcome = guardrails.check(GuardrailRunner.Side.OUTPUT, config, clean, authorization, A2aHop.origin());
+        if (outcome.blocked()) {
+            return new Checked(GuardrailRunner.refusal(GuardrailRunner.Side.OUTPUT, outcome), true);
+        }
+        return new Checked(outcome.text().equals(clean) ? raw : outcome.text(), false);
+    }
+
+    /** The answer the user gets, and whether it is a refusal in place of the agent's. */
+    private record Checked(String text, boolean blocked) {
+        String outcome() {
+            return blocked ? "blocked_output" : "success";
+        }
     }
 
     // ── Internal types ───────────────────────────────────────────────────────
@@ -248,6 +297,12 @@ public class IaAgentController {
             AgentConfig config = resolveConfig(authorization, request);
             tagAgent(observation, config);
 
+            var input = checkInput(observation, config, request.message(), authorization);
+            if (input.blocked()) {
+                return GuardrailRunner.refusal(GuardrailRunner.Side.INPUT, input);
+            }
+            String message = input.text();
+
             try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
                 var peers = peerTools.toolsFor(config, authorization, A2aHop.origin());
                 var toolCallbacks = allTools(config, tools, peers);
@@ -268,7 +323,7 @@ public class IaAgentController {
                         tools.getServerSystemContext(), sessionId, peers);
                 var history = conversationStore.getHistory(sessionId);
 
-                var turn = agentTurn.call(config, systemPrompt, history, request.message(),
+                var turn = agentTurn.call(config, systemPrompt, history, message,
                         toolCallbacks.toArray(new org.springframework.ai.tool.ToolCallback[0]));
                 String content = turn.content();
                 int inputTokens = turn.inputTokens(), outputTokens = turn.outputTokens(),
@@ -278,14 +333,15 @@ public class IaAgentController {
                         inputTokens, outputTokens, totalTokens);
 
                 String raw = (content != null && !content.isBlank()) ? content : "(sin respuesta)";
-                String result = parseNavigation(raw).cleanText();
-                conversationStore.addExchange(sessionId, request.message(), result);
+                var checked = checkOutput(config, raw, authorization);
+                String result = parseNavigation(checked.text()).cleanText();
+                conversationStore.addExchange(sessionId, message, result);
                 conversationStore.accumulateTokens(sessionId, inputTokens, outputTokens, totalTokens);
                 usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
                         inputTokens, outputTokens, totalTokens,
                         jwtIdentityReader.read(authorization), sessionId);
                 tagResponse(observation, result);
-                outcome(observation, "success");
+                outcome(observation, checked.outcome());
                 return result;
             }
         } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
@@ -399,6 +455,11 @@ public class IaAgentController {
         // servers to connect to and with which model to answer — and can refuse.
         AgentConfig config = resolveConfig(authorization, request);
         tagAgent(observation, config);
+        var input = checkInput(observation, config, request.message(), authorization);
+        if (input.blocked()) {
+            return new LlmResult(GuardrailRunner.refusal(GuardrailRunner.Side.INPUT, input), 0, 0, 0);
+        }
+        String message = input.text();
         try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
             var peers = peerTools.toolsFor(config, authorization, A2aHop.origin());
             var toolCallbacks = allTools(config, tools, peers);
@@ -415,7 +476,7 @@ public class IaAgentController {
             }
             String systemPrompt = buildSystemPrompt(config.systemPrompt(),
                     tools.getServerSystemContext(), sessionId, peers);
-            var turn = agentTurn.call(config, systemPrompt, history, request.message(),
+            var turn = agentTurn.call(config, systemPrompt, history, message,
                     toolCallbacks.toArray(new org.springframework.ai.tool.ToolCallback[0]));
             String content = turn.content();
             int inputTokens = turn.inputTokens(), outputTokens = turn.outputTokens(),
@@ -425,14 +486,16 @@ public class IaAgentController {
                     sessionId, content != null ? content.length() : 0,
                     inputTokens, outputTokens, totalTokens);
 
-            String raw = (content != null && !content.isBlank()) ? content : "(sin respuesta)";
-            conversationStore.addExchange(sessionId, request.message(), raw);
+            var checked = checkOutput(config,
+                    (content != null && !content.isBlank()) ? content : "(sin respuesta)", authorization);
+            String raw = checked.text();
+            conversationStore.addExchange(sessionId, message, raw);
             conversationStore.accumulateTokens(sessionId, inputTokens, outputTokens, totalTokens);
             usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
                     inputTokens, outputTokens, totalTokens,
                     jwtIdentityReader.read(authorization), sessionId);
             tagResponse(observation, raw);
-            outcome(observation, "success");
+            outcome(observation, checked.outcome());
             int[] cumulative = conversationStore.getTotalTokens(sessionId);
             return new LlmResult(raw, cumulative[0], cumulative[1], cumulative[2]);
         }

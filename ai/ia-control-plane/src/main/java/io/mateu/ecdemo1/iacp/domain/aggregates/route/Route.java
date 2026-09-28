@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.iacp.domain.aggregates.route;
 
+import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.Guardrails;
 import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.RouteId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Enabled;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Name;
@@ -24,6 +25,9 @@ import java.util.Collection;
  * <p>The match lives in the aggregate because it is the rule's own logic, not the resolver's — the
  * resolver's job is only to try the rules in order and take the first {@link #matches} that returns
  * true.
+ *
+ * <p>A route may also put guardrail agents around the agent it picks ({@link Guardrails}). Never the
+ * target itself: an agent judging its own input or output is not a guardrail.
  */
 @NoArgsConstructor
 @AllArgsConstructor
@@ -39,12 +43,15 @@ public class Route extends AggregateRoot {
     String locale;
     String routePrefix;
     String targetAgentId;
+    Guardrails guardrails;
     Enabled enabled;
     Time created;
 
     public static Route of(RouteId id, Name name, int priority, String role, String tenant,
-                           String locale, String routePrefix, String targetAgentId) {
+                           String locale, String routePrefix, String targetAgentId,
+                           Guardrails guardrails) {
         var route = new Route();
+        route.guardrails = checked(targetAgentId, guardrails);
         route.id = id;
         route.name = name;
         route.priority = priority;
@@ -59,7 +66,10 @@ public class Route extends AggregateRoot {
     }
 
     public void update(Name name, int priority, String role, String tenant, String locale,
-                       String routePrefix, String targetAgentId, Enabled enabled) {
+                       String routePrefix, String targetAgentId, Guardrails guardrails,
+                       Enabled enabled) {
+        // First, so a refused update leaves nothing half-applied.
+        this.guardrails = checked(targetAgentId, guardrails);
         this.name = name;
         this.priority = priority;
         this.role = blankToNull(role);
@@ -68,6 +78,19 @@ public class Route extends AggregateRoot {
         this.routePrefix = blankToNull(routePrefix);
         this.targetAgentId = targetAgentId;
         this.enabled = enabled;
+    }
+
+    private static Guardrails checked(String targetAgentId, Guardrails guardrails) {
+        var g = guardrails == null ? Guardrails.none() : guardrails;
+        if (targetAgentId != null && g.mentions(targetAgentId)) {
+            throw new IllegalArgumentException("Agent '" + targetAgentId
+                    + "' is this route's target and cannot also be one of its guardrails");
+        }
+        return g;
+    }
+
+    public Guardrails getGuardrails() {
+        return guardrails == null ? Guardrails.none() : guardrails;
     }
 
     public boolean isUsable() {

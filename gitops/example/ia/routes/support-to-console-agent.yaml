@@ -6,3 +6,10 @@ priority: 10
 # All conditions AND; omit any to mean "any". This one matches callers with the 'support' realm role.
 role: support
 targetAgent: console-agent
+# Agents run over A2A around the target, in order: before it reads the question, and before the
+# user reads its answer. CLOSED (the default) blocks when a guardrail cannot give a verdict.
+inputGuardrails:
+  - content-guardrail
+outputGuardrails:
+  - content-guardrail
+guardrailFailure: CLOSED

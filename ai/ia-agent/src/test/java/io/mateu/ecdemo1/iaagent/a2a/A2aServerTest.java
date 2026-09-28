@@ -24,7 +24,7 @@ class A2aServerTest {
 
     static AgentConfig config(String id) {
         return new AgentConfig(id, "Agent " + id, "Does " + id + " things", "prompt", null,
-                List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), null, List.of());
     }
 
     final A2aServer server = new A2aServer(

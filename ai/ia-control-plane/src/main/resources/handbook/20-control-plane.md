@@ -48,3 +48,14 @@ agent id. An agent never calls itself, a chain of calls is refused at the third 
 cycle. A peer that is disabled or deleted is dropped from the configuration with a warning, like an
 MCP server. What is not supported: streaming, push notifications, long-running tasks and non-text
 parts, and calling agents outside this deployment.
+
+## Guardrails
+
+A route can name guardrail agents: input ones that check the user's text before the chosen agent
+reads it, and output ones that check the answer before the user reads it. Each is an agent of the
+catalogue, called over A2A, that answers a JSON verdict — `ALLOW`, `BLOCK` with a reason, or
+`REWRITE` with a new text. A blocked question never reaches the agent and the user is told why; a
+blocked answer is replaced by a notice. When a guardrail cannot be reached or does not answer a
+verdict, the route's failure mode decides: `CLOSED` (the default) blocks, `OPEN` lets the text
+through and logs a warning. With output guardrails the answer is shown once it has been checked,
+never in pieces.

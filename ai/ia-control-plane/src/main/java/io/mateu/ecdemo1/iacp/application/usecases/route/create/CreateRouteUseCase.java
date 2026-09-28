@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.iacp.application.usecases.route.create;
 
 import io.mateu.ecdemo1.iacp.application.out.repository.RouteRepository;
 import io.mateu.ecdemo1.iacp.domain.aggregates.route.Route;
+import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.Guardrails;
 import io.mateu.ecdemo1.iacp.domain.aggregates.route.vo.RouteId;
 import io.mateu.ecdemo1.iacp.domain.aggregates.shared.vo.Name;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,9 @@ public class CreateRouteUseCase {
             throw new IllegalArgumentException("A route with id '" + command.id() + "' already exists");
         }
         repository.save(Route.of(id, new Name(command.name()), command.priority(), command.role(),
-                command.tenant(), command.locale(), command.routePrefix(), command.targetAgentId()));
+                command.tenant(), command.locale(), command.routePrefix(), command.targetAgentId(),
+                new Guardrails(command.inputGuardrailAgentIds(), command.outputGuardrailAgentIds(),
+                        Guardrails.Failure.parse(command.guardrailFailure()))));
         return id.value();
     }
 }

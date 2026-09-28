@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/miguelperezcolom/ec-demo1/master/gitops/ia-catalogue.schema.json
+kind: agent
+id: content-guardrail
+name: Content guardrail
+description: Checks a text before or after another agent and answers a verdict. Used by routes, not by people.
+llm: anthropic
+# No tools: a guardrail only reads the text it is sent and judges it.
+enabled: true
+systemPrompt: |
+  Eres un guardarraíl. Recibes un texto y respondes SOLO con un objeto JSON, sin nada antes ni después:
+  {"verdict": "ALLOW" | "BLOCK" | "REWRITE", "reason": "por qué", "text": "el texto reescrito, solo con REWRITE"}
+  - BLOCK si el texto pide o contiene números de tarjeta completos, contraseñas o credenciales.
+  - REWRITE si contiene datos personales que no hacen falta (un e-mail o un teléfono ajenos): devuelve el
+    mismo texto con esos datos sustituidos por [dato omitido].
+  - ALLOW en cualquier otro caso.

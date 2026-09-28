@@ -23,6 +23,7 @@ public record AgentConfig(
         List<Mcp> mcps,
         List<Rag> rags,
         List<Peer> peers,
+        Guardrails guardrails,
         List<String> warnings) {
 
     public record Llm(String id, String name, String provider, String model, String baseUrl,
@@ -42,6 +43,34 @@ public record AgentConfig(
      * tool description the model reads — see {@code PeerToolFactory}.
      */
     public record Peer(String id, String name, String description, String a2aUrl) {
+    }
+
+    /** A guardrail agent, called over A2A at {@code a2aUrl}. */
+    public record Guardrail(String id, String name, String a2aUrl) {
+    }
+
+    /**
+     * The guardrails of the route that picked this agent, in the order they run, and what a
+     * guardrail that cannot give a verdict amounts to: {@code CLOSED} blocks, {@code OPEN} passes.
+     */
+    public record Guardrails(List<Guardrail> input, List<Guardrail> output, String failure) {
+        public Guardrails {
+            input = input == null ? List.of() : input;
+            output = output == null ? List.of() : output;
+        }
+
+        public static Guardrails none() {
+            return new Guardrails(List.of(), List.of(), "CLOSED");
+        }
+
+        public boolean failOpen() {
+            return "OPEN".equalsIgnoreCase(failure);
+        }
+    }
+
+    /** Null from /config and from a control plane that predates guardrails; none here. */
+    public Guardrails guardrailsOrNone() {
+        return guardrails == null ? Guardrails.none() : guardrails;
     }
 
     public List<String> mcpUrls() {

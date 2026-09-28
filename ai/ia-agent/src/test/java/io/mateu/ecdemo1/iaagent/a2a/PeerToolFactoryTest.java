@@ -36,7 +36,7 @@ class PeerToolFactoryTest {
     }
 
     static AgentConfig agent(String id, AgentConfig.Peer... peers) {
-        return new AgentConfig(id, "Agent " + id, null, "p", null, List.of(), List.of(), List.of(peers), List.of());
+        return new AgentConfig(id, "Agent " + id, null, "p", null, List.of(), List.of(), List.of(peers), null, List.of());
     }
 
     static List<String> names(List<ToolCallback> tools) {

@@ -434,6 +434,29 @@
           "type": "string",
           "description": "The id of the agent that answers when this rule matches."
         },
+        "inputGuardrails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of agents that check the user's text over A2A before targetAgent sees it, in order. Each answers ALLOW, BLOCK or REWRITE. Not targetAgent itself."
+        },
+        "outputGuardrails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of agents that check targetAgent's answer over A2A before the user sees it, in order. With any, the answer is not streamed."
+        },
+        "guardrailFailure": {
+          "type": "string",
+          "enum": [
+            "CLOSED",
+            "OPEN"
+          ],
+          "default": "CLOSED",
+          "description": "What an unreachable guardrail, or one that does not answer a verdict, does: CLOSED blocks the text, OPEN lets it through with a warning."
+        },
         "enabled": {
           "type": "boolean",
           "default": true
