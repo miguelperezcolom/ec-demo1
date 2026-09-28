@@ -87,6 +87,9 @@ spring:
         consumeWorkerEvent-in-0:
           destination: crs-integration
           group: ec-demo1-crs-integration-worker
+          consumer:
+            # «crs-integration» has one partition; its two steps only write a command to the outbox.
+            concurrency: 1
         # OUT: business events (outbox), process starts (outbox), and replies to the engine.
         integrationEvents:
           destination: integration-events

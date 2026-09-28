@@ -3,10 +3,10 @@ package io.mateu.ecdemo1.crsintegration.worker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.crsintegration.commands.SystemCommands;
 import io.mateu.ecdemo1.crsintegration.outbox.Outbox;
-import io.mateu.ecdemo1.crsintegration.worker.runtime.ExactStrings;
 import io.mateu.workflow.worker.api.Cancellations;
 import io.mateu.workflow.worker.api.TaskDispatcher;
 import io.mateu.workflow.worker.api.TaskRegistry;
+import io.mateu.workflow.worker.api.TaskTracing;
 import io.mateu.workflow.worker.api.TaskReplySink;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
@@ -70,7 +70,7 @@ class TaskHandlersTest {
     final CrsTasks tasks = new CrsTasks();
     final TaskDispatcher dispatcher = new TaskDispatcher(new TaskRegistry(List.of(
             tasks.annotatePmsReferenceTask(handlers), tasks.annotatePartnerProfileTask(handlers))),
-            sink, Cancellations.NONE, new ExactStrings(new ObjectMapper()), false);
+            sink, Cancellations.NONE, false, TaskTracing.NOOP);
 
     /** What the runtime would answer the engine. */
     static class RecordingSink implements TaskReplySink {

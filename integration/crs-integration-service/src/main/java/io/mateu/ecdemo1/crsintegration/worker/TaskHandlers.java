@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.crsintegration.worker;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.mateu.ecdemo1.crsintegration.commands.SystemCommands;
 import io.mateu.ecdemo1.crsintegration.outbox.Outbox;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
@@ -26,12 +25,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class TaskHandlers {
 
     /** {@code annotate-pms-reference@1}'s input. A task carries every variable of its process; the rest are not its. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record PmsReference(String locator, String pmsReservationId) {
     }
 
     /** {@code annotate-partner-profile@1}'s input. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record PartnerProfile(String partnerCode, String pmsProfileIds, String pmsProfileType) {
     }
 

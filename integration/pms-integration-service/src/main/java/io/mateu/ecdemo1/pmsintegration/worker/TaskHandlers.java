@@ -21,7 +21,6 @@ import io.mateu.ecdemo1.pmsintegration.ohip.OperaProfiles;
 import io.mateu.ecdemo1.pmsintegration.ohip.OperaReservations;
 import io.mateu.ecdemo1.pmsintegration.ohip.PmsRejectedException;
 import io.mateu.ecdemo1.pmsintegration.write.ReservationPayload;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.worker.api.TaskContext;
@@ -65,7 +64,6 @@ public class TaskHandlers {
      * step have to wait (the mapping keeps only its relaunch variables). A task carries every variable
      * of its process; the rest are not its.
      */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record ReservationTask(String definitionId, String processKey, String hotelCode, String locator,
                                   String version, String eventId, String origin, String guestProfileId) {
 
@@ -75,7 +73,6 @@ public class TaskHandlers {
     }
 
     /** {@code ensure-partner-profile@1}'s input. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record PartnerTask(String definitionId, String processKey, String partnerCode, String version,
                               String eventId, String origin) {
 
@@ -85,7 +82,6 @@ public class TaskHandlers {
     }
 
     /** {@code project-stay@1}'s input: the Opera reservation, by property and id. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record StayTask(String pmsHotelCode, String pmsReservationId) {
     }
 

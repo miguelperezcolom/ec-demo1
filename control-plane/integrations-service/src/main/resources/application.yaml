@@ -17,7 +17,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeWorkerEvent;consumeLegacyTasks;consumePmsReservations
+      definition: consumeWorkerEvent;consumePmsReservations
     stream:
       kafka:
         binder:
@@ -28,11 +28,6 @@ spring:
           # trace.
           enable-observation: true
         bindings:
-          # A group created at the end of the topic, not its beginning: it would otherwise run every
-          # task the topic ever held.
-          consumeLegacyTasks-in-0:
-            consumer:
-              start-offset: latest
           outboxUpstream:
             producer:
               sync: true
@@ -84,13 +79,9 @@ spring:
         consumeWorkerEvent-in-0:
           destination: integrations
           group: ec-demo1-integrations-worker
-        # IN: the same tasks, for the ones the engine dispatches with no contract — a process started
-        # on a version of its definition from before it named its tasks. It stamps the contract the
-        # step answers to and runs it through the same runtime; the rest it leaves to
-        # consumeWorkerEvent. Goes once no such process is left.
-        consumeLegacyTasks-in-0:
-          destination: integrations
-          group: ec-demo1-integrations-worker-legacy
+          consumer:
+            # «integrations» has one partition, and an onboarding's steps come one after another.
+            concurrency: 1
         # OUT: replies to the engine; and, through the outbox, the start of an onboarding, the
         # messages that open its gates, and notifications.
         upstream:

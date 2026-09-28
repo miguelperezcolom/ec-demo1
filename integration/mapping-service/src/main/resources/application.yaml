@@ -23,6 +23,9 @@ spring:
         binder:
           brokers: ${KAFKA_BROKERS:localhost:9192}
           auto-create-topics: true
+          # A binding asking for more partitions than its topic has (consumeWorkerEvent's concurrency)
+          # grows the topic: partitions are only ever added.
+          auto-add-partitions: true
           # Every consumer continues the trace its record carries (traceparent header), and every
           # record sent carries the trace it was sent in: the engine's tasks run inside the process's
           # trace.
@@ -57,6 +60,12 @@ spring:
         consumeWorkerEvent-in-0:
           destination: mapping
           group: ec-demo1-mapping-worker
+          consumer:
+            # Three at a time: every reservation's projection goes through here and its steps wait
+            # on the CRS and the integrations service; one thread would queue a backfill behind each call. The topic is grown
+            # to three partitions (auto-add-partitions, above). What must not run at once is kept
+            # apart by the engine's LOCK on the reservation, not by the partition.
+            concurrency: 3
         # IN: what other services ask of the mapping without waiting — the integrations service's
         # equivalences, the agent's proposal, causes to resolve, partners' PMS profiles. Taken once
         # each (inbox); retried until it goes.

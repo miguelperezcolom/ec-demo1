@@ -1,16 +1,14 @@
 package io.mateu.ecdemo1.integrations.worker;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
-import io.mateu.ecdemo1.integrations.worker.runtime.ExactStrings;
-import io.mateu.ecdemo1.integrations.worker.runtime.WorkerRuntime;
 import io.mateu.workflow.dtos.Variable;
 import io.mateu.workflow.dtos.events.integration.TaskExecutionRequested;
 import io.mateu.workflow.worker.api.Cancellations;
 import io.mateu.workflow.worker.api.TaskDispatcher;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import io.mateu.workflow.worker.api.TaskRegistry;
+import io.mateu.workflow.worker.api.TaskTracing;
 import io.mateu.workflow.worker.api.TaskReplySink;
 import org.junit.jupiter.api.Test;
 
@@ -55,9 +53,7 @@ class IntegrationsTasksTest {
     final IntegrationsTasks tasks = new IntegrationsTasks();
     final RecordingSink sink = new RecordingSink();
     final List<TaskRegistration<?, ?>> registrations = registrations();
-    final TaskDispatcher dispatcher = new TaskDispatcher(new TaskRegistry(registrations), sink, Cancellations.NONE,
-            new ExactStrings(new ObjectMapper()), false);
-    final WorkerRuntime.LegacyTasks legacy = new WorkerRuntime.LegacyTasks(dispatcher, tasks.legacyTaskRefs());
+    final TaskDispatcher dispatcher = new TaskDispatcher(new TaskRegistry(registrations), sink, Cancellations.NONE, false, TaskTracing.NOOP);
 
     /** Every @Bean method of IntegrationsTasks that makes a registration, as Spring would call them. */
     List<TaskRegistration<?, ?>> registrations() {
@@ -114,13 +110,15 @@ class IntegrationsTasksTest {
     }
 
     @Test
-    void aStepFromAProcessThatPredatesTheContractsRunsAsTheContractItAnswersTo() {
-        assertThat(legacy.accept(task("sync-partners", "", new Variable("integrationId", "INT-7")), null)).isTrue();
+    void aStepFromAProcessThatPredatesTheContractsRunsAsTheContractItsStepIsNamedAfter() {
+        // No taskId: the runtime (2.23.1) serves the step id as a contract id. A step no contract
+        // here is named after is not served, and a taskId that is set never falls back to the step.
+        dispatcher.dispatch(task("sync-partners", "", new Variable("integrationId", "INT-7")));
+        dispatcher.dispatch(task("prepare", ""));
+        dispatcher.dispatch(task("sync-partners", "sync-partners@2", new Variable("integrationId", "INT-7")));
 
         assertThat(ran).containsExactly("sync-partners INT-7");
-        assertThat(legacy.accept(task("sync-partners", "sync-partners@1", new Variable("integrationId", "INT-7")), null))
-                .isFalse();
-        assertThat(legacy.accept(task("prepare", ""), null)).isFalse();
+        assertThat(sink.replies).containsExactly("COMPLETED []");
     }
 
     @Test

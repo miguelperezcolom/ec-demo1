@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.integrations.worker;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
 import io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
@@ -21,7 +20,6 @@ import java.util.function.Consumer;
 public class TaskHandlers {
 
     /** The input of every onboarding task: which integration it is about. A task carries every variable of its process; the rest are not its. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Onboarding(String integrationId) {
     }
 

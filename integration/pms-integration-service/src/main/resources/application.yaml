@@ -13,6 +13,9 @@ spring:
         binder:
           brokers: ${KAFKA_BROKERS:localhost:9192}
           auto-create-topics: true
+          # A binding asking for more partitions than its topic has (consumeWorkerEvent's concurrency)
+          # grows the topic: partitions are only ever added.
+          auto-add-partitions: true
           # Every consumer continues the trace its record carries (traceparent header), and every
           # record sent carries the trace it was sent in: a task runs inside its process's trace, and
           # what it tells the front office and the pms-fo integration goes on in it.
@@ -43,6 +46,12 @@ spring:
         consumeWorkerEvent-in-0:
           destination: pms-integration
           group: ec-demo1-pms-integration-worker
+          consumer:
+            # Three at a time: every reservation's projection goes through here and its steps wait
+            # on Opera; one thread would queue a backfill behind each call. The topic is grown
+            # to three partitions (auto-add-partitions, above). What must not run at once is kept
+            # apart by the engine's LOCK on the reservation, not by the partition.
+            concurrency: 3
         # OUT: replies to the engine, and the alarm when a write keeps failing.
         upstream:
           destination: upstream

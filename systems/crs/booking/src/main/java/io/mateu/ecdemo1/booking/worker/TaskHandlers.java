@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.booking.worker;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.mateu.ecdemo1.booking.application.usecases.booking.noshow.RegisterNoShowUseCase;
 import io.mateu.workflow.worker.api.TaskContext;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Component;
 public class TaskHandlers {
 
     /** {@code register-no-show@1}'s input. A task carries every variable of its process; the rest are not its. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public record NoShow(String bookingId) {
     }
 

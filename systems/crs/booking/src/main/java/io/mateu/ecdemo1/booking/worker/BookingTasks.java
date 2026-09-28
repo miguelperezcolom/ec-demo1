@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.booking.worker;
 
-import io.mateu.ecdemo1.booking.worker.runtime.LegacyTaskRefs;
 import io.mateu.ecdemo1.booking.worker.runtime.Reasons;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import org.springframework.context.annotation.Bean;
@@ -23,15 +22,5 @@ public class BookingTasks {
     public TaskRegistration<TaskHandlers.NoShow, Void> registerNoShowTask(TaskHandlers handlers) {
         return new TaskRegistration<>(REGISTER_NO_SHOW, 1, TOPIC, TaskHandlers.NoShow.class, Void.class,
                 Reasons.asBefore(handlers::registerNoShow));
-    }
-
-    /**
-     * The contract a step answers to when the engine dispatches it with no {@code taskId}: a
-     * «Registrar no-show» started on a version of the definition from before it named its task. Goes
-     * once none of those is left.
-     */
-    @Bean
-    public LegacyTaskRefs legacyTaskRefs() {
-        return (definitionId, stepId) -> REGISTER_NO_SHOW.equals(stepId) ? REGISTER_NO_SHOW + "@1" : null;
     }
 }
