@@ -43,8 +43,20 @@ public class ApiUsageKpis implements ComponentTreeSupplier {
 
     static Scoreboard tiles(ApiUsage salesforce, ApiUsage opera) {
         return Scoreboard.builder().style("width: 100%;")
-                .metrics(List.of(salesforce(salesforce), salesforcePace(salesforce), opera(opera)))
+                .metrics(cards(salesforce, opera))
                 .build();
+    }
+
+    /**
+     * The same three cards, for a console that lays them out itself: the shells' welcome pages
+     * put them among their own tiles, where every renderer draws a KPI ({@code GET /usage/kpis}).
+     */
+    public List<MetricCard> cards() {
+        return cards(usages.salesforce().orElse(null), usages.opera().orElse(null));
+    }
+
+    static List<MetricCard> cards(ApiUsage salesforce, ApiUsage opera) {
+        return List.of(salesforce(salesforce), salesforcePace(salesforce), opera(opera));
     }
 
     /** "335 llamadas libres de 15.000", going down or coming back against an hour ago. */
