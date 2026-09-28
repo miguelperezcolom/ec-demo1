@@ -130,7 +130,7 @@ public class SecurityConfig {
                         .pathMatchers("/_inbox/push/push.js", "/_inbox/push/sw.js").permitAll()
                         // The inbox, on every host: what it shows depends on the caller's roles.
                         .pathMatchers("/_inbox/**").authenticated()
-                        // The external APIs' usage (the header widget and its page), on every host
+                        // The external APIs' usage (the page behind the home pages' tiles), on every host
                         // like the inbox: counts, no personal data, but not for anonymous callers.
                         // Only these screens: the services' /usage endpoints have no route at all.
                         // Except the page's own path typed in the address bar: a GET with no token,

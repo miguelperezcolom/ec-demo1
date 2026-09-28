@@ -57,7 +57,7 @@ public final class UserWidget {
     }
 
     /**
-     * The same, with other widgets before the inbox badge ({@link ApiUsageWidget}). One layout for all
+     * The same, with other widgets before the inbox badge. One layout for all
      * of them: the header puts each widget in its "widgets" slot, and a bare MicroFrontend does not
      * carry the slot through — it would render outside the header, invisible.
      */

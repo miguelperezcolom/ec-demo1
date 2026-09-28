@@ -4,9 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.uidl.data.MetricCard;
 import io.mateu.uidl.data.MetricTrend;
-import io.mateu.uidl.data.MicroFrontend;
-import io.mateu.uidl.fluent.Component;
-import io.mateu.uidl.interfaces.HttpRequest;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -16,13 +13,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The external APIs' usage on the consoles — "Salesforce 335 libres · Opera 320 hoy" in the header,
- * and the KPI tiles on the welcome pages — from integrations-service: the header's badge is its
- * screen under {@code /_api-usage}, which the gateway routes on every console host; the tiles are its
- * cards, asked from inside the cluster when the welcome page renders.
+ * The external APIs' usage on the consoles: the KPI tiles on the welcome pages, from
+ * integrations-service — its cards, asked from inside the cluster when the welcome page renders.
+ * Clicking one opens the page behind them, under {@code /_api-usage}. Not in the header: the figures
+ * are what one looks at before a meeting or a demo, not on every screen.
  *
- * <p>The tiles are not a micro frontend on the page, as the badge is: a welcome page's tiles are its
- * own {@code @Panel} fields, which is what every renderer draws as KPIs (Redwood's welcome takes its
+ * <p>The tiles are not a micro frontend on the page: a welcome page's tiles are its own
+ * {@code @Panel} fields, which is what every renderer draws as KPIs (Redwood's welcome takes its
  * tiles from those panels only).
  */
 public final class ApiUsageWidget {
@@ -36,10 +33,6 @@ public final class ApiUsageWidget {
     private ApiUsageWidget() {
     }
 
-    /** The header's figures, refreshed every minute. */
-    public static MicroFrontend badge() {
-        return MicroFrontend.builder().baseUrl("/_api-usage").route("/badge").build();
-    }
 
     /**
      * The welcome page's tiles: Salesforce's calls left, our pace, Opera's calls today — each one
@@ -121,11 +114,4 @@ public final class ApiUsageWidget {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    /**
-     * The consoles' header: the APIs' usage, then the inbox badge and the greeting ({@link UserWidget}),
-     * in one layout. Nothing for an anonymous call, like them.
-     */
-    public static List<Component> withInboxBadge(HttpRequest httpRequest) {
-        return UserWidget.withInboxBadge(httpRequest, List.of(badge()));
-    }
 }

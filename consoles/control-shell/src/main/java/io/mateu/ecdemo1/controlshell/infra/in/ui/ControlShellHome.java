@@ -1,6 +1,6 @@
 package io.mateu.ecdemo1.controlshell.infra.in.ui;
 
-import io.mateu.ecdemo1.uicommons.user.ApiUsageWidget;
+import io.mateu.ecdemo1.uicommons.user.UserWidget;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
@@ -146,18 +146,17 @@ public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Hidden
     RemoteMenu inbox = new RemoteMenu("/_inbox");
 
-    /** The external APIs' usage, hidden from the bar like the inbox: its header widget is the way in. */
+    /** The external APIs' usage, hidden from the bar like the inbox: the home's tiles are the way in. */
     @Menu
     @Hidden
     RemoteMenu apiUsage = new RemoteMenu("/_api-usage").withLabel("APIs externas");
 
     /**
-     * How much of Salesforce and Opera is spent, the inbox badge and who is signed in — the widgets
-     * every console shares (ui-commons). Nothing for an anonymous call: the bootstrap page is about
+     * The inbox badge and who is signed in — the widgets every console shares (ui-commons). Nothing for an anonymous call: the bootstrap page is about
      * to redirect to Keycloak.
      */
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
-        return ApiUsageWidget.withInboxBadge(httpRequest);
+        return UserWidget.withInboxBadge(httpRequest);
     }
 }
