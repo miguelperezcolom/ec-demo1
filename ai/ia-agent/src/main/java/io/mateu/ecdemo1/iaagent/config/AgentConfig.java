@@ -17,10 +17,12 @@ import java.util.List;
 public record AgentConfig(
         String agentId,
         String agentName,
+        String agentDescription,
         String systemPrompt,
         Llm llm,
         List<Mcp> mcps,
         List<Rag> rags,
+        List<Peer> peers,
         List<String> warnings) {
 
     public record Llm(String id, String name, String provider, String model, String baseUrl,
@@ -35,7 +37,19 @@ public record AgentConfig(
                       String embeddingModel, int topK, String description) {
     }
 
+    /**
+     * Another agent this one may call over A2A, at {@code a2aUrl}. {@code description} becomes the
+     * tool description the model reads — see {@code PeerToolFactory}.
+     */
+    public record Peer(String id, String name, String description, String a2aUrl) {
+    }
+
     public List<String> mcpUrls() {
         return mcps == null ? List.of() : mcps.stream().map(Mcp::url).toList();
+    }
+
+    /** Null from a control plane that predates A2A; empty here. */
+    public List<Peer> peersOrEmpty() {
+        return peers == null ? List.of() : peers;
     }
 }

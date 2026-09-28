@@ -31,3 +31,20 @@ why a source is only worth attaching to an agent once it holds content.
 
 To check retrieval, ask the chat panel an operational question — for example how the identity sync
 is verified, or what the `ai-admin` role is for — and the agent should answer from this handbook.
+
+## Agents calling agents (A2A)
+
+An agent can be allowed to call other agents of the catalogue — "Agentes a los que puede llamar
+(A2A)" in its editor, `peers:` in its YAML. Each one becomes a tool of the calling agent,
+`ask_<agent-id>`, described with the called agent's own description, so a good description is what
+makes delegation happen. The call uses the A2A protocol: every ia-agent pod serves every agent at
+`/a2a/{agentId}` (Agent Card at `/a2a/{agentId}/.well-known/agent-card.json`, JSON-RPC
+`message/send`), inside the cluster only — the gateway does not route it.
+
+The called agent acts for the same person: the caller's token travels with the call, so it reaches
+its MCP servers as that person and its tokens count against that person's budgets, under its own
+agent id. An agent never calls itself, a chain of calls is refused at the third hop
+(`IA_A2A_MAX_DEPTH`, 2 by default) and a call back to an agent already on the chain is refused as a
+cycle. A peer that is disabled or deleted is dropped from the configuration with a warning, like an
+MCP server. What is not supported: streaming, push notifications, long-running tasks and non-text
+parts, and calling agents outside this deployment.

@@ -54,7 +54,8 @@ public class CatalogueReferenceOptions implements LookupOptionsSupplier, LookupL
             case "ragIds" -> options(rags.findAll(searchText, null, pageable),
                     r -> option(r.id(), r.name(), r.kind().toLowerCase() + " · " + r.collection(),
                             r.status(), "Enabled"));
-            case "targetAgentId" -> options(agents.findAll(searchText, null, pageable),
+            case "targetAgentId", "peerAgentIds", "inputGuardrailAgentIds",
+                 "outputGuardrailAgentIds" -> options(agents.findAll(searchText, null, pageable),
                     r -> option(r.id(), r.name(), r.llm(), r.status(), "Enabled"));
             default -> throw new IllegalArgumentException("No references for field " + fieldId);
         };
@@ -78,7 +79,8 @@ public class CatalogueReferenceOptions implements LookupOptionsSupplier, LookupL
             case "llmId" -> llms.getLabel((String) id);
             case "mcpIds" -> mcps.getLabel((String) id);
             case "ragIds" -> rags.getLabel((String) id);
-            case "targetAgentId" -> agents.getLabel((String) id);
+            case "targetAgentId", "peerAgentIds", "inputGuardrailAgentIds",
+                 "outputGuardrailAgentIds" -> agents.getLabel((String) id);
             default -> String.valueOf(id);
         };
         return "Unknown".equals(label) ? id + " (not in the catalogue)" : label;

@@ -10,6 +10,7 @@ public record AgentDto(
         String llmId,
         List<String> mcpIds,
         List<String> ragIds,
+        List<String> peerAgentIds,
         String description,
         boolean enabled,
         LocalDateTime created) {

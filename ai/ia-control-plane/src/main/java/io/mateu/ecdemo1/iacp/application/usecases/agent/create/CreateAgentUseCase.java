@@ -37,7 +37,7 @@ public class CreateAgentUseCase {
         repository.save(Agent.of(id, new Name(command.name()),
                 new SystemPrompt(command.systemPrompt()), llmId,
                 ids(command.mcpIds(), McpId::new), ids(command.ragIds(), RagId::new),
-                command.description()));
+                ids(command.peerAgentIds(), AgentId::new), command.description()));
         return id.value();
     }
 

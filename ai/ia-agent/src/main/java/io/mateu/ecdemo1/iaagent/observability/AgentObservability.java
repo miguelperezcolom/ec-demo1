@@ -81,6 +81,10 @@ public class AgentObservability {
     public static final String MCP_SERVER = "ia.mcp.server";
     public static final String MCP_SERVER_URL = "ia.mcp.server.url";
     public static final String RAG_ID = "ia.rag.id";
+    /** The agent an {@code ask_<peer>} tool called over A2A. */
+    public static final String A2A_PEER = "ia.a2a.peer";
+    /** How many A2A hops led to this prompt: 0 for a person's, 1 for an agent called by it... */
+    public static final String A2A_DEPTH = "ia.a2a.depth";
 
     /** Before the control plane has said which agent this is — or when it refused to. */
     public static final String UNRESOLVED = "unresolved";

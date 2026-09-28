@@ -37,6 +37,32 @@ same convention `credentialEnv` follows, so editing a base url in a hurry cannot
 somebody wrote. **An empty list empties it**, which is the repo saying so on purpose, and leaves the
 entry catalogued and visibly unusable.
 
+## Agents that call agents (A2A)
+
+An `agent` entry may list, under `peers`, other agents it is allowed to call:
+
+```yaml
+kind: agent
+id: console-agent
+llm: anthropic
+peers:
+  - mapping-agent     # becomes the tool ask_mapping_agent, described by mapping-agent's description
+```
+
+Each peer is offered to the agent's model as one tool that sends it a message over the
+[A2A protocol](https://a2a-protocol.org) (`message/send`, JSON-RPC 2.0) and returns its answer. The
+peer's `description` is the tool description the calling model reads, so write it for that reader.
+The resolved configuration carries each peer's A2A address, built from the control plane's
+`cp.a2a-base-url` (`A2A_BASE_URL`, `http://ia-agent:8095` by default) plus `/a2a/<id>`: every
+ia-agent pod serves every agent there, with its Agent Card at `/a2a/<id>/.well-known/agent-card.json`.
+
+The rules: an agent cannot list itself (the sync reports it as an error); peers are references like
+`mcp` and `rag`, so one that is missing or disabled is dropped at read time with a warning; the
+caller's token is forwarded, so the peer acts for the same person and spends against the same
+budgets; a chain of calls stops at `IA_A2A_MAX_DEPTH` hops (2) and a call back to an agent already
+on the chain is refused. Supported subset: text in, text out, blocking. No streaming, no push
+notifications, no tasks, no agents outside this deployment.
+
 ## The rules that matter
 
 - **Git owns only what git created.** An entry the reconciler writes is remembered as git-managed;

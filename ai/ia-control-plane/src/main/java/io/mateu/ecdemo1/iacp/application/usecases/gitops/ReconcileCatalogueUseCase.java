@@ -344,15 +344,16 @@ public class ReconcileCatalogueUseCase {
             var name = orId(m.name(), m.id());
             var mcpIds = m.mcp() == null ? List.<String>of() : m.mcp();
             var ragIds = m.rag() == null ? List.<String>of() : m.rag();
+            var peerIds = m.peers() == null ? List.<String>of() : m.peers();
             if (exists) {
                 updateAgent.handle(new UpdateAgentCommand(m.id(), name, m.systemPrompt(), m.llm(),
-                        mcpIds, ragIds, m.description(), enabled(m.enabled())));
+                        mcpIds, ragIds, peerIds, m.description(), enabled(m.enabled())));
             } else {
                 createAgent.handle(new CreateAgentCommand(m.id(), name, m.systemPrompt(), m.llm(),
-                        mcpIds, ragIds, m.description()));
+                        mcpIds, ragIds, peerIds, m.description()));
                 if (!enabled(m.enabled())) {
                     updateAgent.handle(new UpdateAgentCommand(m.id(), name, m.systemPrompt(), m.llm(),
-                            mcpIds, ragIds, m.description(), false));
+                            mcpIds, ragIds, peerIds, m.description(), false));
                 }
             }
         });

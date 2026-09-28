@@ -317,8 +317,16 @@
           },
           "description": "Ids of rag entries this agent may search."
         },
+        "peers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of other agent entries this agent may call over A2A. Each becomes a tool its model can use to delegate; the peer's description is what that model reads. Not itself."
+        },
         "description": {
-          "type": "string"
+          "type": "string",
+          "description": "What the agent does. Also what a calling agent's model reads when this one is its A2A peer."
         },
         "enabled": {
           "type": "boolean",

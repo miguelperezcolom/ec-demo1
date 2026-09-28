@@ -31,6 +31,7 @@ public class AgentDBRepository implements AgentRepository {
         e.setLlmId(agent.getLlmId().value());
         e.setMcpIds(IdList.join(agent.getMcpIds().stream().map(McpId::value).toList()));
         e.setRagIds(IdList.join(agent.getRagIds().stream().map(RagId::value).toList()));
+        e.setPeerAgentIds(IdList.join(agent.getPeerAgentIds().stream().map(AgentId::value).toList()));
         e.setDescription(agent.getDescription());
         e.setEnabled(agent.getEnabled().value());
         e.setCreated(agent.getCreated().value());
@@ -66,6 +67,7 @@ public class AgentDBRepository implements AgentRepository {
                 new LlmId(e.getLlmId()),
                 IdList.split(e.getMcpIds()).stream().map(McpId::new).toList(),
                 IdList.split(e.getRagIds()).stream().map(RagId::new).toList(),
+                IdList.split(e.getPeerAgentIds()).stream().map(AgentId::new).toList(),
                 e.getDescription(),
                 new Enabled(e.isEnabled()),
                 new Time(e.getCreated()));

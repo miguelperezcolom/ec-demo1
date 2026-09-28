@@ -122,6 +122,17 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/ai/**
 
+        # Agent-to-agent (/a2a/{agentId}) is for agents inside the cluster calling each other, never
+        # for a browser. Nothing above routes it to ia-agent anyway; this says so on every host, so
+        # a later catch-all towards ia-agent cannot publish it by accident.
+        - id: a2a-not-public
+          uri: no://op
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/a2a/**
+          filters:
+            - SetStatus=404
+
         # Catch-all for the demo console, and therefore last among its routes: the shell's
         # bootstrap page, its /mateu/** endpoint and its static assets.
         # The catch-all is per host, and it is the ONLY thing that differs between the Vaadin

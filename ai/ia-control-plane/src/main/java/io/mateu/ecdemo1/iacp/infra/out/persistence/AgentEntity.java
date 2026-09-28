@@ -40,6 +40,9 @@ public class AgentEntity {
     String mcpIds;
     @Column(length = 4096)
     String ragIds;
+    /** The agents this one may call over A2A. Same shape as the two above, for the same reason. */
+    @Column(length = 4096)
+    String peerAgentIds;
     @Column(length = 2048)
     String description;
     boolean enabled;

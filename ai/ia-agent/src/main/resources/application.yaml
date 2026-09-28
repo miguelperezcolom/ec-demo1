@@ -59,6 +59,19 @@ ia:
   control-plane:
     url: ${IA_CONTROL_PLANE_URL:http://localhost:8110}
   agent-id: ${AGENT_ID:console-agent}
+  # Agent-to-agent. Every pod serves every agent of the catalogue at /a2a/{agentId} (card at
+  # /a2a/{agentId}/.well-known/agent-card.json, JSON-RPC message/send on POST), and calls the peers
+  # the control plane lists for an agent as tools — see io.mateu.ecdemo1.iaagent.a2a.
+  a2a:
+    # What the Agent Card says this service's A2A address is. The control plane builds its peers'
+    # URLs from its own cp.a2a-base-url; the two should agree.
+    base-url: ${IA_A2A_BASE_URL:http://ia-agent:8095}
+    # Hops of agent-calls-agent after a person's prompt: 2 lets A ask B and B ask C, and no further.
+    max-depth: ${IA_A2A_MAX_DEPTH:2}
+    # Per call, and it includes the other agent's whole turn — its model and its tools.
+    timeout-seconds: ${IA_A2A_TIMEOUT_SECONDS:120}
+    # message/send needs the caller's bearer token, forwarded by the calling agent.
+    require-token: ${IA_A2A_REQUIRE_TOKEN:true}
   observability:
     # What the traces keep of the conversation — see ContentCapture:
     #   none      no content: tokens, durations, tools and outcomes only (the default)

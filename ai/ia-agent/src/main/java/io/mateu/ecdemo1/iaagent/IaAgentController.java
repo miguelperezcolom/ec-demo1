@@ -1,13 +1,14 @@
 package io.mateu.ecdemo1.iaagent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mateu.ecdemo1.iaagent.a2a.A2aHop;
+import io.mateu.ecdemo1.iaagent.a2a.PeerToolFactory;
 import io.mateu.ecdemo1.iaagent.config.AgentConfig;
 import io.mateu.ecdemo1.iaagent.config.AgentConfigClient;
 import io.mateu.ecdemo1.iaagent.config.AgentResolver;
 import io.mateu.ecdemo1.iaagent.config.ChatClientRegistry;
 import io.mateu.ecdemo1.iaagent.config.RagToolFactory;
-import io.mateu.ecdemo1.iaagent.observability.AgentObservability;
-import io.mateu.ecdemo1.iaagent.observability.ContentCapture;
+import io.mateu.ecdemo1.iaagent.observability.PromptObservations;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
@@ -47,7 +48,9 @@ public class IaAgentController {
     private final io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter;
     private final AgentResolver agentResolver;
     private final ObservationRegistry observationRegistry;
-    private final ContentCapture content;
+    private final PromptObservations prompts;
+    private final AgentTurn agentTurn;
+    private final PeerToolFactory peerTools;
 
     public IaAgentController(AgentConfigClient configClient,
                              ChatClientRegistry chatClients,
@@ -60,7 +63,9 @@ public class IaAgentController {
                              io.mateu.ecdemo1.iaagent.usage.UsageReporter usageReporter,
                              AgentResolver agentResolver,
                              ObservationRegistry observationRegistry,
-                             ContentCapture content) {
+                             PromptObservations prompts,
+                             AgentTurn agentTurn,
+                             PeerToolFactory peerTools) {
         this.configClient = configClient;
         this.chatClients = chatClients;
         this.mcpFactory = mcpFactory;
@@ -72,70 +77,33 @@ public class IaAgentController {
         this.usageReporter = usageReporter;
         this.agentResolver = agentResolver;
         this.observationRegistry = observationRegistry;
-        this.content = content;
+        this.prompts = prompts;
+        this.agentTurn = agentTurn;
+        this.peerTools = peerTools;
     }
 
     // ── Observation ──────────────────────────────────────────────────────────
 
-    /**
-     * The {@code invoke_agent} span and the {@code ia_agent_prompt_seconds} timer: one per prompt,
-     * parent of every model round trip and tool call it causes. {@code parent} is passed in rather
-     * than taken from the thread because /stream answers on another one than the request's.
-     *
-     * <p>Every low-cardinality key is set at the start, with a placeholder, and overwritten as it
-     * becomes known: they are Prometheus labels, and a meter must carry the same ones on every
-     * sample.
-     *
-     * <p>The tokens, model calls and tool calls it ends with are not set here: every model round
-     * trip and tool call under it adds itself up in {@link AgentObservability.PromptStats} as it
-     * stops, and {@link AgentObservability} writes the totals when this one does. The user's
-     * message goes on it only when {@link ContentCapture} records content.
-     */
+    /** See {@link PromptObservations}: shared with the A2A endpoint. */
     private Observation startPromptObservation(Observation parent, String sessionId, String userMessage) {
-        var observation = Observation.createNotStarted(AgentObservability.PROMPT, observationRegistry)
-                .parentObservation(parent)
-                .contextualName("invoke_agent")
-                .lowCardinalityKeyValue(AgentObservability.OPERATION, "invoke_agent")
-                .lowCardinalityKeyValue(AgentObservability.AGENT_ID, AgentObservability.UNRESOLVED)
-                .lowCardinalityKeyValue(AgentObservability.LLM_ID, AgentObservability.UNRESOLVED)
-                .lowCardinalityKeyValue(AgentObservability.REQUEST_MODEL, AgentObservability.UNRESOLVED)
-                .lowCardinalityKeyValue(AgentObservability.OUTCOME, "error")
-                .highCardinalityKeyValue(AgentObservability.SESSION_ID, String.valueOf(sessionId));
-        AgentObservability.attachStats(observation.getContext());
-        var captured = content.prepare(userMessage);
-        if (captured != null) {
-            observation.highCardinalityKeyValue(AgentObservability.USER_MESSAGE, captured);
-        }
-        return observation.start();
+        return prompts.start(parent, sessionId, userMessage, A2aHop.origin().depth());
     }
 
-    /** The answer as the user reads it — on the span only when content is recorded. */
     private void tagResponse(Observation observation, String response) {
-        var captured = content.prepare(response);
-        if (captured != null) {
-            observation.highCardinalityKeyValue(AgentObservability.AGENT_RESPONSE, captured);
-        }
+        prompts.tagResponse(observation, response);
     }
 
     private static void tagAgent(Observation observation, AgentConfig config) {
-        observation.contextualName("invoke_agent " + config.agentId())
-                .lowCardinalityKeyValue(AgentObservability.AGENT_ID, config.agentId())
-                .highCardinalityKeyValue(AgentObservability.AGENT_NAME, String.valueOf(config.agentName()));
-        if (config.llm() != null) {
-            observation.lowCardinalityKeyValue(AgentObservability.LLM_ID, String.valueOf(config.llm().id()))
-                    .lowCardinalityKeyValue(AgentObservability.REQUEST_MODEL, String.valueOf(config.llm().model()));
-        }
+        PromptObservations.tagAgent(observation, config);
     }
 
     private static void tagTools(Observation observation, PerRequestMcpClientFactory.PerRequestTools tools,
                                  int toolCount) {
-        observation.highCardinalityKeyValue(AgentObservability.TOOLS_AVAILABLE, String.valueOf(toolCount))
-                .highCardinalityKeyValue(AgentObservability.MCP_SERVERS_EXPECTED, String.valueOf(tools.expectedServers()))
-                .highCardinalityKeyValue(AgentObservability.MCP_SERVERS_CONNECTED, String.valueOf(tools.connectedServers()));
+        PromptObservations.tagTools(observation, toolCount, tools.expectedServers(), tools.connectedServers());
     }
 
     private static void outcome(Observation observation, String outcome) {
-        observation.lowCardinalityKeyValue(AgentObservability.OUTCOME, outcome);
+        PromptObservations.outcome(observation, outcome);
     }
 
     /**
@@ -148,19 +116,18 @@ public class IaAgentController {
     }
 
     /**
-     * Every tool this agent has, in one array: the MCP servers' and the RAG sources'. The model
-     * sees one list, and nothing downstream has to know which kind a call belongs to.
+     * Every tool this agent has, in one list: the MCP servers', the RAG sources' and one per peer
+     * agent it may call over A2A. The model sees one list, and nothing downstream has to know which
+     * kind a call belongs to.
      */
-    private org.springframework.ai.tool.ToolCallback[] allTools(
-            AgentConfig config, PerRequestMcpClientFactory.PerRequestTools mcp) {
-        var rag = ragTools.toolsFor(config.rags());
-        if (rag.isEmpty()) {
-            return mcp.getCallbacks();
-        }
+    private List<org.springframework.ai.tool.ToolCallback> allTools(
+            AgentConfig config, PerRequestMcpClientFactory.PerRequestTools mcp,
+            List<org.springframework.ai.tool.ToolCallback> peers) {
         var all = new ArrayList<org.springframework.ai.tool.ToolCallback>(
                 List.of(mcp.getCallbacks()));
-        all.addAll(rag);
-        return all.toArray(new org.springframework.ai.tool.ToolCallback[0]);
+        all.addAll(ragTools.toolsFor(config.rags()));
+        all.addAll(peers);
+        return all;
     }
 
     /**
@@ -189,10 +156,15 @@ public class IaAgentController {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private String buildSystemPrompt(String basePrompt, String serverContext, String sessionId) {
+    private String buildSystemPrompt(String basePrompt, String serverContext, String sessionId,
+                                     List<org.springframework.ai.tool.ToolCallback> peers) {
         var sb = new StringBuilder(basePrompt);
         if (serverContext != null && !serverContext.isBlank()) {
             sb.append("\n\nContexto de las herramientas disponibles:\n\n").append(serverContext);
+        }
+        var peerContext = PeerToolFactory.systemContext(peers);
+        if (!peerContext.isBlank()) {
+            sb.append("\n\n").append(peerContext);
         }
         String menuPrompt = menuContextStore.buildMenuSystemPrompt(sessionId);
         if (!menuPrompt.isBlank()) {
@@ -277,12 +249,13 @@ public class IaAgentController {
             tagAgent(observation, config);
 
             try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
-                var toolCallbacks = allTools(config, tools);
-                tagTools(observation, tools, toolCallbacks.length);
+                var peers = peerTools.toolsFor(config, authorization, A2aHop.origin());
+                var toolCallbacks = allTools(config, tools, peers);
+                tagTools(observation, tools, toolCallbacks.size());
                 // Only a hard stop when there is nothing at all to call. An agent whose MCP
-                // servers are all down but which still has a RAG source can answer from its
-                // documents, and refusing here would take that away.
-                if (tools.hasNoServers() && config.rags().isEmpty()) {
+                // servers are all down but which still has a RAG source or a peer agent can
+                // answer through those, and refusing here would take that away.
+                if (tools.hasNoServers() && config.rags().isEmpty() && peers.isEmpty()) {
                     String err = "No hay ningún servidor MCP disponible (" + tools.expectedServers()
                             + " configurados, 0 conectados) ni ninguna fuente RAG. No puedo "
                             + "responder sin acceso a las herramientas.";
@@ -292,32 +265,14 @@ public class IaAgentController {
                     return err;
                 }
                 String systemPrompt = buildSystemPrompt(config.systemPrompt(),
-                        tools.getServerSystemContext(), sessionId);
+                        tools.getServerSystemContext(), sessionId, peers);
                 var history = conversationStore.getHistory(sessionId);
 
-                var chatResponse = chatClients.forLlm(config.llm()).prompt()
-                        .options(chatClients.optionsFor(config.llm()))
-                        .system(systemPrompt)
-                        .messages(history)
-                        .user(request.message())
-                        .toolCallbacks(toolCallbacks)
-                        .call()
-                        .chatResponse();
-
-                String content = null;
-                int inputTokens = 0, outputTokens = 0, totalTokens = 0;
-                if (chatResponse != null) {
-                    var result = chatResponse.getResult();
-                    if (result != null && result.getOutput() != null) {
-                        content = result.getOutput().getText();
-                    }
-                    var usage = chatResponse.getMetadata() != null ? chatResponse.getMetadata().getUsage() : null;
-                    if (usage != null) {
-                        inputTokens  = usage.getPromptTokens()     != null ? usage.getPromptTokens()     : 0;
-                        outputTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
-                        totalTokens  = usage.getTotalTokens()      != null ? usage.getTotalTokens()      : 0;
-                    }
-                }
+                var turn = agentTurn.call(config, systemPrompt, history, request.message(),
+                        toolCallbacks.toArray(new org.springframework.ai.tool.ToolCallback[0]));
+                String content = turn.content();
+                int inputTokens = turn.inputTokens(), outputTokens = turn.outputTokens(),
+                        totalTokens = turn.totalTokens();
                 log.info("Chat response session={}: {} chars, tokens={}/{}/{}",
                         sessionId, content != null ? content.length() : 0,
                         inputTokens, outputTokens, totalTokens);
@@ -445,9 +400,10 @@ public class IaAgentController {
         AgentConfig config = resolveConfig(authorization, request);
         tagAgent(observation, config);
         try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
-            var toolCallbacks = allTools(config, tools);
-            tagTools(observation, tools, toolCallbacks.length);
-            if (tools.hasNoServers() && config.rags().isEmpty()) {
+            var peers = peerTools.toolsFor(config, authorization, A2aHop.origin());
+            var toolCallbacks = allTools(config, tools, peers);
+            tagTools(observation, tools, toolCallbacks.size());
+            if (tools.hasNoServers() && config.rags().isEmpty() && peers.isEmpty()) {
                 String err = "No hay ningún servidor MCP disponible ("
                         + tools.expectedServers() + " configurados, 0 conectados) ni "
                         + "ninguna fuente RAG. No puedo responder sin acceso a las "
@@ -458,32 +414,12 @@ public class IaAgentController {
                 return new LlmResult(err, 0, 0, 0);
             }
             String systemPrompt = buildSystemPrompt(config.systemPrompt(),
-                    tools.getServerSystemContext(), sessionId);
-            var chatResponse = chatClients.forLlm(config.llm()).prompt()
-                    .options(chatClients.optionsFor(config.llm()))
-                    .system(systemPrompt)
-                    .messages(history)
-                    .user(request.message())
-                    .toolCallbacks(toolCallbacks)
-                    .call()
-                    .chatResponse();
-
-            String content = null;
-            int inputTokens = 0, outputTokens = 0, totalTokens = 0;
-
-            if (chatResponse != null) {
-                var result = chatResponse.getResult();
-                if (result != null && result.getOutput() != null) {
-                    content = result.getOutput().getText();
-                }
-                var usage = chatResponse.getMetadata() != null
-                        ? chatResponse.getMetadata().getUsage() : null;
-                if (usage != null) {
-                    inputTokens  = usage.getPromptTokens()     != null ? usage.getPromptTokens()     : 0;
-                    outputTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
-                    totalTokens  = usage.getTotalTokens()      != null ? usage.getTotalTokens()      : 0;
-                }
-            }
+                    tools.getServerSystemContext(), sessionId, peers);
+            var turn = agentTurn.call(config, systemPrompt, history, request.message(),
+                    toolCallbacks.toArray(new org.springframework.ai.tool.ToolCallback[0]));
+            String content = turn.content();
+            int inputTokens = turn.inputTokens(), outputTokens = turn.outputTokens(),
+                    totalTokens = turn.totalTokens();
 
             log.info("Stream completed session={}: {} chars, tokens={}/{}/{}",
                     sessionId, content != null ? content.length() : 0,
