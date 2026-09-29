@@ -47,9 +47,6 @@ public class LlmViewModel implements CatalogueEditor<LlmDto> {
     @Help("Referenced by agents and RAG sources. Cannot be changed once created.")
     @ReadOnly
     @HiddenInCreate
-    // Deliberately not @NotEmpty: a validation is emitted for every field of this class, hidden
-    // ones included, so requiring a field that the creation form does not render makes creating
-    // one impossible. The requirement belongs on newId, which is the field that is on screen.
     String id;
 
     @NotEmpty

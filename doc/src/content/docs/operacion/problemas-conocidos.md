@@ -54,21 +54,8 @@ módulo.
 
 ## Mateu
 
-Comportamientos que pintan mal sin ningún error:
-
-- una `@Action` en un CRUD no se pinta sin `@Toolbar`, y si devuelve un `String` sustituye el
-  formulario por ese texto: devolver `List.of(new Message(...), new State(this))`;
-- un `@Lookup` con `@Stereotype(checkbox)` no pinta opciones: las casillas leen `options` del view model,
-  que debe implementar `OptionsSupplier`;
-- un formulario en un `Dialog` con `ModelViewComponent` no recibe su estado ni sus acciones: usar
-  `new EmbeddedView(form)`, con `@Getter` en los campos de estado;
-- un `Status` o un `@Notice` a `null` pintan el texto de la plantilla o la palabra «null»;
-- un `@Section` en un campo oculto en ese modo pierde su encabezado;
-- un `Listing` que no es `Navigable` no carga sin un `OnLoadTrigger("search")`;
-- las validaciones de Jakarta se emiten para todos los campos, también los ocultos: `@NotEmpty` en un
-  campo `@HiddenInCreate` hace que el formulario de alta no se pueda enviar.
-
-Comprobar cada formulario nuevo en un navegador. Ver [Mateu](/desarrollo/mateu/).
+Los comportamientos que pintaban mal sin ningún error se corrigieron en Mateu `3.0-alpha.374`. Aun así,
+comprobar cada formulario nuevo en un navegador. Ver [Mateu](/desarrollo/mateu/).
 
 ## Spring y Spring AI
 

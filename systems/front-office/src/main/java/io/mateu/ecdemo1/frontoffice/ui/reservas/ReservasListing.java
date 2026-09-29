@@ -32,7 +32,6 @@ import java.util.Locale;
  * las in house, el check-out se lanza desde el toolbar del 360).
  */
 @Title("Reservas")
-@Trigger(type = TriggerType.OnLoad, actionId = "search")
 // tras seedear reservas de demo, el propio listado se refresca (bus estándar)
 @Trigger(type = TriggerType.OnCustomEvent, actionId = "search", eventName = "reservas-seeded")
 @org.springframework.stereotype.Service

@@ -49,7 +49,7 @@ línea base: ver [La demo](/operacion/demo/).
 
 ## Formularios nuevos
 
-Muchos comportamientos de Mateu pintan mal sin ningún error (ver
-[Problemas conocidos](/operacion/problemas-conocidos/#mateu)). Un formulario nuevo se comprueba en un
+Un formulario que pinta mal no siempre da un error (ver [Mateu](/desarrollo/mateu/)). Un formulario
+nuevo se comprueba en un
 navegador: Playwright contra la ruta propia del servicio (`/_<servicio>/<menú>/<entrada>`) funciona sin
 la consola.

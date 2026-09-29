@@ -45,7 +45,6 @@ import java.util.Set;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Inbox")
-@Trigger(type = TriggerType.OnLoad, actionId = "search")
 @Trigger(type = TriggerType.OnCustomEvent, actionId = "search", eventName = InboxPage.SEEN)
 public class InboxPage implements Listing<InboxRow>, Searchable {
 

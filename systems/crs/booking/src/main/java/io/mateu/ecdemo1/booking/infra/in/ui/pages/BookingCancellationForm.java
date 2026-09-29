@@ -26,7 +26,6 @@ import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.OptionsSupplier;
 import io.mateu.uidl.interfaces.TitleSupplier;
 import io.mateu.uidl.interfaces.VisibilitySupplier;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
@@ -52,18 +51,15 @@ public class BookingCancellationForm implements TitleSupplier, ButtonsSupplier, 
     /** Shown only for several: for one, the dialog's header names it. */
     @ReadOnly
     @Label("Bookings")
-    @Getter
     String bookingIds;
 
     /** A handful of reasons: all of them at once, not a search. */
     @Label("Reason")
     @Stereotype(FieldStereotype.select)
-    @Getter
     String cancellationReasonCode;
 
     /** Where to go once done: the list the bookings were picked from, or the booking itself. */
     @Hidden
-    @Getter
     String returnTo;
 
     final CancelBookingUseCase cancelBookingUseCase;
@@ -77,10 +73,8 @@ public class BookingCancellationForm implements TitleSupplier, ButtonsSupplier, 
         // The form's own title heads it (see title()): a dialog header as well said it twice.
         return Dialog.builder()
                 .width("32rem")
-                // Embedded, not a ModelViewComponent: that one draws the form as part of the page
-                // behind the dialog, so its state never travelled and its buttons went to the
-                // booking. Embedded, it is a component of its own, with its own actions, and its
-                // state is this object as it is serialised — hence the getters on the fields.
+                // Embedded: a component of its own, with its own state and its own actions (the
+                // buttons run on this form, not on the booking behind the dialog).
                 .content(new EmbeddedView(this))
                 .build();
     }
