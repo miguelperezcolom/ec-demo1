@@ -306,6 +306,7 @@ public class ReceptionHandlers {
                             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(clock.instant().atOffset(ZoneOffset.UTC))));
             log.info("{}/{}: the no-show recorded in Opera", hotel, id);
             TaskHandlers.tag("opera.action", "no-show-recorded");
+            outcomes.done(hotel, id, input.stayId(), ReceptionOperation.NO_SHOW, "No show anotado en Opera", null, null);
             return new NoShowRecorded(Outcome.DONE.name(), id);
         } catch (PmsRejectedException e) {
             return refused(input, task, id, ReceptionOperation.NO_SHOW, e, NoShowRecorded.class);

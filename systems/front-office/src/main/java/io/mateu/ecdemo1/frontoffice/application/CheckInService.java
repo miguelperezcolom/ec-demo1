@@ -11,6 +11,7 @@ import io.mateu.ecdemo1.frontoffice.domain.stay.SelectedAddOn;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus;
+import io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports;
 import java.util.Collection;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -22,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The check-in of an arriving stay, and the desk's operations around it — each one transaction: a
  * check-in that fails halfway leaves the stay, its room, its folio and its operations as they were.
+ * The check-in goes up to the PMS, the master of the stay, in the same transaction (an event in the
+ * outbox, {@link ReceptionReports}).
  */
 @Service
 public class CheckInService {
@@ -32,15 +35,18 @@ public class CheckInService {
   final AddOnCatalogRepository addOnCatalog;
   final CheckInOpsRepository checkInOps;
   final GuestNotices notices;
+  final ReceptionReports reception;
 
   public CheckInService(StayRepository stays, RoomRepository rooms, FolioRepository folios,
-                        AddOnCatalogRepository addOnCatalog, CheckInOpsRepository checkInOps, GuestNotices notices) {
+                        AddOnCatalogRepository addOnCatalog, CheckInOpsRepository checkInOps, GuestNotices notices,
+                        ReceptionReports reception) {
     this.stays = stays;
     this.rooms = rooms;
     this.folios = folios;
     this.addOnCatalog = addOnCatalog;
     this.checkInOps = checkInOps;
     this.notices = notices;
+    this.reception = reception;
   }
 
   /**
@@ -76,6 +82,8 @@ public class CheckInService {
             .map(id -> addOnCatalog.findById(id).orElse(null)).filter(Objects::nonNull).toList();
         folios.save(Folio.openAtCheckIn(stay, contracted));
       }
+      // The PMS is the master of the stay: the check-in goes up to it, with this transaction.
+      reception.checkedIn(stay, by);
     }
     update(stayId, ops -> ops.withExtras(true));
     return stay;

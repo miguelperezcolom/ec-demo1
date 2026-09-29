@@ -191,6 +191,68 @@ class PmsStaysTest {
     assertThat(s.total()).isEqualByComparingTo("139.50");
   }
 
+  @Autowired io.mateu.ecdemo1.frontoffice.infra.pms.StayInvoices invoices;
+  @Autowired Invoices invoiceDocuments;
+
+  static FrontOfficeCommand.RecordReception reception(String rid, String stayId, FrontOfficeCommand.ReceptionOperation op,
+      boolean refused, String detail, String room, FrontOfficeCommand.Invoice invoice) {
+    return new FrontOfficeCommand.RecordReception(id(), "XMAR", rid, stayId, op, refused, detail, room, invoice);
+  }
+
+  @Test
+  void thePmsSaysHowItTookTheReception() {
+    pms.take(stay("R60", "LOC60", "2026-09-27T10:00:00"));
+    stays.save(stays.findById("LOC60").orElseThrow().assignRoom("1204", "Estándar King").completeCheckIn());
+
+    // Refused: the stay says why.
+    assertThat(pms.take(reception("R60", "LOC60", FrontOfficeCommand.ReceptionOperation.CHECK_IN, true,
+        "The guest's arrival is not scheduled for today. Check-in not possible.", null, null))).isEqualTo(Outcome.RECEPTION);
+    assertThat(links.stateOf("LOC60")).contains(
+        "Opera: rechazado (check-in) — The guest's arrival is not scheduled for today. Check-in not possible.");
+
+    // Done: the room Opera has them in is the stay's.
+    pms.take(reception("R60", "LOC60", FrontOfficeCommand.ReceptionOperation.CHECK_IN, false, "En casa en Opera", "205", null));
+    assertThat(links.stateOf("LOC60")).contains("Opera: en casa · hab. 205");
+    assertThat(stays.findById("LOC60").orElseThrow().roomNumber()).isEqualTo("205");
+
+    // The projection brings the in-house state back: the desk's stay stays in the house, and says so.
+    assertThat(pms.take(stay("R60", "LOC60", "2026-09-27T12:00:00", PmsStatus.IN_HOUSE, "BRKFST", "C-R60", List.of())))
+        .isEqualTo(Outcome.WRITTEN);
+    assertThat(stays.findById("LOC60").orElseThrow().status()).isEqualTo(StayStatus.IN_HOUSE);
+    assertThat(links.stateOf("LOC60")).contains("Opera: en casa · hab. 205");
+  }
+
+  @Test
+  void theCheckOutsInvoiceIsThePmssDocumentOrTheFrontOfficesProforma() {
+    pms.take(stay("R61", "LOC61", "2026-09-27T10:00:00"));
+    stays.save(stays.findById("LOC61").orElseThrow().assignRoom("1205", "Estándar King").completeCheckIn().completeCheckOut());
+
+    // No invoice from Opera yet: the proforma, labelled as such.
+    assertThat(invoiceDocuments.summary("LOC61").fromThePms()).isFalse();
+    assertThat(invoiceDocuments.summary("LOC61").label()).isEqualTo("Abrir factura proforma (front office)");
+    var proforma = invoiceDocuments.document("LOC61").orElseThrow();
+    assertThat(proforma.fromThePms()).isFalse();
+    assertThat(new String(proforma.pdf(), 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
+
+    // Opera's, with its document.
+    var pdf = "%PDF-1.4 Opera folio".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+    pms.take(reception("R61", "LOC61", FrontOfficeCommand.ReceptionOperation.CHECK_OUT, false, "Salida registrada en Opera",
+        null, new FrontOfficeCommand.Invoice("OPERA", "XMAR377", LocalDate.of(2026, 5, 13), new BigDecimal("150.00"), "MUR",
+            java.util.Base64.getEncoder().encodeToString(pdf))));
+    assertThat(links.stateOf("LOC61")).contains("Opera: salida registrada · factura XMAR377");
+    assertThat(invoices.of("LOC61").orElseThrow().number()).isEqualTo("XMAR377");
+    assertThat(invoiceDocuments.summary("LOC61").label()).isEqualTo("Abrir factura · Opera XMAR377");
+    assertThat(invoiceDocuments.document("LOC61").orElseThrow().pdf()).isEqualTo(pdf);
+
+    // The link the desk opens it with is signed, and only for this stay.
+    var link = invoiceDocuments.link("LOC61");
+    var e = Long.parseLong(link.replaceAll(".*[?&]e=(\\d+).*", "$1"));
+    var sig = link.replaceAll(".*[?&]s=([^&]+).*", "$1");
+    assertThat(invoiceDocuments.valid("LOC61", e, sig)).isTrue();
+    assertThat(invoiceDocuments.valid("LOC60", e, sig)).isFalse();
+    assertThat(invoiceDocuments.valid("LOC61", 1, sig)).isFalse();
+  }
+
   @Test
   void anotherPropertysCommandsAreNotThisFrontOffices() {
     var other = stay("R50", "LOC50", "2026-09-27T10:00:00");
