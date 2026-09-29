@@ -57,9 +57,11 @@ public class AgentProposals {
         body.put("message", """
                 Propón el mapeado pendiente del hotel %s del CRS al PMS. Lee los códigos pendientes con
                 listPendingCodes y el catálogo del PMS con getPmsCatalog; si el propio hotel está pendiente,
-                propón primero su equivalencia. Registra todas las propuestas con proposeMappings, con tu
-                confianza y el porqué de cada una, y termina con un resumen breve de lo que propones y de lo
-                que no has sabido emparejar. No apruebes nada.""".formatted(hotelCode));
+                propón primero su equivalencia. Propón TODOS los pendientes sin propuesta, en una sola llamada a
+                proposeMappings, con tu confianza y el porqué de cada uno: si nada del PMS encaja bien, el más
+                cercano con confianza baja y qué falta en el porqué. Si su respuesta dice que alguno sigue sin
+                propuesta, propónlo también. Termina con un resumen breve: cuántos has propuesto, los de confianza
+                baja y por qué, y los que hayas dejado en unmatched. No apruebes nada.""".formatted(hotelCode));
         body.put("sessionId", "mapping-proposal-" + hotelCode + "-" + UUID.randomUUID());
         body.put("currentRoute", ROUTE);
         body.put("locale", "es");

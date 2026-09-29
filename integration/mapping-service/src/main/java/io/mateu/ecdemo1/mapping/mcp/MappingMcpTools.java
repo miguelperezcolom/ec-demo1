@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.mapping.mcp;
 
 import io.mateu.ecdemo1.integration.model.mapping.CodeEntry;
+import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.mapping.dictionary.Dictionary;
 import io.mateu.ecdemo1.mapping.dictionary.Pending;
 import io.mateu.ecdemo1.mapping.rest.MappingController;
@@ -44,7 +45,21 @@ public class MappingMcpTools implements McpSystemContext {
                   por significado, no por parecido de nombre, y registra la propuesta con proposeMappings,
                   indicando confianza (0..1) y el porqué de cada línea. El hotel (tipo HOTEL) no se propone: lo
                   registra su integración al verificar la conexión con Opera, y sin ella no hay catálogo.
+                - Todo código pendiente necesita una propuesta: listPendingCodes los da todos de una vez (sin
+                  páginas) y proposeMappings contesta cuáles siguen sin propuesta; mientras quede alguno, propónlo.
+                  Si nada del PMS encaja bien, propón el más cercano con confianza baja (0.5 o menos) y di en el
+                  porqué qué falta en el PMS. Solo si el PMS no tiene ningún código de ese tipo va en unmatched,
+                  con el motivo — la persona que revisa lo verá en el aviso.
                 - Un CHANNEL del CRS es en Opera un sourceCode (targetCode) y un marketCode (atributo marketCode).
+                  El sourceCode dice por dónde llega la reserva (web del hotel, teléfono, email, walk-in, ventas
+                  de grupos, central de reservas); el marketCode, el segmento que la vende (BAR, negociada, OTA,
+                  grupos…). Un canal de intermediario — turoperador, OTA — cuyo sourceCode propio no existe en la
+                  propiedad (ni TO, ni OTA, ni agencia) no se inventa ni se disfraza de otro: se propone el
+                  sourceCode por el que de verdad llega (la central de reservas, CRSN, si la hay: la reserva entra
+                  desde el CRS), el marketCode que sí nombra el segmento (NEG para un contrato negociado, OTA para
+                  una agencia online), confianza baja (0.5 o menos) y en el porqué: «la propiedad no tiene un
+                  sourceCode de turoperador/OTA; el segmento lo lleva el marketCode; conviene crear uno en Opera».
+                  Nunca HWEB para una OTA: es la web del propio hotel.
                 - Un PARTNER_TYPE es el tipo de perfil de Opera: TRAVEL_AGENT, COMPANY o SOURCE.
                 - Nada de lo que propongas entra en vigor sin que una persona lo apruebe. No apruebes tú: si el
                   usuario te pide aprobar, hazlo solo con approveMapping indicando su nombre y después de que
@@ -58,7 +73,9 @@ public class MappingMcpTools implements McpSystemContext {
         return api.causes(true);
     }
 
-    @Tool(description = "The CRS codes a hotel can emit that have no approved equivalent in the PMS yet")
+    @Tool(description = "The CRS codes a hotel can emit that have no approved equivalent in the PMS yet — every "
+            + "one of them in a single answer, there is no paging. proposed=true means a proposal for it already "
+            + "waits for a person's decision; each one with proposed=false needs a proposal from you")
     public List<Pending.PendingCode> listPendingCodes(@ToolParam(description = "CRS hotel code, e.g. PMI01") String hotelCode) {
         return pending.pendingCodes(hotelCode);
     }
@@ -69,9 +86,23 @@ public class MappingMcpTools implements McpSystemContext {
         return pending.pmsCatalog(hotelCode);
     }
 
+    /** A pending code the agent could not propose anything for, and why. */
+    public record Unmatched(CodeType type, String hotelCode, String code, String reason) {
+    }
+
     @Tool(description = "Register proposed equivalences for a person to review. hotelCode empty means a "
-            + "chain-level equivalence, valid for every hotel unless one has its own. Returns the proposal ids")
-    public String proposeMappings(List<Dictionary.Proposal> proposals) {
+            + "chain-level equivalence, valid for every hotel unless one has its own. Every pending code needs a "
+            + "proposal: when nothing in the PMS fits well, propose the closest with low confidence and say why "
+            + "in the rationale. Only a code the PMS has no code of its type for goes in unmatched, with the "
+            + "reason. Returns the proposal ids and which pending codes of the hotel are still without a proposal")
+    public String proposeMappings(List<Dictionary.Proposal> proposals,
+                                  @ToolParam(required = false, description = "Pending codes you cannot propose "
+                                          + "anything for, each with the reason; the person reviewing is told")
+                                  List<Unmatched> unmatched) {
+        return propose(proposals == null ? List.of() : proposals, unmatched == null ? List.of() : unmatched);
+    }
+
+    String propose(List<Dictionary.Proposal> proposals, List<Unmatched> unmatched) {
         var ids = new ArrayList<String>();
         var errors = new ArrayList<String>();
         for (var proposal : proposals) {
@@ -81,13 +112,72 @@ public class MappingMcpTools implements McpSystemContext {
                 errors.add(proposal.sourceCode() + ": " + e.getMessage());
             }
         }
-        if (!ids.isEmpty()) {
-            var hotels = proposals.stream().map(Dictionary.Proposal::hotelCode).distinct().toList();
-            announcer.proposalsReady(ids.size(), hotels.size() == 1 ? hotels.get(0) : null);
+        var hotels = java.util.stream.Stream.concat(proposals.stream().map(Dictionary.Proposal::hotelCode),
+                        unmatched.stream().map(Unmatched::hotelCode))
+                .filter(h -> h != null && !h.isBlank()).distinct().toList();
+        var coverage = hotels.stream().map(h -> coverage(h, unmatched)).toList();
+        var leftOut = coverage.stream().flatMap(c -> c.leftOut().stream()).toList();
+        if (!ids.isEmpty() || !leftOut.isEmpty()) {
+            // One hotel and nothing chain-level: the notice links to that hotel's integration.
+            var hotel = hotels.size() == 1 && proposals.stream().allMatch(p -> hotels.get(0).equals(p.hotelCode()))
+                    ? hotels.get(0) : null;
+            announcer.proposalsReady(ids.size(), hotel, leftOut);
         }
-        log.info("Agent proposed {} equivalence(s), {} refused", ids.size(), errors.size());
-        return "Proposed %d, ids %s%s".formatted(ids.size(), ids,
-                errors.isEmpty() ? "" : "; refused: " + errors);
+        log.info("Agent proposed {} equivalence(s), {} refused, {} left without a proposal", ids.size(), errors.size(),
+                leftOut.size());
+        return "Proposed %d, ids %s%s%s".formatted(ids.size(), ids,
+                errors.isEmpty() ? "" : "; refused: " + errors,
+                coverage.stream().map(Coverage::toolAnswer).collect(java.util.stream.Collectors.joining()));
+    }
+
+    /**
+     * What is still without a proposal in a hotel once these are in. It goes back to the agent, so a
+     * first pass that skipped a code — a channel with no obvious source code in the PMS — is told so
+     * and can complete it in the same conversation; and to the notice, so the person reviewing knows.
+     */
+    Coverage coverage(String hotelCode, List<Unmatched> unmatched) {
+        try {
+            // One declared without a hotel is taken as for the hotel(s) of this call.
+            var declared = unmatched.stream()
+                    .filter(u -> u.hotelCode() == null || u.hotelCode().isBlank() || hotelCode.equals(u.hotelCode()))
+                    .toList();
+            var left = pending.withoutProposal(hotelCode);
+            var silent = left.stream().filter(p -> p.type() != CodeType.HOTEL)
+                    .filter(p -> declared.stream().noneMatch(u -> u.type() == p.type() && p.code().equals(u.code())))
+                    .toList();
+            var said = left.stream().flatMap(p -> declared.stream()
+                    .filter(u -> u.type() == p.type() && p.code().equals(u.code()))
+                    .map(u -> p.type() + " " + p.code() + " — " + (u.reason() == null || u.reason().isBlank()
+                            ? "no reason given" : u.reason().strip()))).toList();
+            var leftOut = new ArrayList<>(said);
+            silent.forEach(p -> leftOut.add(p.type() + " " + p.code() + " — the agent gave no proposal and no reason"));
+            return new Coverage(hotelCode, silent, said, leftOut);
+        } catch (RuntimeException e) {
+            return new Coverage(hotelCode, List.of(), List.of(), List.of(), e.getMessage());
+        }
+    }
+
+    record Coverage(String hotelCode, List<Pending.PendingCode> silent, List<String> declared, List<String> leftOut,
+                    String unreadable) {
+        Coverage(String hotelCode, List<Pending.PendingCode> silent, List<String> declared, List<String> leftOut) {
+            this(hotelCode, silent, declared, leftOut, null);
+        }
+
+        String toolAnswer() {
+            if (unreadable != null) {
+                return "; could not check what is left of %s: %s".formatted(hotelCode, unreadable);
+            }
+            if (!silent.isEmpty()) {
+                return ("; still without a proposal in %s (%d): %s. Propose each of them too, with low confidence if "
+                        + "nothing fits well and why in the rationale — or, only if the PMS has no code of its type, "
+                        + "put it in unmatched with the reason").formatted(hotelCode, silent.size(),
+                        silent.stream().map(p -> p.type() + " " + p.code() + " «" + p.description() + "»")
+                                .collect(java.util.stream.Collectors.joining(", ")));
+            }
+            return declared.isEmpty() ? "; every pending code of %s has a proposal".formatted(hotelCode)
+                    : "; every pending code of %s has a proposal, but %d you left unmatched: %s".formatted(hotelCode,
+                    declared.size(), String.join("; ", declared));
+        }
     }
 
     @Tool(description = "Proposals waiting for a person's decision")

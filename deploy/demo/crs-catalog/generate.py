@@ -91,6 +91,13 @@ BOARDS = [
 # (CRS code, CRS name, sells through a partner, XMAR source code, XMAR market code). In Opera a channel
 # is a source code and a market code; the CRS has no markets, so they only show here, as the attribute
 # the mapping should choose. House use (HSE) is not a sales channel.
+#
+# XMAR has no source code for an intermediary (its seven are EML, GS, HSE, PHN, WLK, CRSN, HWEB — groups
+# HTL, GRP, HU, CRS, WEB; checked against OHIP UAT 2026-09-29): a tour operator's or an OTA's booking
+# reaches it through the central reservations system, so CRSN, and the market code is what says who
+# sold it — NEG «Negotiated Rate», OTA «OTA Rate». Never HWEB for an OTA: that is the hotel's own site.
+# Those two are the closest there is, not a true match: the agent proposes them with low confidence
+# and says a source code of their own is missing in Opera.
 CHANNELS = [
     ("WEB", "Web del hotel", False, "HWEB", "BAR"),
     ("CALLCENTER", "Central de reservas (call center)", False, "CRSN", "BAR"),
@@ -99,7 +106,7 @@ CHANNELS = [
     ("WALKIN", "Cliente sin reserva en recepción (walk-in)", False, "WLK", "FIT"),
     ("GRUPOS", "Ventas de grupos", False, "GS", "GRP"),
     ("TTOO", "Turoperador (contrato negociado)", True, "CRSN", "NEG"),
-    ("OTA", "Agencia de viajes online", True, "HWEB", "OTA"),
+    ("OTA", "Agencia de viajes online", True, "CRSN", "OTA"),
 ]
 
 # (CRS code, CRS name, XMAR payment method). XMAR's CD «Credit» and CRE «Credito» say the same and
@@ -203,6 +210,10 @@ def main():
              "| Tipo | Código CRS | Nombre en el CRS | Código XMAR | Nombre en XMAR |", "|---|---|---|---|---|"]
     for kind, c, n, x, xn, extra in rows:
         lines.append(f"| {kind} | `{c}` | {n} | `{x}` | {xn.removeprefix('Source code: ')}{' · ' + extra if extra else ''} |")
+    lines += ["", "`TTOO` and `OTA` have no true match in XMAR: it has no source code for a tour operator or an OTA.",
+              "Their bookings arrive through the central reservations system (CRSN) and the market code says who",
+              "sold them (NEG, OTA). The agent proposes these with low confidence (0.5 or less) and says so; a",
+              "source code of their own would have to be created in Opera."]
     PAIRS_FILE.write_text("\n".join(lines) + "\n")
 
     if args.live:
