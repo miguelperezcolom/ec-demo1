@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.controlshell.infra.in.ui;
 
 import io.mateu.ecdemo1.uicommons.user.UserWidget;
 import io.mateu.uidl.StyleConstants;
+import io.mateu.uidl.annotations.AI;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Script;
@@ -53,6 +54,12 @@ import java.util.List;
 // both renderers draw. It used to be this class's own page, as a landing template with a welcome
 // banner, but Redwood asks for a home route with no class to build it from, and was answered
 // "Not found": its home stayed on "…".
+// The chat panel, as on the data plane: Mateu's client POSTs the prompt here and reads the answer as
+// a stream. The gateway routes this host's /ai/** to an ia-agent of its own, whose agent is the
+// control plane's (82-ia-agent-control-plane.yaml), and requires ai-admin on it like on the rest of
+// this host. That agent reaches the integrations, the mapping, the customer MDM, the notifications
+// and the engines over MCP — what this console governs.
+@AI(sse = "/ai/api/agent/stream")
 public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**

@@ -255,6 +255,10 @@ kubectl apply -f deploy/manifests/60-booking.yaml
 kubectl apply -f deploy/manifests/61-content.yaml
 kubectl apply -f deploy/manifests/62-users.yaml
 kubectl apply -f deploy/manifests/63-ia-agent.yaml
+# The same image as two more agents, one per host that has a chat of its own: the front desk's and the
+# control console's. Their agents come from the catalogue (ec-ia-config).
+kubectl apply -f deploy/manifests/79-ia-agent-front-office.yaml
+kubectl apply -f deploy/manifests/82-ia-agent-control-plane.yaml
 # The CRS-PMS integration PoC (docs/poc-acl).
 kubectl apply -f deploy/manifests/64-erp.yaml
 kubectl apply -f deploy/manifests/65-crs-integration.yaml

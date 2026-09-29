@@ -157,6 +157,11 @@ public class SecurityConfig {
                         // bill. It can be required because Mateu's chat client does send the
                         // bearer token — it reads it from localStorage and sets the header
                         // itself, unlike the @Action(sse) client described above.
+                        // The control console's chat, behind ai-admin like everything else on that
+                        // host: its agent reaches the integrations, the mapping approvals and the
+                        // customer MDM — the same decisions and personal data as the screens.
+                        // Before the rule below, which would otherwise decide it as `authenticated`.
+                        .matchers(onControlHost("/ai/**")).hasRole("ai-admin")
                         .pathMatchers("/ai/**").authenticated()
                         // The GitOps webhook, public on the control host and verified by HMAC in
                         // the control plane — GitHub cannot carry an ai-admin token. Listed before

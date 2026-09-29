@@ -144,6 +144,16 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/ai/**
 
+        # The control console's chat: the same path as the demo console's, to an ia-agent of its own
+        # whose agent is the control plane's (AGENT_ID, 82-ia-agent-control-plane.yaml). Its host is
+        # what says the question comes from the control plane — no route prefix could: the routing
+        # rules key on the screen's route, and both consoles have screens like /mapping.
+        - id: control-plane-agent
+          uri: ${IA_AGENT_CONTROL_PLANE_URL:http://ia-agent-control-plane:8095}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/ai/**
+
         # Agent-to-agent (/a2a/{agentId}) is for agents inside the cluster calling each other, never
         # for a browser. Nothing above routes it to ia-agent anyway; this says so on every host, so
         # a later catch-all towards ia-agent cannot publish it by accident.
