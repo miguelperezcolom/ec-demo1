@@ -265,6 +265,20 @@ persona:
 Solo fusiona si es seguro: el documento es de un único cliente, el pax no tenía otro documento y el
 nombre del documento es el del cliente. Si algo no cuadra, el documento va como Case (ver 10).
 
+**Cada contacto dice cuánto vale.** En Salesforce, la sección *Calidad del dato (MDM)* del contacto:
+*Estado MDM* (Provisional/Consolidado/Anonimizado), *Calidad del dato* (Solo nombre / Con contacto /
+Verificado (documento)) y *Origen* (CRS/Canal/Touroperador, del canal de su primera reserva). Tras
+*Escanear*, el titular pasa a **Verificado (documento)** en un par de minutos. La regla de duplicados solo
+compara contactos con email, teléfono o documento; la vista **Pendientes de identificar** lista los
+«Solo nombre», y las de marketing (*Marketing: contactables*, *Cumpleaños de este mes*) los excluyen. Un
+«Solo nombre» con solo reservas canceladas o no-show se **anonimiza** a los 30 días (el MDM guarda el
+motivo; se ve en la ficha de *Clientes*).
+
+**Sin sondeos.** Fusiones, decisiones, cambios de contacto y avisos llegan por la **Pub/Sub API** en
+segundos, y tras un reinicio el MDM retoma desde el último *replay id*. Para enseñarlo: fusiona un par
+de duplicados en Salesforce (o desmarca *Aviso activo* en un aviso) y mira *Customers →
+Consolidaciones* (vía `EVENT`) o el aviso en la ficha. Las consultas de respaldo son diarias.
+
 **El escáner de demo** no lee nada: se inventa un documento creíble y siempre el mismo para la misma
 persona, sacado de su nombre. Si el pax ya tiene un documento real en la estancia, lee ese; si un
 cliente de la cadena con su nombre tiene documento, lee el de ese cliente; si no, genera un DNI con

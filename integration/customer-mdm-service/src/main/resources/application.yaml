@@ -99,15 +99,29 @@ mdm:
     pubsub-port: ${SF_PUBSUB_PORT:7443}
     subscribe: ${SF_SUBSCRIBE:true}
   projection-tick: ${PROJECTION_TICK:5s}
-  # The nets under Salesforce's Pub/Sub events, which are what bring merges and decisions: a query
-  # each, out of the org's daily API allowance (15,000 calls in a rolling 24 h on a Base Edition).
-  poll: ${CONSOLIDATION_POLL:15m}
-  change-poll: ${CHANGE_POLL:5m}
+  # The nets under Salesforce's Pub/Sub events, which are what bring merges, decisions and notices
+  # (gRPC to api.pubsub.salesforce.com:7443, resumed from the replay id kept in salesforce_cursor;
+  # Pub/Sub does not spend the daily API allowance — its events count against the event delivery
+  # allocation instead). A query each, out of the org's daily API allowance (15,000 calls in a rolling
+  # 24 h on a Base Edition), so once a day — and at once when a subscription starts without a replay id.
+  poll: ${CONSOLIDATION_POLL:24h}
+  change-poll: ${CHANGE_POLL:24h}
   # Reception notices asked for in the Clientes console: written to Salesforce every tick while any
-  # waits (one call for the new ones, one for the rest); the poll asks only for the ones written and
-  # not confirmed by their event after two minutes.
+  # waits (one call for the new ones, one for the rest); their event confirms them, and the daily poll
+  # asks only for the ones written and still not confirmed.
   notice-tick: ${NOTICE_TICK:5s}
-  notice-poll: ${NOTICE_POLL:5m}
+  notice-poll: ${NOTICE_POLL:24h}
+  # How old the org's API total may get before one /limits call asks for it (the consoles' header).
+  usage-limits-stale: ${USAGE_LIMITS_STALE:2h}
+  # How each contact is marked — Estado MDM, Calidad del dato, Origen: sent with every projection, and
+  # every marking-tick for the contacts whose marking changed alone (one call per 200; none if none did).
+  marking-tick: ${MARKING_TICK:2m}
+  # Data minimisation: «Solo nombre» contacts whose customer has only cancelled or no-show bookings are
+  # anonymised in Salesforce after this long without activity (daily, at the cron's time).
+  cleanup:
+    enabled: ${CLEANUP_ENABLED:true}
+    after: ${CLEANUP_AFTER:30d}
+    cron: ${CLEANUP_CRON:0 30 3 * * *}
   # When Salesforce answers REQUEST_LIMIT_EXCEEDED, every call pauses this long, doubled on each
   # refusal after that up to the longest; one inbox notice says so, and it closes when calls go again.
   salesforce-pause: ${SALESFORCE_PAUSE:5m}

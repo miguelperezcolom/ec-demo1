@@ -49,7 +49,7 @@ class SalesforceUsageTest {
             calls, builder);
     final ApiCallHourRepository nothingSaved = (ApiCallHourRepository) Proxy.newProxyInstance(getClass().getClassLoader(),
             new Class<?>[]{ApiCallHourRepository.class}, (proxy, m, args) -> List.of());
-    final SalesforceUsage usage = new SalesforceUsage(salesforce, nothingSaved, properties, clock, registry);
+    final SalesforceUsage usage = new SalesforceUsage(salesforce, nothingSaved, properties, clock, registry, java.time.Duration.ofMinutes(15));
 
     void token() {
         server.expect(requestTo(ORG + "/services/oauth2/token")).andRespond(withSuccess(TOKEN, MediaType.APPLICATION_JSON));

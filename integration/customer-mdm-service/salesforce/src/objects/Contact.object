@@ -32,4 +32,126 @@
         <length>40</length>
         <required>false</required>
     </fields>
+    <fields>
+        <fullName>Estado_MDM__c</fullName>
+        <label>Estado MDM</label>
+        <description>Set by the MDM, not by hand: Provisional (a booking created it and nobody has cleaned it yet), Consolidado (cleaned, the golden record), Anonimizado (only a name and only cancelled or no-show bookings: its personal data were erased after the retention period).</description>
+        <type>Picklist</type>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>Provisional</fullName><default>false</default><label>Provisional</label></value>
+                <value><fullName>Consolidado</fullName><default>false</default><label>Consolidado</label></value>
+                <value><fullName>Anonimizado</fullName><default>false</default><label>Anonimizado</label></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Calidad_Dato__c</fullName>
+        <label>Calidad del dato</label>
+        <description>Set by the MDM, not by hand: Solo nombre (nothing to reach or identify the person by — excluded from duplicate matching and from marketing), Con contacto (an email, a phone or a document from a booking), Verificado (documento) (the desk scanned the identity document at check-in).</description>
+        <type>Picklist</type>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>Solo nombre</fullName><default>false</default><label>Solo nombre</label></value>
+                <value><fullName>Con contacto</fullName><default>false</default><label>Con contacto</label></value>
+                <value><fullName>Verificado (documento)</fullName><default>false</default><label>Verificado (documento)</label></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Origen__c</fullName>
+        <label>Origen</label>
+        <description>Set by the MDM, not by hand: where the customer first came from — CRS (the hotel's own channels: web, call centre, phone, walk-in…), Canal (an online travel agency) or Touroperador.</description>
+        <type>Picklist</type>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>CRS</fullName><default>false</default><label>CRS</label></value>
+                <value><fullName>Canal</fullName><default>false</default><label>Canal</label></value>
+                <value><fullName>Touroperador</fullName><default>false</default><label>Touroperador</label></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <listViews>
+        <fullName>Pendientes_de_identificar</fullName>
+        <columns>FULL_NAME</columns>
+        <columns>CONTACT.PHONE1</columns>
+        <columns>CONTACT.EMAIL</columns>
+        <columns>Calidad_Dato__c</columns>
+        <columns>Estado_MDM__c</columns>
+        <columns>Origen__c</columns>
+        <columns>CONTACT.CREATED_DATE</columns>
+        <filterScope>Everything</filterScope>
+        <filters>
+            <field>Calidad_Dato__c</field>
+            <operation>equals</operation>
+            <value>Solo nombre</value>
+        </filters>
+        <filters>
+            <field>Estado_MDM__c</field>
+            <operation>notEqual</operation>
+            <value>Anonimizado</value>
+        </filters>
+        <label>Pendientes de identificar</label>
+    </listViews>
+    <listViews>
+        <fullName>Marketing_Contactables</fullName>
+        <columns>FULL_NAME</columns>
+        <columns>CONTACT.PHONE1</columns>
+        <columns>CONTACT.EMAIL</columns>
+        <columns>Calidad_Dato__c</columns>
+        <columns>Estado_MDM__c</columns>
+        <columns>Origen__c</columns>
+        <columns>CONTACT.CREATED_DATE</columns>
+        <filterScope>Everything</filterScope>
+        <filters>
+            <field>Calidad_Dato__c</field>
+            <operation>equals</operation>
+            <value>Con contacto,Verificado (documento)</value>
+        </filters>
+        <filters>
+            <field>Estado_MDM__c</field>
+            <operation>notEqual</operation>
+            <value>Anonimizado</value>
+        </filters>
+        <label>Marketing: contactables</label>
+    </listViews>
+    <listViews>
+        <fullName>BirthdaysThisMonth</fullName>
+        <columns>FULL_NAME</columns>
+        <columns>ACCOUNT.NAME</columns>
+        <columns>CONTACT.TITLE</columns>
+        <columns>CONTACT.PHONE1</columns>
+        <columns>CONTACT.EMAIL</columns>
+        <columns>CORE.USERS.ALIAS</columns>
+        <columns>CONTACT.BIRTHDATE</columns>
+        <filterScope>Everything</filterScope>
+        <filters>
+            <field>CONTACT.BIRTHDATE</field>
+            <operation>equals</operation>
+            <value>THIS_MONTH</value>
+        </filters>
+        <filters>
+            <field>Calidad_Dato__c</field>
+            <operation>notEqual</operation>
+            <value>Solo nombre</value>
+        </filters>
+        <filters>
+            <field>Estado_MDM__c</field>
+            <operation>notEqual</operation>
+            <value>Anonimizado</value>
+        </filters>
+        <label>Birthdays This Month</label>
+    </listViews>
 </CustomObject>

@@ -16,10 +16,10 @@ cuenta donde se hace.
 
 - **`customer-mdm-service`** etiqueta cada llamada a Salesforce con su propósito (`projection`,
   `change-case`, `decisions`, `reason`, `refresh`, `poll`, `merge`, `consolidation-read/write`,
-  `notice-write`, `notice-poll`, `limits`, `token`) en cubos por hora guardados en `salesforce_api_calls`, y como
+  `notice-write`, `notice-poll`, `marking`, `cleanup`, `limits`, `token`) en cubos por hora guardados en `salesforce_api_calls`, y como
   `salesforce_api_calls_total{purpose,outcome}`. El total de la org lo toma de la cabecera
   `Sforce-Limit-Info` de cada respuesta (`salesforce_org_api_used` / `_max`,
-  `salesforce_budget_paused`); si nadie lo ha dicho en 15 min, pregunta a `/limits` (una llamada). Avisa
+  `salesforce_budget_paused`); si nadie lo ha dicho en 2 h (`USAGE_LIMITS_STALE`), pregunta a `/limits` (una llamada). Avisa
   al arrancar si `mdm.poll` es de menos de 5 min. `GET /usage/salesforce`, solo dentro del clúster.
 - **`pms-integration-service`** cuenta cada llamada a OHIP por módulo y endpoint con un interceptor en
   `OhipClient` (`opera_api_calls_total{service,purpose,outcome}`, 429 = `limited`) y guarda las
@@ -43,7 +43,9 @@ cuenta donde se hace.
 
 | Qué | Llamadas |
 | :-- | :------- |
-| El MDM en reposo | ~100 al día: el sondeo de fusiones cada 15 min y, solo mientras haya un Case abierto, el de decisiones cada 5 min |
+| El MDM en reposo | ~15 al día: las redes de seguridad una vez al día (fusiones; decisiones y avisos solo si hay algo pendiente) y `/limits` cada 2 h para la cifra de la org. Lo demás llega por la Pub/Sub API, que no gasta cupo. Antes, ~100 (sondeo de fusiones cada 15 min) |
+| Marcar contactos por calidad | 1 por cada 200 cuya marca cambió; 0 si ninguna |
+| Limpieza de «Solo nombre» | 1 al día por cada 200 contactos a anonimizar; 0 si ninguno |
 | Proyectar clientes | 1 por cada 200 pendientes |
 | Un alta con 10 reservas | ~5 |
 | Un cambio de datos desde recepción | ~5 |

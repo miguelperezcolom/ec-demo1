@@ -43,6 +43,11 @@ public class SalesforceInbox {
      * answers again: the event is not replayed, and the poll looks for merges, not for changes.
      */
     public void contactChanged(String mdmId) {
+        if (customers.findById(mdmId).map(c -> c.anonymizedAt != null).orElse(false)) {
+            // Its own anonymisation, announced: nothing personal to read back, and nothing to project.
+            log.debug("{} was anonymised: its contact's change is not read back", mdmId);
+            return;
+        }
         lock.lock();
         try {
             projection.refresh(mdmId, null, null);
@@ -64,6 +69,13 @@ public class SalesforceInbox {
             return;
         }
         for (var c : customers.findTop50BySalesforceRefreshPendingTrue()) {
+            if (c.anonymizedAt != null) {
+                tx.executeWithoutResult(s -> customers.findById(c.id).ifPresent(r -> {
+                    r.salesforceRefreshPending = null;
+                    customers.save(r);
+                }));
+                continue;
+            }
             lock.lock();
             try {
                 projection.refresh(c.id, null, null);
@@ -82,10 +94,18 @@ public class SalesforceInbox {
 
     /**
      * The safety net for a missed decision event: asks Salesforce how the open ones stand — one query
-     * for all of them, and only while there is any. Every five minutes: the event is what brings a
-     * decision; this is for one that was lost.
+     * for all of them, and only while there is any. Once a day, at start, and when the decisions'
+     * subscription starts without a replay id: the Pub/Sub event is what brings a decision; this is for
+     * one that was lost.
      */
-    @Scheduled(fixedDelayString = "${mdm.change-poll:5m}")
+    @org.springframework.context.event.EventListener
+    public void onGap(io.mateu.ecdemo1.mdm.salesforce.SubscriptionGap gap) {
+        if (io.mateu.ecdemo1.mdm.salesforce.ConsolidationEvents.DECISIONS.equals(gap.topic())) {
+            poll();
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${mdm.change-poll:24h}", initialDelayString = "${mdm.change-poll-initial-delay:2m}")
     public void poll() {
         if (!salesforce.available()) {
             return;

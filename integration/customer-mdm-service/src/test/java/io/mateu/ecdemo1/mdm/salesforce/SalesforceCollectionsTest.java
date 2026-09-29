@@ -46,4 +46,18 @@ class SalesforceCollectionsTest {
         c.birthDate = java.time.LocalDate.of(1984, 3, 2);
         assertThat(SalesforceClient.contactFields(c)).containsEntry("LastName", "?").containsEntry("Birthdate", "1984-03-02");
     }
+
+    @Test
+    void anAnonymisedContactKeepsNothingPersonal_andSaysItIsAnonymised() {
+        var c = customer("C-1");
+        c.firstName = "Tomas";
+        c.lastName = "Serra";
+        c.nationality = "ES";
+        c.anonymizedAt = java.time.Instant.now();
+        assertThat(SalesforceClient.anonymousFields(c))
+                .containsEntry("FirstName", null).containsEntry("LastName", "Anonimizado")
+                .containsEntry("Email", null).containsEntry("Phone", null).containsEntry("Nationality__c", null)
+                .containsEntry("Document_Number__c", null)
+                .containsEntry("Estado_MDM__c", "Anonimizado").containsEntry("Calidad_Dato__c", "Solo nombre");
+    }
 }

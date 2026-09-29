@@ -3,8 +3,31 @@
     <actionOnInsert>Allow</actionOnInsert>
     <actionOnUpdate>Allow</actionOnUpdate>
     <alertText>This customer may be someone Salesforce already has. Merging is a steward's decision; the MDM applies it.</alertText>
-    <description>Records every possible duplicate the MDM's customers make as a duplicate record set, for a steward to review. Never blocks: the MDM owns the customer, and a sale never waits for cleaning.</description>
-    <duplicateRuleFilter xsi:nil="true" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+    <description>Only contacts with an email, a phone or a document: a name alone is no evidence. Records possible duplicates as duplicate record sets for a steward. Never blocks: the MDM owns the customer.</description>
+    <duplicateRuleFilter>
+        <booleanFilter>1 OR 2 OR 3</booleanFilter>
+        <duplicateRuleFilterItems>
+            <field>Email</field>
+            <operation>notEqual</operation>
+            <value></value>
+            <sortOrder>1</sortOrder>
+            <table>Contact</table>
+        </duplicateRuleFilterItems>
+        <duplicateRuleFilterItems>
+            <field>Phone</field>
+            <operation>notEqual</operation>
+            <value></value>
+            <sortOrder>2</sortOrder>
+            <table>Contact</table>
+        </duplicateRuleFilterItems>
+        <duplicateRuleFilterItems>
+            <field>Document_Number__c</field>
+            <operation>notEqual</operation>
+            <value></value>
+            <sortOrder>3</sortOrder>
+            <table>Contact</table>
+        </duplicateRuleFilterItems>
+    </duplicateRuleFilter>
     <duplicateRuleMatchRules>
         <matchRuleSObjectType>Contact</matchRuleSObjectType>
         <matchingRule>MDM_Same_Person</matchingRule>

@@ -45,10 +45,10 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class ConsolidationEvents implements SmartLifecycle {
 
-    static final String TOPIC = "/event/ClienteConsolidado__e";
-    static final String DECISIONS = "/event/CambioClienteResuelto__e";
-    static final String CONTACT_CHANGES = "/event/ClienteActualizado__e";
-    static final String NOTICES = "/event/AvisoRecepcionCambiado__e";
+    public static final String TOPIC = "/event/ClienteConsolidado__e";
+    public static final String DECISIONS = "/event/CambioClienteResuelto__e";
+    public static final String CONTACT_CHANGES = "/event/ClienteActualizado__e";
+    public static final String NOTICES = "/event/AvisoRecepcionCambiado__e";
     static final int BATCH = 25;
 
     /** A topic, where its replay position is kept, and what to do with each of its events. */
@@ -62,13 +62,16 @@ public class ConsolidationEvents implements SmartLifecycle {
     final Map<String, Schema> schemas = new ConcurrentHashMap<>();
     final java.util.List<Topic> topics;
     final java.util.List<Thread> threads = new java.util.concurrent.CopyOnWriteArrayList<>();
+    final org.springframework.context.ApplicationEventPublisher publisher;
 
     volatile boolean running;
     volatile ManagedChannel channel;
 
     public ConsolidationEvents(MdmProperties properties, SalesforceClient salesforce, Consolidations consolidations,
                                CursorRepository cursors, io.mateu.ecdemo1.mdm.change.SalesforceInbox inbox,
-                               io.mateu.ecdemo1.mdm.notice.CustomerNotices notices) {
+                               io.mateu.ecdemo1.mdm.notice.CustomerNotices notices,
+                               org.springframework.context.ApplicationEventPublisher publisher) {
+        this.publisher = publisher;
         this.properties = properties.salesforce();
         this.salesforce = salesforce;
         this.consolidations = consolidations;
@@ -183,15 +186,14 @@ public class ConsolidationEvents implements SmartLifecycle {
             }
         };
         requests[0] = async.subscribe(responses);
-        var first = FetchRequest.newBuilder().setTopicName(topic.name()).setNumRequested(BATCH);
         var replayId = cursors.findById(topic.cursor()).map(c -> c.replayId).orElse(null);
-        if (replayId != null) {
-            first.setReplayPreset(ReplayPreset.CUSTOM).setReplayId(ByteString.copyFrom(Base64.getDecoder().decode(replayId)));
-        } else {
-            first.setReplayPreset(ReplayPreset.LATEST);
-        }
-        requests[0].onNext(first.build());
+        requests[0].onNext(firstRequest(topic.name(), replayId));
         log.info("Subscribed to {} from {}", topic.name(), replayId == null ? "now" : "the last event handled");
+        if (replayId == null) {
+            // From now: what happened before — while nobody listened, or older than Salesforce keeps — is
+            // for the topic's poll, which runs now instead of waiting for its day.
+            publisher.publishEvent(new SubscriptionGap(topic.name()));
+        }
         while (running && !ended.await(1, TimeUnit.SECONDS)) {
             // waiting for the stream to end
         }
@@ -205,6 +207,20 @@ public class ConsolidationEvents implements SmartLifecycle {
             }
             throw e;
         }
+    }
+
+    /**
+     * A subscription starts where the last one left off — the replay id of the last event handled, or of
+     * the last keepalive — and, when there is none, from now.
+     */
+    static FetchRequest firstRequest(String topic, String replayId) {
+        var first = FetchRequest.newBuilder().setTopicName(topic).setNumRequested(BATCH);
+        if (replayId != null) {
+            first.setReplayPreset(ReplayPreset.CUSTOM).setReplayId(ByteString.copyFrom(Base64.getDecoder().decode(replayId)));
+        } else {
+            first.setReplayPreset(ReplayPreset.LATEST);
+        }
+        return first.build();
     }
 
     GenericRecord decode(PubSubGrpc.PubSubBlockingStub blocking, String schemaId, ByteString payload) {

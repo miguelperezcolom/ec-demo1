@@ -10,6 +10,11 @@ public enum SalesforceState {
     FAILED,
     /** Someone deleted its contact in Salesforce without merging it: not sent again on its own. */
     REMOVED,
+    /**
+     * Its contact was anonymised (a name only, and only cancelled or no-show bookings): not sent again
+     * on its own.
+     */
+    ANONYMIZED,
     /** Not needed there: absorbed by a merge. */
     NOT_PROJECTED
 }

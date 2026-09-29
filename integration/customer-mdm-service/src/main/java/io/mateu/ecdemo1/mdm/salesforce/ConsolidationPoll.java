@@ -19,10 +19,11 @@ import java.time.format.DateTimeFormatter;
  * MDM id deleted since the last look, read from the recycle bin. An event lost while the MDM was
  * down, or older than the replay window, is found here.
  *
- * <p>A net, not the way merges arrive: every quarter of an hour, one query (two for a page past 200),
- * about a hundred calls a day out of the org's allowance — a minute's poll was 1,440. Not while the
- * allowance pauses calls; the cursor is only moved once what was found is applied, so nothing is
- * skipped.
+ * <p>A net, not the way merges arrive — they arrive by the Pub/Sub subscription, which resumes from
+ * its replay id after a restart: once a day, one query (two for a page past 200), and at once when the
+ * subscription starts without a replay id ({@link SubscriptionGap}). A quarter of an hour's poll was 96
+ * calls a day; a minute's, 1,440. Not while the allowance pauses calls; the cursor is only moved once
+ * what was found is applied, so nothing is skipped.
  */
 @Component
 @RequiredArgsConstructor
@@ -36,8 +37,15 @@ public class ConsolidationPoll {
     final CursorRepository cursors;
     final Clock clock;
 
-    @Scheduled(fixedDelayString = "${mdm.poll:15m}", initialDelayString = "${mdm.poll-initial-delay:2m}")
-    public void poll() {
+    @org.springframework.context.event.EventListener
+    public void onGap(SubscriptionGap gap) {
+        if (ConsolidationEvents.TOPIC.equals(gap.topic())) {
+            poll();
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${mdm.poll:24h}", initialDelayString = "${mdm.poll-initial-delay:2m}")
+    public synchronized void poll() {
         if (!salesforce.available()) {
             return;
         }

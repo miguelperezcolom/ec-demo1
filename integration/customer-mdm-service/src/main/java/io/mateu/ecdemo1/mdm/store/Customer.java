@@ -64,6 +64,23 @@ public class Customer {
      */
     public Boolean salesforceRefreshPending;
 
+    /**
+     * Where the customer first came from — CRS, CHANNEL or TOUR_OPERATOR ({@code marking.Origin}) — read
+     * once from its first booking's channel; empty when it cannot be told (no booking, or not in the CRS).
+     */
+    public String origin;
+    /** When the desk scanned the identity document the record holds: the data are the person's own paper. */
+    public Instant documentVerifiedAt;
+    /** The marking its Salesforce contact has — {@code marking.Marking#key()} — to send it only when it changes. */
+    public String markedAs;
+    /**
+     * When its Salesforce contact was anonymised, and why: only a name and only cancelled or no-show
+     * bookings, past the retention period. The MDM keeps the record and the reason; Salesforce, nothing personal.
+     */
+    public Instant anonymizedAt;
+    @Column(length = 500)
+    public String anonymizedReason;
+
     /** Which value won each field in the last merge, and why: to audit it, and to undo it. */
     @Column(length = 2000)
     public String survivorship;
