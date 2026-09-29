@@ -5,7 +5,7 @@ description: Cómo se usa Mateu en ec-demo1 — pantallas federadas, dos rendere
 
 [Mateu](https://mateu.io) es el framework de interfaces de todas las pantallas de ec-demo1: cada servicio
 describe sus pantallas en Java (view models con anotaciones) y el renderer las dibuja. La versión es la
-misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.373`).
+misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.374`).
 
 ## Cómo se usa aquí
 
@@ -31,17 +31,16 @@ misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.373`).
 
 ## Lo que hay que saber
 
-- Una `@Action` en un CRUD necesita `@Toolbar` para pintarse, y debe devolver
-  `List.of(new Message(...), new State(this))`, no un `String`. Una acción de `@Toolbar` también aparece
-  en el modo vista, donde los campos de edición están vacíos.
-- Las casillas (`@Stereotype(checkbox)`) leen las opciones de `OptionsSupplier`, no de `@Lookup`; un
-  `@Lookup` normal (combo) funciona tal cual.
-- Un formulario en un `Dialog` va como `new EmbeddedView(form)`, con `@Getter` en sus campos de estado,
+- `@Action` no pinta ningún botón: dice cómo se comporta la acción. El botón lo pone `@Toolbar` (o
+  `@Button`). Una acción que devuelve un `String` lo muestra como mensaje y deja la pantalla como
+  estaba; si además cambió el estado del formulario, devolver `List.of(new Message(...), new State(this))`.
+  Una acción de `@Toolbar` también aparece en el modo vista, donde los campos de edición están vacíos.
+- Un formulario en un `Dialog` o un `Drawer` es un componente propio, con su estado y sus acciones
+  (`new EmbeddedView(form)`, o un `ModelViewComponent`, que dentro de un overlay se trata igual);
   título con `TitleSupplier` y botones con `ButtonsSupplier`.
 - `VisibilitySupplier` decide qué acciones y campos se ven según el estado (confirmar solo una reserva
   pendiente, p. ej.).
-- Un `Listing` que no es `Navigable` necesita `OnLoadTrigger("search")`.
-- Las validaciones se emiten para todos los campos, también los ocultos.
 
-La lista completa, con los síntomas, está en
-[Problemas conocidos](/operacion/problemas-conocidos/#mateu).
+Desde la `3.0-alpha.374` ya no hacen falta los rodeos de antes: un `Listing` carga al abrirse aunque no
+sea `Navigable`, un `@Lookup` en casillas trae sus opciones, las validaciones de los campos ocultos no se
+envían, un `@Section` sobre un campo oculto conserva su encabezado y un `@Notice` a `null` no se pinta.

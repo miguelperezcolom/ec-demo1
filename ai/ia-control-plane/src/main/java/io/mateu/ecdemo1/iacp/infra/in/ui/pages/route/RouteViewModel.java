@@ -48,8 +48,6 @@ public class RouteViewModel implements CatalogueEditor<RouteDto>, OptionsSupplie
     @ReadOnly
     @HiddenInCreate
     @Help("Cannot be changed once created.")
-    // Deliberately not @NotEmpty — see the note on LlmViewModel.id. The requirement belongs on
-    // newId, which is the field the creation form actually renders.
     String id;
 
     @NotEmpty

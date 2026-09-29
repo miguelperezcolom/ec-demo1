@@ -6,9 +6,6 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
-import io.mateu.uidl.fluent.OnLoadTrigger;
-import io.mateu.uidl.fluent.Trigger;
-import io.mateu.uidl.fluent.TriggersSupplier;
 import io.mateu.uidl.interfaces.Listing;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
@@ -19,7 +16,7 @@ import org.springframework.stereotype.Service;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Partners in the PMS")
-public class PartnerProfilesPage implements Listing<PartnerProfileRow>, io.mateu.uidl.interfaces.Searchable, TriggersSupplier {
+public class PartnerProfilesPage implements Listing<PartnerProfileRow>, io.mateu.uidl.interfaces.Searchable {
 
     final PartnerProfileQueries profiles;
 
@@ -29,14 +26,5 @@ public class PartnerProfilesPage implements Listing<PartnerProfileRow>, io.mateu
         return DbPaging.page(request, pageable -> profiles.page(request.searchText(), pageable),
                 p -> new PartnerProfileRow(p.partnerCode, p.profileType, p.pmsProfileId, p.projectedVersion,
                         String.valueOf(p.updatedAt)));
-    }
-
-    /**
-     * Search as soon as the page loads. A listing that is not navigable does not do it by itself —
-     * it stays on its loading skeleton until someone types in the search box.
-     */
-    @Override
-    public java.util.List<Trigger> triggers(HttpRequest httpRequest) {
-        return java.util.List.of(new OnLoadTrigger("search"));
     }
 }

@@ -7,9 +7,6 @@ import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
-import io.mateu.uidl.fluent.OnLoadTrigger;
-import io.mateu.uidl.fluent.Trigger;
-import io.mateu.uidl.fluent.TriggersSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Filterable;
 import io.mateu.uidl.interfaces.Listing;
@@ -31,8 +28,7 @@ import java.util.stream.Collectors;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Consolidations")
-public class ConsolidationsPage implements Listing<ConsolidationRow>, Searchable, Filterable<ConsolidationFilters>,
-        TriggersSupplier {
+public class ConsolidationsPage implements Listing<ConsolidationRow>, Searchable, Filterable<ConsolidationFilters> {
 
     /** Grid column → consolidation property: what a click on a column's header sorts by. */
     static final Map<String, String> SORTABLE = Map.of("absorbed", "absorbedId", "survivor", "survivorId", "via", "via",
@@ -55,11 +51,5 @@ public class ConsolidationsPage implements Listing<ConsolidationRow>, Searchable
                                 : c.propagatedAt != null ? new Status(StatusType.SUCCESS, "Propagated")
                                 : new Status(StatusType.WARNING, "Pending"),
                         c.detail == null ? "" : c.detail));
-    }
-
-    /** A listing that is not navigable does not search on its own when the page loads. */
-    @Override
-    public List<Trigger> triggers(HttpRequest httpRequest) {
-        return List.of(new OnLoadTrigger("search"));
     }
 }

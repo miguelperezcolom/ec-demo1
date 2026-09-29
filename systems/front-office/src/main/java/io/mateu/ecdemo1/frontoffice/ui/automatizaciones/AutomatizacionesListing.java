@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
  * para los procesos con warnings/errores — al arreglar, el listado se refresca por el bus.
  */
 @Title("Automatizaciones")
-@Trigger(type = TriggerType.OnLoad, actionId = "search")
 @Trigger(type = TriggerType.OnCustomEvent, actionId = "search", eventName = "automatizacion-arreglada")
 @org.springframework.stereotype.Service
 @org.springframework.context.annotation.Scope("prototype")

@@ -9,9 +9,6 @@ import io.mateu.uidl.data.Pageable;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
-import io.mateu.uidl.fluent.OnLoadTrigger;
-import io.mateu.uidl.fluent.Trigger;
-import io.mateu.uidl.fluent.TriggersSupplier;
 import io.mateu.uidl.interfaces.Filterable;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
@@ -35,7 +32,7 @@ import java.util.Map;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Audited actions")
-public class AuditPage implements Listing<AuditRow>, Searchable, Filterable<AuditFilters>, TriggersSupplier {
+public class AuditPage implements Listing<AuditRow>, Searchable, Filterable<AuditFilters> {
 
     static final int PAGE_SIZE = 50;
 
@@ -77,11 +74,5 @@ public class AuditPage implements Listing<AuditRow>, Searchable, Filterable<Audi
                 // both outcomes, or neither, is either
                 filters.outcome == null || filters.outcome.size() != 1 ? null
                         : filters.outcome.contains(AuditFilters.Outcome.CARRIED_OUT));
-    }
-
-    /** Not navigable, so it would not search on opening by itself. */
-    @Override
-    public List<Trigger> triggers(HttpRequest httpRequest) {
-        return List.of(new OnLoadTrigger("search"));
     }
 }
