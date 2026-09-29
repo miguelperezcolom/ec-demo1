@@ -209,3 +209,32 @@ create table if not exists pms_catalogue_sync (
     synced_at  timestamp   not null
 );
 
+
+-- ── Reception notices (avisos de recepción) ─────────────────────────────────
+-- The chain's customers' notices as the MDM sends them (customer-notices; Salesforce is their master),
+-- by the customer code a guest or a companion carries. The MDM's version orders them.
+create table if not exists customer_notice (
+    notice_id   varchar(64)  primary key,
+    customer_id varchar(64)  not null,
+    version     bigint       not null,
+    text        varchar(300),
+    type        varchar(20),
+    valid_from  date,
+    valid_to    date,
+    show_at     varchar(60),
+    active      boolean      not null,
+    updated_at  timestamp
+);
+create index if not exists customer_notice_customer on customer_notice (customer_id);
+
+-- What the desk said it read before a check-in (blocking notices) or a check-out (notices, kárdex
+-- pending or rejected by Salesforce): the last acknowledgement of each stay and moment, and what it
+-- covered — a warning that changed after it is not acknowledged.
+create table if not exists stay_notice_ack (
+    stay_id         varchar(64)   not null,
+    moment          varchar(20)   not null,
+    fingerprint     varchar(2000) not null,
+    acknowledged_by varchar(200),
+    acknowledged_at timestamp,
+    primary key (stay_id, moment)
+);

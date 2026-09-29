@@ -274,7 +274,8 @@ it — ec1, any local stack with the same credentials, scripts, people. A local 
 once spent all of it. So every call is counted where it is made:
 
 - **customer-mdm-service** tags each Salesforce call with its purpose (projection, change-case,
-  decisions, reason, refresh, poll, merge, consolidation-read/write, limits, token) — hourly buckets
+  decisions, reason, refresh, poll, merge, consolidation-read/write, notice-write, notice-poll, limits,
+  token) — hourly buckets
   saved in `salesforce_api_calls`, and `salesforce_api_calls_total{purpose,outcome}` — and keeps the
   org's total from the `Sforce-Limit-Info` header (`salesforce_org_api_used/max`,
   `salesforce_budget_paused`). If no answer said it for 15 min it asks `/limits`, one call. It warns at

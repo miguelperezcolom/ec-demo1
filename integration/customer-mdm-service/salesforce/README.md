@@ -12,6 +12,20 @@ that deploys it. Salesforce cleans and deduplicates; the golden record is the MD
 | Flow `Mdm_Keep_Mdm_Id` | A merge must not give the survivor the absorbed contact's MDM id |
 | Permission set `MDM_Integration` | The fields, for the user the integration runs as (and for stewards) |
 | Matching rule `MDM_Same_Person`, duplicate rule `MDM_Possible_Duplicate` | Deliberately wide: they only propose, recording possible duplicates as duplicate record sets for a steward. Never block |
+| `Case.Aviso_Tipo__c` (Informativo/Importante/Bloqueante), `Aviso_Mostrar_En__c` (Check-in/Check-out/Estancia), `Aviso_Desde__c`, `Aviso_Hasta__c`, `Aviso_Activo__c`, `MdmAvisoId__c` (external id) | A **reception notice** («aviso de recepción») is a Case on the contact with a *Tipo de aviso*; its Subject is the text. Section *Aviso de recepción* on the Case layout |
+| `AvisoRecepcionCambiado__e`, flow `Mdm_Announce_Notice_Change` | A notice created or changed — here, or written by the MDM from the Clientes console — is announced **whole**, so the MDM projects it without reading it back. Unticking *Aviso activo* or closing the Case deactivates it |
+
+### Reception notices: why a Case and not a custom object
+
+The notices were meant to be a custom object (`Aviso_Recepcion__c`, a lookup to Contact). The Base
+Edition refuses it — *reached maximum number of custom objects* — while it still takes custom fields on
+standard objects and platform events. So a notice is the closest thing the org allows: a **Case on the
+contact** marked by *Tipo de aviso*, with its own fields and its own section on the Case layout; the
+change requests' Cases have none of them, and their flow ignores notices (it needs `MdmRequestId__c`).
+
+The org also allows **five auto-launched flows**, and this makes the fifth: there is no flow for a
+deleted notice. To take one away, untick *Aviso activo* or close the Case (both are announced); a
+deleted Case is not.
 
 ## Deploying
 

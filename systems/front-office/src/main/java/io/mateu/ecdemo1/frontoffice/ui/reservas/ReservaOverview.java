@@ -3,6 +3,8 @@ package io.mateu.ecdemo1.frontoffice.ui.reservas;
 import io.mateu.ecdemo1.frontoffice.application.CheckInService;
 import io.mateu.ecdemo1.frontoffice.application.CheckOutService;
 import io.mateu.ecdemo1.frontoffice.application.FolioService;
+import io.mateu.ecdemo1.frontoffice.application.GuestNotices;
+import io.mateu.ecdemo1.frontoffice.infra.security.DeskUser;
 import io.mateu.ecdemo1.frontoffice.application.IncidentService;
 import io.mateu.ecdemo1.frontoffice.application.KardexService;
 import io.mateu.ecdemo1.frontoffice.application.NoShowService;
@@ -104,11 +106,13 @@ public class ReservaOverview
   @Getter(AccessLevel.NONE) final RoomRepository rooms;
   @Getter(AccessLevel.NONE) final ChargeCatalogRepository chargeCatalog;
   @Getter(AccessLevel.NONE) final AddOnCatalogRepository addOnCatalog;
+  @Getter(AccessLevel.NONE) final GuestNotices notices;
 
   public ReservaOverview(StayQueries queries, CheckInService checkIn, CheckOutService checkOut,
                          NoShowService noShows, RoomChangeService roomChange, FolioService folios,
                          KardexService kardex, IncidentService incidents, RoomRepository rooms,
-                         ChargeCatalogRepository chargeCatalog, AddOnCatalogRepository addOnCatalog) {
+                         ChargeCatalogRepository chargeCatalog, AddOnCatalogRepository addOnCatalog,
+                         GuestNotices notices) {
     this.queries = queries;
     this.checkIn = checkIn;
     this.checkOut = checkOut;
@@ -120,6 +124,7 @@ public class ReservaOverview
     this.rooms = rooms;
     this.chargeCatalog = chargeCatalog;
     this.addOnCatalog = addOnCatalog;
+    this.notices = notices;
   }
 
   /** El ancho de página según el estado: el foldout de llegada va a sangre; el general
@@ -224,7 +229,8 @@ public class ReservaOverview
           ? "Check-out · " + estancia().balanceResumen()
           : "Estancia · " + EstanciaPanel.cierre(stay);
       return dosZonas(
-          List.of(titulo(tituloMain), operativaPorEstado(stay), estancia().checkoutFolioPanel(),
+          List.of(titulo(tituloMain), estancia().avisosCheckout(stay), operativaPorEstado(stay),
+              estancia().checkoutFolioPanel(),
               estancia().checkoutCargosPanel(), estancia().checkoutCobroPanel()),
           List.of(titulo("Información"),
               modoCheckout ? estancia().claveCheckout(stay) : huespedes().infoSalida(stay)));
@@ -333,7 +339,7 @@ public class ReservaOverview
             "gestionFolio", "opPeticion", "registrarPeticion",
             "opIncidencia", "crearIncidencia", "enviarMensaje",
             "opExtras", "extras360", "cerrarExtras", "opFirma", "opFirmaDone",
-            "buscarCargos", "seleccionarCargo", "cambiarMetodo", "confirmPayment")
+            "buscarCargos", "seleccionarCargo", "cambiarMetodo", "confirmPayment", "entendidoCheckout")
         .contains(actionId);
   }
 
@@ -545,6 +551,12 @@ public class ReservaOverview
         yield this;
       }
       case "confirmPayment" -> confirmPayment(httpRequest);
+      case "entendidoCheckout" -> {
+        // «Entendido»: recepción ha leído los avisos de la salida (kárdex rechazado o pendiente de
+        // Salesforce, avisos de check-out) tal como están ahora; queda auditado
+        notices.acknowledgeCheckOut(stayId, DeskUser.name(), null);
+        yield List.of(this, new Message("Avisos de salida confirmados — ya se puede cobrar y cerrar el check-out"));
+      }
       default -> null;
     };
   }
@@ -555,10 +567,16 @@ public class ReservaOverview
    */
   private Object iniciarCheckin() {
     var stay = stay();
-    if (!queries.readyForDirectCheckIn(stay)) {
+    // un aviso bloqueante sin leer se lee en el primer paso del wizard
+    if (!queries.readyForDirectCheckIn(stay) || !notices.checkInAcknowledged(stay)) {
       return URI.create("/checkin/" + stayId);
     }
-    var checkedIn = checkIn.checkIn(stayId, null, List.of());
+    Stay checkedIn;
+    try {
+      checkedIn = checkIn.checkIn(stayId, null, List.of(), DeskUser.name());
+    } catch (GuestNotices.NotAcknowledged e) {
+      return URI.create("/checkin/" + stayId);
+    }
     var mensaje = new Message("✅ Check-in completado — " + view().guest().name() + " · Hab " + checkedIn.roomNumber());
     // solo una reserva DE GRUPO propone seguir con la siguiente llegada del grupo
     // (simulado: mismo grupo = primera palabra de la agencia); sin grupo o sin más
@@ -645,7 +663,11 @@ public class ReservaOverview
     };
     var view = view();
     var total = GuestHeaders.euros(GuestHeaders.balance(view.folio()));
-    checkOut.checkOut(stayId);
+    try {
+      checkOut.checkOut(stayId, DeskUser.name());
+    } catch (GuestNotices.NotAcknowledged e) {
+      return List.of(this, new Message("⛔ " + e.getMessage()));
+    }
     modoCheckout = false;
     return List.of(
         this,

@@ -17,7 +17,7 @@ contexto y cada servicio depende solo de los que habla. Los paquetes
 | Módulo | Qué tiene | Topics |
 | :----- | :-------- | :----- |
 | `contracts-reservation` | La reserva canónica (`Reservation`, `Room`, `Person`…), una proyección pedida, un no-show, una reserva cambiada en el PMS | `projection-requests`, `no-show-reports`, `pms-reservations` |
-| `contracts-customer` | `CustomerEvent`, `GoldenRecord`, la resolución de identidad, `CustomerCommand` | `customers`, `customer-commands` |
+| `contracts-customer` | `CustomerEvent`, `GoldenRecord`, la resolución de identidad, `CustomerCommand`, `CustomerNoticeChanged` | `customers`, `customer-notices`, `customer-commands` |
 | `contracts-partner` | El interlocutor y su perfil en el PMS | — (HTTP) |
 | `contracts-mapping` | Tipos de código, traducciones, causas, `MappingCommand` | `mapping-commands` |
 | `contracts-integration` | El ciclo de vida de una integración, la conexión, las reservas futuras y sus códigos; `ApiUsage` | — (HTTP) |

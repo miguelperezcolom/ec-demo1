@@ -3,6 +3,8 @@ package io.mateu.ecdemo1.frontoffice.infra.mcp;
 import io.mateu.ecdemo1.frontoffice.application.CheckInService;
 import io.mateu.ecdemo1.frontoffice.application.CheckOutService;
 import io.mateu.ecdemo1.frontoffice.application.FolioService;
+import io.mateu.ecdemo1.frontoffice.application.GuestNotices;
+import io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice;
 import io.mateu.ecdemo1.frontoffice.application.KardexService;
 import io.mateu.ecdemo1.frontoffice.application.NoShowService;
 import io.mateu.ecdemo1.frontoffice.application.RoomChangeService;
@@ -61,12 +63,15 @@ public class FrontDeskMcpTools {
   final KardexService kardex;
   final WalkInService walkInService;
   final PendingConfirmations confirmations;
+  final GuestNotices notices;
+  final McpCaller caller;
 
   public FrontDeskMcpTools(StayQueries queries, StayRepository stays, GuestRepository guests, FolioRepository folios,
                            RoomRepository rooms, AddOnCatalogRepository addOns, WalkIns walkIns,
                            CheckInService checkIn, CheckOutService checkOut, NoShowService noShows,
                            RoomChangeService roomChange, FolioService folioService, KardexService kardex,
-                           WalkInService walkInService, PendingConfirmations confirmations) {
+                           WalkInService walkInService, PendingConfirmations confirmations, GuestNotices notices,
+                           McpCaller caller) {
     this.queries = queries;
     this.stays = stays;
     this.guests = guests;
@@ -82,6 +87,8 @@ public class FrontDeskMcpTools {
     this.kardex = kardex;
     this.walkInService = walkInService;
     this.confirmations = confirmations;
+    this.notices = notices;
+    this.caller = caller;
   }
 
   /** What every connected agent is told about this server — the ia-agent's "system-context" prompt. */
@@ -99,6 +106,13 @@ public class FrontDeskMcpTools {
           siguiente mensaje, llama a confirmAction con ese token. Si dice que no, cancelAction. Nunca confirmes
           en el mismo mensaje en que preparas: el servidor lo rechaza. Si al confirmar no tienes el token,
           listPendingActions da las operaciones pendientes de esa persona.
+        - Avisos de recepción (los guarda Salesforce, maestro de clientes): getNotices da los de una estancia
+          — de su titular y de sus acompañantes clientes de la cadena — y los cambios de kárdex que Salesforce ha
+          rechazado o aún no ha decidido; getStay también los trae. Antes de pedir confirmación de un check-in,
+          di SIEMPRE los avisos BLOQUEANTES, con su texto, y pregunta si los ha leído: confirmar el check-in es
+          declarar «He leído el aviso» (queda auditado). Antes de un check-out, avisa de los cambios de kárdex
+          rechazados (campo, lo propuesto y lo que se queda, y el motivo) o pendientes («la factura saldrá con el
+          dato anterior») y de los avisos de salida: confirmar es decir «Entendido».
         - Un no show de toda la reserva se comunica al CRS; un walk-in reserva en el CRS; los cambios de nombre,
           documento o contacto del titular se proponen al maestro de clientes (Salesforce). Dilo en el resumen.
         """;
@@ -142,7 +156,38 @@ public class FrontDeskMcpTools {
 
   public record StayDetail(StaySummary stay, String guestId, List<CompanionView> companions,
                            List<String> addOns, List<Integer> noShowPax, Map<String, Boolean> checkInTasks,
-                           List<IncidentView> incidents, String vipNote, String walkIn, BigDecimal folioBalance) {}
+                           List<IncidentView> incidents, String vipNote, String walkIn, BigDecimal folioBalance,
+                           List<NoticeView> notices, List<KardexWarningView> kardexWarnings,
+                           Boolean blockingNoticesRead, Boolean checkOutWarningsRead) {}
+
+  public record NoticeView(int pax, String guest, String type, String text, List<String> showAt, LocalDate from,
+                           LocalDate to) {}
+
+  public record KardexWarningView(int pax, String guest, String status, List<String> detail) {}
+
+  public record StayNotices(String stayId, List<NoticeView> notices, List<KardexWarningView> kardexWarnings,
+                            boolean blockingNoticesRead, boolean checkOutWarningsRead) {}
+
+  @Tool(description = "The reception notices (avisos de recepción) of a stay's guests — its holder and the companions "
+      + "who are chain customers — as Salesforce keeps them: type (INFORMATIVE, IMPORTANT, BLOCKING), text, where they "
+      + "show (CHECK_IN, CHECK_OUT, STAY) and dates; and the kárdex changes Salesforce REJECTED or has PENDING. A "
+      + "BLOCKING check-in notice must be read by the person before the check-in; the check-out warnings acknowledged "
+      + "before the check-out")
+  public StayNotices getNotices(@ToolParam(description = "The stay's front-office id or CRS locator") String stayRef) {
+    var stay = stay(stayRef);
+    return new StayNotices(stay.id(), noticeViews(notices.activeForStay(stay)), kardexViews(stay),
+        notices.checkInAcknowledged(stay), notices.checkOutAcknowledged(stay));
+  }
+
+  List<NoticeView> noticeViews(List<GuestNotices.PaxNotice> list) {
+    return list.stream().map(p -> new NoticeView(p.pax(), p.guestName(), p.notice().type().name(), p.notice().text(),
+        p.notice().showAt().stream().sorted().map(Enum::name).toList(), p.notice().from(), p.notice().to())).toList();
+  }
+
+  List<KardexWarningView> kardexViews(Stay stay) {
+    return notices.kardexWarnings(stay).stream()
+        .map(k -> new KardexWarningView(k.pax(), k.guestName(), k.status().name(), k.lines())).toList();
+  }
 
   @Tool(description = "One stay in full: its status, room, dates, pax and companions, add-ons, the desk's check-in "
       + "tasks, pax marked as no-show, incidents, walk-in state and folio balance")
@@ -171,7 +216,8 @@ public class FrontDeskMcpTools {
         stay.incidents().stream().map(i -> new IncidentView(i.code(), i.type() == null ? null : i.type().name(),
             i.title(), i.status() == null ? null : i.status().name(), i.complaint())).toList(),
         stay.vipNote(), walkIns.of(stay.id()).map(WalkIn::label).orElse(null),
-        folio.map(Folio::balance).orElse(null));
+        folio.map(Folio::balance).orElse(null), noticeViews(notices.activeForStay(stay)), kardexViews(stay),
+        notices.checkInAcknowledged(stay), notices.checkOutAcknowledged(stay));
   }
 
   public record FieldChangeView(String field, String before, String after) {}
@@ -305,10 +351,26 @@ public class FrontDeskMcpTools {
         .formatted(stay.id(), guest, stay.pax(), stay.checkIn(), stay.checkOut(), number,
             room.housekeeping() == null ? "" : " (" + room.housekeeping() + ")", stay.total(),
             titles.isEmpty() ? "" : " y los extras: " + String.join(", ", titles));
-    var params = params("stayId", stay.id(), "roomNumber", number, "addOnIds", chosen);
+    // Los avisos del check-in, en el resumen; un bloqueante sin leer se declara leído al confirmar.
+    var avisos = notices.forStay(stay, CustomerNotice.Moment.CHECK_IN);
+    var mustRead = !notices.checkInAcknowledged(stay);
+    var fingerprint = notices.checkInFingerprint(stay);
+    if (!avisos.isEmpty()) {
+      summary += " Avisos de recepción: " + String.join(" ", avisos.stream().map(p -> (p.notice().blocking()
+          ? "AVISO BLOQUEANTE" : "Aviso " + p.notice().typeLabel().toLowerCase()) + " de " + p.guestName() + ": «"
+          + p.notice().text() + "».").toList());
+      if (mustRead) {
+        summary += " Al confirmar, la persona declara que ha leído el aviso bloqueante (queda auditado).";
+      }
+    }
+    var params = params("stayId", stay.id(), "roomNumber", number, "addOnIds", chosen, "blockingNotices", fingerprint);
     var stayId = stay.id();
     return confirmations.prepare("Check-in", summary, params, () -> {
-      var done = checkIn.checkIn(stayId, number, chosen);
+      var by = PendingConfirmations.actor(caller.person());
+      if (mustRead) {
+        notices.acknowledgeCheckIn(stayId, by, fingerprint);
+      }
+      var done = checkIn.checkIn(stayId, number, chosen, by);
       if (done.status() != StayStatus.IN_HOUSE) {
         throw new IllegalStateException("la estancia ya no estaba pendiente de llegada (" + done.status() + ")");
       }
@@ -326,9 +388,27 @@ public class FrontDeskMcpTools {
     var balance = folios.findByStayId(stay.id()).map(Folio::balance).orElse(BigDecimal.ZERO);
     var summary = "Check-out de %s, habitación %s (salida prevista %s). Saldo del folio: %s €. La habitación queda libre y sucia."
         .formatted(stay.id(), stay.roomNumber(), stay.checkOut(), balance);
+    // Lo que la salida advierte: kárdex rechazado o pendiente en Salesforce, avisos de check-out.
+    var warnings = notices.checkOutWarnings(stay);
+    var mustAcknowledge = warnings.any() && !notices.checkOutAcknowledged(stay);
+    for (var k : warnings.kardex()) {
+      summary += " ATENCIÓN, kárdex de " + k.guestName() + (k.rejected() ? " RECHAZADO por Salesforce: "
+          : " PENDIENTE de Salesforce (la factura saldrá con el dato anterior): ") + String.join("; ", k.lines()) + ".";
+    }
+    for (var p : warnings.notices()) {
+      summary += " Aviso " + p.notice().typeLabel().toLowerCase() + " de " + p.guestName() + ": «" + p.notice().text() + "».";
+    }
+    if (mustAcknowledge) {
+      summary += " Al confirmar, la persona dice «Entendido» a estos avisos (queda auditado).";
+    }
     var stayId = stay.id();
-    return confirmations.prepare("Check-out", summary, params("stayId", stayId), () -> {
-      var done = checkOut.checkOut(stayId);
+    var fingerprint = warnings.fingerprint();
+    return confirmations.prepare("Check-out", summary, params("stayId", stayId, "warnings", fingerprint), () -> {
+      var by = PendingConfirmations.actor(caller.person());
+      if (mustAcknowledge) {
+        notices.acknowledgeCheckOut(stayId, by, fingerprint);
+      }
+      var done = checkOut.checkOut(stayId, by);
       if (done.status() != StayStatus.DEPARTED) {
         throw new IllegalStateException("la estancia ya no estaba en casa (" + done.status() + ")");
       }

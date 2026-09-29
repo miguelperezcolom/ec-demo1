@@ -23,6 +23,7 @@ Cada uno tiene su esquema versionado en `contracts/schemas/<topic>/v<N>.schema.j
 | `pms-reservations` | contracts-schemas | pms-integration | integrations | `PmsReservationChanged`: una reserva se escribió en Opera |
 | `front-office-commands` | contracts-schemas | pms-integration, integrations | front-office | `write-stay`, `replace-catalogue` |
 | `customers` | contracts-schemas | customer-mdm | crs-integration, front-office | `CustomerChanged`, `CustomersMerged` |
+| `customer-notices` | contracts-schemas | customer-mdm | front-office | `CustomerNoticeChanged`: un aviso de recepción de un cliente, entero, como lo confirmó Salesforce; gana la versión mayor |
 | `customer-commands` | contracts-schemas | front-office | customer-mdm | `propose-change`, `record-scanned-identity` |
 | `no-show-reports` | contracts-schemas | front-office | crs-integration | `ReportNoShow` |
 | `notifications` | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication | Un aviso |

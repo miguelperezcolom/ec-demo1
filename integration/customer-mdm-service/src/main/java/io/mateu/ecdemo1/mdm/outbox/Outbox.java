@@ -24,6 +24,8 @@ public class Outbox {
     public static final String CUSTOMERS = "customers";
     public static final String NOTIFICATIONS = "notifications";
     public static final String RESOLUTIONS = "resolutions";
+    /** The customers' reception notices, as Salesforce confirmed them (customer-notices). */
+    public static final String CUSTOMER_NOTICES = "customerNotices";
 
     final io.mateu.ecdemo1.messaging.Outbox outbox;
     final ObjectMapper objectMapper;
@@ -32,6 +34,13 @@ public class Outbox {
     @Transactional(propagation = Propagation.MANDATORY)
     public void append(CustomerEvent event) {
         write(CUSTOMERS, event.customerId(), event.getClass().getSimpleName(), serialise(CustomerEvent.class, event));
+    }
+
+    /** A customer's reception notice, whole, keyed by the customer: the hotels keep the highest version. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void appendNotice(io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged n) {
+        write(CUSTOMER_NOTICES, n.customerId(), "CustomerNoticeChanged",
+                serialise(io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.class, n));
     }
 
     /** A person to be told something: the communication service decides who, and how. */

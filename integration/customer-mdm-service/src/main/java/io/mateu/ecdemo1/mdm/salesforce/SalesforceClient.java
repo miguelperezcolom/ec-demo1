@@ -52,6 +52,10 @@ public class SalesforceClient {
         public static final String CONSOLIDATION_READ = "consolidation-read";
         public static final String CONSOLIDATION_WRITE = "consolidation-write";
         public static final String LIMITS = "limits";
+        /** Reception notices written from the Clientes console (Cases with a Tipo de aviso). */
+        public static final String NOTICE_WRITE = "notice-write";
+        /** The net under a notice's event: asking how the ones written and not confirmed stand. */
+        public static final String NOTICE_POLL = "notice-poll";
         /** An OAuth token: counted, but not a call the org's allowance counts. */
         public static final String TOKEN = "token";
 
@@ -279,6 +283,112 @@ public class SalesforceClient {
                 .contentType(MediaType.APPLICATION_JSON).body(fields)
                 .retrieve().body(JsonNode.class));
         return answer == null ? null : answer.path("id").asText(null);
+    }
+
+    /**
+     * A reception notice as its Case carries it, in Salesforce's words: the Subject is the text, the
+     * type and the moments are the picklists' values ("Bloqueante", "Check-in;Estancia").
+     *
+     * @param caseId null for one Salesforce does not have yet: created, keyed by the MDM's id
+     */
+    public record NoticeCase(String mdmNoticeId, String caseId, String contactId, String text, String type,
+                             java.time.LocalDate from, java.time.LocalDate to, String showAt, boolean active) {
+    }
+
+    /** One notice of a write: its Case, or why Salesforce refused it. */
+    public record Written(String mdmNoticeId, String caseId, String error) {
+        public boolean ok() {
+            return error == null;
+        }
+    }
+
+    /**
+     * Writes reception notices as Cases, up to {@value #COLLECTION} of each kind in one call each: the
+     * new ones upserted by the MDM's id (MdmAvisoId__c) — sending one twice is one Case — and the ones
+     * Salesforce already has updated by their id, which also gives a notice created there the MDM's id.
+     * Not all or none. At most two calls whatever the number of notices.
+     */
+    public List<Written> writeNotices(List<NoticeCase> notices) {
+        if (notices.size() > COLLECTION) {
+            throw new IllegalArgumentException("At most " + COLLECTION + " notices in one write, not " + notices.size());
+        }
+        var created = notices.stream().filter(n -> n.caseId() == null).toList();
+        var updated = notices.stream().filter(n -> n.caseId() != null).toList();
+        var result = new ArrayList<Written>();
+        if (!created.isEmpty()) {
+            var answer = call(Purpose.NOTICE_WRITE, s -> rest.patch()
+                    .uri(s.instanceUrl() + "/services/data/{v}/composite/sobjects/Case/MdmAvisoId__c", properties.apiVersion())
+                    .header("Authorization", "Bearer " + s.accessToken())
+                    .contentType(MediaType.APPLICATION_JSON).body(collection(created, false))
+                    .retrieve().body(JsonNode.class));
+            result.addAll(written(created, answer));
+        }
+        if (!updated.isEmpty()) {
+            var answer = call(Purpose.NOTICE_WRITE, s -> rest.patch()
+                    .uri(s.instanceUrl() + "/services/data/{v}/composite/sobjects", properties.apiVersion())
+                    .header("Authorization", "Bearer " + s.accessToken())
+                    .contentType(MediaType.APPLICATION_JSON).body(collection(updated, true))
+                    .retrieve().body(JsonNode.class));
+            result.addAll(written(updated, answer));
+        }
+        return result;
+    }
+
+    static Map<String, Object> collection(List<NoticeCase> notices, boolean byId) {
+        var records = new ArrayList<Map<String, Object>>();
+        for (var n : notices) {
+            var record = new LinkedHashMap<String, Object>();
+            record.put("attributes", Map.of("type", "Case"));
+            if (byId) {
+                record.put("id", safe(n.caseId()));
+            } else {
+                record.put("ContactId", n.contactId());
+                record.put("Description", "Aviso de recepción escrito desde Clientes (MDM). Recepción lo ve en el "
+                        + "check-in y el check-out; para retirarlo, desmarcar Aviso activo o cerrar el caso.");
+            }
+            record.put("MdmAvisoId__c", n.mdmNoticeId());
+            record.put("Subject", cut(n.text(), 255));
+            record.put("Aviso_Tipo__c", n.type());
+            record.put("Aviso_Desde__c", n.from() == null ? null : n.from().toString());
+            record.put("Aviso_Hasta__c", n.to() == null ? null : n.to().toString());
+            record.put("Aviso_Mostrar_En__c", n.showAt());
+            record.put("Aviso_Activo__c", n.active());
+            records.add(record);
+        }
+        var body = new LinkedHashMap<String, Object>();
+        body.put("allOrNone", false);
+        body.put("records", records);
+        return body;
+    }
+
+    static List<Written> written(List<NoticeCase> sent, JsonNode answer) {
+        var result = new ArrayList<Written>();
+        for (int i = 0; i < sent.size(); i++) {
+            var r = answer == null ? null : answer.get(i);
+            var n = sent.get(i);
+            if (r == null) {
+                result.add(new Written(n.mdmNoticeId(), null, "no answer for this notice"));
+            } else if (r.path("success").asBoolean(false)) {
+                result.add(new Written(n.mdmNoticeId(), r.path("id").asText(n.caseId()), null));
+            } else {
+                var errors = new ArrayList<String>();
+                r.path("errors").forEach(e -> errors.add(e.path("statusCode").asText("") + " " + e.path("message").asText("")));
+                result.add(new Written(n.mdmNoticeId(), null, errors.isEmpty() ? "refused" : String.join("; ", errors).trim()));
+            }
+        }
+        return result;
+    }
+
+    /** These notices' Cases as Salesforce has them now — deleted ones too: one query, whatever their number. */
+    public List<JsonNode> noticeCases(java.util.Collection<String> caseIds) {
+        if (caseIds.isEmpty()) {
+            return List.of();
+        }
+        var in = caseIds.stream().map(SalesforceClient::safe).map(id -> "'" + id + "'")
+                .collect(java.util.stream.Collectors.joining(","));
+        return queryAll(Purpose.NOTICE_POLL, "SELECT Id, IsDeleted, IsClosed, MdmAvisoId__c, ContactId, Contact.MDM_Id__c, "
+                + "Subject, Aviso_Tipo__c, Aviso_Desde__c, Aviso_Hasta__c, Aviso_Mostrar_En__c, Aviso_Activo__c "
+                + "FROM Case WHERE Id IN (" + in + ")");
     }
 
     /** The decided ones among these change requests: request id → Aprobada or Rechazada. */

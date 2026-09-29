@@ -9,6 +9,7 @@ import io.mateu.ecdemo1.integration.model.command.ProjectReservation;
 import io.mateu.ecdemo1.integration.model.command.ReportNoShow;
 import io.mateu.ecdemo1.integration.model.customer.CustomerChanged;
 import io.mateu.ecdemo1.integration.model.customer.CustomerEvent;
+import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged;
 import io.mateu.ecdemo1.integration.model.customer.CustomersMerged;
 import io.mateu.ecdemo1.integration.model.customer.GoldenRecord;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
@@ -51,6 +52,20 @@ class PublishedLanguageTest {
                                 new CustomersMerged("E-2", AT, "C-00042", 4,
                                         new GoldenRecord("Ana", "García", "ana@example.com", null, "ES", null, null, null),
                                         "C-00051", List.of("MRU01/12E45", "MRU01/0099"))),
+                TopicSpec.topic("customer-notices")
+                        .describedAs("A customer's reception notices, as Salesforce (their master) has them: created, "
+                                + "changed or deactivated — the whole notice each time; the highest version wins.")
+                        .ownedBy("customer-mdm-service").keyedBy("customerId")
+                        .producedBy("customer-mdm-service").consumedBy("front-office")
+                        .messages(CustomerNoticeChanged.class)
+                        .example(new CustomerNoticeChanged("E-4", AT, "AV-7F3A2C", 2, "C-00042",
+                                        "Pedir el pasaporte original: el del CRS está caducado",
+                                        CustomerNoticeChanged.NoticeType.BLOCKING, LocalDate.of(2026, 11, 1), null,
+                                        List.of(CustomerNoticeChanged.NoticeMoment.CHECK_IN), true, "500d1000009XyZAAA0"),
+                                new CustomerNoticeChanged("E-5", AT, "AV-7F3A2D", 5, "C-00042",
+                                        "Cliente alérgico a los frutos secos", CustomerNoticeChanged.NoticeType.IMPORTANT,
+                                        null, null, List.of(CustomerNoticeChanged.NoticeMoment.CHECK_IN,
+                                                CustomerNoticeChanged.NoticeMoment.STAY), false, "500d1000009XyZBAA0")),
                 TopicSpec.topic("customer-commands")
                         .describedAs("What the MDM is asked without waiting: a change to a customer proposed, an "
                                 + "identity scanned at check-in recorded.")

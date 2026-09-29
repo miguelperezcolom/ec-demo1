@@ -107,4 +107,69 @@
         <type>TextArea</type>
         <required>false</required>
     </fields>
+    <fields>
+        <fullName>Aviso_Tipo__c</fullName>
+        <label>Tipo de aviso</label>
+        <description>Set, the Case is a reception notice (its Subject is the notice's text) — not a request: what reception must know about the contact. Salesforce is its master; the MDM projects it to the hotels.</description>
+        <type>Picklist</type>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>Informativo</fullName><default>false</default><label>Informativo</label></value>
+                <value><fullName>Importante</fullName><default>false</default><label>Importante</label></value>
+                <value><fullName>Bloqueante</fullName><default>false</default><label>Bloqueante</label></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Aviso_Desde__c</fullName>
+        <label>Aviso desde</label>
+        <inlineHelpText>Vacío: desde siempre</inlineHelpText>
+        <type>Date</type>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Aviso_Hasta__c</fullName>
+        <label>Aviso hasta</label>
+        <inlineHelpText>Vacío: sin fecha de fin</inlineHelpText>
+        <type>Date</type>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Aviso_Mostrar_En__c</fullName>
+        <label>Mostrar el aviso en</label>
+        <type>MultiselectPicklist</type>
+        <visibleLines>3</visibleLines>
+        <required>false</required>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>Check-in</fullName><default>false</default><label>Check-in</label></value>
+                <value><fullName>Check-out</fullName><default>false</default><label>Check-out</label></value>
+                <value><fullName>Estancia</fullName><default>false</default><label>Estancia</label></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Aviso_Activo__c</fullName>
+        <label>Aviso activo</label>
+        <inlineHelpText>Desmarcado (o el caso cerrado), recepción deja de verlo</inlineHelpText>
+        <type>Checkbox</type>
+        <defaultValue>true</defaultValue>
+    </fields>
+    <fields>
+        <fullName>MdmAvisoId__c</fullName>
+        <label>Id del aviso (MDM)</label>
+        <description>Set when the notice was written from the MDM's Clientes console: its upsert key. Empty for one created in Salesforce.</description>
+        <type>Text</type>
+        <length>64</length>
+        <required>false</required>
+        <externalId>true</externalId>
+        <unique>true</unique>
+        <caseSensitive>false</caseSensitive>
+    </fields>
 </CustomObject>

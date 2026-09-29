@@ -53,6 +53,11 @@ spring:
               sync: true
               configuration:
                 key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          customerNotices:
+            producer:
+              sync: true
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
       bindings:
         customers:
           destination: customers
@@ -62,6 +67,10 @@ spring:
           destination: notifications
         resolutions:
           destination: notification-resolutions
+        # OUT, through the outbox: a customer's reception notices as Salesforce (their master)
+        # confirmed them, whole, keyed by the customer — the front office shows them at the desk.
+        customerNotices:
+          destination: customer-notices
         # IN: what the hotels tell the MDM without waiting — a change the desk made to a customer, a
         # document it scanned. Taken once each (inbox); retried until it goes.
         consumeCustomerCommands-in-0:
@@ -94,6 +103,11 @@ mdm:
   # each, out of the org's daily API allowance (15,000 calls in a rolling 24 h on a Base Edition).
   poll: ${CONSOLIDATION_POLL:15m}
   change-poll: ${CHANGE_POLL:5m}
+  # Reception notices asked for in the Clientes console: written to Salesforce every tick while any
+  # waits (one call for the new ones, one for the rest); the poll asks only for the ones written and
+  # not confirmed by their event after two minutes.
+  notice-tick: ${NOTICE_TICK:5s}
+  notice-poll: ${NOTICE_POLL:5m}
   # When Salesforce answers REQUEST_LIMIT_EXCEEDED, every call pauses this long, doubled on each
   # refusal after that up to the longest; one inbox notice says so, and it closes when calls go again.
   salesforce-pause: ${SALESFORCE_PAUSE:5m}

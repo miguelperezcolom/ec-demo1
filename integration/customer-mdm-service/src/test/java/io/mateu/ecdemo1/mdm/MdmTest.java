@@ -55,7 +55,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@link Consolidations#received}, as the event and the poll both do.
  */
 @SpringBootTest(properties = {"mdm.projection-tick=1h", "mdm.poll=1h", "mdm.propagation-tick=1h", "mdm.change-poll=1h",
-        "mdm.refresh-tick=1h", "mdm.change-tick=1h", "mdm.salesforce-merge-tick=1h",
+        "mdm.refresh-tick=1h", "mdm.change-tick=1h", "mdm.notice-tick=1h", "mdm.notice-poll=1h", "mdm.salesforce-merge-tick=1h",
         "mdm.salesforce-pause=400ms", "mdm.salesforce-pause-max=400ms",
         "mdm.salesforce.client-id=test", "mdm.salesforce.client-secret=secret", "mdm.salesforce.subscribe=false"})
 @AutoConfigureMockMvc

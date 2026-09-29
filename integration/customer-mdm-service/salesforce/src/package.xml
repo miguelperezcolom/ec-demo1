@@ -19,12 +19,19 @@
         <members>Case.Cambios__c</members>
         <members>Case.Decision__c</members>
         <members>Case.Motivo__c</members>
+        <members>Case.Aviso_Tipo__c</members>
+        <members>Case.Aviso_Desde__c</members>
+        <members>Case.Aviso_Hasta__c</members>
+        <members>Case.Aviso_Mostrar_En__c</members>
+        <members>Case.Aviso_Activo__c</members>
+        <members>Case.MdmAvisoId__c</members>
         <name>CustomField</name>
     </types>
     <types>
         <members>ClienteConsolidado__e</members>
         <members>CambioClienteResuelto__e</members>
         <members>ClienteActualizado__e</members>
+        <members>AvisoRecepcionCambiado__e</members>
         <name>CustomObject</name>
     </types>
     <types>
@@ -32,6 +39,7 @@
         <members>Mdm_Keep_Mdm_Id</members>
         <members>Mdm_Apply_Change_Request</members>
         <members>Mdm_Announce_Contact_Change</members>
+        <members>Mdm_Announce_Notice_Change</members>
         <name>Flow</name>
     </types>
     <types>

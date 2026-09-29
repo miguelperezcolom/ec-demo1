@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <label>MDM integration</label>
-    <description>What the MDM's integration user and the data stewards need on Contact: our fields, readable and writable; and the customer data change requests (Cases) they decide.</description>
+    <description>What the MDM's integration user and the data stewards need on Contact: our fields, readable and writable; the customer data change requests (Cases) they decide; and the reception notices they keep (Cases with a Tipo de aviso).</description>
     <hasActivationRequired>false</hasActivationRequired>
     <fieldPermissions>
         <editable>true</editable>
@@ -91,6 +91,36 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>Contact.Document_Number__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Case.Aviso_Tipo__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Case.Aviso_Desde__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Case.Aviso_Hasta__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Case.Aviso_Mostrar_En__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Case.Aviso_Activo__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Case.MdmAvisoId__c</field>
         <readable>true</readable>
     </fieldPermissions>
 </PermissionSet>

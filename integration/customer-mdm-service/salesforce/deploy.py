@@ -115,13 +115,19 @@ def activate_flows(instance, access):
             call(instance, access, "DELETE", f"/tooling/sobjects/Flow/{old['Id']}")
 
 
-CASE_SECTION = "Cambio de datos de cliente (MDM)"
 # What a steward decides on a customer data change request (a Case the MDM opened): the decision and
-# the proposed data, which can be corrected before approving; where it came from, read only.
-CASE_FIELDS = [("Decision__c", "Edit"), ("Motivo__c", "Edit"), ("Cambios__c", "Readonly"), ("Origen__c", "Readonly"),
-               ("Nombre__c", "Edit"), ("Apellidos__c", "Edit"), ("Email__c", "Edit"), ("Telefono__c", "Edit"),
-               ("Nacionalidad__c", "Edit"), ("FechaNacimiento__c", "Edit"), ("TipoDocumento__c", "Edit"),
-               ("NumeroDocumento__c", "Edit"), ("MdmId__c", "Readonly"), ("MdmRequestId__c", "Readonly")]
+# the proposed data, which can be corrected before approving; where it came from, read only. And what
+# makes a Case a reception notice (its Subject is the text).
+CASE_SECTIONS = {
+    "Cambio de datos de cliente (MDM)": [
+        ("Decision__c", "Edit"), ("Motivo__c", "Edit"), ("Cambios__c", "Readonly"), ("Origen__c", "Readonly"),
+        ("Nombre__c", "Edit"), ("Apellidos__c", "Edit"), ("Email__c", "Edit"), ("Telefono__c", "Edit"),
+        ("Nacionalidad__c", "Edit"), ("FechaNacimiento__c", "Edit"), ("TipoDocumento__c", "Edit"),
+        ("NumeroDocumento__c", "Edit"), ("MdmId__c", "Readonly"), ("MdmRequestId__c", "Readonly")],
+    "Aviso de recepción": [
+        ("Aviso_Tipo__c", "Edit"), ("Aviso_Mostrar_En__c", "Edit"), ("Aviso_Activo__c", "Edit"),
+        ("Aviso_Desde__c", "Edit"), ("Aviso_Hasta__c", "Edit"), ("MdmAvisoId__c", "Readonly")],
+}
 
 
 def without_nulls(value):
@@ -133,7 +139,7 @@ def without_nulls(value):
 
 
 def case_layout(instance, access):
-    """The change request's fields on the Case page, in a section of their own; added once."""
+    """The change request's fields and the notice's on the Case page, each in a section of its own; added once."""
     q = urllib.parse.quote("SELECT Id FROM Layout WHERE TableEnumOrId = 'Case' AND Name = 'Case Layout'")
     records = call(instance, access, "GET", f"/tooling/query?q={q}")["records"]
     if not records:
@@ -141,14 +147,18 @@ def case_layout(instance, access):
         return
     layout_id = records[0]["Id"]
     metadata = call(instance, access, "GET", f"/tooling/sobjects/Layout/{layout_id}")["Metadata"]
-    if any(s.get("label") == CASE_SECTION for s in metadata.get("layoutSections", [])):
+    present = {s.get("label") for s in metadata.get("layoutSections", [])}
+    missing = [label for label in CASE_SECTIONS if label not in present]
+    if not missing:
         return
-    half = (len(CASE_FIELDS) + 1) // 2
-    columns = [CASE_FIELDS[:half], CASE_FIELDS[half:]]
-    metadata["layoutSections"].insert(1, {
-        "label": CASE_SECTION, "style": "TwoColumnsTopToBottom", "customLabel": True,
-        "detailHeading": True, "editHeading": True,
-        "layoutColumns": [{"layoutItems": [{"field": f, "behavior": b} for f, b in column]} for column in columns]})
+    for label in missing:
+        fields = CASE_SECTIONS[label]
+        half = (len(fields) + 1) // 2
+        columns = [fields[:half], fields[half:]]
+        metadata["layoutSections"].insert(1, {
+            "label": label, "style": "TwoColumnsTopToBottom", "customLabel": True,
+            "detailHeading": True, "editHeading": True,
+            "layoutColumns": [{"layoutItems": [{"field": f, "behavior": b} for f, b in column]} for column in columns]})
     # Salesforce does not take back its own metadata as it sent it: without the nulls, and without the
     # action list and the summary layout, whose enums it serialises in a form it then refuses (the layout
     # keeps the default actions; Lightning shows its compact layout, not the summary).
@@ -162,7 +172,7 @@ def case_layout(instance, access):
         if not related.get("quickActions"):
             related.pop("quickActions", None)
     call(instance, access, "PATCH", f"/tooling/sobjects/Layout/{layout_id}", {"Metadata": metadata})
-    print("Case Layout: section", CASE_SECTION, "added")
+    print("Case Layout: sections added:", ", ".join(missing))
 
 
 if __name__ == "__main__":

@@ -319,6 +319,26 @@ Probado en ec1 el 2026-09-24 con C-E572C893A59C (reserva CU838F): dos cambios ap
 Salesforce llegaron al front office y al perfil 20538296 de Opera; el segundo cambió el email en su
 sitio. (Ese cliente y sus Cases se borraron al poner ec1 a cero.)
 
+### 10 · avisos. Un aviso de recepción, y un kárdex rechazado a la salida
+
+Los **avisos de recepción** son de Salesforce (un Case sobre el contacto con *Tipo de aviso*); se crean
+allí o desde *Clientes*, y el front office los enseña al entrar y al salir.
+
+1. **Consola → Clientes →** el titular de una llegada de hoy (`deploy/demo/demo-prep.sh seed
+   arriving-today` si no hay) **→ Avisos de recepción**: texto «Pedir el pasaporte original», tipo
+   **Bloqueante**, *Mostrar en el check-in* → **Guardar aviso**. Sale *Pendiente de enviar* / *Enviado*;
+   en unos segundos, **Confirmado** con el enlace a su Case en Salesforce (una llamada para escribirlo;
+   vuelve por `AvisoRecepcionCambiado__e`, sin leer nada).
+2. **Front office →** la reserva: el titular lleva «⛔ Aviso bloqueante: …» en el carril. **Confirmar
+   check-in** abre el asistente por el paso **Avisos**; sin marcar **«He leído el aviso»** el check-in se
+   rechaza; marcado, entra (auditado).
+3. **Kárdex rechazado:** cambia el email del titular en recepción y, en Salesforce, pon el Case en
+   *Rechazada* con un motivo. Al pulsar **Check-out**, arriba sale el bloque rojo: el campo, lo propuesto,
+   lo que se queda y el motivo. El cobro se rechaza hasta pulsar **«Entendido»**. Un cambio aún
+   *pendiente* avisa de que «la factura saldrá con el dato anterior».
+4. El **agente de recepción** dice el aviso bloqueante antes de pedir confirmación del check-in, y el
+   kárdex rechazado antes del check-out.
+
 ## 10 bis. No show: el hotel lo dice y el CRS lo cobra
 
 HLA F006: el no-show se detecta en el hotel, sube al CRS como estado, el CRS aplica su regla y el
