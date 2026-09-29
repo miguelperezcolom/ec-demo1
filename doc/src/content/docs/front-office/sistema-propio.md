@@ -34,12 +34,28 @@ proyecta las pantallas para cada audiencia.
 | El cliente (kárdex) | El MDM, que lo tiene de Salesforce | Topic `customers` |
 | Avisos de recepción del cliente | Salesforce (su maestro), por el MDM | Topic `customer-notices` |
 | Precio y alta de un walk-in | El CRS | HTTP a `crs-integration-service`: la recepción necesita el localizador ya |
+| Cómo tomó el PMS lo que hizo recepción, y la factura del check-out | Opera | `front-office-commands` (`record-reception`) |
+| Habitaciones que ofrecer en el check-in, con su estado | Opera (catálogo y housekeeping) | Catálogo por `replace-catalogue`; el estado, HTTP a `pms-integration-service` (`GET /front-office/rooms`): la pantalla lo necesita ya |
 
-Y lo que el front office **manda**, por su outbox (`command_outbox`):
+Y lo que el front office **manda**, por su outbox:
 
 - un **cambio de datos del cliente**, a Salesforce vía MDM (`customer-commands`, `propose-change`);
 - un **documento escaneado**, al MDM (`customer-commands`, `record-scanned-identity`);
-- un **no show**, al CRS (`no-show-reports`) — solo en la PoC, ver abajo.
+- lo que hizo **recepción** — check-in, check-out, no show —, al PMS (`front-office-events`), que lo
+  registra en Opera; el no show sigue de Opera al CRS, que aplica su cargo.
+
+## El estado de Opera y la factura
+
+La estancia dice dónde está en el PMS, en «En otros sistemas»: «Opera: pendiente — check-in enviado»
+al hacerlo, y luego lo que conteste el PMS — «Opera: en casa · hab. 205», «Opera: salida registrada ·
+factura XMAR377», «Opera: rechazado (check-in) — motivo». Si Opera asigna otra habitación, esa es la de
+la estancia. Un walk-in que aún no está ni en el CRS ni en Opera espera: su check-in sube cuando su
+reserva vuelve de Opera.
+
+Una estancia cerrada tiene **«Abrir factura»**: el documento que Opera emitió en el check-out si lo dio
+(el PMS es el maestro del folio); si no, una **«Factura proforma (front office)»** hecha con el folio del
+front office, que lo dice en la página. La sirve el front office (`/invoices/{estancia}`), nunca un
+enlace a Opera, con un enlace firmado que caduca (una pestaña nueva no lleva el token).
 
 ## Avisos de recepción, al entrar y al salir
 
@@ -83,7 +99,8 @@ Y los requisitos de negocio del front office de destino van más allá de lo que
 comunicaciones** por los servicios de Riu que ya se encargan de ellos, no necesariamente por Opera.
 
 :::note[El no show]
-En la PoC la recepción marca un no show y el CRS lo cobra (`registrar-no-show`). En producción lo marca
+En la PoC la recepción marca un no show, el PMS lo anota (`registrar-no-show-pms`) y el CRS lo cobra
+(`registrar-no-show`). En producción lo marca
 el **Night Audit de Opera** y el front office solo lo refleja: no es un argumento para el front office
 propio.
 :::

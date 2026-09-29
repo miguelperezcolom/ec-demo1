@@ -17,7 +17,7 @@ each service depends on the contexts it speaks and nothing else. The packages
 | `contracts-partner` | The partner and its PMS profile | — (HTTP) | crs-integration, pms-integration, mapping, integrations |
 | `contracts-mapping` | Code types, translations, causes, `MappingCommand` | mapping-commands | crs-integration, pms-integration, mapping, integrations |
 | `contracts-integration` | An integration's lifecycle: status, connection, connectivity, future reservations and their codes (needs `contracts-mapping`); `ApiUsage`, what an external API (Salesforce, Opera) is spent | — (HTTP) | crs-integration, pms-integration, mapping, integrations, customer-mdm |
-| `contracts-frontoffice` | `FrontOfficeCommand` (stays, catalogues), the catalogue summary | front-office-commands | pms-integration, integrations, front-office |
+| `contracts-frontoffice` | `FrontOfficeCommand` (stays, catalogues, how the PMS took the reception: `RecordReception`), `FrontOfficeEvent` (check-in, check-out, no-show at the desk), the catalogue summary | front-office-commands, front-office-events | pms-integration, integrations, front-office |
 | `contracts-communication` | Notifications asked for and resolved | notifications, notification-resolutions | pms-integration, customer-mdm, mapping, integrations, communication |
 | `contracts-audit` | `AuditedAction` | audit | mapping, integrations, front-office, audit |
 | `contracts-process` | The processes' vocabulary shared with ec-definitions: definition ids, gate messages, variable names, outcomes | — | crs-integration, pms-integration, mapping, integrations |
@@ -49,9 +49,10 @@ producer writes it.
 | customer-notices | contracts-schemas | customer-mdm | front-office |
 | customer-commands | contracts-schemas | front-office | customer-mdm |
 | projection-requests | contracts-schemas | integrations | crs-integration |
-| no-show-reports | contracts-schemas | front-office | crs-integration |
+| no-show-reports | contracts-schemas | — (the front office's no-show goes to the PMS: front-office-events) | crs-integration |
 | mapping-commands | contracts-schemas | integrations | mapping |
 | front-office-commands | contracts-schemas | pms-integration, integrations | front-office |
+| front-office-events | contracts-schemas (front-office's language) | front-office | integrations |
 | pms-reservations | contracts-schemas | pms-integration | integrations |
 | notifications | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication |
 | notification-resolutions | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication |

@@ -21,7 +21,7 @@ contexto y cada servicio depende solo de los que habla. Los paquetes
 | `contracts-partner` | El interlocutor y su perfil en el PMS | — (HTTP) |
 | `contracts-mapping` | Tipos de código, traducciones, causas, `MappingCommand` | `mapping-commands` |
 | `contracts-integration` | El ciclo de vida de una integración, la conexión, las reservas futuras y sus códigos; `ApiUsage` | — (HTTP) |
-| `contracts-frontoffice` | `FrontOfficeCommand` (estancias, catálogos) | `front-office-commands` |
+| `contracts-frontoffice` | `FrontOfficeCommand` (estancias, catálogos, `RecordReception`), `FrontOfficeEvent` (check-in, check-out, no show de recepción) | `front-office-commands`, `front-office-events` |
 | `contracts-communication` | Avisos pedidos y resueltos | `notifications`, `notification-resolutions` |
 | `contracts-audit` | `AuditedAction` | `audit` |
 | `contracts-process` | El vocabulario de los procesos compartido con ec-definitions: ids de definición, mensajes de espera, nombres de variables, resultados | — |

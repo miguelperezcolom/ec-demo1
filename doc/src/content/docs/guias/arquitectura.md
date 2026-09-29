@@ -61,9 +61,10 @@ tienen operativa propia que enseñar.
 
 ## El motor
 
-EventConductor lleva cada reserva por sus pasos. Los procesos están en ec-definitions y son siete:
+EventConductor lleva cada reserva por sus pasos. Los procesos están en ec-definitions y son diez:
 `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `proyectar-estancia`,
-`registrar-no-show`, `alta-integracion` y `alta-integracion-fo`. Cada paso `ACTION` es una **tarea**
+`registrar-no-show`, `registrar-checkin`, `registrar-checkout`, `registrar-no-show-pms`,
+`alta-integracion` y `alta-integracion-fo`. Cada paso `ACTION` es una **tarea**
 que atiende un worker en un topic de Kafka (`mapping`, `pms-integration`, `crs-integration`,
 `integrations`, `booking`). Ver [Los procesos del motor](/guias/procesos/) y
 [Workers y tareas](/contratos/workers-y-tareas/).
