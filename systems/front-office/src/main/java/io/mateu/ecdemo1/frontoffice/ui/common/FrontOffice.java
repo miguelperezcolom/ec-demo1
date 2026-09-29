@@ -36,12 +36,15 @@ public class FrontOffice {
   private final io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks pmsLinks;
   private final io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms;
   private final io.mateu.ecdemo1.frontoffice.application.Invoices invoices;
+  private final io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings;
 
   public FrontOffice(StayQueries queries, StayReadModel stayReads, RoomRepository rooms,
                      AddOnCatalogRepository addOnCatalog, io.mateu.ecdemo1.frontoffice.application.GuestNotices notices,
                      io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks pmsLinks,
                      io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms,
-                     io.mateu.ecdemo1.frontoffice.application.Invoices invoices) {
+                     io.mateu.ecdemo1.frontoffice.application.Invoices invoices,
+                     io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings) {
+    this.chargePostings = chargePostings;
     this.queries = queries;
     this.stayReads = stayReads;
     this.rooms = rooms;
@@ -62,6 +65,27 @@ public class FrontOffice {
   public static java.util.Optional<String> pmsReservation(String stayId) {
     return instance.pmsLinks.ofStay(stayId).map(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.Link::pmsReservationId)
         .filter(id -> id != null && !id.isBlank());
+  }
+
+  /** Where each charge of the stay's folio stands in the PMS's folio, by line id. */
+  public static java.util.Map<String, io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings.Posting> chargePostings(
+      String stayId) {
+    return instance.chargePostings.ofStay(stayId);
+  }
+
+  /** Whether a room can be given now as Opera has it: vacant and as the property's housekeeping requires. */
+  public static boolean ready(Room room) {
+    return instance.pmsRooms.ready(room);
+  }
+
+  /** Whether the room given to a stay is ready in Opera now (kept a few seconds). */
+  public static io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms.Readiness roomReadiness(String roomNumber) {
+    return instance.pmsRooms.readiness(roomNumber);
+  }
+
+  /** As {@link #roomReadiness}, asking Opera again now (the desk's «Comprobar»). */
+  public static io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms.Readiness refreshRoom(String roomNumber) {
+    return instance.pmsRooms.refresh(roomNumber);
   }
 
   /** What «Abrir factura» opens for a closed stay: the PMS's document, or the front office's proforma. */

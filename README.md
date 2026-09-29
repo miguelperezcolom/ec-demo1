@@ -135,7 +135,8 @@ The engine runs only that PoC's processes, imported from
 `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor` and `registrar-no-show`; and the
 pms-fo side's `alta-integracion-fo`, `proyectar-estancia` and the reception up to the PMS —
 `registrar-checkin`, `registrar-checkout`, `registrar-no-show-pms` (which reports the no-show on to the
-CRS: `registrar-no-show`). A
+CRS: `registrar-no-show`), and the desk's charges onto the PMS's folio, `registrar-cargo` and
+`anular-cargo`. A
 new reservation starts exactly one of them — one `proyectar-reserva` — because the CRS makes it
 confirmed and with its payments in one change, one event. The engine's own
 examples (`order-fulfilment`, the sagas) were removed from it on 2026-09-25.

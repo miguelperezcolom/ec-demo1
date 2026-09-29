@@ -23,6 +23,7 @@ import java.util.List;
         @JsonSubTypes.Type(value = FrontOfficeCommand.WriteStay.class, name = "write-stay"),
         @JsonSubTypes.Type(value = FrontOfficeCommand.ReplaceCatalogue.class, name = "replace-catalogue"),
         @JsonSubTypes.Type(value = FrontOfficeCommand.RecordReception.class, name = "record-reception"),
+        @JsonSubTypes.Type(value = FrontOfficeCommand.RecordCharge.class, name = "record-charge"),
 })
 public sealed interface FrontOfficeCommand {
 
@@ -120,6 +121,26 @@ public sealed interface FrontOfficeCommand {
     record RecordReception(String commandId, String pmsHotelCode, String pmsReservationId, String stayId,
                            ReceptionOperation operation, boolean refused, String detail, String roomNumber,
                            Invoice invoice) implements FrontOfficeCommand {
+        @Override
+        public String key() {
+            return pmsHotelCode + "/" + pmsReservationId;
+        }
+    }
+
+    /**
+     * How the PMS took a charge of the desk ({@link FrontOfficeEvent.ChargePosted}) or its void
+     * ({@link FrontOfficeEvent.ChargeVoided}) — told to the front office by the process that posted it
+     * to the PMS's folio.
+     *
+     * @param stayId       the front office's stay
+     * @param lineId       the front office's folio line
+     * @param reversal     whether it is about the line's void (the PMS's reversal) rather than its charge
+     * @param refused      whether the PMS refused it: {@code detail} says why, and the process waits on a cause
+     * @param detail       the PMS's words, when refused; otherwise what was done
+     * @param pmsPostingId the PMS's posting (its transaction number): the charge, or its reversal
+     */
+    record RecordCharge(String commandId, String pmsHotelCode, String pmsReservationId, String stayId, String lineId,
+                        boolean reversal, boolean refused, String detail, String pmsPostingId) implements FrontOfficeCommand {
         @Override
         public String key() {
             return pmsHotelCode + "/" + pmsReservationId;

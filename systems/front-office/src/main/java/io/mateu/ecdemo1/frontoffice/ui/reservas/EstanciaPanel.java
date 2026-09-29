@@ -82,7 +82,7 @@ final class EstanciaPanel {
             .max(preauth)
             .unit("€")
             .caption(pct + "% de la preautorización consumido · "
-                + (folio == null ? 0 : folio.lines().size()) + " cargos")
+                + (folio == null ? 0 : folio.lines().stream().filter(l -> !l.voided()).count()) + " cargos")
             .warnAt(preauth * 0.8)
             .dangerAt(preauth * 0.95)
             .build());
@@ -203,11 +203,12 @@ final class EstanciaPanel {
         .currency("€")
         .totalLabel("Total")
         .lines(folio == null ? List.of() : folio.lines().stream()
+            // una línea anulada queda en el folio y no cuenta: sin importe, «Anulado»
             .map(l -> LedgerLine.builder()
-                .concept(l.concept())
-                .amount(l.amount() == null ? null : l.amount().doubleValue())
-                .included(l.included())
-                .includedLabel(l.includedLabel())
+                .concept(l.voided() ? l.concept() + " (" + GuestHeaders.euros(l.amount()) + ")" : l.concept())
+                .amount(l.amount() == null || l.voided() ? null : l.amount().doubleValue())
+                .included(l.included() || l.voided())
+                .includedLabel(l.voided() ? "Anulado" : l.includedLabel())
                 .build())
             .toList())
         .total(folio == null ? 0 : folio.balance().doubleValue());

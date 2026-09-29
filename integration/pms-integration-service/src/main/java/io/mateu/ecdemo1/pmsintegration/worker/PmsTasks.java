@@ -37,6 +37,8 @@ public class PmsTasks {
     public static final String CHECK_OUT_RESERVATION = "check-out-reservation";
     public static final String FETCH_INVOICE = "fetch-invoice";
     public static final String RECORD_NO_SHOW = "record-no-show";
+    public static final String POST_CHARGE = "post-charge";
+    public static final String REVERSE_CHARGE = "reverse-charge";
 
     @Bean
     public TaskRegistration<TaskHandlers.ReservationTask, TaskHandlers.GuestProfile> ensureGuestProfileTask(
@@ -117,6 +119,24 @@ public class PmsTasks {
         return new TaskRegistration<>(RECORD_NO_SHOW, 1, TOPIC, ReceptionHandlers.ReceptionTask.class,
                 ReceptionHandlers.NoShowRecorded.class, watched(watch, handlers::recordNoShow,
                         ReceptionHandlers.ReceptionTask::pmsHotelCode, ReceptionHandlers.ReceptionTask::stayId));
+    }
+
+    // ── the desk's charges, onto Opera's folio (pms-fo) ────────────────────────────────────────────
+
+    @Bean
+    public TaskRegistration<ChargeHandlers.ChargeTask, ChargeHandlers.ChargePosted> postChargeTask(
+            ChargeHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(POST_CHARGE, 1, TOPIC, ChargeHandlers.ChargeTask.class,
+                ChargeHandlers.ChargePosted.class, watched(watch, handlers::postCharge,
+                        ChargeHandlers.ChargeTask::pmsHotelCode, input -> input.stayId() + "/" + input.lineId()));
+    }
+
+    @Bean
+    public TaskRegistration<ChargeHandlers.ChargeTask, ChargeHandlers.ChargeReversed> reverseChargeTask(
+            ChargeHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(REVERSE_CHARGE, 1, TOPIC, ChargeHandlers.ChargeTask.class,
+                ChargeHandlers.ChargeReversed.class, watched(watch, handlers::reverseCharge,
+                        ChargeHandlers.ChargeTask::pmsHotelCode, input -> input.stayId() + "/" + input.lineId()));
     }
 
     /**

@@ -1,6 +1,5 @@
 package io.mateu.ecdemo1.frontoffice.ui.reservas;
 
-import io.mateu.ecdemo1.frontoffice.domain.room.HousekeepingStatus;
 import io.mateu.ecdemo1.frontoffice.domain.stay.SelectedAddOn;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.ui.checkin.HabitacionStep;
@@ -77,8 +76,7 @@ final class LlegadaPanel {
         new Op("habitacion", "🛏️",
             habitacionLista ? "Habitación " + stay.roomNumber() : "Habitación",
             "Sin habitación asignada — elegir una para la estancia",
-            stay.roomType() + " asignada"
-                + (habitacionInspeccionada(stay) ? " · inspeccionada y lista" : " · pendiente de inspección"),
+            stay.roomType() + " asignada · " + listaEnOpera(stay),
             habitacionLista, "Cambiar", "opHabitacion", "vaadin:exchange"),
         new Op("wifi", "📶", "Tarjeta wifi",
             "Crear las credenciales de acceso del huésped",
@@ -105,10 +103,46 @@ final class LlegadaPanel {
             ops.extras(), "Elegir", "opExtras", "vaadin:gift"));
   }
 
-  boolean habitacionInspeccionada(Stay stay) {
-    return r.rooms.findByNumber(stay.roomNumber())
-        .map(room -> room.housekeeping() == HousekeepingStatus.INSPECTED)
-        .orElse(false);
+  /** «lista en Opera» o por qué no — lo que dice Opera ahora de la habitación asignada (unos segundos en caché). */
+  static String listaEnOpera(Stay stay) {
+    var readiness = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.roomReadiness(stay.roomNumber());
+    if (!readiness.known()) {
+      return "estado de Opera no disponible";
+    }
+    return readiness.ready() ? "lista en Opera (" + readiness.state() + ")"
+        : "aún no lista en Opera: " + readiness.reason();
+  }
+
+  /**
+   * «Habitación lista»: lo que Opera dice ahora de la habitación asignada a una llegada — lista (libre e
+   * inspeccionada, lo que XMAR exige para asignarla) o aún no, y por qué —, con «Comprobar» para
+   * preguntarlo otra vez. Vacío sin habitación asignada.
+   */
+  Component habitacionLista(Stay stay) {
+    if (!stay.hasRoom()) {
+      return new VerticalLayout();
+    }
+    var readiness = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.roomReadiness(stay.roomNumber());
+    var texto = !readiness.known()
+        ? "Habitación " + stay.roomNumber() + ": Opera no ha dicho aún si está lista — " + readiness.reason()
+        : readiness.ready()
+            ? "✓ Habitación " + stay.roomNumber() + " lista — " + readiness.state() + " en Opera"
+            : "Habitación " + stay.roomNumber() + " aún no lista — " + readiness.reason()
+                + (readiness.state() == null ? "" : " (" + readiness.state() + ")")
+                + ". Opera puede rechazar el check-in hasta que lo esté; o cambia de habitación.";
+    return HorizontalLayout.builder()
+        .spacing(true).wrap(true)
+        .style("width: 100%; align-items: center;")
+        .content(List.of(
+            io.mateu.uidl.data.Notice.builder()
+                .theme(readiness.ready() ? "success" : readiness.known() ? "warning" : "info")
+                .text(texto)
+                .slim(true)
+                .style("flex: 1 1 20rem;")
+                .build(),
+            // un botón propio: la acción de un Notice no la pinta cualquier renderer
+            Button.builder().label("Comprobar").actionId("comprobarHabitacion").build()))
+        .build();
   }
 
   /** Texto de la operación de extras hecha, con lo contratado. */
@@ -158,7 +192,7 @@ final class LlegadaPanel {
                 .toList())
             .build();
     return VerticalLayout.builder()
-        .content(List.of(checklist))
+        .content(List.of(habitacionLista(stay), checklist))
         .style("width: 100%; gap: .5rem;")
         .build();
   }

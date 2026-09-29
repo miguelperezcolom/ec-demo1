@@ -550,7 +550,7 @@ public class FrontDeskMcpTools {
     var stayId = stay.id();
     return confirmations.prepare("Late check-out", summary, params("stayId", stayId, "fee", Folio.LATE_CHECK_OUT_FEE),
         () -> {
-          if (!folioService.contractLateCheckOut(stayId)) {
+          if (!folioService.contractLateCheckOut(stayId, "agente de recepción")) {
             throw new IllegalStateException("ya estaba contratado");
           }
           return "Late check-out de " + stayId + " contratado; " + Folio.LATE_CHECK_OUT_FEE + " € cargados en su folio.";

@@ -72,6 +72,28 @@ de Opera); el front office muestra «Opera: rechazado — motivo». Lo transitor
   API no hay «No Show», lo pone la auditoría nocturna) → `report-no-show` (`crs-integration`), que
   arranca `registrar-no-show`.
 
+## Los cargos de recepción, al folio del PMS: `registrar-cargo`, `anular-cargo`
+
+El PMS es también el maestro del **folio**: cada cargo que recepción pone en el folio de la estancia
+—un extra contratado en el check-in, el late check-out, un consumo del catálogo— sale como
+`charge-posted` en `front-office-events`, con su línea de folio (`lineId`), su tipo (`ADD_ON`,
+`LATE_CHECK_OUT`, `CONSUMPTION`), su código, concepto e importe; anularlo, como `charge-voided`. El
+alojamiento no: Opera cobra sus noches con su tarifa. Un proceso por línea y operación, clave
+`registrar-cargo:<hotel>/<localizador>:<línea>` (o `anular-cargo:…`), dentro del candado
+`reservation`: va detrás del check-in y delante del check-out que recepción hizo después.
+
+- **`registrar-cargo`**: `post-charge` postea el cargo en el folio de Opera (ventana 1, con el cajero
+  de la integración y el código de transacción de su tipo) con la referencia `FO:<línea>`: si Opera ya
+  tiene un posteo con esa referencia, no escribe. Si Opera aún no tiene a los huéspedes en casa, espera
+  (causa `PMS_REJECTED …:post-charge`), y el check-in en Opera la resuelve.
+- **`anular-cargo`**: `reverse-charge` postea el mismo importe en negativo, con el mismo código y la
+  referencia `FO:<línea>:R`. Si Opera aún no tiene el cargo, espera a que llegue (lo resuelve su
+  `post-charge`).
+
+Así, lo que Opera salda y factura en el check-out cubre los cargos de recepción, y el total de su
+factura coincide con el del folio del front office (el alojamiento, si Opera lo factura igual). Cada
+línea muestra en el front office dónde está en Opera («Opera: en el folio · 88731245»).
+
 ## `registrar-no-show` — Registrar no-show
 
 El CRS, maestro de la venta, cancela la reserva como no-show con su cargo. Un solo paso:

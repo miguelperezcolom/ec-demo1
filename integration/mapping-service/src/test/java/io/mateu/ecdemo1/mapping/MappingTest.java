@@ -372,6 +372,33 @@ class MappingTest {
                 .containsEntry("processKey", key + ">r").doesNotContainKey("checkInOutcome"));
     }
 
+    @Test
+    void aChargeProcessIsRelaunchedWithItsFolioLine() throws Exception {
+        var key = "registrar-cargo:MRU01/GSX4AK:L-1";
+        var cause = "PMS_REJECTED:MRU01:GSX4AK:post-charge";
+        causesService.await(key, "registrar-cargo", "MRU01", "GSX4AK", List.of(
+                        new Variable("definitionId", "registrar-cargo"), new Variable("processKey", key),
+                        new Variable("hotelCode", "MRU01"), new Variable("locator", "GSX4AK"),
+                        new Variable("pmsHotelCode", "XMAR"), new Variable("pmsReservationId", "39486034"),
+                        new Variable("stayId", "GSX4AK"), new Variable("lineId", "L-1"),
+                        new Variable("chargeKind", "CONSUMPTION"), new Variable("chargeCode", "MB-02"),
+                        new Variable("description", "Minibar"), new Variable("amount", "12.50"),
+                        new Variable("currency", "MUR"), new Variable("chargeOutcome", "WAIT")),
+                List.of(new io.mateu.ecdemo1.integration.model.mapping.Cause(cause,
+                        io.mateu.ecdemo1.integration.model.mapping.CauseType.PMS_REJECTED, "not in house")));
+        causesService.resolve(cause, "ana");
+
+        causesService.relaunch(key);
+
+        var successors = consume("upstream", r -> r.value().contains("process-creation-requested")
+                && r.value().contains(key + ">r"), 1, 8);
+        assertThat(successors).singleElement().satisfies(r -> assertThat(variables(json(r.value())))
+                .containsEntry("lineId", "L-1").containsEntry("chargeKind", "CONSUMPTION")
+                .containsEntry("chargeCode", "MB-02").containsEntry("description", "Minibar")
+                .containsEntry("amount", "12.50").containsEntry("currency", "MUR")
+                .containsEntry("pmsReservationId", "39486034").doesNotContainKey("chargeOutcome"));
+    }
+
     void waitOn(String processKey, String causeKey) {
         causesService.await(processKey, "proyectar-reserva", "PMI01", "L2",
                 List.of(new Variable("locator", "L2"), new Variable("hotelCode", "PMI01")),

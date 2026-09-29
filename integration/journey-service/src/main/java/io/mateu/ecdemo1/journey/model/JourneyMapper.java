@@ -439,6 +439,13 @@ public final class JourneyMapper {
                     return hop(Lane.FRONT_OFFICE, span, "Check-out en recepción", "Sube al PMS, el maestro de la estancia y del folio",
                             Tone.OK, null);
                 }
+                if (what == Kind.CHARGE) {
+                    return hop(Lane.FRONT_OFFICE, span, "Cargo en recepción", "Va al folio del PMS, el maestro del folio", Tone.OK, null);
+                }
+                if (what == Kind.CHARGE_VOID) {
+                    return hop(Lane.FRONT_OFFICE, span, "Cargo anulado en recepción", "Se anula también en el folio del PMS",
+                            Tone.OK, null);
+                }
                 if (what == Kind.NO_SHOW) {
                     return hop(Lane.FRONT_OFFICE, span, "No show en recepción", "Nadie de la reserva ha llegado: sube al PMS y de él al CRS",
                             Tone.OK, null);
@@ -457,7 +464,7 @@ public final class JourneyMapper {
         }
 
         Hop integrations(TraceSpan span) {
-            if (span.has("eventconductor.business-key") && java.util.Set.of("check-in", "check-out", "no-show")
+            if (span.has("eventconductor.business-key") && java.util.Set.of("check-in", "check-out", "no-show", "charge", "charge-void")
                     .contains(span.attr("booking.event"))) {
                 var key = span.attr("eventconductor.business-key");
                 var workflow = key == null ? null : key.substring(0, key.indexOf(':') > 0 ? key.indexOf(':') : key.length());
@@ -544,6 +551,13 @@ public final class JourneyMapper {
                         : "no-show-kept".equals(task.get("opera.action")) ? "Opera ya lo tenía: no se escribe"
                         : "No-show anotado en la reserva de Opera (su estado «No Show» lo pone la auditoría nocturna)", calls);
                 case "report-no-show" -> "La integración crs-pms lo sube al CRS: arranca «Registrar no-show»";
+                case "post-charge" -> join(task.containsKey("opera.refused") ? "Opera no admite el cargo: " + task.get("opera.refused")
+                        : "charge-already-posted".equals(task.get("opera.action")) ? "Opera ya tenía el cargo en su folio: no se escribe"
+                        : "Cargo en el folio de Opera" + (task.containsKey("opera.transaction.code")
+                                ? " (código " + task.get("opera.transaction.code") + ")" : ""), calls);
+                case "reverse-charge" -> join(task.containsKey("opera.refused") ? "Opera no admite la anulación: " + task.get("opera.refused")
+                        : "charge-already-reversed".equals(task.get("opera.action")) ? "Opera ya lo tenía anulado: no se escribe"
+                        : "Cargo anulado en el folio de Opera (el mismo importe, en negativo)", calls);
                 default -> calls;
             };
         }
@@ -648,7 +662,8 @@ public final class JourneyMapper {
             var end = spans.stream().mapToLong(TraceSpan::endNanos).max().orElse(start);
             var kind = kind();
             var toOpera = operaWrittenAt > 0 ? Duration.ofNanos(operaWrittenAt - start) : stepEnd(start, "upsert-reservation", "cancel-reservation",
-                    "check-in-reservation", "check-out-reservation", "record-no-show");
+                    "check-in-reservation", "check-out-reservation", "record-no-show",
+                    "post-charge", "reverse-charge");
             var toFrontOffice = frontOfficeAt > 0 ? Duration.ofNanos(frontOfficeAt - start) : null;
             Outcome outcome;
             String detail;
@@ -700,6 +715,12 @@ public final class JourneyMapper {
             }
             if (processes.values().stream().anyMatch(p -> "registrar-checkout".equals(p.workflowId()))) {
                 return Kind.CHECK_OUT;
+            }
+            if (processes.values().stream().anyMatch(p -> "registrar-cargo".equals(p.workflowId()))) {
+                return Kind.CHARGE;
+            }
+            if (processes.values().stream().anyMatch(p -> "anular-cargo".equals(p.workflowId()))) {
+                return Kind.CHARGE_VOID;
             }
             if (walkIn) {
                 return Kind.WALK_IN;
@@ -844,6 +865,8 @@ public final class JourneyMapper {
             case "registrar-checkin" -> "Registrar check-in";
             case "registrar-checkout" -> "Registrar check-out";
             case "registrar-no-show-pms" -> "Registrar no-show en el PMS";
+            case "registrar-cargo" -> "Registrar cargo";
+            case "anular-cargo" -> "Anular cargo";
             default -> workflowId;
         };
     }

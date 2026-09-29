@@ -244,6 +244,9 @@ class ReceptionHandlersTest {
         // An earlier attempt Opera refused (another room) has nothing left to wait for.
         verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:assign-room"), anyString());
         verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:check-in-reservation"), anyString());
+        // The desk's charges that waited for the guests to be in the house go on the folio now.
+        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:post-charge"), anyString());
+        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:reverse-charge"), anyString());
     }
 
     @Test

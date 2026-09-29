@@ -66,16 +66,25 @@ public class HabitacionStep implements WizardStep {
             .build();
       };
 
+  /**
+   * A room of the grid. Ready (vacant, and as Opera's housekeeping must say for the property to assign
+   * it — XMAR: inspected) in green; a vacant one not ready yet greyed, with why, and still selectable:
+   * the desk may give it on purpose, and Opera may then refuse it; an occupied or out of order one
+   * cannot be chosen.
+   */
   public static ResourceItem item(Room room, String reservedRoom, String selectedRoom) {
     var occupied = !room.assignable();
+    var ready = FrontOffice.ready(room);
     return ResourceItem.builder()
         .id(room.number())
         .title(room.number())
         .subtitle(room.type() != null ? room.type() : occupied ? "Ocupada" : "Libre")
-        .statusLabel(housekeepingLabel(room.housekeeping()))
-        .statusColor(room.housekeeping() == HousekeepingStatus.DIRTY ? "contrast" : "success")
-        .note(room.maintenanceNote())
-        .noteColor(room.maintenanceNote() != null ? "error" : null)
+        .statusLabel(occupied ? "Ocupada" : ready ? "Lista · " + housekeepingLabel(room.housekeeping())
+            : housekeepingLabel(room.housekeeping()))
+        .statusColor(ready ? "success" : "contrast")
+        .note(ready ? null : room.maintenanceNote() != null ? "No lista — " + room.maintenanceNote()
+            : occupied ? null : "No lista")
+        .noteColor(ready ? null : occupied ? "error" : "warning")
         .disabled(occupied)
         .recommended(room.number().equals(reservedRoom))
         .selected(room.number().equals(selectedRoom))

@@ -79,7 +79,9 @@ front office por `front-office-events` y la integración pms-fo los registra en 
 [Los procesos del motor](/guias/procesos/)). Lo que queda en Opera vuelve por el camino de siempre:
 el conector publica `pms-reservations` y `proyectar-estancia` manda la estancia con su estado de Opera
 (`IN_HOUSE`, `CHECKED_OUT`). Lo que `write-stay` no dice llega como `record-reception`: que Opera lo
-rechazó y por qué, la habitación en la que Opera tiene a los huéspedes, la factura del check-out.
+rechazó y por qué, la habitación en la que Opera tiene a los huéspedes, la factura del check-out. Los
+**cargos** que recepción pone en el folio (y sus anulaciones) suben igual, con `registrar-cargo` y
+`anular-cargo`, y su posteo en Opera vuelve como `record-charge`.
 
 Las llamadas a OHIP (`OperaFrontDesk`):
 
@@ -92,7 +94,20 @@ Las llamadas a OHIP (`OperaFrontDesk`):
 | Folios del check-out (solo lectura) | `GET /csh/v1/hotels/{h}/folioHistory?checkOut=true` |
 | Documento de la factura | `POST /csh/v1/hotels/{h}/reservations/{id}/folios` (con el cajero) → `storedFolioId` → `GET /csh/v1/hotels/{h}/storedFolios/{id}` → `folioReportURL` |
 | No show | Un comentario en la reserva (`PUT /rsv/v1/hotels/{h}/reservations/{id}`, solo `comments`) |
-| Estado de las habitaciones de un tipo (solo lectura) | `GET /fof/v1/hotels/{h}/rooms?roomType=` |
+| Estado de las habitaciones de un tipo, o de una (solo lectura) | `GET /fof/v1/hotels/{h}/rooms?roomType=` · `?fromRoomNumber=&toRoomNumber=` |
+| Cargo de recepción en el folio (y su anulación, en negativo) | `POST /csh/v1/hotels/{h}/reservations/{id}/charges` (`transactionCode`, `price`, `postingReference` `FO:<línea>`, con el cajero) |
+| Posteos del folio (solo lectura) | `GET /csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Postings` |
+
+Los **códigos de transacción** de los cargos de recepción (`ohip.charges` en pms-integration), de los
+que XMAR deja postear a mano (`GET /csh/v1/hotels/XMAR/transactionCodes?manualPostAllowed=true`):
+
+| Cargo del front office | Código de Opera |
+| :-- | :-- |
+| Late check-out (el del mostrador y el extra `late`) | 1200 «P200.-Supl Alojamiento» |
+| Minibar (`MB-02`) | 1402 «P402.-Bebida Comedor» |
+| Room service (`RS-01`), cena romántica (`cena`) | 1403 «P403.-Comida» |
+| Lavandería (`LAU-04`) | 1516 «P516.-Lavandería Externa» |
+| Cualquier otro (masaje, transfer, babysitting…) | 1851 «P851.-Ingr.Serv.Diversos» (el genérico) |
 
 ## Qué casa con lo que ya había
 

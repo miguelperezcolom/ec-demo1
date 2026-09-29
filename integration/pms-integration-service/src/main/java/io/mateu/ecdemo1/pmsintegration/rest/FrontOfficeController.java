@@ -35,11 +35,15 @@ public class FrontOfficeController {
     final OperaStays stays;
     final io.mateu.ecdemo1.pmsintegration.ohip.OperaFrontDesk desk;
 
-    /** The property's rooms of a type, with Opera's housekeeping and front office status now. */
+    /**
+     * The property's rooms of a type — or the one room given ({@code roomId}: whether the room a stay was
+     * given is ready yet) — with Opera's housekeeping and front office status now.
+     */
     @GetMapping("/rooms")
     public List<io.mateu.ecdemo1.pmsintegration.ohip.OperaFrontDesk.RoomState> rooms(@RequestParam String hotelId,
-                                                                                    @RequestParam String roomType) {
-        return desk.rooms(hotelId, roomType);
+                                                                                    @RequestParam(required = false) String roomType,
+                                                                                    @RequestParam(required = false) String roomId) {
+        return desk.rooms(hotelId, roomType, roomId);
     }
 
     @GetMapping("/catalogue")

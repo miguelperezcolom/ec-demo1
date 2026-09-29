@@ -41,8 +41,7 @@ class FrontOfficeProducedContractsTest {
         var links = mock(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.class);
         when(links.ofStay("12E45")).thenReturn(Optional.of(new io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.Link(
                 "12E45", "39486034", "2026-09-29T10:00:00")));
-        var reports = new io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports("MRU01", "XMAR", walkIns, links,
-                new CommandOutbox(outbox));
+        var reports = reports(walkIns, links);
 
         reports.noShow("12E45", 2, "ana");
 
@@ -50,6 +49,50 @@ class FrontOfficeProducedContractsTest {
         Contracts.topic("front-office-events").assertValid(json);
         org.assertj.core.api.Assertions.assertThat(json).contains("\"type\":\"no-show-reported\"")
                 .contains("\"pmsReservationId\":\"39486034\"").contains("\"at\":\"");
+    }
+
+    io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports reports(WalkIns walkIns,
+                                                                    io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks links) {
+        return new io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports("MRU01", "XMAR", "MUR", walkIns, links,
+                new CommandOutbox(outbox), mock(io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings.class),
+                mock(io.mateu.ecdemo1.frontoffice.domain.folio.FolioRepository.class));
+    }
+
+    @Test
+    void aChargeOfTheDeskForThePmsFolioIsWhatTheSchemaSays() {
+        var walkIns = mock(WalkIns.class);
+        when(walkIns.of("12E45")).thenReturn(Optional.empty());
+        var links = mock(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.class);
+        when(links.ofStay("12E45")).thenReturn(Optional.of(new io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.Link(
+                "12E45", "39486034", "2026-09-29T10:00:00")));
+        var line = io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine.charged(
+                io.mateu.ecdemo1.frontoffice.domain.folio.ChargeKind.CONSUMPTION, "MB-02", "Minibar", new java.math.BigDecimal("12.50"));
+
+        reports(walkIns, links).chargePosted("12E45", line, "ana");
+
+        var json = written(CommandOutbox.FRONT_OFFICE_EVENTS);
+        Contracts.topic("front-office-events").assertValid(json);
+        org.assertj.core.api.Assertions.assertThat(json).contains("\"type\":\"charge-posted\"")
+                .contains("\"lineId\":\"" + line.id() + "\"").contains("\"kind\":\"CONSUMPTION\"")
+                .contains("\"amount\":12.50").contains("\"currency\":\"MUR\"");
+    }
+
+    @Test
+    void aVoidOfTheDeskForThePmsFolioIsWhatTheSchemaSays() {
+        var walkIns = mock(WalkIns.class);
+        when(walkIns.of("12E45")).thenReturn(Optional.empty());
+        var links = mock(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.class);
+        when(links.ofStay("12E45")).thenReturn(Optional.empty());
+        var line = io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine.charged(
+                io.mateu.ecdemo1.frontoffice.domain.folio.ChargeKind.LATE_CHECK_OUT, null, "Late check-out (salida 15:00)",
+                new java.math.BigDecimal("50.00")).asVoided();
+
+        reports(walkIns, links).chargeVoided("12E45", line, "ana");
+
+        var json = written(CommandOutbox.FRONT_OFFICE_EVENTS);
+        Contracts.topic("front-office-events").assertValid(json);
+        org.assertj.core.api.Assertions.assertThat(json).contains("\"type\":\"charge-voided\"")
+                .contains("\"kind\":\"LATE_CHECK_OUT\"").contains("\"pmsReservationId\":null");
     }
 
     @Test

@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.frontoffice.infra.pms;
 
+import io.mateu.ecdemo1.frontoffice.domain.folio.ChargeKind;
+import io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
 import io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox;
@@ -13,7 +15,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * What the desk did, up to the PMS — the master of the stay (pms-fo). A check-in, a check-out, a
- * reservation nobody came for: each is an event on {@code front-office-events}, written to the outbox
+ * reservation nobody came for, a charge put on the stay's folio or taken back: each is an event on
+ * {@code front-office-events}, written to the outbox
  * in the transaction of the desk's decision, and the pms-fo integration records it in Opera through
  * the engine. The stay shows where that stands: «Opera: pendiente…» now, and what the PMS answers
  * later — «en casa», «salida registrada», «rechazado — motivo» ({@link PmsLinks#state}).
@@ -33,18 +36,26 @@ public class ReceptionReports {
 
   final String hotel;
   final String pmsHotel;
+  final String currency;
   final WalkIns walkIns;
   final PmsLinks links;
   final CommandOutbox outbox;
+  final ChargePostings postings;
+  final io.mateu.ecdemo1.frontoffice.domain.folio.FolioRepository folios;
   final Clock clock = Clock.systemUTC();
 
   public ReceptionReports(@Value("${frontoffice.hotel:MRU01}") String hotel,
-      @Value("${frontoffice.pms-hotel:XMAR}") String pmsHotel, WalkIns walkIns, PmsLinks links, CommandOutbox outbox) {
+      @Value("${frontoffice.pms-hotel:XMAR}") String pmsHotel, @Value("${frontoffice.currency:}") String currency,
+      WalkIns walkIns, PmsLinks links, CommandOutbox outbox, ChargePostings postings,
+      io.mateu.ecdemo1.frontoffice.domain.folio.FolioRepository folios) {
     this.hotel = hotel;
     this.pmsHotel = pmsHotel;
+    this.currency = currency == null || currency.isBlank() ? null : currency.trim();
     this.walkIns = walkIns;
     this.links = links;
     this.outbox = outbox;
+    this.postings = postings;
+    this.folios = folios;
   }
 
   record Refs(String crsLocator, String pmsReservationId) {
@@ -116,11 +127,66 @@ public class ReceptionReports {
 
   /**
    * A stay the desk checked in before its reservation was anywhere — a walk-in — now linked to it: its
-   * check-in goes up now. Nothing for any other stay.
+   * check-in goes up now, and the charges of its folio after it. Nothing for any other stay.
    */
   public void pendingLink(Stay stay) {
     if (stay.inHouse() && WAITING_FOR_THE_PMS.equals(links.stateOf(stay.id()).orElse(null))) {
       checkedIn(stay, "front office " + hotel);
+      folios.findByStayId(stay.id()).ifPresent(folio -> folio.toThePms().forEach(line -> {
+        chargePosted(stay.id(), line, "front office " + hotel);
+        if (line.voided()) {
+          chargeVoided(stay.id(), line, "front office " + hotel);
+        }
+      }));
     }
+  }
+
+  /**
+   * The desk charged something to the stay's folio — a late check-out, an extra, a consumption: in its
+   * transaction, the PMS — the master of the folio — is asked to post it on the reservation's folio.
+   * The accommodation is not one (the PMS charges it itself), nor a line from before charges went up.
+   */
+  public void chargePosted(String stayId, FolioLine line, String by) {
+    if (!line.toThePms()) {
+      return;
+    }
+    var refs = refs(stayId);
+    if (refs.none()) {
+      // A walk-in neither the CRS nor Opera has yet: its charges go up with its check-in (pendingLink).
+      postings.pending(stayId, line.id(), "Opera: pendiente — la reserva aún no ha llegado a Opera", clock.instant());
+      return;
+    }
+    outbox.appendEvent(new FrontOfficeEvent.ChargePosted("CH-" + UUID.randomUUID(), clock.instant(), hotel, stayId,
+        refs.crsLocator(), pmsHotel, refs.pmsReservationId(), line.id(), kind(line.kind()), line.code(), line.concept(),
+        line.amount(), currency, by));
+    postings.pending(stayId, line.id(), "Opera: pendiente — cargo enviado", clock.instant());
+    log.info("{}: line {} «{}» {} — to the PMS's folio ({} / {})", stayId, line.id(), line.concept(), line.amount(),
+        refs.crsLocator(), refs.pmsReservationId());
+  }
+
+  /** The desk took a charge back: in its transaction, the PMS is asked to reverse its posting. */
+  public void chargeVoided(String stayId, FolioLine line, String by) {
+    if (!line.toThePms()) {
+      return;
+    }
+    var refs = refs(stayId);
+    if (refs.none()) {
+      postings.pending(stayId, line.id(), "Anulado — la reserva aún no ha llegado a Opera", clock.instant());
+      return;
+    }
+    outbox.appendEvent(new FrontOfficeEvent.ChargeVoided("CV-" + UUID.randomUUID(), clock.instant(), hotel, stayId,
+        refs.crsLocator(), pmsHotel, refs.pmsReservationId(), line.id(), kind(line.kind()), line.code(), line.concept(),
+        line.amount(), currency, by));
+    postings.pending(stayId, line.id(), "Opera: pendiente — anulación enviada", clock.instant());
+    log.info("{}: line {} «{}» voided — to the PMS's folio ({} / {})", stayId, line.id(), line.concept(),
+        refs.crsLocator(), refs.pmsReservationId());
+  }
+
+  static FrontOfficeEvent.ChargeKind kind(ChargeKind kind) {
+    return switch (kind) {
+      case ADD_ON -> FrontOfficeEvent.ChargeKind.ADD_ON;
+      case LATE_CHECK_OUT -> FrontOfficeEvent.ChargeKind.LATE_CHECK_OUT;
+      case CONSUMPTION, ACCOMMODATION -> FrontOfficeEvent.ChargeKind.CONSUMPTION;
+    };
   }
 }

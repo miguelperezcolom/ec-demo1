@@ -2,7 +2,7 @@
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "$id" : "urn:ec-demo1:topic:front-office-events:v1",
   "title" : "front-office-events v1",
-  "description" : "What happened at a hotel's reception — a guest checked in, checked out, nobody came. The PMS is the master of the stay: the pms-fo integration records each in it through the engine, and a no-show goes on to the CRS for its fee.",
+  "description" : "What happened at a hotel's reception — a guest checked in, checked out, nobody came, a charge put on the stay's folio or taken back. The PMS is the master of the stay and its folio: the pms-fo integration records each in it through the engine, and a no-show goes on to the CRS for its fee.",
   "x-topic" : "front-office-events",
   "x-version" : 1,
   "x-owner" : "front-office",
@@ -17,8 +17,129 @@
     "$ref" : "#/$defs/FrontOfficeEvent.GuestCheckedOut"
   }, {
     "$ref" : "#/$defs/FrontOfficeEvent.NoShowReported"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeEvent.ChargePosted"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeEvent.ChargeVoided"
   } ],
   "$defs" : {
+    "FrontOfficeEvent.ChargeKind" : {
+      "type" : "string",
+      "enum" : [ "ADD_ON", "LATE_CHECK_OUT", "CONSUMPTION" ]
+    },
+    "FrontOfficeEvent.ChargeKind-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/FrontOfficeEvent.ChargeKind"
+      } ]
+    },
+    "FrontOfficeEvent.ChargePosted" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "charge-posted"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "lineId" : {
+          "type" : [ "string", "null" ]
+        },
+        "kind" : {
+          "$ref" : "#/$defs/FrontOfficeEvent.ChargeKind-nullable"
+        },
+        "code" : {
+          "type" : [ "string", "null" ]
+        },
+        "description" : {
+          "type" : [ "string", "null" ]
+        },
+        "amount" : {
+          "type" : [ "number", "null" ]
+        },
+        "currency" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "lineId", "kind", "code", "description", "amount", "currency", "by" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeEvent.ChargeVoided" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "charge-voided"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "lineId" : {
+          "type" : [ "string", "null" ]
+        },
+        "kind" : {
+          "$ref" : "#/$defs/FrontOfficeEvent.ChargeKind-nullable"
+        },
+        "code" : {
+          "type" : [ "string", "null" ]
+        },
+        "description" : {
+          "type" : [ "string", "null" ]
+        },
+        "amount" : {
+          "type" : [ "number", "null" ]
+        },
+        "currency" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "lineId", "kind", "code", "description", "amount", "currency", "by" ],
+      "additionalProperties" : false
+    },
     "FrontOfficeEvent.GuestCheckedIn" : {
       "type" : "object",
       "properties" : {
@@ -172,6 +293,38 @@
     "pmsHotelCode" : "XMAR",
     "pmsReservationId" : "123456",
     "pax" : 2,
+    "by" : "ana"
+  }, {
+    "type" : "charge-posted",
+    "eventId" : "E-7",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "lineId" : "L-7F3A2C1D",
+    "kind" : "LATE_CHECK_OUT",
+    "code" : null,
+    "description" : "Late check-out (salida 15:00)",
+    "amount" : 50.0,
+    "currency" : "MUR",
+    "by" : "ana"
+  }, {
+    "type" : "charge-voided",
+    "eventId" : "E-8",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "lineId" : "L-9B1E4A20",
+    "kind" : "CONSUMPTION",
+    "code" : "MB-02",
+    "description" : "Minibar",
+    "amount" : 12.5,
+    "currency" : "MUR",
     "by" : "ana"
   } ]
 }

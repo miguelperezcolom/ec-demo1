@@ -8,6 +8,8 @@ public enum Kind {
     NO_SHOW("No-show"),
     CHECK_IN("Check-in"),
     CHECK_OUT("Check-out"),
+    CHARGE("Cargo en recepción"),
+    CHARGE_VOID("Cargo anulado en recepción"),
     WALK_IN("Walk-in"),
     BACKFILL("Reproyectada (backfill)"),
     RELAUNCH("Reanudada tras resolver sus causas"),
@@ -35,6 +37,8 @@ public enum Kind {
             case "no-show" -> NO_SHOW;
             case "check-in" -> CHECK_IN;
             case "check-out" -> CHECK_OUT;
+            case "charge" -> CHARGE;
+            case "charge-void" -> CHARGE_VOID;
             case "backfill" -> BACKFILL;
             case "relaunch" -> RELAUNCH;
             default -> null;

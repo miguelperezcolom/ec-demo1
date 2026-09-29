@@ -30,6 +30,14 @@ public final class Definitions {
     public static final String REGISTER_CHECK_OUT = "registrar-checkout";
     public static final String REGISTER_NO_SHOW_PMS = "registrar-no-show-pms";
 
+    /**
+     * The desk's charges, onto the PMS's folio (pms-fo): a charge of the front office's folio (a late
+     * check-out, an extra, a consumption) is posted to the reservation's folio in the PMS; its void is
+     * reversed there. One process per folio line and operation.
+     */
+    public static final String REGISTER_CHARGE = "registrar-cargo";
+    public static final String REVERSE_CHARGE = "anular-cargo";
+
     /** The message a waiting process is resumed with once its last cause is resolved. */
     public static final String CAUSES_RESOLVED_MESSAGE = "causes-resolved";
 

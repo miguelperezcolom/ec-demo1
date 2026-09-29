@@ -2,7 +2,7 @@
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "$id" : "urn:ec-demo1:topic:front-office-commands:v1",
   "title" : "front-office-commands v1",
-  "description" : "What the front office is told: a stay written as the PMS has it, a property's catalogue replaced whole, how the PMS took what the reception did (refused, the room, the check-out's invoice).",
+  "description" : "What the front office is told: a stay written as the PMS has it, a property's catalogue replaced whole, how the PMS took what the reception did (refused, the room, the check-out's invoice, a charge's posting).",
   "x-topic" : "front-office-commands",
   "x-version" : 1,
   "x-owner" : "front-office",
@@ -17,6 +17,8 @@
     "$ref" : "#/$defs/FrontOfficeCommand.ReplaceCatalogue"
   }, {
     "$ref" : "#/$defs/FrontOfficeCommand.RecordReception"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeCommand.RecordCharge"
   } ],
   "$defs" : {
     "FrontOfficeCommand.CatalogueEntry" : {
@@ -135,6 +137,43 @@
       }, {
         "$ref" : "#/$defs/FrontOfficeCommand.ReceptionOperation"
       } ]
+    },
+    "FrontOfficeCommand.RecordCharge" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "record-charge"
+        },
+        "commandId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "lineId" : {
+          "type" : [ "string", "null" ]
+        },
+        "reversal" : {
+          "type" : "boolean"
+        },
+        "refused" : {
+          "type" : "boolean"
+        },
+        "detail" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsPostingId" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "commandId", "pmsHotelCode", "pmsReservationId", "stayId", "lineId", "reversal", "refused", "detail", "pmsPostingId" ],
+      "additionalProperties" : false
     },
     "FrontOfficeCommand.RecordReception" : {
       "type" : "object",
@@ -333,5 +372,16 @@
       "currency" : "EUR",
       "pdf" : "JVBERi0xLjQK"
     }
+  }, {
+    "type" : "record-charge",
+    "commandId" : "CMD-12",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "stayId" : "12E45",
+    "lineId" : "L-7F3A2C1D",
+    "reversal" : false,
+    "refused" : false,
+    "detail" : "Posted to Opera's folio",
+    "pmsPostingId" : "88731245"
   } ]
 }
