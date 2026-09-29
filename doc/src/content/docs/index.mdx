@@ -1,0 +1,47 @@
+---
+title: ec-demo1
+description: La PoC ACL de Riu sobre Mateu y EventConductor — reservas del CRS a Opera Cloud y al front office, clientes en Salesforce, agentes de IA — desplegada en el clúster ec1.
+template: splash
+hero:
+  tagline: Una reserva del CRS llega a Opera Cloud y al front office del hotel sin que nadie toque nada; lo que falta espera a su causa en vez de fallar; el cliente se limpia en Salesforce. Todo sobre EventConductor y Mateu, en un clúster que se despliega con un script.
+  actions:
+    - text: Empezar
+      link: /guias/introduccion/
+      icon: right-arrow
+    - text: Ver en GitHub
+      link: https://github.com/miguelperezcolom/ec-demo1
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Qué hay aquí
+
+<CardGrid stagger>
+  <Card title="Cada dato, desde su maestro" icon="random">
+    Las reservas viajan **CRS → Opera → front office**; los clientes, desde **Salesforce** a través
+    del MDM. Ningún sistema recibe una copia de segunda mano: cada uno lee de quien manda.
+  </Card>
+  <Card title="Espera, no falla" icon="approve-check-circle">
+    Un código sin mapear, un interlocutor que falta o un rechazo de Opera se convierten en una
+    **causa** con nombre. El proceso espera; al resolverla, todos los que la esperaban siguen solos.
+  </Card>
+  <Card title="Dos planos, dos consolas" icon="laptop">
+    El **plano de datos** (`ec1.mateu.io`) es lo que usa el negocio; el **plano de control**
+    (`console.ec1.mateu.io`) es quién lo gobierna. Cada una, pintada por Vaadin y por Redwood.
+  </Card>
+  <Card title="Agentes que solo llaman herramientas" icon="rocket">
+    El agente de la consola, el de recepción y el de mapeado responden llamando a herramientas MCP;
+    se configuran desde un catálogo, se llaman entre sí por A2A y pueden llevar guardarraíles.
+  </Card>
+</CardGrid>
+
+## Por dónde empezar
+
+<CardGrid>
+  <LinkCard title="Introducción" href="/guias/introduccion/" description="Qué es ec-demo1, sus sistemas y dónde verlo funcionando." />
+  <LinkCard title="Arquitectura" href="/guias/arquitectura/" description="La regla del maestro, la capa anticorrupción, el motor, outbox e inbox." />
+  <LinkCard title="Del CRS a Opera" href="/integracion/crs-a-opera/" description="El camino de una reserva, paso a paso, hasta el conector de OHIP." />
+  <LinkCard title="Despliegue" href="/operacion/despliegue/" description="Imágenes, manifiestos, tags y lo que hay que saber del clúster." />
+</CardGrid>

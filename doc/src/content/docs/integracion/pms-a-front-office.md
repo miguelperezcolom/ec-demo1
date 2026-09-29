@@ -1,0 +1,81 @@
+---
+title: De Opera al front office
+description: La integración pms-fo — el front office consume lo que Opera tiene, por evento, por sondeo y por backfill.
+---
+
+Las reservas van en cadena **CRS → PMS → front office**. El front office no recibe lo que se mandó a
+Opera: recibe **lo que Opera tiene**, con los códigos y los nombres de Opera. Es otra integración, con
+su propio ciclo de vida (hito H14).
+
+## La integración
+
+`FrontOfficeIntegration` en `integrations-service`, una por propiedad de Opera y su front office, con
+su máquina de estados y su proceso de alta, `alta-integracion-fo`
+(*Integrations → PMS → Front office → New*):
+
+1. **Conexión**: Opera legible (token y la propiedad) y el front office responde.
+2. **Catálogo**: el catálogo de la propiedad tal como lo lee un front office —tipos de habitación,
+   tarifas con su nombre, todos los paquetes (también los que no se venden sueltos, como el desayuno que
+   llega dentro de una tarifa) y las habitaciones con su tipo— va al front office
+   (`replace-catalogue`). La puerta se abre cuando el front office dice que tiene ese mismo.
+3. **Backfill**: las reservas de la ventana —en casa o con llegada dentro del horizonte
+   (`horizonDays`, 60 por defecto)—, un `proyectar-estancia` por reserva.
+4. **Activación** por una persona: desde ahí fluyen los cambios.
+
+**Ámbito** (`scope`): `CHAIN`, el que se usa por defecto, trae solo las reservas que escribió la
+integración de la cadena (las que llevan la *Custom Reference* de la ejecución); `ALL` trae todas las de
+la propiedad, también las nacidas en Opera.
+
+:::caution[No `ALL` en ec1]
+El UAT de Opera es compartido. Con `ALL`, el front office de MRU01 pasó a tener todas las reservas de
+XMAR de la ventana —814 estancias con huéspedes reales de otros, a la vista con `demo/demo`—. El ámbito
+no se cambia después del alta: otro ámbito es otra integración.
+:::
+
+## Cómo llega una reserva
+
+```mermaid
+flowchart LR
+  subgraph PMS["pms-integration"]
+    W["upsert / cancel"] -- "pms-reservations" --> I
+  end
+  I["integrations-service<br/>(pms-fo activa)"] --> P["proyectar-estancia"]
+  POLL["sondeo cada 60 s"] --> P
+  BF["backfill"] --> P
+  P --> S["project-stay:<br/>relee la reserva de Opera"]
+  S -- "front-office-commands<br/>write-stay" --> FO["front office"]
+```
+
+- **Por evento**: lo que la integración crs-pms escribe en Opera lo avisa el conector
+  (`pms-reservations`) y la integración pms-fo, si está activa, arranca `proyectar-estancia`.
+- **Por sondeo**: OHIP no tiene en la búsqueda de reservas un filtro «modificadas desde» (los
+  parámetros de ese tipo se ignoran), y los *business events* exigen suscribir un sistema externo en la
+  configuración de Opera, algo que esta integración no toca. Lo que sí da la búsqueda es el
+  `lastModifyDateTime` de cada reserva. Así que la integración **sondea** (`FO_POLL`, 60 s): recorre las
+  reservas de la ventana, 200 por página, y proyecta las modificadas desde su **cursor** (la última
+  modificación ya proyectada), que avanza en la misma transacción que arranca los procesos.
+- **Por backfill**: al dar de alta la integración.
+
+El paso `project-stay` **relee la reserva de Opera** y la manda al front office por
+`front-office-commands` (`write-stay`) con los códigos de Opera; el front office la lee con el catálogo
+que tiene («Pensión Desayuno Adulto», no `BKF`). El cliente viene del MDM: qué cliente es el perfil de
+Opera (su xref) y su golden record.
+
+## Idempotencia y orden
+
+- Cada proceso lleva como clave la reserva de Opera y su `lastModifyDateTime` (o el id del evento):
+  `proyectar-estancia:XMAR:39484606:2026-09-28T00:44:46`. El motor no arranca dos veces la misma.
+- El front office deduplica por `commandId` y **ordena por la versión de Opera**: una más antigua que
+  la que tiene no se aplica; la misma se reaplica (así llega un cambio del cliente que no tocó la
+  reserva, como una fusión en el MDM).
+- `project-stay` publica sin outbox (el conector no tiene base de datos): si Kafka no lo toma, el paso
+  falla y el motor lo reintenta; repetirlo no hace nada.
+
+## Qué casa con lo que ya había
+
+Una estancia se reconoce por la reserva de Opera; si no, por el localizador del CRS (su referencia
+externa en el contexto de la ejecución); si no, por el walk-in que abrió recepción. Una reserva nacida
+en Opera abre la estancia `OP-<confirmación>`.
+
+Lo que no llega de Opera son los **acompañantes**: Opera solo tiene al titular (el conector no escribe
+acompañantes). Si Opera no manda ninguno, la estancia conserva los que tenía.

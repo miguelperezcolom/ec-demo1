@@ -1,0 +1,13 @@
+# Netlify configuration for the ec-demo1 documentation site (Astro + Starlight), the same shape as
+# EventConductor's and Mateu's.
+#
+# This file lives in the site's base directory (doc/) and intentionally pins ONLY the Node.js
+# version. The base directory, build command and publish directory come from the Netlify UI
+# settings, if a site is ever created for it — this file does not create one. On ec1 the site is
+# served by its own image instead (doc/Dockerfile, deploy/manifests/81-docs.yaml).
+#
+# Why Node 24: the lock file is written by npm 11, and npm 10 (Node 22) reads it as out of sync
+# (optional wasm dependencies of sharp). The Dockerfile builds on node:24-slim for the same reason.
+
+[build.environment]
+  NODE_VERSION = "24"

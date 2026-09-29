@@ -103,6 +103,10 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 New here? **[ONBOARDING.md](ONBOARDING.md)** — access, what lives in which repository, and the
 four things about this cluster that otherwise cost an afternoon.
 
+**The documentation site** — the whole project explained, in Spanish — is in [`doc/`](doc/README.md)
+(Astro + Starlight, like EventConductor's and Mateu's) and served at https://doc.ec1.mateu.io, behind
+a username and password (`riu`, password in `deploy/.secrets/credentials.env` as `DOCS_PASSWORD`).
+
 ## Deploy
 
 ```sh

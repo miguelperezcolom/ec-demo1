@@ -107,6 +107,8 @@ append_if_missing CP_CRYPTO_KEY "$(openssl rand -base64 32)"
 # The same rule for the key the integrations' Opera secrets are sealed under: a new one leaves every
 # stored connection unreadable, and each hotel's secret would have to be entered again.
 append_if_missing INTEGRATIONS_CRYPTO_KEY "$(openssl rand -base64 32)"
+# The documentation site's password (doc.ec1.mateu.io, user `riu`), for the docs-basic-auth Secret below.
+append_if_missing DOCS_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
 
 # shellcheck disable=SC1090
 set -a; . "$SECRETS"; set +a
@@ -131,6 +133,20 @@ kubectl create configmap keycloak-realm -n "$NS" \
 kubectl create secret generic kafka-console-auth -n "$NS" \
   --from-literal=auth="admin:$(openssl passwd -apr1 "$KAFKA_CONSOLE_PASSWORD")" \
   --dry-run=client -o yaml | kubectl apply -f -
+# htpasswd for the documentation site's ingress (81-docs.yaml), user `riu`. Created only if it is
+# not there: a bcrypt line is salted, so re-creating it on every run would change the Secret for
+# nothing. bcrypt with apache2-utils' htpasswd, or from the httpd image when it is not installed;
+# openssl's apr1 (what the Kafka console's uses, which ingress-nginx also takes) as the last resort.
+if ! kubectl get secret docs-basic-auth -n "$NS" >/dev/null 2>&1; then
+  if command -v htpasswd >/dev/null 2>&1; then
+    DOCS_HTPASSWD="$(htpasswd -nbB riu "$DOCS_PASSWORD")"
+  elif command -v docker >/dev/null 2>&1; then
+    DOCS_HTPASSWD="$(docker run --rm httpd:2.4-alpine htpasswd -nbB riu "$DOCS_PASSWORD")"
+  else
+    DOCS_HTPASSWD="riu:$(openssl passwd -apr1 "$DOCS_PASSWORD")"
+  fi
+  kubectl create secret generic docs-basic-auth -n "$NS" --from-literal=auth="$DOCS_HTPASSWD"
+fi
 # Shared by the orchestrator and the forms engine: each reads its own key and ignores the other.
 # Both apps verify inbound webhooks against it, and a blank value would make them verify nothing.
 kubectl create secret generic ec-git-webhook -n "$NS" \
@@ -250,6 +266,8 @@ kubectl apply -f deploy/manifests/76-customer-mdm.yaml
 kubectl apply -f deploy/manifests/77-front-office.yaml
 kubectl apply -f deploy/manifests/78-audit.yaml
 kubectl apply -f deploy/manifests/80-journey.yaml
+# The documentation site (doc/), behind basic auth.
+kubectl apply -f deploy/manifests/81-docs.yaml
 # The control console: its database first, then the service, then its shell.
 kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml
@@ -317,6 +335,7 @@ Done.
   Keycloak  https://auth.ec1.mateu.io     admin / \$KEYCLOAK_ADMIN_PASSWORD
   Grafana   https://grafana.ec1.mateu.io  admin / \$GRAFANA_ADMIN_PASSWORD
   Kafka     https://kafka.ec1.mateu.io    admin / \$KAFKA_CONSOLE_PASSWORD
+  Docs      https://doc.ec1.mateu.io      riu / \$DOCS_PASSWORD
 
 Passwords are in $SECRETS.
 Certificates take a minute: kubectl get certificate -A

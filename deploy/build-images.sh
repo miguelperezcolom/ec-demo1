@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds and pushes the eleven images this repository owns: the four shells, the gateway, the four
-# demo services, the IA control plane and the pod that serves catalogued APIs as MCP servers.
+# demo services, the IA control plane and the pod that serves catalogued APIs as MCP servers — and
+# the documentation site (doc/), last, with no Maven step.
 #
 # Four shell images from two modules: each console is served by a Vaadin one and a Redwood one,
 # differing only in which Mateu frontend artifact the build puts on the classpath. consoles/shell
@@ -92,6 +93,14 @@ for app in $APPS; do
       ;;
   esac
 done
+
+# The documentation site (doc/): not a Maven module. Its Dockerfile builds it with Node and serves
+# it with nginx, so there is no package step here — only the image, with its own tag (DOCS_TAG), as
+# deploy/manifests/81-docs.yaml pulls it.
+DOCS_TAG="${DOCS_TAG:-0.1.0}"
+echo "── building doc (the documentation site) ──"
+docker buildx build --platform linux/amd64 -t "$REGISTRY/ec-demo1-docs:$DOCS_TAG" --push doc
+echo "Pushed $REGISTRY/ec-demo1-docs:$DOCS_TAG"
 
 echo
 for image in $PUSHED; do echo "Pushed $REGISTRY/$image:$TAG"; done
