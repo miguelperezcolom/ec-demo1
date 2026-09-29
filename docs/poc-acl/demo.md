@@ -711,5 +711,20 @@ desde su cursor. Qué hacer:
     (ECDEMO0001/0002), que cada alta vuelve a encontrar por su CorporateId; el perfil de huésped
     20538296 conserva un email antiguo como secundario (la API de Opera no permite borrarlo).
 - En Opera, lo que necesita un administrador de OPERA: la interfaz de las referencias externas de
-  perfil (OPERAWS-GEN01187) y un cajero para los depósitos (FOF00094). Sin eso, los perfiles van
-  sin referencia externa y los depósitos no se apuntan al folio.
+  perfil (OPERAWS-GEN01187). Sin eso, los perfiles van sin referencia externa.
+- El cajero (FOF00094 «Invalid Cashier»), comprobado el 2026-09-29: el usuario de integración de la
+  app (`RIUC-UAT-RIUE-MTCE13UA-RIU_HOTEL_CLIENTE_OHIP@RIUE`) no tiene cajero propio, así que toda
+  llamada de caja **sin** `cashierId` falla. Se creó por OHIP un cajero para la PoC en XMAR:
+  **`69721441` «EC-DEMO1 Integración»** (`InterfaceCashier`, MUR), con
+  `POST /fof/config/v1/cashiers` (el número, de `GET /fof/config/v1/cashiers/nextAvailable`).
+  Uso: pasar `"cashierId": 69721441` dentro de `criteria` en las llamadas de `csh` — depósitos
+  (`POST …/reservations/{id}/depositPayments`), check-out (`POST …/reservations/{id}/checkOuts`),
+  generar el folio/factura (`POST …/reservations/{id}/folios`), pagos. Comprobado sin mover dinero con
+  `PUT /csh/v1/hotels/XMAR/depositfolios/action/validate`: sin `cashierId` → FOF00094; con
+  `69721441` → 200. Leer el folio (`GET /csh/v1/hotels/XMAR/reservations/{id}/folios`) no lo necesita.
+  Asignarlo al usuario de integración por OHIP (`PUT /fof/config/v1/cashiers` con `appUsers`) da 500:
+  si se quiere que sea el cajero por defecto (y no pasarlo en cada llamada), un administrador de OPERA
+  debe asociarlo al usuario en OPERA Cloud (gestión de usuarios → Cashier ID). El conector aún no
+  pasa `cashierId` (`OPERA_POST_DEPOSITS` sigue en `false`). Ojo: `GET /csh/v1/cashiers/{id}/locks`
+  no es de solo lectura — toma un bloqueo del cajero (y lo abre); se suelta con
+  `DELETE /csh/v1/cashiersLock/{lockHandle}`.
