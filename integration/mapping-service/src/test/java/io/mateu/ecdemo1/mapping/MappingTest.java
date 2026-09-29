@@ -327,13 +327,18 @@ class MappingTest {
         assertThat(java.util.Arrays.stream(mappingTools.getToolCallbacks()).map(t -> t.getToolDefinition().name()))
                 .contains("listOpenCauses", "listPendingCodes", "getPmsCatalog", "proposeMappings", "listProposals",
                         "approveMapping", "rejectMapping", "resolveCause");
+        // What the agent cannot match goes in unmatched — optional: a full proposal has nothing there.
+        var propose = java.util.Arrays.stream(mappingTools.getToolCallbacks())
+                .filter(t -> t.getToolDefinition().name().equals("proposeMappings")).findFirst().orElseThrow();
+        var schema = propose.getToolDefinition().inputSchema().replaceAll("\\s", "");
+        assertThat(schema).contains("\"unmatched\"").contains("\"reason\"").contains("\"required\":[\"proposals\"]");
     }
 
     @Test
     void theAgentsProposalsWaitForAPersonAndAnApprovalNeedsAName() {
         var answer = tools.proposeMappings(List.of(
                 new Dictionary.Proposal(CodeType.BOARD, null, "MP", "HALFB", Map.of(), 0.95, "Media pensión is half board"),
-                new Dictionary.Proposal(CodeType.BOARD, null, "TI", "ALLINC", Map.of(), 0.9, "Todo incluido is all inclusive")));
+                new Dictionary.Proposal(CodeType.BOARD, null, "TI", "ALLINC", Map.of(), 0.9, "Todo incluido is all inclusive")), null);
         assertThat(answer).startsWith("Proposed 2");
         assertThat(dictionary.resolve("PMI01", CodeType.BOARD, "MP")).isEmpty();
         var mp = tools.listProposals().stream().filter(p -> p.sourceCode().equals("MP")).findFirst().orElseThrow();

@@ -52,6 +52,14 @@ public class Pending {
     }
 
     /**
+     * The pending codes of this hotel no proposal covers yet — what an agent that has just proposed
+     * still left out. The integration stays waiting for a mapping until each has one.
+     */
+    public List<PendingCode> withoutProposal(String hotelCode) {
+        return pendingCodes(hotelCode).stream().filter(p -> !p.proposed()).toList();
+    }
+
+    /**
      * The hotels of every integration still in service with a CRS code no equivalence and no proposal
      * covers — what "ask the agent" with nothing chosen asks about. A hotel whose codes cannot be read
      * now is left out, not failed: the others are still worth asking for.
@@ -63,7 +71,7 @@ public class Pending {
                 .distinct()
                 .filter(hotel -> {
                     try {
-                        return pendingCodes(hotel).stream().anyMatch(p -> !p.proposed());
+                        return !withoutProposal(hotel).isEmpty();
                     } catch (RuntimeException e) {
                         return false;
                     }

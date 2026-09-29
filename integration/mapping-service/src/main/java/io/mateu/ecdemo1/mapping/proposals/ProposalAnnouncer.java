@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 
 /** Tells whoever reviews mappings that the agent has left proposals for them. */
@@ -34,14 +35,34 @@ public class ProposalAnnouncer {
      */
     @Transactional
     public void proposalsReady(int count, String hotelCode) {
+        proposalsReady(count, hotelCode, List.of());
+    }
+
+    /**
+     * @param leftOut the pending codes the agent left without a proposal, each with why when it said
+     *                so: the notice names them, because the integration keeps waiting for a mapping
+     *                until each has one, and "43 proposals" alone reads as if that were everything
+     */
+    @Transactional
+    public void proposalsReady(int count, String hotelCode, List<String> leftOut) {
         var now = clock.instant();
         var link = properties.consoleUrl() + "/mapping/dictionary"
                 + (hotelCode == null || hotelCode.isBlank() ? "" : "?integration=" + hotelCode);
         outbox.appendNotification(new NotificationRequested(UUID.randomUUID().toString(),
                 NotificationType.PROPOSAL_READY, hotelCode, SUBJECT,
-                "%d mapping proposal(s) to review".formatted(count),
-                "The agent proposed %d equivalence(s). None is in force until someone approves it.".formatted(count),
-                link,
+                title(count, leftOut), body(count, leftOut), link,
                 "proposal-ready:" + now.toEpochMilli(), now));
+    }
+
+    public static String title(int count, List<String> leftOut) {
+        return "%d mapping proposal(s) to review".formatted(count)
+                + (leftOut.isEmpty() ? "" : ", %d code(s) left without one".formatted(leftOut.size()));
+    }
+
+    public static String body(int count, List<String> leftOut) {
+        var body = "The agent proposed %d equivalence(s). None is in force until someone approves it.".formatted(count);
+        return leftOut.isEmpty() ? body
+                : body + " Still without a proposal, so the integration keeps waiting for a mapping: "
+                + String.join("; ", leftOut) + ".";
     }
 }

@@ -40,7 +40,7 @@ is the mapping's (the agent's) job; this is the answer to check it against.
 | Canal | `WALKIN` | Cliente sin reserva en recepción (walk-in) | `WLK` | Walk In · mercado FIT «FIT Rate» |
 | Canal | `GRUPOS` | Ventas de grupos | `GS` | Group Sales · mercado GRP «Group - Other» |
 | Canal | `TTOO` | Turoperador (contrato negociado) | `CRSN` | Central Reservation · mercado NEG «Negotiated Rate» |
-| Canal | `OTA` | Agencia de viajes online | `HWEB` | Hotel Website · mercado OTA «OTA Rate» |
+| Canal | `OTA` | Agencia de viajes online | `CRSN` | Central Reservation · mercado OTA «OTA Rate» |
 | Forma de pago | `VISA` | Tarjeta Visa | `VI` | Visa |
 | Forma de pago | `VISA-MANUAL` | Tarjeta Visa tecleada a mano | `VI/OL` | Visa Manual |
 | Forma de pago | `MASTERCARD` | Tarjeta Mastercard | `MC` | Master Card |
@@ -51,3 +51,8 @@ is the mapping's (the agent's) job; this is the answer to check it against.
 | Motivo de cancelación | `CANCELA-TTOO` | Cancelada por el turoperador | `TTOO` | Cancelada por tour operador |
 | Motivo de cancelación | `OTR` | Otros motivos | `OTROS` | Otros Motivos |
 | Motivo de cancelación | `NOS` | No show | `NOSHOW` | No Show |
+
+`TTOO` and `OTA` have no true match in XMAR: it has no source code for a tour operator or an OTA.
+Their bookings arrive through the central reservations system (CRSN) and the market code says who
+sold them (NEG, OTA). The agent proposes these with low confidence (0.5 or less) and says so; a
+source code of their own would have to be created in Opera.
