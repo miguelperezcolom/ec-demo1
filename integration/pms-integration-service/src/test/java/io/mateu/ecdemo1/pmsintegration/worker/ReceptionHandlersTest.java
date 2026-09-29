@@ -116,7 +116,7 @@ class ReceptionHandlersTest {
         var mapper = new ObjectMapper();
         var handlers = new ReceptionHandlers(new OperaFrontDesk(client, properties, mapper),
                 new OperaReservations(client, properties, mapper), integration, events, outcomes,
-                Clock.fixed(Instant.parse("2026-09-29T10:15:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-09-29T10:15:00Z"), ZoneOffset.UTC), properties);
         var tasks = new PmsTasks();
         var watch = mock(RetryWatch.class);
         dispatcher = new TaskDispatcher(new TaskRegistry(List.of(tasks.assignRoomTask(handlers, watch),
@@ -241,6 +241,9 @@ class ReceptionHandlersTest {
         verify(outcomes).done("XMAR", "39486034", "GSX4AK", ReceptionOperation.CHECK_IN, "En casa en Opera", "205", null);
         // Whoever consumes the PMS reads it again: the stay comes back «en casa».
         verify(events).written("XMAR", "39486034", "MRU01", "GSX4AK", "registrar-checkin");
+        // An earlier attempt Opera refused (another room) has nothing left to wait for.
+        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:assign-room"), anyString());
+        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:check-in-reservation"), anyString());
     }
 
     @Test
@@ -284,9 +287,61 @@ class ReceptionHandlersTest {
 
     // ── the check-out and its invoice ─────────────────────────────────────────────────────────────
 
+    void operasDateIs(String date) {
+        answers.put("GET /ent/config/v1/hotels/XMAR/operaContext", new String[]{"200",
+                "{\"hotelContext\": {\"hotelId\": \"XMAR\", \"businessDate\": \"" + date + "\"}}"});
+    }
+
+    @Test
+    void aCheckOutBeforeTheDepartureIsAnEarlyDeparture() {
+        operaHas("InHouse", "205");
+        operasDateIs("2026-05-13");
+        answers.put("PUT /csh/v1/hotels/XMAR/reservations/39486034/earlyDeparture", new String[]{"200", "{}"});
+        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/checkOuts", new String[]{"201", "{}"});
+
+        run("registrar-checkout", "check-out-reservation", "check-out-reservation@1",
+                new Variable("pmsReservationId", "39486034"));
+
+        assertThat(sink.replies).containsExactly("COMPLETED [checkOutOutcome=DONE, pmsReservationId=39486034]");
+        // Made an early departure first (its departure moves to Opera's date), then checked out.
+        assertThat(writes()).extracting(Call::method, Call::path).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("PUT", "/csh/v1/hotels/XMAR/reservations/39486034/earlyDeparture"),
+                org.assertj.core.groups.Tuple.tuple("POST", "/csh/v1/hotels/XMAR/reservations/39486034/checkOuts"));
+    }
+
+    @Test
+    void aFolioWithABalanceIsSettledWithWhatTheDeskCollectedBeforeTheCheckOut() {
+        operaHas("InHouse", "205");
+        operasDateIs("2026-05-14");
+        answers.put("GET /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"200", """
+                {"reservationFolioInformation": {"folioWindows": [
+                  {"folioWindowNo": 1, "balance": {"amount": 306, "currencyCode": "MUR"}},
+                  {"folioWindowNo": 2, "balance": {"amount": 0, "currencyCode": "MUR"}}]}}
+                """});
+        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/payments", new String[]{"201", "{}"});
+        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"201", """
+                {"folioWindows": [{"folioWindowNo": 1, "storedFolioId": {"id": "8812", "type": "StoredFolio"}}]}
+                """});
+        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/checkOuts", new String[]{"201", "{}"});
+
+        run("registrar-checkout", "check-out-reservation", "check-out-reservation@1",
+                new Variable("pmsReservationId", "39486034"));
+
+        // Settled, its folio generated (the invoice: Opera checks out nothing before, FOF00125), checked out.
+        assertThat(sink.replies).containsExactly(
+                "COMPLETED [checkOutOutcome=DONE, pmsReservationId=39486034, storedFolioId=8812]");
+        assertThat(writes()).extracting(Call::path).containsExactly("/csh/v1/hotels/XMAR/reservations/39486034/payments",
+                "/csh/v1/hotels/XMAR/reservations/39486034/folios", "/csh/v1/hotels/XMAR/reservations/39486034/checkOuts");
+        assertThat(writes().getFirst().body()).contains("\"amount\":306").contains("\"folioWindowNo\":1")
+                .contains("\"cashierId\":69721441").contains("\"action\":\"Settlefolio\"")
+                .contains("\"postingReference\":\"Front office MRU01 · GSX4AK\"");
+        assertThat(writes().getFirst().body()).contains("\"cashierId\":69721441").contains("\"id\":\"39486034\"");
+    }
+
     @Test
     void theCheckOutGoesWithTheIntegrationsCashier() {
         operaHas("InHouse", "205");
+        operasDateIs("2026-05-14");
         answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/checkOuts", new String[]{"201", "{}"});
 
         run("registrar-checkout", "check-out-reservation", "check-out-reservation@1",
@@ -314,6 +369,7 @@ class ReceptionHandlersTest {
     @Test
     void anOpenBalanceIsACause() {
         operaHas("InHouse", "205");
+        operasDateIs("2026-05-14");
         answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/checkOuts", new String[]{"400", """
                 {"title":"Balance must be zero to check out","o:errorCode":"FOF00123"}
                 """});
@@ -349,6 +405,27 @@ class ReceptionHandlersTest {
                 new Invoice("OPERA", "XMAR377", LocalDate.of(2026, 5, 13), new BigDecimal("150"), "MUR",
                         Base64.getEncoder().encodeToString("%PDF-1.4 fake".getBytes(StandardCharsets.ISO_8859_1))));
         assertThat(writes()).singleElement().satisfies(w -> assertThat(w.body()).contains("\"cashierId\":69721441"));
+    }
+
+    @Test
+    void theInvoiceIsTheFolioTheCheckOutGeneratedWithoutGeneratingAnother() {
+        answers.put("GET /csh/v1/hotels/XMAR/folioHistory", new String[]{"200", """
+                {"folioHistory": [{"reservationInfo": {"reservationId": 39486034}, "folioNo": 380, "folioNoWithPrefix": "XMAR380",
+                   "folioWindowNo": 1, "folioStatus": "Ok", "start": "2026-05-13", "folioAmount": {"amount": 306, "currencyCode": "MUR"}}]}
+                """});
+        answers.put("GET /csh/v1/hotels/XMAR/storedFolios/8812", new String[]{"200", """
+                {"storedFolioDetails": {"folioReportURL": "/reports/folio-8812.pdf"}}
+                """});
+        answers.put("GET /reports/folio-8812.pdf", new String[]{"200", "%PDF-1.4 folio", "application/pdf"});
+
+        run("registrar-checkout", "fetch-invoice", "fetch-invoice@1", new Variable("pmsReservationId", "39486034"),
+                new Variable("storedFolioId", "8812"));
+
+        assertThat(sink.replies).containsExactly("COMPLETED [invoiceOutcome=DONE]");
+        assertThat(writes()).isEmpty();
+        verify(outcomes).done(eq("XMAR"), eq("39486034"), eq("GSX4AK"), eq(ReceptionOperation.CHECK_OUT), anyString(), isNull(),
+                eq(new Invoice("OPERA", "XMAR380", LocalDate.of(2026, 5, 13), new BigDecimal("306"), "MUR",
+                        Base64.getEncoder().encodeToString("%PDF-1.4 folio".getBytes(StandardCharsets.ISO_8859_1)))));
     }
 
     @Test

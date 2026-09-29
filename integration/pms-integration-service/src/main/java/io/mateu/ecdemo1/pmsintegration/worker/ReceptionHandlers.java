@@ -52,6 +52,7 @@ public class ReceptionHandlers {
     final PmsEvents events;
     final ReceptionOutcomes outcomes;
     final Clock clock;
+    final io.mateu.ecdemo1.pmsintegration.config.OhipProperties ohipProperties;
 
     /**
      * The input of the reception steps: the stay both ways — the front office's (hotel and stay), the
@@ -83,8 +84,8 @@ public class ReceptionHandlers {
         }
     }
 
-    /** {@code fetch-invoice@1}'s input. */
-    public record InvoiceTask(String pmsHotelCode, String pmsReservationId, String stayId) {
+    /** {@code fetch-invoice@1}'s input: the stored folio the check-out generated, when Opera kept one. */
+    public record InvoiceTask(String pmsHotelCode, String pmsReservationId, String stayId, String storedFolioId) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -95,8 +96,9 @@ public class ReceptionHandlers {
     public record CheckedIn(String checkInOutcome, String pmsReservationId) {
     }
 
+    /** {@code check-out-reservation@1}'s output: the stored folio of the invoice Opera generated, if it keeps one. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record CheckedOut(String checkOutOutcome, String pmsReservationId) {
+    public record CheckedOut(String checkOutOutcome, String pmsReservationId, String storedFolioId) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -190,6 +192,7 @@ public class ReceptionHandlers {
         if (OperaFrontDesk.inHouse(r) || OperaFrontDesk.checkedOut(r)) {
             log.info("{}/{}: Opera has it {} already", hotel, id, OperaFrontDesk.status(r));
             TaskHandlers.tag("opera.action", "already-in-house");
+            supersede(input, "in house in Opera", ASSIGN_ROOM, CHECK_IN);
             events.written(hotel, id, input.hotelCode(), input.locator(), task.workflowDefinitionId());
             return new CheckedIn(Outcome.STALE.name(), id);
         }
@@ -200,6 +203,7 @@ public class ReceptionHandlers {
             TaskHandlers.tag("opera.room", room);
             TaskHandlers.tag("opera.action", "checked-in");
             outcomes.done(hotel, id, input.stayId(), ReceptionOperation.CHECK_IN, "En casa en Opera", room, null);
+            supersede(input, "checked in in Opera, room " + room, ASSIGN_ROOM, CHECK_IN);
             events.written(hotel, id, input.hotelCode(), input.locator(), task.workflowDefinitionId());
             return new CheckedIn(Outcome.DONE.name(), id);
         } catch (PmsRejectedException e) {
@@ -211,18 +215,26 @@ public class ReceptionHandlers {
     public CheckedOut checkOut(ReceptionTask input, TaskContext task) {
         var found = reservation(input, task);
         if (found.isEmpty()) {
-            return new CheckedOut(Outcome.WAIT.name(), null);
+            return new CheckedOut(Outcome.WAIT.name(), null, null);
         }
         var r = found.get();
         var hotel = input.pmsHotelCode();
         var id = OperaReservations.id(r);
         TaskHandlers.tag("opera.hotel", hotel);
         TaskHandlers.tag("opera.reservation.id", id);
+        if (OperaFrontDesk.cancelled(r)) {
+            // Cancelled in the CRS (and so in Opera) while the desk had the guests in: Opera has nothing
+            // to check out, and the desk's stay is its own.
+            log.info("{}/{}: Opera has it {}: nothing to check out", hotel, id, OperaFrontDesk.status(r));
+            TaskHandlers.tag("opera.action", "cancelled-in-opera");
+            return new CheckedOut(Outcome.STALE.name(), id, null);
+        }
         if (OperaFrontDesk.checkedOut(r)) {
             log.info("{}/{}: Opera has it checked out already", hotel, id);
             TaskHandlers.tag("opera.action", "already-checked-out");
+            supersede(input, "checked out in Opera", CHECK_OUT);
             events.written(hotel, id, input.hotelCode(), input.locator(), task.workflowDefinitionId());
-            return new CheckedOut(Outcome.STALE.name(), id);
+            return new CheckedOut(Outcome.STALE.name(), id, null);
         }
         try {
             if (!OperaFrontDesk.inHouse(r)) {
@@ -231,11 +243,31 @@ public class ReceptionHandlers {
                 throw new PmsRejectedException(409, "NOT_IN_HOUSE",
                         "Opera does not have it in house (" + OperaFrontDesk.status(r) + "): check it in first");
             }
+            var today = desk.businessDate(hotel);
+            var early = OperaFrontDesk.departure(r).map(d -> d.isAfter(today)).orElse(false);
+            if (early) {
+                desk.earlyDeparture(hotel, id);
+            }
+            // The guest paid at the desk (its check-out takes the payment): Opera's folio is settled with it,
+            // for what Opera's folio owes — the master of the folio says the amount.
+            String stored = null;
+            for (var window : desk.openBalances(hotel, id)) {
+                desk.settle(hotel, id, window, ohipProperties.payAtHotelMethod(), "Front office " + input.hotelCode() + " · " + input.stayId());
+                log.info("{}/{}: folio window {} settled in Opera: {} {}", hotel, id, window.window(), window.balance(), window.currency());
+                // The invoice: Opera checks out nothing whose folio it has not generated (FOF00125).
+                var generated = desk.generateFolio(hotel, id, window.window());
+                log.info("{}/{}: folio of window {} generated{}", hotel, id, window.window(),
+                        generated.map(g -> ", stored as " + g).orElse(", not stored"));
+                if (stored == null) {
+                    stored = generated.orElse(null);
+                }
+            }
             desk.checkOut(hotel, id);
-            log.info("{}/{}: checked out in Opera", hotel, id);
+            log.info("{}/{}: checked out in Opera{}", hotel, id, early ? " (an early departure: Opera's date is " + today + ")" : "");
             TaskHandlers.tag("opera.action", "checked-out");
+            supersede(input, "checked out in Opera", CHECK_OUT);
             events.written(hotel, id, input.hotelCode(), input.locator(), task.workflowDefinitionId());
-            return new CheckedOut(Outcome.DONE.name(), id);
+            return new CheckedOut(Outcome.DONE.name(), id, stored);
         } catch (PmsRejectedException e) {
             return refused(input, task, id, ReceptionOperation.CHECK_OUT, e, CheckedOut.class);
         }
@@ -253,7 +285,10 @@ public class ReceptionHandlers {
         var folio = folios.isEmpty() ? null : folios.getFirst();
         String pdf = null;
         try {
-            var document = desk.folioDocument(hotel, id, folio == null ? 1 : folio.window());
+            // The folio the check-out generated — its stored document —, or, failing that, one generated now.
+            var document = input.storedFolioId() != null && !input.storedFolioId().isBlank()
+                    ? desk.storedDocument(hotel, id, input.storedFolioId())
+                    : desk.folioDocument(hotel, id, folio == null ? 1 : folio.window());
             if (document.isPresent() && document.get().length <= MAX_PDF_BYTES) {
                 pdf = Base64.getEncoder().encodeToString(document.get());
             } else if (document.isPresent()) {
@@ -334,9 +369,30 @@ public class ReceptionHandlers {
             return output.cast(new CheckedIn(wait, reservationId));
         }
         if (output == CheckedOut.class) {
-            return output.cast(new CheckedOut(wait, reservationId));
+            return output.cast(new CheckedOut(wait, reservationId, null));
         }
         return output.cast(new NoShowRecorded(wait, reservationId));
+    }
+
+    static final String ASSIGN_ROOM = "assign-room";
+    static final String CHECK_IN = "check-in-reservation";
+    static final String CHECK_OUT = "check-out-reservation";
+
+    /**
+     * Opera holds now what an earlier attempt was refused — the desk chose another room, say, and this
+     * process checked the guests in with it: the refusals of those steps have nothing left to wait for.
+     * Resolved here if open, and the process that waited on them resumes, finds Opera there already, and
+     * ends. The mapping not answering leaves them for a person; the write is not undone for it.
+     */
+    void supersede(ReceptionTask input, String why, String... steps) {
+        for (var step : steps) {
+            try {
+                integration.resolveCauseIfOpen(Cause.pmsRejectedReservation(input.hotelCode(), input.locator(), step, "").key(),
+                        "pms-integration: " + why);
+            } catch (RuntimeException e) {
+                log.warn("{}: a refusal of its {} could not be resolved as superseded: {}", input.locator(), step, e.getMessage());
+            }
+        }
     }
 
     void await(ReceptionTask input, List<Cause> causes) {

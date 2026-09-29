@@ -222,6 +222,26 @@ class PmsStaysTest {
     assertThat(links.stateOf("LOC60")).contains("Opera: en casa · hab. 205");
   }
 
+  @Autowired RoomChangeService roomChange;
+
+  @Test
+  void aRoomOfThePmsIsGivenToAStayStillToArrive() {
+    pms.take(stay("R62", "LOC62", "2026-09-27T10:00:00"));
+
+    var room = roomChange.changeRoom("LOC62", "001");
+
+    assertThat(room).isPresent();
+    assertThat(stays.findById("LOC62").orElseThrow().roomNumber()).isEqualTo("001");
+    assertThat(stays.findById("LOC62").orElseThrow().roomType()).isEqualTo("DBJB");
+    assertThat(roomChange.changeRoom("LOC62", "not-a-room")).isEmpty();
+
+    // In at the desk, but Opera refused the check-in: another room of the PMS, and the check-in goes up again.
+    stays.save(stays.findById("LOC62").orElseThrow().completeCheckIn());
+    links.state("LOC62", "Opera: rechazado (check-in) — Room 001 at property XMAR is Clean (CL).");
+    assertThat(roomChange.changeRoom("LOC62", "001")).isPresent();
+    assertThat(links.stateOf("LOC62")).contains("Opera: pendiente — check-in enviado");
+  }
+
   @Test
   void theCheckOutsInvoiceIsThePmssDocumentOrTheFrontOfficesProforma() {
     pms.take(stay("R61", "LOC61", "2026-09-27T10:00:00"));

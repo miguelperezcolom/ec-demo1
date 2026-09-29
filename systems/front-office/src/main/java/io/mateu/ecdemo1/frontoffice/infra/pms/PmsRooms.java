@@ -71,6 +71,13 @@ public class PmsRooms {
     return rooms.stream().map(e -> room(e.code(), label, opera.get(e.code()), !opera.isEmpty())).toList();
   }
 
+  /** A room of the PMS's catalogue, by number — without asking Opera its state. */
+  public java.util.Optional<Room> find(String number) {
+    return catalogue.list(pmsHotel, CatalogueType.ROOM).stream().filter(e -> e.code().equals(number)).findFirst()
+        .map(e -> room(e.code(), e.extra() == null ? null
+            : catalogue.describe(pmsHotel, CatalogueType.ROOM_TYPE, e.extra()).orElse(e.extra()), null, false));
+  }
+
   Map<String, OperaRoom> opera(String roomTypeCode) {
     var byRoom = new HashMap<String, OperaRoom>();
     if (pms == null) {
@@ -96,8 +103,9 @@ public class PmsRooms {
       // a room with letters: no floor
     }
     if (opera == null) {
-      return new Room(number, floor, type, RoomOccupancy.FREE, HousekeepingStatus.CLEAN,
-          operaAnswered ? "Opera no la lista" : "Estado de Opera no disponible");
+      // Opera answered and did not list it (out of order, say): not offered.
+      return new Room(number, floor, type, operaAnswered ? RoomOccupancy.OCCUPIED : RoomOccupancy.FREE,
+          HousekeepingStatus.CLEAN, operaAnswered ? "Opera no la lista" : "Estado de Opera no disponible");
     }
     var hk = opera.housekeeping() == null ? "" : opera.housekeeping();
     var housekeeping = switch (hk) {
@@ -106,8 +114,11 @@ public class PmsRooms {
       default -> HousekeepingStatus.DIRTY;
     };
     var occupied = "Occupied".equalsIgnoreCase(opera.frontOffice());
+    // A property that works with inspected rooms (XMAR does) refuses a clean one not yet inspected at
+    // the assignment (FOF00081 «Room … is Clean (CL)»): said, so the desk picks an inspected one.
     var note = hk.equals("OutOfOrder") || hk.equals("OutOfService") ? "Fuera de servicio en Opera"
-        : hk.equals("Pickup") ? "Pendiente de repaso en Opera" : null;
+        : hk.equals("Pickup") ? "Pendiente de repaso en Opera"
+        : hk.equals("Clean") ? "Limpia, sin inspeccionar en Opera" : null;
     return new Room(number, floor, type, occupied || note != null && note.startsWith("Fuera") ? RoomOccupancy.OCCUPIED
         : RoomOccupancy.FREE, housekeeping, note);
   }

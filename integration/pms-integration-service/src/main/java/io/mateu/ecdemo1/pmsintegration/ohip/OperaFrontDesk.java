@@ -27,7 +27,11 @@ import java.util.Optional;
  *   <li>check-in: {@code POST /fof/v1/hotels/{h}/reservations/{id}/checkIns}; a reservation that is
  *       not «due in» — arriving on the business date — is refused;</li>
  *   <li>check-out: {@code POST /csh/v1/hotels/{h}/reservations/{id}/checkOuts}, with the integration's
- *       cashier ({@link OhipProperties#cashierId()}): without one, 400 FOF00094 «Invalid Cashier»;</li>
+ *       cashier ({@link OhipProperties#cashierId()}): without one, 400 FOF00094 «Invalid Cashier»; before
+ *       the departure date, made an early departure first ({@code PUT …/earlyDeparture}; the business
+ *       date, {@code GET /ent/config/v1/hotels/{h}/operaContext}, says which);</li>
+ *   <li>the folio settled first with what the desk collected: {@code GET …/folios?fetchInstructions=Windowbalances},
+ *       {@code POST /csh/v1/hotels/{h}/reservations/{id}/payments} (with the cashier);</li>
  *   <li>the invoice: the folios the check-out closed, {@code GET /csh/v1/hotels/{h}/folioHistory
  *       ?checkOut=true}; its printable document, {@code POST …/reservations/{id}/folios} (generate,
  *       with the cashier) → {@code storedFolioId} → {@code GET /csh/v1/hotels/{h}/storedFolios/{id}}
@@ -127,6 +131,81 @@ public class OperaFrontDesk {
         ohip.post(hotelId, "/fof/v1/hotels/{h}/reservations/{id}/checkIns", body, hotelId, reservationId);
     }
 
+    /** The property's business date — Opera's «today», which need not be the calendar's (XMAR's UAT is not). */
+    public java.time.LocalDate businessDate(String hotelId) {
+        var context = ohip.get(hotelId, "/ent/config/v1/hotels/{h}/operaContext", hotelId).body();
+        var date = context == null ? "" : context.path("hotelContext").path("businessDate").asText("");
+        if (date.isBlank()) {
+            throw new PmsTransientException("Opera gave no business date for " + hotelId);
+        }
+        return java.time.LocalDate.parse(date.substring(0, 10));
+    }
+
+    /** The reservation's departure, as Opera has it. */
+    public static java.util.Optional<java.time.LocalDate> departure(JsonNode reservation) {
+        var date = reservation.path("roomStay").path("departureDate").asText("");
+        return date.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(java.time.LocalDate.parse(date.substring(0, 10)));
+    }
+
+    /**
+     * Before the reservation's departure — the business date is earlier —, Opera checks out nothing
+     * (FOF00107 «The guest's departure is not scheduled for today», whatever the event type): the
+     * reservation is first made an early departure, which moves its departure to the business date
+     * and leaves it due out ({@code PUT /csh/v1/hotels/{h}/reservations/{id}/earlyDeparture}; {@code GET
+     * …/earlyDeparture/verify?id=&type=Reservation} says, read-only, whether it may).
+     */
+    public void earlyDeparture(String hotelId, String reservationId) {
+        var body = objectMapper.createObjectNode();
+        var criteria = body.putObject("criteria");
+        criteria.put("hotelId", hotelId);
+        criteria.putObject("reservationIdList").put("id", reservationId).put("type", "Reservation");
+        criteria.put("postEarlyDeparturePenalty", false);
+        cashier(criteria);
+        ohip.put(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/earlyDeparture", body, hotelId, reservationId);
+    }
+
+    /** What a folio window owes: its number, balance and currency. */
+    public record WindowBalance(int window, BigDecimal balance, String currency) {
+    }
+
+    /** The reservation's folio windows that owe something. Read-only. */
+    public List<WindowBalance> openBalances(String hotelId, String reservationId) {
+        var answer = ohip.find(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Windowbalances",
+                hotelId, reservationId).orElse(null);
+        var open = new ArrayList<WindowBalance>();
+        for (var w : answer == null ? List.<JsonNode>of() : answer.path("reservationFolioInformation").path("folioWindows")) {
+            var balance = w.path("balance").path("amount");
+            if (balance.isNumber() && balance.decimalValue().signum() != 0) {
+                open.add(new WindowBalance(w.path("folioWindowNo").asInt(1), balance.decimalValue(),
+                        w.path("balance").path("currencyCode").asText(null)));
+            }
+        }
+        return open;
+    }
+
+    /**
+     * Settles a folio window with what the desk collected at the check-out — Opera refuses to check out
+     * a folio with a balance (FOF00108 «… has an open folio balance of 306. Settle the balance, then
+     * retry»): a payment of the window's balance, with the integration's cashier.
+     */
+    public void settle(String hotelId, String reservationId, WindowBalance window, String method, String reference) {
+        var body = objectMapper.createObjectNode();
+        var criteria = body.putObject("criteria");
+        criteria.put("hotelId", hotelId);
+        criteria.putObject("reservationId").put("id", reservationId).put("type", "Reservation");
+        criteria.putObject("paymentMethod").put("paymentMethod", method);
+        var amount = criteria.putObject("postingAmount").put("amount", window.balance());
+        if (window.currency() != null) {
+            amount.put("currencyCode", window.currency());
+        }
+        criteria.put("folioWindowNo", window.window());
+        criteria.put("postingReference", reference);
+        criteria.put("action", "Settlefolio");
+        cashier(criteria);
+        ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/payments", body, hotelId, reservationId);
+    }
+
+    /** The check-out of a reservation due out today (after {@link #earlyDeparture}, if it was not). */
     public void checkOut(String hotelId, String reservationId) {
         var body = objectMapper.createObjectNode();
         var reservation = body.putObject("reservation");
@@ -173,6 +252,20 @@ public class OperaFrontDesk {
      * a property that does not store folios, an empty window.
      */
     public Optional<byte[]> folioDocument(String hotelId, String reservationId, int window) {
+        var stored = generateFolio(hotelId, reservationId, window);
+        if (stored.isEmpty()) {
+            log.info("{}/{}: Opera generated the folio of window {} but stored no document", hotelId, reservationId, window);
+            return Optional.empty();
+        }
+        return storedDocument(hotelId, reservationId, stored.get());
+    }
+
+    /**
+     * Generates the folio of a window — the invoice — with the cashier: Opera refuses to check out a
+     * reservation whose folio was not generated (FOF00125 «Generate the folio before checkout»). The
+     * stored folio it kept, if the property stores them: its document is the invoice's PDF.
+     */
+    public Optional<String> generateFolio(String hotelId, String reservationId, int window) {
         var body = objectMapper.createObjectNode();
         var criteria = body.putObject("criteria");
         criteria.put("hotelId", hotelId);
@@ -181,18 +274,17 @@ public class OperaFrontDesk {
         criteria.put("eventType", "CheckOut");
         cashier(criteria);
         var generated = ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/folios", body, hotelId, reservationId).body();
-        String stored = null;
         for (var w : generated == null ? List.<JsonNode>of() : generated.path("folioWindows")) {
             var id = w.path("storedFolioId").path("id").asText("");
             if (!id.isBlank()) {
-                stored = id;
-                break;
+                return Optional.of(id);
             }
         }
-        if (stored == null) {
-            log.info("{}/{}: Opera generated the folio of window {} but stored no document", hotelId, reservationId, window);
-            return Optional.empty();
-        }
+        return Optional.empty();
+    }
+
+    /** The document of a stored folio: its report, the PDF. */
+    public Optional<byte[]> storedDocument(String hotelId, String reservationId, String stored) {
         var details = ohip.get(hotelId, "/csh/v1/hotels/{h}/storedFolios/{id}", hotelId, stored).body();
         var url = details == null ? "" : details.path("storedFolioDetails").path("folioReportURL").asText("");
         if (url.isBlank()) {
