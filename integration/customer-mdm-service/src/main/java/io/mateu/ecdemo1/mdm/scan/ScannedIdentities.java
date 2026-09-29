@@ -127,13 +127,21 @@ public class ScannedIdentities {
             target.documentKey = Normalizer.document(target.documentType, target.documentNumber);
             target.version++;
             target.updatedAt = clock.instant();
-            if (target.salesforceState != SalesforceState.REMOVED && target.status != CustomerStatus.MERGED) {
+            if (target.salesforceState != SalesforceState.REMOVED
+                    && target.salesforceState != SalesforceState.ANONYMIZED && target.status != CustomerStatus.MERGED) {
                 // To Salesforce as any change of the golden record: the contact gets it, no Case.
                 target.salesforceState = SalesforceState.PENDING;
             }
             customers.save(target);
             // The hotels hold copies — the front office's kardex, Opera's profiles: they learn it as always.
             events.changed(target, true, null, null, null);
+        }
+
+        if (documentKey.equals(target.documentKey) && target.documentVerifiedAt == null) {
+            // The document it holds is the one the desk just read: «Verificado (documento)» in Salesforce,
+            // with the next projection or, if nothing else changed, the next marking (ContactMarking).
+            target.documentVerifiedAt = clock.instant();
+            customers.save(target);
         }
 
         var contradictions = contradictions(target, scan, documentKey, documentHeldBy);

@@ -137,7 +137,8 @@ public class IdentityResolution {
             c.documentKey = Normalizer.document(c.documentType, c.documentNumber);
             c.version++;
             c.updatedAt = clock.instant();
-            if (c.salesforceState != SalesforceState.REMOVED && c.status != CustomerStatus.MERGED) {
+            if (c.salesforceState != SalesforceState.REMOVED
+                    && c.salesforceState != SalesforceState.ANONYMIZED && c.status != CustomerStatus.MERGED) {
                 c.salesforceState = SalesforceState.PENDING;
             }
             customers.save(c);

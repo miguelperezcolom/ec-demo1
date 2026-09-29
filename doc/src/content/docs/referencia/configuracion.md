@@ -63,8 +63,12 @@ Cómo se llega a cada propiedad no está aquí: es de la integración de cada ho
 | `SF_DOMAIN`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET` | (Secret `ec-salesforce`, opcional) | La org de Salesforce. Sin ellas resuelve identidades y no limpia |
 | `FRONT_OFFICE_PUBLIC_URL` | `https://front.ec1.mateu.io` | Los enlaces al front office |
 
-En `application.yaml`: `CONSOLIDATION_POLL` (`15m`, el sondeo de fusiones), `CHANGE_POLL` (`5m`, el de
-decisiones de Cases), `PROJECTION_TICK` (`5s`).
+En `application.yaml`: `CONSOLIDATION_POLL`, `CHANGE_POLL`, `NOTICE_POLL` (`24h`: las redes de seguridad
+bajo la Pub/Sub API — fusiones, decisiones de Cases, avisos sin confirmar), `PROJECTION_TICK` (`5s`),
+`MARKING_TICK` (`2m`, las marcas de calidad que cambiaron), `CLEANUP_AFTER` (`30d`), `CLEANUP_CRON`
+(`0 30 3 * * *`) y `CLEANUP_ENABLED` (`true`) — la anonimización de los «Solo nombre» —, y
+`USAGE_LIMITS_STALE` (`2h`, cada cuánto se pregunta a `/limits`). `SF_PUBSUB_HOST`/`SF_PUBSUB_PORT`
+(`api.pubsub.salesforce.com:7443`) y `SF_SUBSCRIBE` (`true`).
 
 ### communication-service
 

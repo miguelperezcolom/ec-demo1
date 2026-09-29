@@ -212,9 +212,17 @@ public class CustomerNotices {
 
     /**
      * The net under a lost event: the notices written a while ago and still unconfirmed, asked for in
-     * one query — only while there is any.
+     * one query — only while there is any. Once a day, at start, and when the notices' subscription
+     * starts without a replay id.
      */
-    @Scheduled(fixedDelayString = "${mdm.notice-poll:5m}")
+    @org.springframework.context.event.EventListener
+    public void onGap(io.mateu.ecdemo1.mdm.salesforce.SubscriptionGap gap) {
+        if (io.mateu.ecdemo1.mdm.salesforce.ConsolidationEvents.NOTICES.equals(gap.topic())) {
+            poll();
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${mdm.notice-poll:24h}", initialDelayString = "${mdm.notice-poll-initial-delay:2m}")
     public void poll() {
         if (!salesforce.available()) {
             return;

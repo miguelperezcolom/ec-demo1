@@ -5,6 +5,21 @@
     <hasActivationRequired>false</hasActivationRequired>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Contact.Estado_MDM__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.Calidad_Dato__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.Origen__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Case.MdmRequestId__c</field>
         <readable>true</readable>
     </fieldPermissions>

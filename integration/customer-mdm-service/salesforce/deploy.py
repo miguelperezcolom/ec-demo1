@@ -98,7 +98,8 @@ def main():
     if not check:
         activate_flows(instance, access)
         assign_permission_sets(instance, access, user_id)
-        case_layout(instance, access)
+        layout_sections(instance, access, "Case", "Case Layout", CASE_SECTIONS)
+        layout_sections(instance, access, "Contact", "Contact Layout", CONTACT_SECTIONS)
 
 
 def activate_flows(instance, access):
@@ -130,6 +131,14 @@ CASE_SECTIONS = {
 }
 
 
+# How the MDM marks a contact — set by the MDM, read only on the page.
+CONTACT_SECTIONS = {
+    "Calidad del dato (MDM)": [
+        ("Estado_MDM__c", "Readonly"), ("Calidad_Dato__c", "Readonly"), ("Origen__c", "Readonly"),
+        ("MDM_Id__c", "Readonly")],
+}
+
+
 def without_nulls(value):
     if isinstance(value, dict):
         return {k: without_nulls(v) for k, v in value.items() if v is not None}
@@ -138,21 +147,25 @@ def without_nulls(value):
     return value
 
 
-def case_layout(instance, access):
-    """The change request's fields and the notice's on the Case page, each in a section of its own; added once."""
-    q = urllib.parse.quote("SELECT Id FROM Layout WHERE TableEnumOrId = 'Case' AND Name = 'Case Layout'")
+def layout_sections(instance, access, sobject, name, sections):
+    """Sections of our fields on the object's page layout — on Case, the change request's and the notice's;
+    on Contact, the MDM's marking — each in a section of its own; added once."""
+    q = urllib.parse.quote(f"SELECT Id FROM Layout WHERE TableEnumOrId = '{sobject}' AND Name = '{name}'")
     records = call(instance, access, "GET", f"/tooling/query?q={q}")["records"]
     if not records:
-        print("no Case Layout to add the change request's section to")
+        print(f"no {name} to add the sections to")
         return
     layout_id = records[0]["Id"]
     metadata = call(instance, access, "GET", f"/tooling/sobjects/Layout/{layout_id}")["Metadata"]
     present = {s.get("label") for s in metadata.get("layoutSections", [])}
-    missing = [label for label in CASE_SECTIONS if label not in present]
+    # A field already on the layout, in any section, is not put there twice (Salesforce refuses it).
+    placed = {i.get("field") for sec in metadata.get("layoutSections", []) for col in sec.get("layoutColumns") or []
+              for i in col.get("layoutItems") or []}
+    missing = [label for label in sections if label not in present]
     if not missing:
         return
     for label in missing:
-        fields = CASE_SECTIONS[label]
+        fields = [(f, b) for f, b in sections[label] if f not in placed]
         half = (len(fields) + 1) // 2
         columns = [fields[:half], fields[half:]]
         metadata["layoutSections"].insert(1, {
@@ -172,7 +185,7 @@ def case_layout(instance, access):
         if not related.get("quickActions"):
             related.pop("quickActions", None)
     call(instance, access, "PATCH", f"/tooling/sobjects/Layout/{layout_id}", {"Metadata": metadata})
-    print("Case Layout: sections added:", ", ".join(missing))
+    print(f"{name}: sections added:", ", ".join(missing))
 
 
 if __name__ == "__main__":

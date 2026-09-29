@@ -5,6 +5,9 @@
         <members>Contact.Nationality__c</members>
         <members>Contact.Document_Type__c</members>
         <members>Contact.Document_Number__c</members>
+        <members>Contact.Estado_MDM__c</members>
+        <members>Contact.Calidad_Dato__c</members>
+        <members>Contact.Origen__c</members>
         <members>Case.MdmRequestId__c</members>
         <members>Case.MdmId__c</members>
         <members>Case.Nombre__c</members>
@@ -41,6 +44,12 @@
         <members>Mdm_Announce_Contact_Change</members>
         <members>Mdm_Announce_Notice_Change</members>
         <name>Flow</name>
+    </types>
+    <types>
+        <members>Contact.Pendientes_de_identificar</members>
+        <members>Contact.Marketing_Contactables</members>
+        <members>Contact.BirthdaysThisMonth</members>
+        <name>ListView</name>
     </types>
     <types>
         <members>MDM_Integration</members>

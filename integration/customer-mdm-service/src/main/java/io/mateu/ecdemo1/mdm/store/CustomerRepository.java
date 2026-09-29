@@ -22,4 +22,7 @@ public interface CustomerRepository extends JpaRepository<Customer, String>, Jpa
     List<Customer> findTop50BySalesforceRefreshPendingTrue();
 
     List<Customer> findAllByOrderByUpdatedAtDesc();
+
+    /** The customers whose contact Salesforce has: what the marking and the clean-up look at. */
+    List<Customer> findBySalesforceStateAndSalesforceContactIdNotNullAndAnonymizedAtIsNull(SalesforceState state);
 }

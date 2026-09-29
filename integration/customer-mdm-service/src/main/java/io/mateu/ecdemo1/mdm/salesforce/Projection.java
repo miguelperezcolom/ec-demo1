@@ -34,6 +34,7 @@ public class Projection {
     final CustomerRepository customers;
     final TransactionTemplate tx;
     final io.mateu.ecdemo1.mdm.change.Xrefs xrefs;
+    final io.mateu.ecdemo1.mdm.marking.Origins origins;
     final Clock clock;
     Backoff backoff;
 
@@ -57,6 +58,17 @@ public class Projection {
                     customers.save(c);
                 }));
                 continue;
+            }
+            if (pending.origin == null) {
+                // Its origin goes with it: read once from its first booking (the CRS, not Salesforce).
+                origins.fill(pending);
+                if (pending.origin != null) {
+                    var origin = pending.origin;
+                    tx.executeWithoutResult(s -> customers.findById(pending.id).ifPresent(c -> {
+                        c.origin = origin;
+                        customers.save(c);
+                    }));
+                }
             }
             batch.add(pending);
         }
@@ -92,9 +104,11 @@ public class Projection {
             var pending = batch.get(i);
             var answer = answers.get(i);
             var sent = pending.version;
+            var marking = io.mateu.ecdemo1.mdm.marking.Marking.of(pending).key();
             if (answer.ok()) {
                 tx.executeWithoutResult(s -> customers.findById(pending.id).ifPresent(c -> {
                     c.salesforceContactId = answer.contactId();
+                    c.markedAs = marking;
                     c.projectedAt = clock.instant();
                     c.projectionError = null;
                     // Changed while it was being sent: stays pending, and goes again.

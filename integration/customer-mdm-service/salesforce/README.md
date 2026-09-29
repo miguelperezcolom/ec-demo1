@@ -11,7 +11,9 @@ that deploys it. Salesforce cleans and deduplicates; the golden record is the MD
 | Flow `Mdm_Announce_Merge` | Publishes it before the delete. `MasterRecordId` is still empty then, so the event names only what left; the MDM reads the survivor afterwards with `queryAll` |
 | Flow `Mdm_Keep_Mdm_Id` | A merge must not give the survivor the absorbed contact's MDM id |
 | Permission set `MDM_Integration` | The fields, for the user the integration runs as (and for stewards) |
-| Matching rule `MDM_Same_Person`, duplicate rule `MDM_Possible_Duplicate` | Deliberately wide: they only propose, recording possible duplicates as duplicate record sets for a steward. Never block |
+| Matching rule `MDM_Same_Person`, duplicate rule `MDM_Possible_Duplicate` | Deliberately wide: they only propose, recording possible duplicates as duplicate record sets for a steward. Never block. The duplicate rule's conditions evaluate only contacts with an email, a phone or a document — a name alone is no evidence (a matching rule takes no conditions) |
+| `Contact.Estado_MDM__c` (Provisional/Consolidado/Anonimizado), `Calidad_Dato__c` (Solo nombre/Con contacto/Verificado (documento)), `Origen__c` (CRS/Canal/Touroperador) | How far a contact can be trusted, computed and projected by the MDM (section *Calidad del dato (MDM)* on the Contact layout, added by `deploy.py`). Restricted picklists |
+| List views `Pendientes_de_identificar`, `Marketing_Contactables`, `BirthdaysThisMonth` | The «Solo nombre» contacts to identify; the marketing views without them (and without the anonymised) |
 | `Case.Aviso_Tipo__c` (Informativo/Importante/Bloqueante), `Aviso_Mostrar_En__c` (Check-in/Check-out/Estancia), `Aviso_Desde__c`, `Aviso_Hasta__c`, `Aviso_Activo__c`, `MdmAvisoId__c` (external id) | A **reception notice** («aviso de recepción») is a Case on the contact with a *Tipo de aviso*; its Subject is the text. Section *Aviso de recepción* on the Case layout |
 | `AvisoRecepcionCambiado__e`, flow `Mdm_Announce_Notice_Change` | A notice created or changed — here, or written by the MDM from the Clientes console — is announced **whole**, so the MDM projects it without reading it back. Unticking *Aviso activo* or closing the Case deactivates it |
 
@@ -26,6 +28,13 @@ change requests' Cases have none of them, and their flow ignores notices (it nee
 The org also allows **five auto-launched flows**, and this makes the fifth: there is no flow for a
 deleted notice. To take one away, untick *Aviso activo* or close the Case (both are announced); a
 deleted Case is not.
+
+### Pub/Sub, not polling
+
+The MDM subscribes to the four events through the Pub/Sub API (gRPC, `api.pubsub.salesforce.com:7443`,
+the same client-credentials token), keeps each topic's replay id in its database and resumes from it
+after a restart. Pub/Sub does not spend the daily API request allowance; delivered events count
+against the event delivery allocation. The queries under the events are a daily safety net.
 
 ## Deploying
 

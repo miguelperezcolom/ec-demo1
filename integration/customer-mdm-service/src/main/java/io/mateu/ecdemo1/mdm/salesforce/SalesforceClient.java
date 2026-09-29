@@ -52,6 +52,10 @@ public class SalesforceClient {
         public static final String CONSOLIDATION_READ = "consolidation-read";
         public static final String CONSOLIDATION_WRITE = "consolidation-write";
         public static final String LIMITS = "limits";
+        /** The marking of contacts whose marking changed, alone: estado, calidad, origen. */
+        public static final String MARKING = "marking";
+        /** Contacts anonymised after the retention period. */
+        public static final String CLEANUP = "cleanup";
         /** Reception notices written from the Clientes console (Cases with a Tipo de aviso). */
         public static final String NOTICE_WRITE = "notice-write";
         /** The net under a notice's event: asking how the ones written and not confirmed stand. */
@@ -178,6 +182,75 @@ public class SalesforceClient {
      * the order sent.
      */
     public List<Upserted> upsertContacts(List<Customer> customers) {
+        return upsert(Purpose.PROJECTION, customers, SalesforceClient::contactFields);
+    }
+
+    /**
+     * Only the marking — Estado MDM, Calidad del dato, Origen — of up to {@value #COLLECTION} contacts in
+     * one call, by their contact ids (an update: a contact gone meanwhile is an error, never a new
+     * one): nothing else of the contact is touched, so it announces no change of
+     * the data the hotels use (the contact-change flow does not look at these fields).
+     */
+    public List<Upserted> markContacts(List<Customer> customers) {
+        return update(Purpose.MARKING, customers, c -> io.mateu.ecdemo1.mdm.marking.Marking.of(c).fields());
+    }
+
+    /**
+     * Erases what is personal from up to {@value #COLLECTION} contacts in one call — names, email,
+     * phone, birth date, nationality, document — leaving the contact, its MDM id and its marking
+     * (Anonimizado): the MDM keeps the reference and the reason.
+     */
+    public List<Upserted> anonymizeContacts(List<Customer> customers) {
+        return update(Purpose.CLEANUP, customers, SalesforceClient::anonymousFields);
+    }
+
+    static Map<String, Object> anonymousFields(Customer c) {
+        var fields = new LinkedHashMap<String, Object>();
+        fields.put("FirstName", null);
+        fields.put("LastName", "Anonimizado");
+        fields.put("Email", null);
+        fields.put("Phone", null);
+        fields.put("Birthdate", null);
+        fields.put("Nationality__c", null);
+        fields.put("Document_Type__c", null);
+        fields.put("Document_Number__c", null);
+        fields.putAll(io.mateu.ecdemo1.mdm.marking.Marking.of(c).fields());
+        return fields;
+    }
+
+    /**
+     * sObject Collections' update of the customers' contacts by their Salesforce ids, not all or none,
+     * the answers in the order sent.
+     */
+    List<Upserted> update(String purpose, List<Customer> customers, Function<Customer, Map<String, Object>> fieldsOf) {
+        if (customers.isEmpty()) {
+            return List.of();
+        }
+        if (customers.size() > COLLECTION) {
+            throw new IllegalArgumentException("At most " + COLLECTION + " contacts in one call, not " + customers.size());
+        }
+        var records = new ArrayList<Map<String, Object>>();
+        for (var c : customers) {
+            var record = new LinkedHashMap<String, Object>();
+            record.put("attributes", Map.of("type", "Contact"));
+            record.put("Id", safe(c.salesforceContactId));
+            record.putAll(fieldsOf.apply(c));
+            records.add(record);
+        }
+        var body = new LinkedHashMap<String, Object>();
+        body.put("allOrNone", false);
+        body.put("records", records);
+        var answer = call(purpose, s -> rest.patch()
+                .uri(s.instanceUrl() + "/services/data/{v}/composite/sobjects", properties.apiVersion())
+                .header("Authorization", "Bearer " + s.accessToken())
+                .header("Sforce-Duplicate-Rule-Header", "allowSave=true")
+                .contentType(MediaType.APPLICATION_JSON).body(body)
+                .retrieve().body(JsonNode.class));
+        return upserted(customers, answer);
+    }
+
+    /** sObject Collections' upsert by the MDM id, not all or none, the answers in the order sent. */
+    List<Upserted> upsert(String purpose, List<Customer> customers, Function<Customer, Map<String, Object>> fieldsOf) {
         if (customers.isEmpty()) {
             return List.of();
         }
@@ -189,13 +262,13 @@ public class SalesforceClient {
             var record = new LinkedHashMap<String, Object>();
             record.put("attributes", Map.of("type", "Contact"));
             record.put("MDM_Id__c", c.id);
-            record.putAll(contactFields(c));
+            record.putAll(fieldsOf.apply(c));
             records.add(record);
         }
         var body = new LinkedHashMap<String, Object>();
         body.put("allOrNone", false);
         body.put("records", records);
-        var answer = call(Purpose.PROJECTION, s -> rest.patch()
+        var answer = call(purpose, s -> rest.patch()
                 .uri(s.instanceUrl() + "/services/data/{v}/composite/sobjects/Contact/MDM_Id__c", properties.apiVersion())
                 .header("Authorization", "Bearer " + s.accessToken())
                 .header("Sforce-Duplicate-Rule-Header", "allowSave=true")
@@ -232,6 +305,8 @@ public class SalesforceClient {
         fields.put("Nationality__c", c.nationality);
         fields.put("Document_Type__c", c.documentType);
         fields.put("Document_Number__c", c.documentNumber);
+        // How far it can be trusted: marked on every projection, so a new contact is born marked.
+        fields.putAll(io.mateu.ecdemo1.mdm.marking.Marking.of(c).fields());
         return fields;
     }
 

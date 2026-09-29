@@ -35,7 +35,12 @@ public class SalesforceUsage {
 
     /** Below this, a net under the events spends more than it catches: the local stack once polled every 20s. */
     static final Duration SHORTEST_SENSIBLE_POLL = Duration.ofMinutes(5);
-    static final Duration STALE = Duration.ofMinutes(15);
+    /**
+     * How old the org's total may get before it is asked for (one call). Every answer says it for free;
+     * with the polls gone to a daily net, the MDM at rest seldom asks anything, so this is what paces
+     * the header's figure: every two hours, twelve calls a day.
+     */
+    final Duration stale;
 
     final SalesforceClient salesforce;
     final ApiCallHourRepository saved;
@@ -43,7 +48,9 @@ public class SalesforceUsage {
     final Clock clock;
 
     public SalesforceUsage(SalesforceClient salesforce, ApiCallHourRepository saved, MdmProperties properties,
-                           Clock clock, MeterRegistry registry) {
+                           Clock clock, MeterRegistry registry,
+                           @org.springframework.beans.factory.annotation.Value("${mdm.usage-limits-stale:2h}") Duration stale) {
+        this.stale = stale;
         this.salesforce = salesforce;
         this.saved = saved;
         this.properties = properties;
@@ -88,11 +95,11 @@ public class SalesforceUsage {
         }
     }
 
-    /** The org's total, asked when no answer has said it for a quarter of an hour — one call, if any. */
+    /** The org's total, asked when no answer has said it for {@link #stale} — one call, if any. */
     @Scheduled(fixedDelayString = "${mdm.usage-limits-check:5m}", initialDelayString = "${mdm.usage-limits-check:5m}")
     public void refreshLimits() {
         var seen = salesforce.budget().seenAt();
-        if (!salesforce.available() || (seen != null && seen.isAfter(clock.instant().minus(STALE)))) {
+        if (!salesforce.available() || (seen != null && seen.isAfter(clock.instant().minus(stale)))) {
             return;
         }
         try {

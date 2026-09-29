@@ -28,9 +28,19 @@ import java.util.TreeSet;
 @Slf4j
 public class Footprint {
 
-    /** A CRS booking, as the CRS holds it now. */
+    /**
+     * A CRS booking, as the CRS holds it now: with the channel it came in by (and the partner, for a
+     * tour operator's or an agency's) and, when cancelled, why — NOS is a no-show.
+     */
     public record Booking(String id, String hotelCode, LocalDate arrival, LocalDate departure, String status,
-                          String holder, String pmsReservationId) {
+                          String holder, String pmsReservationId, String channelCode, String partnerCode,
+                          String cancellationReason) {
+
+        /** Cancelled — a no-show included, which the CRS records as a cancellation for NOS — or a no-show. */
+        public boolean cancelledOrNoShow() {
+            var s = status == null ? "" : status.replace("-", "").replace("_", "").toLowerCase();
+            return s.equals("cancelled") || s.equals("canceled") || s.equals("noshow");
+        }
     }
 
     /** A stay in the front office, and whether the customer is its guest or rooms with them. */
@@ -120,6 +130,25 @@ public class Footprint {
             return Optional.empty();
         }
         try {
+            return lookup(id);
+        } catch (RuntimeException e) {
+            log.warn("The CRS did not answer for booking {}: {}", id, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * {@link #booking}, telling "the CRS has no such booking" (empty) from "the CRS did not answer" (an
+     * exception): what decides something on a customer's bookings must know which.
+     */
+    public Optional<Booking> lookup(String id) {
+        if (booking == null) {
+            throw new IllegalStateException("The CRS is not configured");
+        }
+        if (id == null) {
+            return Optional.empty();
+        }
+        try {
             var b = booking.get().uri("/bookings/{id}", id).retrieve().body(JsonNode.class);
             if (b == null) {
                 return Optional.empty();
@@ -128,11 +157,10 @@ public class Footprint {
             return Optional.of(new Booking(text(b, "id"), text(b, "hotelCode"), date(b, "arrival"), date(b, "departure"),
                     text(b, "status"),
                     ((holder.path("firstName").asText("") + " " + holder.path("lastName").asText("")).trim()),
-                    b.path("pmsReference").isObject() ? text(b.path("pmsReference"), "reservationId") : null));
+                    b.path("pmsReference").isObject() ? text(b.path("pmsReference"), "reservationId") : null,
+                    text(b, "channelCode"), text(b, "partnerCode"),
+                    b.path("cancellation").isObject() ? text(b.path("cancellation"), "reasonCode") : null));
         } catch (HttpClientErrorException.NotFound e) {
-            return Optional.empty();
-        } catch (RuntimeException e) {
-            log.warn("The CRS did not answer for booking {}: {}", id, e.getMessage());
             return Optional.empty();
         }
     }

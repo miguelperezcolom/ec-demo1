@@ -129,6 +129,9 @@ public class CustomerCard implements Identifiable {
     @Label("En Salesforce")
     String salesforce;
     @ReadOnly
+    @Label("Calidad del dato")
+    String quality;
+    @ReadOnly
     @Label("Actualizado")
     String updatedAt;
 
@@ -185,6 +188,7 @@ public class CustomerCard implements Identifiable {
         var codes = footprint.codesOf(c);
         aliases = String.join(", ", codes.subList(1, codes.size()));
         salesforce = salesforce(c);
+        quality = io.mateu.ecdemo1.mdm.marking.Marking.of(c).describe();
         updatedAt = Estados.moment(c.updatedAt);
         var name = c.fullName();
         changeRequests = customers.changeRequestsOf(codes).stream()
@@ -439,6 +443,7 @@ public class CustomerCard implements Identifiable {
             case PENDING -> "Pendiente de enviar";
             case FAILED -> "No aceptado: " + (c.projectionError == null ? "" : c.projectionError);
             case REMOVED -> "Contacto borrado en Salesforce";
+            case ANONYMIZED -> "Contacto anonimizado en Salesforce: " + (c.anonymizedReason == null ? "" : c.anonymizedReason);
             case NOT_PROJECTED -> "No se envía (fusionado)";
         };
     }
