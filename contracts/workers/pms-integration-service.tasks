@@ -1,6 +1,11 @@
 # pms-integration-service: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
+assign-room@1 pms-integration
 cancel-reservation@1 pms-integration
+check-in-reservation@1 pms-integration
+check-out-reservation@1 pms-integration
 ensure-guest-profile@1 pms-integration
 ensure-partner-profile@1 pms-integration
+fetch-invoice@1 pms-integration
 project-stay@1 pms-integration
+record-no-show@1 pms-integration
 upsert-reservation@1 pms-integration

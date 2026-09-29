@@ -32,6 +32,20 @@ public class PmsLinks {
         stayId).stream().findFirst();
   }
 
+  /**
+   * Where the stay stands in the PMS, in the desk's words — «Opera: en casa», «Opera: pendiente —
+   * check-in enviado», «Opera: rechazado — motivo»: what the reception did, as the PMS took it.
+   */
+  public void state(String stayId, String state) {
+    jdbc.update("update stay set pms_state = ? where id = ?", state == null ? null
+        : state.length() > 500 ? state.substring(0, 497) + "…" : state, stayId);
+  }
+
+  public Optional<String> stateOf(String stayId) {
+    return jdbc.query("select pms_state from stay where id = ?", (rs, n) -> rs.getString(1), stayId).stream()
+        .filter(java.util.Objects::nonNull).findFirst();
+  }
+
   /** The stay is this PMS reservation, as of this version; the rate plan in words, when known. */
   public void link(String stayId, String pmsReservationId, String pmsVersion, String ratePlan) {
     jdbc.update("update stay set pms_reservation_id = ?, pms_version = ?, rate_plan = ? where id = ?",

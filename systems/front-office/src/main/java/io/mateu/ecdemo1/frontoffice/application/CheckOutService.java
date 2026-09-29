@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.frontoffice.domain.room.Room;
 import io.mateu.ecdemo1.frontoffice.domain.room.RoomRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
+import io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports;
 import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,11 +16,13 @@ public class CheckOutService {
   final StayRepository stays;
   final RoomRepository rooms;
   final GuestNotices notices;
+  final ReceptionReports reception;
 
-  public CheckOutService(StayRepository stays, RoomRepository rooms, GuestNotices notices) {
+  public CheckOutService(StayRepository stays, RoomRepository rooms, GuestNotices notices, ReceptionReports reception) {
     this.stays = stays;
     this.rooms = rooms;
     this.notices = notices;
+    this.reception = reception;
   }
 
   /**
@@ -42,6 +45,9 @@ public class CheckOutService {
     notices.requireCheckOut(stay, by);
     var departed = stays.save(stay.completeCheckOut());
     rooms.findByNumber(stay.roomNumber()).map(Room::release).ifPresent(rooms::save);
+    // The PMS is the master of the stay and of its folio: the check-out goes up to it, with this
+    // transaction; its invoice comes back to the stay.
+    reception.checkedOut(departed, by);
     return departed;
   }
 }

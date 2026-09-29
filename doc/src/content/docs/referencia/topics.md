@@ -21,11 +21,12 @@ Cada uno tiene su esquema versionado en `contracts/schemas/<topic>/v<N>.schema.j
 | `projection-requests` | contracts-schemas | integrations | crs-integration | Proyectar una reserva (backfill) |
 | `mapping-commands` | contracts-schemas | integrations | mapping | `define-equivalence`, `request-agent-proposal`, `resolve-cause-if-open`, `record-partner-profile` |
 | `pms-reservations` | contracts-schemas | pms-integration | integrations | `PmsReservationChanged`: una reserva se escribió en Opera |
-| `front-office-commands` | contracts-schemas | pms-integration, integrations | front-office | `write-stay`, `replace-catalogue` |
+| `front-office-commands` | contracts-schemas | pms-integration, integrations | front-office | `write-stay` (estado de Opera: también `IN_HOUSE`, `CHECKED_OUT`), `replace-catalogue`, `record-reception` (cómo tomó el PMS lo que hizo recepción: rechazo y motivo, la habitación, la factura del check-out) |
+| `front-office-events` | contracts-schemas | front-office | integrations | `guest-checked-in`, `guest-checked-out`, `no-show-reported`: lo que hizo recepción, para que el PMS lo registre. Clave `hotel/estancia` |
 | `customers` | contracts-schemas | customer-mdm | crs-integration, front-office | `CustomerChanged`, `CustomersMerged` |
 | `customer-notices` | contracts-schemas | customer-mdm | front-office | `CustomerNoticeChanged`: un aviso de recepción de un cliente, entero, como lo confirmó Salesforce; gana la versión mayor |
 | `customer-commands` | contracts-schemas | front-office | customer-mdm | `propose-change`, `record-scanned-identity` |
-| `no-show-reports` | contracts-schemas | front-office | crs-integration | `ReportNoShow` |
+| `no-show-reports` | contracts-schemas | — | crs-integration | `ReportNoShow`. El front office ya no lo manda: su no-show sube al PMS (`front-office-events`) y de él al CRS por el motor |
 | `notifications` | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication | Un aviso |
 | `notification-resolutions` | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication | Lo que causó un aviso se resolvió |
 | `audit` | contracts-schemas | integrations, mapping, front-office | audit | `AuditedAction` |

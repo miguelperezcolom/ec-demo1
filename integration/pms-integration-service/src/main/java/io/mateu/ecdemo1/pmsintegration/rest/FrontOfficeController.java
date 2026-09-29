@@ -22,7 +22,9 @@ import java.util.List;
 /**
  * What the pms-fo integration asks of Opera through the connector — queries only: the property's
  * catalogue as a front office reads it, and its reservations of a window with when each was last
- * modified (its backfill and its polling).
+ * modified (its backfill and its polling). And the one the front office asks itself, because a screen
+ * needs the answer now: which rooms of a type Opera has clean and free, for the desk to pick at the
+ * check-in (a query, not an order: orders go by events).
  */
 @RestController
 @RequestMapping("/front-office")
@@ -31,6 +33,14 @@ public class FrontOfficeController {
 
     final FrontOfficeCatalogue catalogue;
     final OperaStays stays;
+    final io.mateu.ecdemo1.pmsintegration.ohip.OperaFrontDesk desk;
+
+    /** The property's rooms of a type, with Opera's housekeeping and front office status now. */
+    @GetMapping("/rooms")
+    public List<io.mateu.ecdemo1.pmsintegration.ohip.OperaFrontDesk.RoomState> rooms(@RequestParam String hotelId,
+                                                                                    @RequestParam String roomType) {
+        return desk.rooms(hotelId, roomType);
+    }
 
     @GetMapping("/catalogue")
     public List<CatalogueEntry> catalogue(@RequestParam String hotelId) {

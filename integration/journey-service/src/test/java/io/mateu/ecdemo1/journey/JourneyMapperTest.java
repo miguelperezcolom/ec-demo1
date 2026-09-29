@@ -218,6 +218,43 @@ class JourneyMapperTest {
         assertThat(hop(journey, "Evento → proceso").detail()).isEqualTo("Reserva creada (versión 1) · arranca «Proyectar reserva»");
     }
 
+    @Test
+    void aCheckInGoesFromTheDeskUpToOpera() {
+        var t0 = 1_000_000_000_000L;
+        var spans = List.of(
+                span("a", null, "front-office", "http post /mateu/v3/_reserva/run", "SERVER", t0, t0 + 100, java.util.Map.of()),
+                span("b", "a", "integrations", "front-office-events process", "CONSUMER", t0 + 200, t0 + 210,
+                        java.util.Map.of("booking.locator", "GSX4AK", "hotel.code", "MRU01", "booking.event", "check-in",
+                                "eventconductor.business-key", "registrar-checkin:MRU01/GSX4AK")),
+                span("c", "b", "orchestrator", "Registrar check-in", "INTERNAL", t0 + 300, t0 + 2_000,
+                        java.util.Map.of("eventconductor.process.id", "p1", "eventconductor.workflow.id", "registrar-checkin",
+                                "eventconductor.process.status", "COMPLETED", "eventconductor.process.businessKey", "registrar-checkin:MRU01/GSX4AK")),
+                span("d", "c", "orchestrator", "Asignar la habitación en Opera", "INTERNAL", t0 + 310, t0 + 700,
+                        java.util.Map.of("eventconductor.step.type", "ACTION", "eventconductor.step.id", "assign-room",
+                                "eventconductor.step.topic", "pms-integration", "eventconductor.step.status", "COMPLETED",
+                                "eventconductor.step.executionId", "x1")),
+                span("e", "d", "pms-integration", "eventconductor.task assign-room", "CONSUMER", t0 + 320, t0 + 690,
+                        java.util.Map.of("eventconductor.step.executionId", "x1", "opera.room", "205", "opera.action", "room-assigned",
+                                "opera.hotel", "XMAR", "opera.reservation.id", "39486034")),
+                span("f", "c", "orchestrator", "Hacer el check-in en Opera", "INTERNAL", t0 + 710, t0 + 1_500,
+                        java.util.Map.of("eventconductor.step.type", "ACTION", "eventconductor.step.id", "check-in-reservation",
+                                "eventconductor.step.topic", "pms-integration", "eventconductor.step.status", "COMPLETED",
+                                "eventconductor.step.executionId", "x2")),
+                span("g", "f", "pms-integration", "eventconductor.task check-in-reservation", "CONSUMER", t0 + 720, t0 + 1_490,
+                        java.util.Map.of("eventconductor.step.executionId", "x2", "opera.room", "205", "opera.action", "checked-in",
+                                "opera.hotel", "XMAR", "opera.reservation.id", "39486034")));
+        var journey = JourneyMapper.map("t", "GSX4AK", spans, LATER);
+
+        assertThat(journey.kind()).isEqualTo(Kind.CHECK_IN);
+        assertThat(journey.outcome()).isEqualTo(Outcome.DONE);
+        assertThat(journey.operaAction()).isEqualTo("checked-in");
+        assertThat(titles(journey)).containsSubsequence("Check-in en recepción", "La integración pms-fo lo recibe",
+                "Proceso «Registrar check-in»", "Asignar la habitación en Opera", "Hacer el check-in en Opera");
+        assertThat(hop(journey, "La integración pms-fo lo recibe").detail()).isEqualTo("Arranca «Registrar check-in»");
+        assertThat(hop(journey, "Asignar la habitación en Opera").detail()).isEqualTo("Habitación 205 asignada en Opera");
+        assertThat(hop(journey, "Hacer el check-in en Opera").detail()).isEqualTo("Check-in hecho en Opera, habitación 205");
+    }
+
     static TraceSpan span(String id, String parent, String service, String name, String kind, long start, long end,
                           java.util.Map<String, String> attributes) {
         return new TraceSpan(id, parent, service, name, kind, start, end, attributes, false, null);

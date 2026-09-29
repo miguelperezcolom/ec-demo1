@@ -177,10 +177,24 @@ final class EstanciaPanel {
     var folio = r.view().folio();
     var content = new ArrayList<Component>();
     content.add(Notice.builder().theme("info").text(avisoCierre(stay)).build());
+    if (stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED) {
+      content.add(factura(stay.id()));
+    }
     if (folio != null) {
       content.add(ledger(folio).build());
     }
     return VerticalLayout.builder().content(content).style("width: 100%; gap: 1rem;").build();
+  }
+
+  /**
+   * Lo que dice el PMS (Opera, el maestro de la estancia y del folio) de la salida; «Abrir factura» está
+   * en «En otros sistemas» (un enlace a una pestaña propia, servida por el front office).
+   */
+  static Component factura(String stayId) {
+    var invoice = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.invoice(stayId);
+    var state = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.pmsState(stayId).orElse("Opera: sin noticias del check-out");
+    return Notice.builder().theme(state.contains("rechazado") ? "warning" : "info")
+        .text(state + " — «" + invoice.label() + "» en «En otros sistemas»").build();
   }
 
   /** El desglose de un folio como Ledger (sin folio, vacío). */

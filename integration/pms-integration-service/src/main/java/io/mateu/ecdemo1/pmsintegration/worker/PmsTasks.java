@@ -32,6 +32,11 @@ public class PmsTasks {
     public static final String CANCEL_RESERVATION = "cancel-reservation";
     public static final String ENSURE_PARTNER_PROFILE = "ensure-partner-profile";
     public static final String PROJECT_STAY = "project-stay";
+    public static final String ASSIGN_ROOM = "assign-room";
+    public static final String CHECK_IN_RESERVATION = "check-in-reservation";
+    public static final String CHECK_OUT_RESERVATION = "check-out-reservation";
+    public static final String FETCH_INVOICE = "fetch-invoice";
+    public static final String RECORD_NO_SHOW = "record-no-show";
 
     @Bean
     public TaskRegistration<TaskHandlers.ReservationTask, TaskHandlers.GuestProfile> ensureGuestProfileTask(
@@ -70,6 +75,48 @@ public class PmsTasks {
         return new TaskRegistration<>(PROJECT_STAY, 1, TOPIC, TaskHandlers.StayTask.class, Void.class,
                 watched(watch, handlers::projectStay, TaskHandlers.StayTask::pmsHotelCode,
                         input -> input.pmsHotelCode() + "/" + input.pmsReservationId()));
+    }
+
+    // ── the reception, up to the PMS (pms-fo) ──────────────────────────────────────────────────────
+
+    @Bean
+    public TaskRegistration<ReceptionHandlers.ReceptionTask, ReceptionHandlers.RoomAssigned> assignRoomTask(
+            ReceptionHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(ASSIGN_ROOM, 1, TOPIC, ReceptionHandlers.ReceptionTask.class,
+                ReceptionHandlers.RoomAssigned.class, watched(watch, handlers::assignRoom,
+                        ReceptionHandlers.ReceptionTask::pmsHotelCode, ReceptionHandlers.ReceptionTask::stayId));
+    }
+
+    @Bean
+    public TaskRegistration<ReceptionHandlers.ReceptionTask, ReceptionHandlers.CheckedIn> checkInReservationTask(
+            ReceptionHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(CHECK_IN_RESERVATION, 1, TOPIC, ReceptionHandlers.ReceptionTask.class,
+                ReceptionHandlers.CheckedIn.class, watched(watch, handlers::checkIn,
+                        ReceptionHandlers.ReceptionTask::pmsHotelCode, ReceptionHandlers.ReceptionTask::stayId));
+    }
+
+    @Bean
+    public TaskRegistration<ReceptionHandlers.ReceptionTask, ReceptionHandlers.CheckedOut> checkOutReservationTask(
+            ReceptionHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(CHECK_OUT_RESERVATION, 1, TOPIC, ReceptionHandlers.ReceptionTask.class,
+                ReceptionHandlers.CheckedOut.class, watched(watch, handlers::checkOut,
+                        ReceptionHandlers.ReceptionTask::pmsHotelCode, ReceptionHandlers.ReceptionTask::stayId));
+    }
+
+    @Bean
+    public TaskRegistration<ReceptionHandlers.InvoiceTask, ReceptionHandlers.InvoiceFetched> fetchInvoiceTask(
+            ReceptionHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(FETCH_INVOICE, 1, TOPIC, ReceptionHandlers.InvoiceTask.class,
+                ReceptionHandlers.InvoiceFetched.class, watched(watch, handlers::fetchInvoice,
+                        ReceptionHandlers.InvoiceTask::pmsHotelCode, ReceptionHandlers.InvoiceTask::stayId));
+    }
+
+    @Bean
+    public TaskRegistration<ReceptionHandlers.ReceptionTask, ReceptionHandlers.NoShowRecorded> recordNoShowTask(
+            ReceptionHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(RECORD_NO_SHOW, 1, TOPIC, ReceptionHandlers.ReceptionTask.class,
+                ReceptionHandlers.NoShowRecorded.class, watched(watch, handlers::recordNoShow,
+                        ReceptionHandlers.ReceptionTask::pmsHotelCode, ReceptionHandlers.ReceptionTask::stayId));
     }
 
     /**

@@ -9,7 +9,10 @@ import io.mateu.ecdemo1.frontoffice.infra.pms.PmsCatalogue;
 import io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.CatalogueType;
+import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.RecordReception;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.ReplaceCatalogue;
+import io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports;
+import io.mateu.ecdemo1.frontoffice.infra.pms.StayInvoices;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.WriteStay;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -39,7 +42,8 @@ public class PmsStays {
   public static final String ROOM_ONLY = "Solo alojamiento";
 
   /** What became of a command. */
-  public enum Outcome { WRITTEN, CANCELLED, NO_SHOW, KEPT_BY_THE_DESK, STALE, UNKNOWN_STAY, CATALOGUE, DUPLICATE, OTHER_HOTEL }
+  public enum Outcome { WRITTEN, CANCELLED, NO_SHOW, KEPT_BY_THE_DESK, STALE, UNKNOWN_STAY, CATALOGUE, DUPLICATE, OTHER_HOTEL,
+    RECEPTION }
 
   final String pmsHotel;
   final StayRepository stays;
@@ -51,10 +55,13 @@ public class PmsStays {
   public static final String CONSUMER = "front-office";
 
   final Inbox inbox;
+  final ReceptionReports reception;
+  final StayInvoices invoices;
   final Clock clock = Clock.systemUTC();
 
   public PmsStays(@Value("${frontoffice.pms-hotel:XMAR}") String pmsHotel, StayRepository stays, WalkIns walkIns,
-      StayWrites writes, PmsCatalogue catalogue, PmsLinks links, Inbox inbox) {
+      StayWrites writes, PmsCatalogue catalogue, PmsLinks links, Inbox inbox, ReceptionReports reception,
+      StayInvoices invoices) {
     this.pmsHotel = pmsHotel;
     this.stays = stays;
     this.walkIns = walkIns;
@@ -62,6 +69,8 @@ public class PmsStays {
     this.catalogue = catalogue;
     this.links = links;
     this.inbox = inbox;
+    this.reception = reception;
+    this.invoices = invoices;
   }
 
   public String pmsHotel() {
@@ -74,6 +83,7 @@ public class PmsStays {
     var hotel = switch (command) {
       case WriteStay w -> w.pmsHotelCode();
       case ReplaceCatalogue c -> c.pmsHotelCode();
+      case RecordReception r -> r.pmsHotelCode();
     };
     if (!pmsHotel.equals(hotel)) {
       log.debug("Command {} is for PMS property {}, not {}: not this front office's", command.commandId(), hotel, pmsHotel);
@@ -91,7 +101,54 @@ public class PmsStays {
         log.info("PMS catalogue of {}: {} entries", c.pmsHotelCode(), c.entries() == null ? 0 : c.entries().size());
         yield Outcome.CATALOGUE;
       }
+      case RecordReception r -> record(r);
     };
+  }
+
+  /**
+   * How the PMS took what the desk did: refused — the stay says why, and the process in the PMS waits
+   * on a cause someone resolves —, the room the PMS put the guests in, the check-out's invoice.
+   */
+  Outcome record(RecordReception r) {
+    var stayId = links.byPmsReservation(r.pmsReservationId()).map(PmsLinks.Link::stayId)
+        .or(() -> Optional.ofNullable(r.stayId()).filter(id -> stays.findById(id).isPresent()));
+    if (stayId.isEmpty()) {
+      log.info("PMS reservation {}: {} for a stay this front office does not have", r.pmsReservationId(), r.operation());
+      return Outcome.UNKNOWN_STAY;
+    }
+    var id = stayId.get();
+    var what = switch (r.operation()) {
+      case CHECK_IN -> "check-in";
+      case CHECK_OUT -> "check-out";
+      case NO_SHOW -> "no show";
+    };
+    if (r.refused()) {
+      links.state(id, "Opera: rechazado (" + what + ") — " + (r.detail() == null ? "sin motivo" : r.detail()));
+      log.warn("{}: the PMS refused its {}: {}", id, what, r.detail());
+      return Outcome.RECEPTION;
+    }
+    switch (r.operation()) {
+      case CHECK_IN -> {
+        var stay = stays.findById(id).orElseThrow();
+        // The PMS is the master of the stay: the room it has the guests in is the stay's.
+        if (r.roomNumber() != null && !r.roomNumber().isBlank() && !r.roomNumber().equals(stay.roomNumber())
+            && stay.status() != io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED) {
+          stays.save(stay.assignRoom(r.roomNumber(), stay.roomType()));
+        }
+        links.state(id, "Opera: en casa" + (r.roomNumber() == null ? "" : " · hab. " + r.roomNumber()));
+      }
+      case CHECK_OUT -> {
+        if (r.invoice() != null) {
+          invoices.save(id, r.invoice(), clock.instant());
+        }
+        links.state(id, "Opera: salida registrada" + (r.invoice() == null || r.invoice().number() == null ? ""
+            : " · factura " + r.invoice().number()));
+      }
+      case NO_SHOW -> links.state(id, "Opera: no show anotado; el CRS aplica su cargo");
+    }
+    log.info("{}: the PMS recorded its {}{}", id, what, r.invoice() == null ? "" : " — invoice " + r.invoice().number()
+        + (r.invoice().pdf() == null ? " (figures only)" : " (with its document)"));
+    return Outcome.RECEPTION;
   }
 
   Outcome write(WriteStay w) {
@@ -103,7 +160,7 @@ public class PmsStays {
       return Outcome.STALE;
     }
     var status = w.status() == null ? FrontOfficeCommand.PmsStatus.RESERVED : w.status();
-    if (status != FrontOfficeCommand.PmsStatus.RESERVED) {
+    if (status == FrontOfficeCommand.PmsStatus.CANCELLED || status == FrontOfficeCommand.PmsStatus.NO_SHOW) {
       if (found.isEmpty()) {
         log.info("PMS reservation {} is {} and never was a stay here: nothing to do", w.pmsReservationId(), status);
         return Outcome.UNKNOWN_STAY;
@@ -131,6 +188,18 @@ public class PmsStays {
     links.link(stayId, w.pmsReservationId(), w.pmsVersion(), ratePlan(w));
     walkInOf(w).ifPresent(walkIn -> walkIns.save(walkIn.cameBack(w.crsLocator() != null ? w.crsLocator() : walkIn.locator(),
         w.pmsReservationId(), clock.instant())));
+    // The reception's, as the PMS holds it now: the stay says so. What the desk did before the stay was
+    // linked (a walk-in's check-in) goes up now.
+    switch (status) {
+      case IN_HOUSE -> {
+        if (!links.stateOf(stayId).orElse("").startsWith("Opera: en casa")) {
+          links.state(stayId, "Opera: en casa");
+        }
+      }
+      case CHECKED_OUT -> links.state(stayId, "Opera: salida registrada" + invoices.of(stayId)
+          .map(i -> i.number() == null ? "" : " · factura " + i.number()).orElse(""));
+      default -> stays.findById(stayId).ifPresent(reception::pendingLink);
+    }
     log.info("PMS reservation {} v{} written onto stay {} ({})", w.pmsReservationId(), w.pmsVersion(), stayId,
         written.created() ? "new" : "changed");
     return Outcome.WRITTEN;

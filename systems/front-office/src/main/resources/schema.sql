@@ -192,6 +192,23 @@ alter table stay add column if not exists pms_reservation_id varchar(64);
 alter table stay add column if not exists pms_version varchar(32);
 alter table stay add column if not exists rate_plan varchar(200);
 create index if not exists stay_pms_reservation on stay (pms_reservation_id);
+-- Where the reception's operations stand in the PMS (the master of the stay), in the desk's words:
+-- «Opera: pendiente — check-in enviado», «Opera: en casa», «Opera: rechazado — motivo».
+alter table stay add column if not exists pms_state varchar(500);
+
+-- The invoice the PMS issued at the check-out (the PMS is the master of the folio): its number and
+-- figures, and its document when the PMS gave one. None: the desk's «Abrir factura» is the front
+-- office's proforma, labelled as such.
+create table if not exists stay_invoice (
+    stay_id      varchar(64)   primary key,
+    source       varchar(20)   not null,
+    number       varchar(40),
+    invoice_date date,
+    amount       decimal(12, 2),
+    currency     varchar(3),
+    pdf          bytea,
+    received_at  timestamp     not null
+);
 
 -- The PMS's catalogue of the property — room types, rate plans, packages, rooms — in its words: what
 -- the stays it sends are read with. Replaced whole each time the integration sends it.

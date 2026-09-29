@@ -13,6 +13,7 @@ import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged;
 import io.mateu.ecdemo1.integration.model.customer.CustomersMerged;
 import io.mateu.ecdemo1.integration.model.customer.GoldenRecord;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
+import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationResolved;
@@ -85,9 +86,11 @@ class PublishedLanguageTest {
                         .messages(ProjectReservation.class)
                         .example(new ProjectReservation("CMD-3", "MRU01", "12E45", "backfill:R1")),
                 TopicSpec.topic("no-show-reports")
-                        .describedAs("The hotel says a reservation's guests have not arrived; the CRS cancels it as a no-show.")
+                        .describedAs("The hotel says a reservation's guests have not arrived; the CRS cancels it as a no-show. "
+                                + "The front office no longer sends it: its no-show goes up to the PMS (front-office-events), "
+                                + "which reports it to the CRS through the engine. Kept for whoever reports one directly.")
                         .ownedBy("crs-integration-service").keyedBy("hotelCode/locator")
-                        .producedBy("front-office").consumedBy("crs-integration-service")
+                        .consumedBy("crs-integration-service")
                         .messages(ReportNoShow.class)
                         .example(new ReportNoShow("CMD-4", "MRU01", "12E45", "front office")),
                 TopicSpec.topic("mapping-commands")
@@ -103,7 +106,8 @@ class PublishedLanguageTest {
                                 new MappingCommand.RecordPartnerProfile("CMD-8", "NORDTRAVEL", "16120699", "Agent")),
                 TopicSpec.topic("front-office-commands")
                         .describedAs("What the front office is told: a stay written as the PMS has it, a property's "
-                                + "catalogue replaced whole.")
+                                + "catalogue replaced whole, how the PMS took what the reception did (refused, the room, "
+                                + "the check-out's invoice).")
                         .ownedBy("front-office").keyedBy("pmsHotelCode/pmsReservationId, or pmsHotelCode for a catalogue")
                         .producedBy("pms-integration-service", "integrations-service").consumedBy("front-office")
                         .messages(FrontOfficeCommand.class)
@@ -117,7 +121,24 @@ class PublishedLanguageTest {
                                         new FrontOfficeCommand.CatalogueEntry(FrontOfficeCommand.CatalogueType.ROOM_TYPE,
                                                 "KNG", "King", null),
                                         new FrontOfficeCommand.CatalogueEntry(FrontOfficeCommand.CatalogueType.ROOM,
-                                                "101", "Room 101", "KNG")))),
+                                                "101", "Room 101", "KNG"))),
+                                new FrontOfficeCommand.RecordReception("CMD-11", "XMAR", "123456", "12E45",
+                                        FrontOfficeCommand.ReceptionOperation.CHECK_OUT, false, "Checked out in Opera", "205",
+                                        new FrontOfficeCommand.Invoice("OPERA", "XMAR377", LocalDate.of(2026, 11, 7),
+                                                new BigDecimal("312.40"), "EUR", "JVBERi0xLjQK"))),
+                TopicSpec.topic("front-office-events")
+                        .describedAs("What happened at a hotel's reception — a guest checked in, checked out, nobody "
+                                + "came. The PMS is the master of the stay: the pms-fo integration records each in it "
+                                + "through the engine, and a no-show goes on to the CRS for its fee.")
+                        .ownedBy("front-office").keyedBy("hotelCode/stayId")
+                        .producedBy("front-office").consumedBy("integrations-service")
+                        .messages(FrontOfficeEvent.class)
+                        .example(new FrontOfficeEvent.GuestCheckedIn("E-4", AT, "MRU01", "12E45", "12E45", "XMAR",
+                                        "123456", "205", 2, "ana"),
+                                new FrontOfficeEvent.GuestCheckedOut("E-5", AT, "MRU01", "12E45", "12E45", "XMAR",
+                                        "123456", "205", "ana"),
+                                new FrontOfficeEvent.NoShowReported("E-6", AT, "MRU01", "12E45", "12E45", "XMAR",
+                                        "123456", 2, "ana")),
                 TopicSpec.topic("pms-reservations")
                         .describedAs("A reservation written in the PMS — for whoever follows the PMS (the pms-fo integration).")
                         .ownedBy("pms-integration-service").keyedBy("pmsHotelCode/pmsReservationId")

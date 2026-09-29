@@ -343,6 +343,30 @@ class MappingTest {
         assertThat(consume("notifications", r -> r.value().contains("PROPOSAL_READY"), 1, 10)).isNotEmpty();
     }
 
+    @Test
+    void aReceptionProcessIsRelaunchedWithItsStay() throws Exception {
+        var key = "registrar-checkin:MRU01/GSX4AK";
+        var cause = "PMS_REJECTED:MRU01:GSX4AK:check-in-reservation";
+        causesService.await(key, "registrar-checkin", "MRU01", "GSX4AK", List.of(
+                        new Variable("definitionId", "registrar-checkin"), new Variable("processKey", key),
+                        new Variable("hotelCode", "MRU01"), new Variable("locator", "GSX4AK"),
+                        new Variable("pmsHotelCode", "XMAR"), new Variable("pmsReservationId", "39486034"),
+                        new Variable("stayId", "GSX4AK"), new Variable("roomNumber", "205"),
+                        new Variable("checkInOutcome", "WAIT")),
+                List.of(new io.mateu.ecdemo1.integration.model.mapping.Cause(cause,
+                        io.mateu.ecdemo1.integration.model.mapping.CauseType.PMS_REJECTED, "room dirty")));
+        causesService.resolve(cause, "ana");
+
+        causesService.relaunch(key);
+
+        var successors = consume("upstream", r -> r.value().contains("process-creation-requested")
+                && r.value().contains(key + ">r"), 1, 8);
+        assertThat(successors).singleElement().satisfies(r -> assertThat(variables(json(r.value())))
+                .containsEntry("pmsHotelCode", "XMAR").containsEntry("pmsReservationId", "39486034")
+                .containsEntry("stayId", "GSX4AK").containsEntry("roomNumber", "205")
+                .containsEntry("processKey", key + ">r").doesNotContainKey("checkInOutcome"));
+    }
+
     void waitOn(String processKey, String causeKey) {
         causesService.await(processKey, "proyectar-reserva", "PMI01", "L2",
                 List.of(new Variable("locator", "L2"), new Variable("hotelCode", "PMI01")),

@@ -49,15 +49,39 @@ La integración PMS → front office: relee de Opera una reserva —del CRS o na
 en el front office como estancia, ordenada por la última modificación de Opera. Un solo paso:
 `project-stay` (`pms-integration`). Ver [De Opera al front office](/integracion/pms-a-front-office/).
 
+## La recepción, al PMS: `registrar-checkin`, `registrar-checkout`, `registrar-no-show-pms`
+
+El PMS es el maestro de la estancia: lo que hace recepción sube a él. El front office escribe en su
+outbox `front-office-events` (`guest-checked-in`, `guest-checked-out`, `no-show-reported`) en la
+transacción de la decisión; `integrations-service`, si la integración pms-fo de la propiedad está
+activa, arranca el proceso con clave `<proceso>:<hotel>/<localizador>` (el hotel y localizador del CRS,
+o la propiedad y la reserva de Opera si nació en Opera). Las escrituras en Opera van dentro del candado
+`reservation` (`hotelCode + '/' + locator`), el mismo que toman `proyectar-reserva` y
+`proyectar-cancelacion`. Un rechazo de Opera es una causa `PMS_REJECTED` con su aviso en la bandeja, el
+proceso espera y se relanza al resolverla (el sucesor conserva la estancia, la habitación y la reserva
+de Opera); el front office muestra «Opera: rechazado — motivo». Lo transitorio se reintenta.
+
+- **`registrar-checkin`**: `assign-room` (la habitación que dio recepción; sin ella, la de Opera o la
+  primera que sugiere) → `check-in-reservation`. Opera solo admite el check-in de una llegada en su
+  **fecha de negocio** (XMAR: 2026-05-13; si no, FOF00067). Hecho, la proyección de la estancia
+  devuelve «en casa» al front office.
+- **`registrar-checkout`**: `check-out-reservation` (con el cajero de la integración,
+  `OPERA_CASHIER_ID`) → `fetch-invoice` (la factura que emitió Opera, al front office). Un saldo
+  pendiente en Opera es una causa.
+- **`registrar-no-show-pms`**: `record-no-show` (un comentario «No show» en la reserva de Opera: por
+  API no hay «No Show», lo pone la auditoría nocturna) → `report-no-show` (`crs-integration`), que
+  arranca `registrar-no-show`.
+
 ## `registrar-no-show` — Registrar no-show
 
-El hotel dice que los huéspedes de una reserva no han llegado y el CRS la cancela como no-show con su
-cargo. Un solo paso: `register-no-show` (`booking`). Lo que cuesta baja a Opera y al front office por
-la proyección de la cancelación.
+El CRS, maestro de la venta, cancela la reserva como no-show con su cargo. Un solo paso:
+`register-no-show` (`booking`). Lo arranca `report-no-show` después de que el PMS lo registre (o
+`POST /no-shows` de crs-integration). Lo que cuesta baja a Opera y al front office por la proyección de
+la cancelación.
 
 :::note[Solo en la PoC]
 En producción el no-show lo marca el **Night Audit de Opera** y el front office solo lo refleja. El
-flujo «recepción marca no show → el CRS cobra» existe para enseñarlo en la demo.
+flujo «recepción marca no show → el PMS lo anota → el CRS cobra» existe para enseñarlo en la demo.
 :::
 
 ## `alta-integracion` — Alta de integración

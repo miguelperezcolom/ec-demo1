@@ -53,7 +53,7 @@ public class TempoClient {
         var filter = text == null || text.isBlank()
                 ? "span.booking.locator != \"\""
                 : "span.booking.locator =~ \".*" + quote(regex(text.trim().toUpperCase())) + ".*\"";
-        return search("{ " + filter + " } | select(span.booking.locator, span.hotel.code)", limit);
+        return search("{ " + filter + " } | select(span.booking.locator, span.hotel.code, span.booking.event)", limit);
     }
 
     public Optional<JsonNode> trace(String traceId) {

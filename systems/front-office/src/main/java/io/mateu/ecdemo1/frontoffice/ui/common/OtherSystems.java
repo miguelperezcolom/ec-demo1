@@ -20,7 +20,21 @@ public final class OtherSystems {
   private OtherSystems() {}
 
   public static Component of(String stayId) {
-    var links = CrossLinks.of(stayId);
+    var links = new java.util.ArrayList<CrossLinks.Link>();
+    // The PMS is the master of the stay: which Opera reservation it is, and where the desk's check-in,
+    // check-out or no-show stands there.
+    var pms = FrontOffice.pmsReservation(stayId);
+    var state = FrontOffice.pmsState(stayId);
+    if (pms.isPresent() || state.isPresent()) {
+      links.add(new CrossLinks.Link("Opera", pms.map(id -> "Reserva " + id).orElse("Reserva sin enlazar")
+          + state.map(s -> " — " + s).orElse(""), null));
+    }
+    // A closed stay's invoice: the PMS's, or the front office's proforma — in a tab of its own.
+    var stay = FrontOffice.stayView(stayId).stay();
+    if (stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED) {
+      links.add(new CrossLinks.Link("Factura", FrontOffice.invoice(stayId).label(), FrontOffice.invoiceLink(stayId)));
+    }
+    links.addAll(CrossLinks.of(stayId));
     if (links.isEmpty()) {
       return Text.builder().text("Esta estancia no viene de la central de reservas.").noMargins(true).build();
     }
@@ -40,7 +54,7 @@ public final class OtherSystems {
     return Element.html("div", Map.of("style", "width: 100%;"), html.toString());
   }
 
-  static String escape(String text) {
+  public static String escape(String text) {
     if (text == null) {
       return "";
     }

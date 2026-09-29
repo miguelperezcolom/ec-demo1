@@ -6,6 +6,8 @@ public enum Kind {
     MODIFIED("Modificada"),
     CANCELLED("Cancelada"),
     NO_SHOW("No-show"),
+    CHECK_IN("Check-in"),
+    CHECK_OUT("Check-out"),
     WALK_IN("Walk-in"),
     BACKFILL("Reproyectada (backfill)"),
     RELAUNCH("Reanudada tras resolver sus causas"),
@@ -31,6 +33,8 @@ public enum Kind {
             case "reservation-modified" -> MODIFIED;
             case "reservation-cancelled" -> CANCELLED;
             case "no-show" -> NO_SHOW;
+            case "check-in" -> CHECK_IN;
+            case "check-out" -> CHECK_OUT;
             case "backfill" -> BACKFILL;
             case "relaunch" -> RELAUNCH;
             default -> null;

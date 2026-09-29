@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  */
 public final class JourneyMapper {
 
-    static final Pattern OPERA_RESERVATION = Pattern.compile("/rsv/v1/hotels/([^/?]+)/reservations/([^/?]+)");
+    static final Pattern OPERA_RESERVATION = Pattern.compile("/(?:rsv|fof|csh)/v1/hotels/([^/?]+)/reservations/([^/?]+)");
     static final Pattern OPERA_RESERVATIONS = Pattern.compile("/rsv/v1/hotels/([^/?]+)/reservations");
     static final Pattern OPERA_PROFILE = Pattern.compile("/crm/v1/profiles/([^/?]+)");
     static final Pattern OPERA_XREF = Pattern.compile("xref=OPERA:([^&]+)");
@@ -430,6 +430,20 @@ public final class JourneyMapper {
                 return hop(Lane.FRONT_OFFICE, span, "Walk-in vendido en recepción", "Un huésped sin reserva en el mostrador",
                         Tone.OK, null);
             }
+            if (span.parentId() == null) {
+                var what = Kind.ofEvent(event);
+                if (what == Kind.CHECK_IN) {
+                    return hop(Lane.FRONT_OFFICE, span, "Check-in en recepción", "Sube al PMS, el maestro de la estancia", Tone.OK, null);
+                }
+                if (what == Kind.CHECK_OUT) {
+                    return hop(Lane.FRONT_OFFICE, span, "Check-out en recepción", "Sube al PMS, el maestro de la estancia y del folio",
+                            Tone.OK, null);
+                }
+                if (what == Kind.NO_SHOW) {
+                    return hop(Lane.FRONT_OFFICE, span, "No show en recepción", "Nadie de la reserva ha llegado: sube al PMS y de él al CRS",
+                            Tone.OK, null);
+                }
+            }
             return null;
         }
 
@@ -443,6 +457,13 @@ public final class JourneyMapper {
         }
 
         Hop integrations(TraceSpan span) {
+            if (span.has("eventconductor.business-key") && java.util.Set.of("check-in", "check-out", "no-show")
+                    .contains(span.attr("booking.event"))) {
+                var key = span.attr("eventconductor.business-key");
+                var workflow = key == null ? null : key.substring(0, key.indexOf(':') > 0 ? key.indexOf(':') : key.length());
+                return hop(Lane.ENGINE, span, "La integración pms-fo lo recibe",
+                        workflow == null ? "Lo que hizo recepción, al PMS" : "Arranca «" + workflowName(workflow) + "»", Tone.OK, null);
+            }
             if (span.parentId() == null && span.isServer()) {
                 return hop(Lane.MAPPING, span, "Se resuelve lo que faltaba", "Desde la integración del hotel", Tone.OK, null);
             }
@@ -508,6 +529,21 @@ public final class JourneyMapper {
                         : "El CRS guarda que en Opera es la " + operaReservationId;
                 case "resolve-projection" -> "Libera lo que esperaba a que la reserva llegase a Opera";
                 case "register-no-show" -> "El CRS cancela la reserva como no-show y aplica su penalización";
+                case "assign-room" -> join(task.containsKey("opera.refused") ? "Opera no la asigna: " + task.get("opera.refused")
+                        : task.containsKey("opera.room") ? "Habitación " + task.get("opera.room") + " asignada en Opera"
+                        : "La habitación que dio recepción, en Opera (ya la tenía)", calls);
+                case "check-in-reservation" -> join(task.containsKey("opera.refused") ? "Opera rechaza el check-in: " + task.get("opera.refused")
+                        : "already-in-house".equals(task.get("opera.action")) ? "Opera ya la tenía en casa: no se escribe"
+                        : "Check-in hecho en Opera" + (task.containsKey("opera.room") ? ", habitación " + task.get("opera.room") : ""), calls);
+                case "check-out-reservation" -> join(task.containsKey("opera.refused") ? "Opera rechaza el check-out: " + task.get("opera.refused")
+                        : "already-checked-out".equals(task.get("opera.action")) ? "Opera ya la tenía fuera: no se escribe"
+                        : "Check-out hecho en Opera, con el cajero de la integración", calls);
+                case "fetch-invoice" -> join(task.containsKey("opera.invoice") ? "Factura " + task.get("opera.invoice")
+                        + " de Opera, al front office" : "Opera no emitió factura: el front office ofrece su proforma", calls);
+                case "record-no-show" -> join(task.containsKey("opera.refused") ? "Opera no lo admite: " + task.get("opera.refused")
+                        : "no-show-kept".equals(task.get("opera.action")) ? "Opera ya lo tenía: no se escribe"
+                        : "No-show anotado en la reserva de Opera (su estado «No Show» lo pone la auditoría nocturna)", calls);
+                case "report-no-show" -> "La integración crs-pms lo sube al CRS: arranca «Registrar no-show»";
                 default -> calls;
             };
         }
@@ -525,6 +561,8 @@ public final class JourneyMapper {
                 case "updated" -> "Reserva " + id + " actualizada en Opera" + hotelText + versionText;
                 case "stale" -> "Opera ya tenía la reserva " + id + " en esta versión o una más nueva: no se escribe";
                 case "cancelled", "no-show" -> "Reserva " + id + " cancelada en Opera";
+                case "checked-in" -> "Reserva " + id + " en casa en Opera" + hotelText;
+                case "checked-out" -> "Reserva " + id + " con salida en Opera" + hotelText;
                 default -> "Reserva " + id + " en Opera" + hotelText + versionText;
             };
         }
@@ -609,7 +647,8 @@ public final class JourneyMapper {
                     .orElse(spans.stream().mapToLong(TraceSpan::startNanos).min().orElse(0));
             var end = spans.stream().mapToLong(TraceSpan::endNanos).max().orElse(start);
             var kind = kind();
-            var toOpera = operaWrittenAt > 0 ? Duration.ofNanos(operaWrittenAt - start) : stepEnd(start, "upsert-reservation", "cancel-reservation");
+            var toOpera = operaWrittenAt > 0 ? Duration.ofNanos(operaWrittenAt - start) : stepEnd(start, "upsert-reservation", "cancel-reservation",
+                    "check-in-reservation", "check-out-reservation", "record-no-show");
             var toFrontOffice = frontOfficeAt > 0 ? Duration.ofNanos(frontOfficeAt - start) : null;
             Outcome outcome;
             String detail;
@@ -652,8 +691,15 @@ public final class JourneyMapper {
             if (tagged != null) {
                 return tagged;
             }
-            if (spans.stream().anyMatch(s -> s.isServer() && s.name().endsWith("/no-shows"))) {
+            if (spans.stream().anyMatch(s -> s.isServer() && s.name().endsWith("/no-shows"))
+                    || processes.values().stream().anyMatch(p -> "registrar-no-show-pms".equals(p.workflowId()))) {
                 return Kind.NO_SHOW;
+            }
+            if (processes.values().stream().anyMatch(p -> "registrar-checkin".equals(p.workflowId()))) {
+                return Kind.CHECK_IN;
+            }
+            if (processes.values().stream().anyMatch(p -> "registrar-checkout".equals(p.workflowId()))) {
+                return Kind.CHECK_OUT;
             }
             if (walkIn) {
                 return Kind.WALK_IN;
@@ -711,6 +757,19 @@ public final class JourneyMapper {
         if (uri.contains("cancellations") || (url(span) != null && url(span).contains("cancellations"))) {
             return new OperaWrite("cancelled", true);
         }
+        var full = url(span) == null ? uri : uri + " " + url(span);
+        if (full.contains("/checkIns")) {
+            return new OperaWrite("checked-in", true);
+        }
+        if (full.contains("/checkOuts")) {
+            return new OperaWrite("checked-out", true);
+        }
+        if (full.contains("/roomAssignments")) {
+            return new OperaWrite("room-assigned", true);
+        }
+        if (full.contains("/csh/v1/") && full.contains("/folios")) {
+            return new OperaWrite("invoice", false);
+        }
         if (uri.startsWith("/rsv/v1/hotels/{h}/reservations")) {
             if (uri.contains("deposit") || uri.contains("payment")) {
                 return new OperaWrite("deposit", false);
@@ -730,7 +789,8 @@ public final class JourneyMapper {
         var client = span.attr("client.name");
         var url = url(span);
         return (client != null && client.contains("hospitality-api"))
-                || (url != null && (url.contains("/rsv/v1/") || url.contains("/crm/v1/")));
+                || (url != null && (url.contains("/rsv/v1/") || url.contains("/crm/v1/") || url.contains("/fof/v1/")
+                        || url.contains("/csh/v1/")));
     }
 
     static boolean isProcess(TraceSpan span) {
@@ -781,6 +841,9 @@ public final class JourneyMapper {
             case "proyectar-cancelacion" -> "Proyectar cancelación";
             case "proyectar-estancia" -> "Proyectar estancia";
             case "registrar-no-show" -> "Registrar no-show";
+            case "registrar-checkin" -> "Registrar check-in";
+            case "registrar-checkout" -> "Registrar check-out";
+            case "registrar-no-show-pms" -> "Registrar no-show en el PMS";
             default -> workflowId;
         };
     }

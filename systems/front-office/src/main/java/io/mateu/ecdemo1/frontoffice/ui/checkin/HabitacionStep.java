@@ -52,7 +52,8 @@ public class HabitacionStep implements WizardStep {
   Callable<Component> habitaciones =
       () -> {
         var stay = FrontOffice.stayView(stayId).stay();
-        var floor = FrontOffice.roomsOnFloor(12);
+        // The PMS's rooms of the stay's type, as Opera has them now (the check-in assigns the chosen one there).
+        var floor = FrontOffice.roomsFor(stay, 12);
         return ResourceGrid.builder()
             .style("width: 100%;")
             .actionId("pickRoom")

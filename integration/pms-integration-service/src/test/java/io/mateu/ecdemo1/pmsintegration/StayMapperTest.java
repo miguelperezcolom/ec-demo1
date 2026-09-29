@@ -159,6 +159,14 @@ class StayMapperTest {
     }
 
     @Test
+    void guestsOperaHasInTheHouseOrCheckedOutAreSoForTheFrontOffice() throws Exception {
+        assertThat(StayMapper.toWriteStay("XMAR", reservation("InHouse", "", CRS_REFS), NO_CUSTOMER).status())
+                .isEqualTo(PmsStatus.IN_HOUSE);
+        assertThat(StayMapper.toWriteStay("XMAR", reservation("CheckedOut", "", CRS_REFS), NO_CUSTOMER).status())
+                .isEqualTo(PmsStatus.CHECKED_OUT);
+    }
+
+    @Test
     void aTravelAgentOnTheReservationIsWhoSoldIt() throws Exception {
         var node = (com.fasterxml.jackson.databind.node.ObjectNode) reservation("Reserved", "", CRS_REFS);
         node.set("reservationProfiles", JSON.readTree("""

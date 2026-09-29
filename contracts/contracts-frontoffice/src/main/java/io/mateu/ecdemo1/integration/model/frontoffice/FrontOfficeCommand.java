@@ -22,6 +22,7 @@ import java.util.List;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = FrontOfficeCommand.WriteStay.class, name = "write-stay"),
         @JsonSubTypes.Type(value = FrontOfficeCommand.ReplaceCatalogue.class, name = "replace-catalogue"),
+        @JsonSubTypes.Type(value = FrontOfficeCommand.RecordReception.class, name = "record-reception"),
 })
 public sealed interface FrontOfficeCommand {
 
@@ -46,7 +47,11 @@ public sealed interface FrontOfficeCommand {
         /** Cancelled in the PMS: a stay still to arrive is cancelled; one in the house is the desk's. */
         CANCELLED,
         /** Cancelled as a no-show: the stay costs what the PMS still charges ({@code total}). */
-        NO_SHOW
+        NO_SHOW,
+        /** Checked in in the PMS: the guests are in the house. */
+        IN_HOUSE,
+        /** Checked out in the PMS: the guests left, the PMS closed the folio. */
+        CHECKED_OUT
     }
 
     /**
@@ -76,6 +81,45 @@ public sealed interface FrontOfficeCommand {
                      Person holder, List<Person> companions, String roomTypeCode, String ratePlanCode,
                      String boardCode, LocalDate checkIn, LocalDate checkOut, int pax, String agency,
                      BigDecimal total, String currency) implements FrontOfficeCommand {
+        @Override
+        public String key() {
+            return pmsHotelCode + "/" + pmsReservationId;
+        }
+    }
+
+    /** What the reception did that the PMS was asked to record (a {@link FrontOfficeEvent}). */
+    enum ReceptionOperation {
+        CHECK_IN, CHECK_OUT, NO_SHOW
+    }
+
+    /**
+     * The invoice the PMS produced at the check-out — the PMS is the master of the folio.
+     *
+     * @param source   who produced it: {@code OPERA} for the PMS's own document
+     * @param number   the PMS's folio number, as the PMS prints it ({@code XMAR377})
+     * @param date     the folio's date (the PMS's business date)
+     * @param amount   what the folio adds up to
+     * @param pdf      the printable document, base 64 — null when the PMS gave the figures but no document
+     */
+    record Invoice(String source, String number, LocalDate date, BigDecimal amount, String currency, String pdf) {
+    }
+
+    /**
+     * How the PMS took what the reception did — told to the front office by the process that recorded
+     * it. The state it brought about comes back by {@link WriteStay} (in the house, checked out); this
+     * says what that one cannot: the PMS refused, and why; the room the PMS put the guests in; the
+     * invoice of the check-out.
+     *
+     * @param stayId     the front office's stay the operation was about
+     * @param refused    whether the PMS refused it: {@code detail} says why, and the process waits on a
+     *                   cause someone resolves
+     * @param detail     the PMS's words, when refused; otherwise what was done
+     * @param roomNumber the room the PMS has the guests in, after a check-in
+     * @param invoice    the PMS's invoice, after a check-out; null otherwise, or when the PMS gave none
+     */
+    record RecordReception(String commandId, String pmsHotelCode, String pmsReservationId, String stayId,
+                           ReceptionOperation operation, boolean refused, String detail, String roomNumber,
+                           Invoice invoice) implements FrontOfficeCommand {
         @Override
         public String key() {
             return pmsHotelCode + "/" + pmsReservationId;

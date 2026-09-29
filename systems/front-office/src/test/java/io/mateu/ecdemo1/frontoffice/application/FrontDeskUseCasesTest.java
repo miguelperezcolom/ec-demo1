@@ -44,6 +44,7 @@ class FrontDeskUseCasesTest {
   @Autowired CheckInOpsRepository ops;
   @Autowired WalkIns walkInStore;
   @Autowired CommandOutbox outbox;
+  @Autowired io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks pmsLinks;
 
   @Test
   void aCheckInMovesTheStayInOccupiesTheRoomOpensTheFolioAndClosesTheExtras() {
@@ -131,7 +132,23 @@ class FrontDeskUseCasesTest {
   }
 
   @Test
-  void whenNobodyOfTheReservationArrivesTheCrsIsToldAndAMarkCanBeTakenBack() {
+  void aCheckInAndACheckOutGoUpToThePmsWithTheirTransactions() {
+    var a = Fixtures.arrival(guests, stays, rooms, 2);
+
+    checkIn.checkIn(a.stayId(), null, List.of());
+    checkOut.checkOut(a.stayId());
+
+    // Events of the desk, for the PMS (the master of the stay), in the outbox with the decisions.
+    assertThat(outbox.all(CommandOutbox.FRONT_OFFICE_EVENTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
+        .extracting(e -> e.type()).containsExactly("GuestCheckedIn", "GuestCheckedOut");
+    assertThat(outbox.all(CommandOutbox.FRONT_OFFICE_EVENTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
+        .first().satisfies(e -> assertThat(e.payload()).contains("\"type\":\"guest-checked-in\"",
+            "\"crsLocator\":\"" + a.stayId() + "\"", "\"roomNumber\":\"" + a.room() + "\"", "\"pmsHotelCode\":\"XMAR\""));
+    assertThat(pmsLinks.stateOf(a.stayId())).contains("Opera: pendiente — check-out enviado");
+  }
+
+  @Test
+  void whenNobodyOfTheReservationArrivesThePmsIsToldAndAMarkCanBeTakenBack() {
     var a = Fixtures.arrival(guests, stays, rooms, 2);
 
     var first = noShows.paxToggled(a.stayId(), 1);
@@ -141,11 +158,12 @@ class FrontDeskUseCasesTest {
 
     var all = noShows.paxToggled(a.stayId(), 2);
     assertThat(all.nobodyArrived()).isTrue();
-    assertThat(all.crsNotice()).contains("Se comunica al CRS");
-    // The report is a command for the CRS adapter, in the outbox with the mark.
-    assertThat(outbox.all(CommandOutbox.NO_SHOW_REPORTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
+    assertThat(all.crsNotice()).contains("Se comunica a Opera");
+    // An event for the PMS — which records it and reports it to the CRS —, in the outbox with the mark.
+    assertThat(outbox.all(CommandOutbox.FRONT_OFFICE_EVENTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
         .singleElement().satisfies(e -> assertThat(e.payload())
-            .contains("\"hotelCode\":\"MRU01\"", "\"locator\":\"" + a.stayId() + "\"", "\"commandId\":\"NS-"));
+            .contains("\"type\":\"no-show-reported\"", "\"hotelCode\":\"MRU01\"", "\"crsLocator\":\"" + a.stayId() + "\"",
+                "\"eventId\":\"NS-"));
 
     var back = noShows.paxToggled(a.stayId(), 1);
     assertThat(back.noShow()).isFalse();

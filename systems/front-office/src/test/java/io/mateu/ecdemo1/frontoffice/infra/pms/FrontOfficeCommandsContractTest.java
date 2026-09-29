@@ -39,5 +39,13 @@ class FrontOfficeCommandsContractTest {
             assertThat(c).isInstanceOf(FrontOfficeCommand.ReplaceCatalogue.class);
             assertThat(((FrontOfficeCommand.ReplaceCatalogue) c).entries()).isNotEmpty();
         });
+        assertThat(taken.getAllValues()).anySatisfy(c -> {
+            assertThat(c).isInstanceOf(FrontOfficeCommand.RecordReception.class);
+            var reception = (FrontOfficeCommand.RecordReception) c;
+            assertThat(reception.operation()).isEqualTo(FrontOfficeCommand.ReceptionOperation.CHECK_OUT);
+            assertThat(reception.invoice().number()).isEqualTo("XMAR377");
+            assertThat(reception.invoice().date()).isNotNull();
+            assertThat(reception.invoice().pdf()).isNotBlank();
+        });
     }
 }

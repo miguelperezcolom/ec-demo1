@@ -65,11 +65,14 @@ class TaskHandlersTest {
 
     final RecordingOutbox outbox = new RecordingOutbox();
     final NoTransactions transactions = new NoTransactions();
-    final TaskHandlers handlers = new TaskHandlers(outbox, transactions);
+    final io.mateu.ecdemo1.crsintegration.noshow.NoShowReports noShows =
+            org.mockito.Mockito.mock(io.mateu.ecdemo1.crsintegration.noshow.NoShowReports.class);
+    final TaskHandlers handlers = new TaskHandlers(outbox, transactions, noShows);
     final RecordingSink sink = new RecordingSink();
     final CrsTasks tasks = new CrsTasks();
     final TaskDispatcher dispatcher = new TaskDispatcher(new TaskRegistry(List.of(
-            tasks.annotatePmsReferenceTask(handlers), tasks.annotatePartnerProfileTask(handlers))),
+            tasks.annotatePmsReferenceTask(handlers), tasks.annotatePartnerProfileTask(handlers),
+            tasks.reportNoShowTask(handlers))),
             sink, Cancellations.NONE, false, TaskTracing.NOOP);
 
     /** What the runtime would answer the engine. */
@@ -115,6 +118,20 @@ class TaskHandlersTest {
         assertThat(sink.replies).containsExactly("COMPLETED TE-1 []");
         assertThat(new ObjectMapper().writeValueAsString(outbox.written.getFirst()))
                 .contains("\"type\":\"annotate-pms-reference\"").contains("\"bookingId\":\"LOC1\"").doesNotContain("\"key\"");
+    }
+
+    @Test
+    void theNoShowThePmsRecordedGoesUpToTheCrs() {
+        org.mockito.Mockito.when(noShows.report(org.mockito.ArgumentMatchers.eq("MRU01"), org.mockito.ArgumentMatchers.eq("GSX4AK"),
+                        org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(io.mateu.ecdemo1.crsintegration.noshow.NoShowReports.Answer.REPORTED);
+
+        dispatcher.dispatch(new TaskExecutionRequested("TE-1", "PROC-1", "registrar-no-show-pms", "report-no-show",
+                "report-no-show@1", List.of(new Variable("hotelCode", "MRU01"), new Variable("locator", "GSX4AK"),
+                new Variable("stayId", "GSX4AK"), new Variable("pmsHotelCode", "XMAR"), new Variable("noShowOutcome", "DONE"))));
+
+        assertThat(sink.replies).containsExactly("COMPLETED TE-1 [Variable[name=reportOutcome, value=REPORTED]]");
+        org.mockito.Mockito.verify(noShows).report("MRU01", "GSX4AK", "front office MRU01 (stay GSX4AK), recorded in the PMS");
     }
 
     @Test

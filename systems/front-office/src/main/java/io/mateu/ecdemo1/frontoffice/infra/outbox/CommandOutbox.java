@@ -18,8 +18,11 @@ public class CommandOutbox {
 
   /** The customer MDM's commands: the desk's changes to a customer, the documents it scans. */
   public static final String CUSTOMER_COMMANDS = "customer-commands";
-  /** The CRS adapter's: the reservations nobody arrived for. */
-  public static final String NO_SHOW_REPORTS = "no-show-reports";
+  /**
+   * The front office's own events: what its desk did — check-in, check-out, no-show — for the PMS,
+   * the master of the stay, to record (the pms-fo integration takes them).
+   */
+  public static final String FRONT_OFFICE_EVENTS = io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.TOPIC;
 
   static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -32,6 +35,12 @@ public class CommandOutbox {
   /** In the caller's transaction, if there is one: the command leaves only if the decision was saved. */
   public void append(String topic, String key, Object command) {
     outbox.append(topic, key, command.getClass().getSimpleName(), JSON.writeValueAsString(command), null);
+  }
+
+  /** An event of the desk, in the caller's transaction: it leaves only if the decision was saved. */
+  public void appendEvent(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent event) {
+    outbox.append(FRONT_OFFICE_EVENTS, event.key(), event.getClass().getSimpleName(),
+        JSON.writerFor(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.class).writeValueAsString(event), null);
   }
 
   /** Every command written to a topic, oldest first: what the tests read. */

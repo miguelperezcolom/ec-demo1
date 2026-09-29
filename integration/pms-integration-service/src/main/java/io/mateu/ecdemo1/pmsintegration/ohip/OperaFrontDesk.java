@@ -1,0 +1,253 @@
+package io.mateu.ecdemo1.pmsintegration.ohip;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.mateu.ecdemo1.pmsintegration.config.OhipProperties;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * The reception in Opera (OHIP front desk and cashiering): what the front office did, recorded in the
+ * PMS — the master of the stay. Found against OHIP UAT (XMAR, 2026-09-29):
+ *
+ * <ul>
+ *   <li>room: {@code POST /fof/v1/hotels/{h}/reservations/{id}/roomAssignments} ({@code criteria.roomId});
+ *       the rooms Opera would give it, {@code GET …/verifyCheckIns} ({@code suggestedRoomNumbers}) —
+ *       which also says, read-only, whether it can be checked in (FOF00067 «The guest's arrival is not
+ *       scheduled for today» when the arrival is not Opera's business date);</li>
+ *   <li>check-in: {@code POST /fof/v1/hotels/{h}/reservations/{id}/checkIns}; a reservation that is
+ *       not «due in» — arriving on the business date — is refused;</li>
+ *   <li>check-out: {@code POST /csh/v1/hotels/{h}/reservations/{id}/checkOuts}, with the integration's
+ *       cashier ({@link OhipProperties#cashierId()}): without one, 400 FOF00094 «Invalid Cashier»;</li>
+ *   <li>the invoice: the folios the check-out closed, {@code GET /csh/v1/hotels/{h}/folioHistory
+ *       ?checkOut=true}; its printable document, {@code POST …/reservations/{id}/folios} (generate,
+ *       with the cashier) → {@code storedFolioId} → {@code GET /csh/v1/hotels/{h}/storedFolios/{id}}
+ *       → {@code folioReportURL};</li>
+ *   <li>a no-show: OHIP has no call that sets Opera's «No Show» (its Night Audit does); the reservation
+ *       gets a comment saying who reported it and when.</li>
+ * </ul>
+ *
+ * <p>Every refusal is a {@link PmsRejectedException}, every «not now» a {@link PmsTransientException}
+ * ({@link OhipClient}): the tasks turn the first into a cause, and the engine retries the second.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class OperaFrontDesk {
+
+    /** What a no-show comment starts with: how the task knows it already wrote it. */
+    public static final String NO_SHOW_COMMENT = "No show";
+
+    final OhipClient ohip;
+    final OhipProperties properties;
+    final ObjectMapper objectMapper;
+
+    /** The reservation, whole, if Opera has it. */
+    public Optional<JsonNode> reservation(String hotelId, String reservationId) {
+        return ohip.find(hotelId, "/rsv/v1/hotels/{h}/reservations/{id}", hotelId, reservationId)
+                .map(body -> body.path("reservations").path("reservation"))
+                .filter(list -> list.isArray() && !list.isEmpty())
+                .map(list -> list.get(0));
+    }
+
+    /** Opera's status of it: Reserved, InHouse, CheckedOut, Cancelled, NoShow… */
+    public static String status(JsonNode reservation) {
+        return reservation.path("reservationStatus").asText("");
+    }
+
+    public static boolean inHouse(JsonNode reservation) {
+        return "InHouse".equalsIgnoreCase(status(reservation));
+    }
+
+    public static boolean checkedOut(JsonNode reservation) {
+        return "CheckedOut".equalsIgnoreCase(status(reservation));
+    }
+
+    public static boolean cancelled(JsonNode reservation) {
+        var status = status(reservation);
+        return "Cancelled".equalsIgnoreCase(status) || "NoShow".equalsIgnoreCase(status);
+    }
+
+    /** The room Opera has the reservation in, if any. */
+    public static Optional<String> room(JsonNode reservation) {
+        var stay = reservation.path("roomStay");
+        var room = stay.path("currentRoomInfo").path("roomId").asText("");
+        if (room.isBlank()) {
+            room = stay.path("roomRates").path(0).path("roomId").asText("");
+        }
+        if (room.isBlank()) {
+            room = stay.path("roomId").asText("");
+        }
+        return room.isBlank() ? Optional.empty() : Optional.of(room);
+    }
+
+    /**
+     * The rooms Opera would give the reservation, best first — read-only. Opera answers this only for a
+     * reservation it could check in now: otherwise the refusal says why.
+     */
+    public List<String> suggestedRooms(String hotelId, String reservationId) {
+        var answer = ohip.get(hotelId, "/fof/v1/hotels/{h}/reservations/{id}/verifyCheckIns", hotelId, reservationId).body();
+        var rooms = new ArrayList<String>();
+        for (var r : answer == null ? List.<JsonNode>of() : answer.path("reservation")) {
+            for (var n : r.path("roomStay").path("currentRoomInfo").path("suggestedRoomNumbers")) {
+                rooms.add(n.asText());
+            }
+        }
+        return rooms;
+    }
+
+    public void assignRoom(String hotelId, String reservationId, String roomId) {
+        var body = objectMapper.createObjectNode();
+        var criteria = body.putObject("criteria");
+        criteria.put("hotelId", hotelId);
+        criteria.putObject("reservationIdList").put("id", reservationId).put("type", "Reservation");
+        criteria.put("roomId", roomId);
+        ohip.post(hotelId, "/fof/v1/hotels/{h}/reservations/{id}/roomAssignments", body, hotelId, reservationId);
+    }
+
+    public void checkIn(String hotelId, String reservationId, String roomId) {
+        var body = objectMapper.createObjectNode();
+        var reservation = body.putObject("reservation");
+        if (roomId != null) {
+            reservation.put("roomId", roomId);
+        }
+        reservation.put("stopCheckin", false);
+        reservation.put("printRegistration", false);
+        reservation.put("checkInInitiatedBy", "Integration");
+        body.put("includeNotifications", false);
+        ohip.post(hotelId, "/fof/v1/hotels/{h}/reservations/{id}/checkIns", body, hotelId, reservationId);
+    }
+
+    public void checkOut(String hotelId, String reservationId) {
+        var body = objectMapper.createObjectNode();
+        var reservation = body.putObject("reservation");
+        reservation.put("hotelId", hotelId);
+        reservation.putObject("reservationIdList").put("id", reservationId).put("type", "Reservation");
+        reservation.put("eventType", "CheckOut");
+        cashier(reservation);
+        body.put("verificationOnly", false);
+        ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/checkOuts", body, hotelId, reservationId);
+    }
+
+    /** A folio of the check-out, as Opera's folio history lists it. */
+    public record Folio(String number, long folioNo, int window, LocalDate date, BigDecimal amount, String currency,
+                        String status) {
+    }
+
+    /** The folios the check-out closed — the invoice — newest first. Read-only. */
+    public List<Folio> checkOutFolios(String hotelId, String reservationId) {
+        var answer = ohip.get(hotelId, "/csh/v1/hotels/{h}/folioHistory?reservationIdId={id}&reservationIdType=Reservation"
+                + "&checkOut=true&limit=20", hotelId, reservationId).body();
+        var folios = new ArrayList<Folio>();
+        for (var f : answer == null ? List.<JsonNode>of() : answer.path("folioHistory")) {
+            if (!reservationId.equals(f.path("reservationInfo").path("reservationId").asText(reservationId))) {
+                continue;
+            }
+            var status = f.path("folioStatus").asText("");
+            if ("Deposit".equalsIgnoreCase(status) || "Void".equalsIgnoreCase(status)) {
+                continue;
+            }
+            var no = f.path("folioNo").asLong(0);
+            folios.add(new Folio(f.path("folioNoWithPrefix").asText(no == 0 ? null : String.valueOf(no)), no,
+                    f.path("folioWindowNo").asInt(1),
+                    f.hasNonNull("start") ? LocalDate.parse(f.path("start").asText().substring(0, 10)) : null,
+                    f.path("folioAmount").path("amount").isNumber() ? f.path("folioAmount").path("amount").decimalValue() : null,
+                    f.path("folioAmount").path("currencyCode").asText(null), status));
+        }
+        folios.sort(Comparator.comparingLong(Folio::folioNo).reversed());
+        return folios;
+    }
+
+    /**
+     * The printable document of the reservation's folio window: Opera generates it (with the cashier)
+     * and keeps it as a stored folio, whose report is the PDF. Empty when Opera gives no document —
+     * a property that does not store folios, an empty window.
+     */
+    public Optional<byte[]> folioDocument(String hotelId, String reservationId, int window) {
+        var body = objectMapper.createObjectNode();
+        var criteria = body.putObject("criteria");
+        criteria.put("hotelId", hotelId);
+        criteria.putObject("reservationId").put("id", reservationId).put("type", "Reservation");
+        criteria.put("folioWindowNo", window);
+        criteria.put("eventType", "CheckOut");
+        cashier(criteria);
+        var generated = ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/folios", body, hotelId, reservationId).body();
+        String stored = null;
+        for (var w : generated == null ? List.<JsonNode>of() : generated.path("folioWindows")) {
+            var id = w.path("storedFolioId").path("id").asText("");
+            if (!id.isBlank()) {
+                stored = id;
+                break;
+            }
+        }
+        if (stored == null) {
+            log.info("{}/{}: Opera generated the folio of window {} but stored no document", hotelId, reservationId, window);
+            return Optional.empty();
+        }
+        var details = ohip.get(hotelId, "/csh/v1/hotels/{h}/storedFolios/{id}", hotelId, stored).body();
+        var url = details == null ? "" : details.path("storedFolioDetails").path("folioReportURL").asText("");
+        if (url.isBlank()) {
+            log.info("{}/{}: stored folio {} has no report", hotelId, reservationId, stored);
+            return Optional.empty();
+        }
+        var pdf = ohip.document(hotelId, url);
+        return pdf == null || pdf.length == 0 ? Optional.empty() : Optional.of(pdf);
+    }
+
+    /** Whether the reservation already carries the no-show comment. */
+    public static boolean hasNoShowComment(JsonNode reservation) {
+        for (var c : reservation.path("comments")) {
+            if (c.path("comment").path("text").path("value").asText("").startsWith(NO_SHOW_COMMENT)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A comment on the reservation, alone in the change: nothing else of it is touched. */
+    public void comment(String hotelId, String reservationId, String title, String text) {
+        var change = objectMapper.createObjectNode();
+        ObjectNode reservation = change.putArray("reservations").addObject();
+        reservation.putArray("reservationIdList").addObject().put("id", reservationId).put("type", "Reservation");
+        reservation.put("hotelId", hotelId);
+        reservation.putArray("comments").addObject().putObject("comment")
+                .put("commentTitle", title).put("type", "GEN").put("internal", false)
+                .putObject("text").put("value", text);
+        ohip.put(hotelId, "/rsv/v1/hotels/{h}/reservations/{id}", change, hotelId, reservationId);
+    }
+
+    /** A room of the property, as Opera's housekeeping has it now. */
+    public record RoomState(String roomId, String roomType, String housekeeping, String frontOffice) {
+    }
+
+    /** The property's rooms of a type, with their housekeeping and front office status. Read-only. */
+    public List<RoomState> rooms(String hotelId, String roomType) {
+        var answer = ohip.get(hotelId, "/fof/v1/hotels/{h}/rooms?roomType={t}&limit=100", hotelId, roomType).body();
+        var rooms = new ArrayList<RoomState>();
+        for (var r : answer == null ? List.<JsonNode>of() : answer.path("hotelRoomsDetails").path("room")) {
+            var status = r.path("housekeeping").path("roomStatus");
+            rooms.add(new RoomState(r.path("roomId").asText(), r.path("roomType").path("roomType").asText(roomType),
+                    status.path("roomStatus").asText(null), status.path("frontOfficeStatus").asText(null)));
+        }
+        return rooms;
+    }
+
+    void cashier(ObjectNode node) {
+        if (properties.cashierId() != null) {
+            try {
+                node.put("cashierId", Long.parseLong(properties.cashierId().trim()));
+            } catch (NumberFormatException e) {
+                node.put("cashierId", properties.cashierId().trim());
+            }
+        }
+    }
+}

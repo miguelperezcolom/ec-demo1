@@ -21,14 +21,15 @@ el otro sistema la ha aplicado.
 | `booking-commands` | crs-integration-service | booking (`consumeBookingCommands`, grupo `ec-demo1-booking-commands`) | `annotate-pms-reference` (paso `annotate-pms-reference`) |
 | `projection-requests` | integrations-service (backfill) | crs-integration-service (`consumeProjectionRequests`, grupo `ec-demo1-crs-integration-projections`) | proyectar una reserva por «Proyectar Reserva». El backfill escribe las órdenes de una página y mueve su cursor en la misma transacción. |
 | `customer-commands` | front-office (`command_outbox`) | customer-mdm-service (`consumeCustomerCommands`, grupo `ec-demo1-customer-mdm-commands`) | `propose-change` (un cambio del kárdex, para que Salesforce lo decida; su `commandId` es el id de la solicitud, `CR-FO-…`), `record-scanned-identity` (el documento escaneado de un pax: dato de confianza, ver abajo) |
-| `no-show-reports` | front-office (`command_outbox`) | crs-integration-service (`consumeNoShowReports`, grupo `ec-demo1-crs-integration-no-shows`) | `ReportNoShow`: nadie de la reserva ha llegado; arranca `registrar-no-show` una vez por reserva |
-| `front-office-commands` | integrations-service (outbox; `replace-catalogue`) y pms-integration (paso `project-stay` de `proyectar-estancia`; `write-stay`) | front-office (`FrontOfficeCommands`, grupo `ec-demo1-front-office-commands`, inbox `command_inbox`) | La integración pms-fo: el catálogo del PMS con el que el front office lee sus estancias, y cada reserva **tal como Opera la tiene** (creada, cambiada, cancelada, no show), ordenada por la última modificación de Opera. Clave: `propiedad/reserva de Opera` |
+| `no-show-reports` | — (el front office ya no la manda: su no show sube al PMS, `front-office-events`) | crs-integration-service (`consumeNoShowReports`, grupo `ec-demo1-crs-integration-no-shows`) | `ReportNoShow`: nadie de la reserva ha llegado; arranca `registrar-no-show` una vez por reserva. El no show del front office llega al CRS por el paso `report-no-show` de `registrar-no-show-pms` |
+| `front-office-commands` | integrations-service (outbox; `replace-catalogue`) y pms-integration (paso `project-stay` de `proyectar-estancia`; `write-stay`) | front-office (`FrontOfficeCommands`, grupo `ec-demo1-front-office-commands`, inbox `command_inbox`) | La integración pms-fo: el catálogo del PMS con el que el front office lee sus estancias, y cada reserva **tal como Opera la tiene** (creada, cambiada, cancelada, no show, en casa, salida), ordenada por la última modificación de Opera; y `record-reception` (pms-integration, pasos de `registrar-checkin`, `-checkout`, `-no-show-pms`): Opera rechazó lo que hizo recepción y por qué, la habitación de Opera, la factura del check-out. Clave: `propiedad/reserva de Opera` |
 
 ## Eventos que van por Kafka
 
 | Topic | Emisor | Consumidores | Qué dice |
 |---|---|---|---|
 | `pms-reservations` | pms-integration (tras grabar o cancelar en Opera, también si Opera ya la tenía) | integrations-service (`consumePmsReservations`, grupo `ec-demo1-integrations-pms-reservations`) | `PmsReservationChanged`: una reserva se ha escrito en Opera. El conector no sabe quién la consume; la integración pms-fo de la propiedad, si está activa, arranca `proyectar-estancia` |
+| `front-office-events` | front-office (outbox, en la transacción de recepción) | integrations-service (`consumeFrontOfficeEvents`, grupo `ec-demo1-integrations-front-office-events`) | `guest-checked-in`, `guest-checked-out`, `no-show-reported`: lo que hizo recepción. El PMS es el maestro de la estancia: la integración pms-fo, si está activa, arranca `registrar-checkin`, `registrar-checkout` o `registrar-no-show-pms`. Clave: `hotel/estancia` |
 | `customers` | customer-mdm-service | pms-integration **ya no**; front-office (`CustomerEvents`, grupo `ec-demo1-front-office-customers`) y crs-integration | El golden record del cliente cambió o dos clientes eran uno: el kárdex del front office lo toma directamente del MDM |
 
 - **El contrato es del receptor.** El formato de `mapping-commands`, `projection-requests`,
@@ -60,8 +61,9 @@ el otro sistema la ha aplicado.
   Opera, publica `write-stay` con productor síncrono y solo entonces contesta al motor. Si Kafka no la
   toma, el paso falla y el motor lo reintenta; repetirla no hace nada, porque el front office ordena
   por la versión de Opera y deduplica por `commandId`. Lo mismo el evento `pms-reservations` en
-  `upsert-reservation` y `cancel-reservation`. Un no show sale con el aviso «Se comunica al CRS…»; si el
-  CRS no la tiene o ya estaba cancelada, se registra en crs-integration y la estancia no cambia.
+  `upsert-reservation` y `cancel-reservation`, y `record-reception` en los pasos de recepción. Un no
+  show sale con el aviso «Se comunica a Opera, el PMS, que lo anota y lo sube al CRS…»; si el CRS no la
+  tiene o ya estaba cancelada, `report-no-show` lo registra y la estancia no cambia.
 - **Un documento escaneado es dato de confianza.** El MDM rellena lo que el cliente no tiene
   (documento, fecha de nacimiento, nacionalidad) y lo proyecta al contacto de Salesforce **sin Case**.
   Lo que contradice (otro nombre, otra fecha de nacimiento, otro documento) va como solicitud de cambio
@@ -114,6 +116,7 @@ el otro sistema la ha aplicado.
 | booking, front-office → mdm | `GET /reservations/{h}/{loc}/links` | consulta | Los enlaces a otros sistemas en la ficha de la reserva. |
 | booking → erp | `GET /partners` | consulta | El formulario de reservas de demo. |
 | front-office → crs-integration | `GET /walk-ins/offer`, `POST /walk-ins/quote` | UI | La recepción elige habitación y ve el precio. |
+| front-office → pms-integration → Opera | `GET /front-office/rooms?hotelId&roomType` | consulta de UI | El paso de habitación del check-in ofrece las habitaciones del tipo de la estancia con su estado en Opera (limpia, inspeccionada, sucia; libre u ocupada), para no elegir una que Opera rechazaría. Si no contesta, se ofrecen las del catálogo sin estado. El check-in en sí va por `front-office-events`. |
 | front-office → crs-integration, mdm | `GET /reservations/{h}/{loc}`, `GET /customers?q=` | consulta de UI | El escáner de demo lee la reserva (nacionalidad, edad del niño) y si el pax ya es un cliente con documento. Si no contestan, se inventa el documento igual. |
 | front-office → crs-integration → booking | `POST /walk-ins` → `POST /bookings` | orden que necesita respuesta | La recepción necesita el localizador del CRS para abrir la estancia. Es idempotente por la referencia `FO-…`, y el reenvío programado del front office cubre la caída. |
 | ia-agent → servidores MCP, api-mcp → APIs | herramientas | ida y vuelta de UI | Una persona conversa con el agente: cada herramienta es parte de su respuesta. |

@@ -49,8 +49,17 @@ import java.util.UUID;
 @Slf4j
 public class Causes {
 
+    /**
+     * What a successor is started with. The reception's processes (registrar-checkin, -checkout,
+     * -no-show-pms) name the stay too: the Opera reservation, the front office's stay, the room.
+     */
     static final Set<String> RELAUNCH_VARIABLES = Set.of(ProcessVariables.DEFINITION_ID, ProcessVariables.HOTEL_CODE,
-            ProcessVariables.LOCATOR, ProcessVariables.PARTNER_CODE, ProcessVariables.VERSION, ProcessVariables.EVENT_ID, ProcessVariables.ORIGIN);
+            ProcessVariables.LOCATOR, ProcessVariables.PARTNER_CODE, ProcessVariables.VERSION, ProcessVariables.EVENT_ID, ProcessVariables.ORIGIN,
+            ProcessVariables.PMS_HOTEL_CODE, ProcessVariables.PMS_RESERVATION_ID, ProcessVariables.STAY_ID, ProcessVariables.ROOM_NUMBER);
+
+    /** The definitions whose waiters are a booking's: a relaunch names it on its span, for the booking's journey. */
+    static final Set<String> BOOKING_DEFINITIONS = Set.of(Definitions.PROJECT_RESERVATION, Definitions.PROJECT_CANCELLATION,
+            Definitions.REGISTER_CHECK_IN, Definitions.REGISTER_CHECK_OUT, Definitions.REGISTER_NO_SHOW_PMS);
 
     final CauseRecordRepository causes;
     final WaiterRepository waiters;
@@ -154,8 +163,7 @@ public class Causes {
         // The successor starts in the trace of whoever resolved the causes — an approval, for as many
         // reservations as it released — so it says which reservation it is, as the router does: the
         // booking's journey (journey-service) finds it by this.
-        if (waiter.getSubject() != null && (Definitions.PROJECT_RESERVATION.equals(waiter.getDefinitionId())
-                || Definitions.PROJECT_CANCELLATION.equals(waiter.getDefinitionId()))) {
+        if (waiter.getSubject() != null && BOOKING_DEFINITIONS.contains(waiter.getDefinitionId())) {
             var span = io.opentelemetry.api.trace.Span.current();
             span.setAttribute("booking.locator", waiter.getSubject());
             if (waiter.getHotelCode() != null) {

@@ -1,3 +1,4 @@
 # crs-integration-service: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
 annotate-partner-profile@1 crs-integration
 annotate-pms-reference@1 crs-integration
+report-no-show@1 crs-integration

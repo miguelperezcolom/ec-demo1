@@ -21,6 +21,15 @@ public final class Definitions {
     /** A PMS reservation, as the PMS holds it, into the hotel's front office as a stay. */
     public static final String PROJECT_STAY = "proyectar-estancia";
 
+    /**
+     * The reception, up to the PMS — the master of the stay (pms-fo): the desk checked a guest in,
+     * checked one out, or nobody came. Each records it in the PMS; the no-show is then reported on to
+     * the CRS, the master of the sale, which applies its fee («registrar-no-show»).
+     */
+    public static final String REGISTER_CHECK_IN = "registrar-checkin";
+    public static final String REGISTER_CHECK_OUT = "registrar-checkout";
+    public static final String REGISTER_NO_SHOW_PMS = "registrar-no-show-pms";
+
     /** The message a waiting process is resumed with once its last cause is resolved. */
     public static final String CAUSES_RESOLVED_MESSAGE = "causes-resolved";
 

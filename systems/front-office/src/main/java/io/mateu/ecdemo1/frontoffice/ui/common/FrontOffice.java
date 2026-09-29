@@ -33,15 +33,54 @@ public class FrontOffice {
   private final RoomRepository rooms;
   private final AddOnCatalogRepository addOnCatalog;
   private final io.mateu.ecdemo1.frontoffice.application.GuestNotices notices;
+  private final io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks pmsLinks;
+  private final io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms;
+  private final io.mateu.ecdemo1.frontoffice.application.Invoices invoices;
 
   public FrontOffice(StayQueries queries, StayReadModel stayReads, RoomRepository rooms,
-                     AddOnCatalogRepository addOnCatalog, io.mateu.ecdemo1.frontoffice.application.GuestNotices notices) {
+                     AddOnCatalogRepository addOnCatalog, io.mateu.ecdemo1.frontoffice.application.GuestNotices notices,
+                     io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks pmsLinks,
+                     io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms,
+                     io.mateu.ecdemo1.frontoffice.application.Invoices invoices) {
     this.queries = queries;
     this.stayReads = stayReads;
     this.rooms = rooms;
     this.addOnCatalog = addOnCatalog;
     this.notices = notices;
+    this.pmsLinks = pmsLinks;
+    this.pmsRooms = pmsRooms;
+    this.invoices = invoices;
     instance = this;
+  }
+
+  /** Where the stay stands in the PMS — «Opera: en casa», «Opera: rechazado — …» —, if it was ever told. */
+  public static java.util.Optional<String> pmsState(String stayId) {
+    return instance.pmsLinks.stateOf(stayId);
+  }
+
+  /** The PMS reservation the stay is, if it is linked to one. */
+  public static java.util.Optional<String> pmsReservation(String stayId) {
+    return instance.pmsLinks.ofStay(stayId).map(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.Link::pmsReservationId)
+        .filter(id -> id != null && !id.isBlank());
+  }
+
+  /** What «Abrir factura» opens for a closed stay: the PMS's document, or the front office's proforma. */
+  public static io.mateu.ecdemo1.frontoffice.application.Invoices.Summary invoice(String stayId) {
+    return instance.invoices.summary(stayId);
+  }
+
+  /** The signed link the desk opens the invoice with, in a tab of its own. */
+  public static String invoiceLink(String stayId) {
+    return instance.invoices.link(stayId);
+  }
+
+  /**
+   * The rooms to offer a stay at the check-in: the PMS's of its room type, with Opera's state; the
+   * front office's own floor when the PMS's catalogue has none (a front office not fed from a PMS).
+   */
+  public static List<Room> roomsFor(Stay stay, int fallbackFloor) {
+    var fromThePms = instance.pmsRooms.ofType(stay.roomType());
+    return fromThePms.isEmpty() ? instance.rooms.findByFloor(fallbackFloor) : fromThePms;
   }
 
   /** The stay behind a screen's route, with its guest and folio. */

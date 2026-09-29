@@ -71,6 +71,29 @@ Opera (su xref) y su golden record.
 - `project-stay` publica sin outbox (el conector no tiene base de datos): si Kafka no lo toma, el paso
   falla y el motor lo reintenta; repetirlo no hace nada.
 
+## Lo que hace recepción sube al PMS
+
+El PMS es el maestro de la estancia. El check-in, el check-out y el no show de recepción salen del
+front office por `front-office-events` y la integración pms-fo los registra en Opera con
+`registrar-checkin`, `registrar-checkout` y `registrar-no-show-pms` (ver
+[Los procesos del motor](/guias/procesos/)). Lo que queda en Opera vuelve por el camino de siempre:
+el conector publica `pms-reservations` y `proyectar-estancia` manda la estancia con su estado de Opera
+(`IN_HOUSE`, `CHECKED_OUT`). Lo que `write-stay` no dice llega como `record-reception`: que Opera lo
+rechazó y por qué, la habitación en la que Opera tiene a los huéspedes, la factura del check-out.
+
+Las llamadas a OHIP (`OperaFrontDesk`):
+
+| Qué | OHIP |
+| :-- | :--- |
+| Asignar habitación | `POST /fof/v1/hotels/{h}/reservations/{id}/roomAssignments` (`criteria.roomId`) |
+| Habitaciones que sugiere Opera (solo lectura) | `GET /fof/v1/hotels/{h}/reservations/{id}/verifyCheckIns` |
+| Check-in | `POST /fof/v1/hotels/{h}/reservations/{id}/checkIns` |
+| Check-out | `POST /csh/v1/hotels/{h}/reservations/{id}/checkOuts`, con `cashierId` (`OPERA_CASHIER_ID`; sin él, FOF00094) |
+| Folios del check-out (solo lectura) | `GET /csh/v1/hotels/{h}/folioHistory?checkOut=true` |
+| Documento de la factura | `POST /csh/v1/hotels/{h}/reservations/{id}/folios` (con el cajero) → `storedFolioId` → `GET /csh/v1/hotels/{h}/storedFolios/{id}` → `folioReportURL` |
+| No show | Un comentario en la reserva (`PUT /rsv/v1/hotels/{h}/reservations/{id}`, solo `comments`) |
+| Estado de las habitaciones de un tipo (solo lectura) | `GET /fof/v1/hotels/{h}/rooms?roomType=` |
+
 ## Qué casa con lo que ya había
 
 Una estancia se reconoce por la reserva de Opera; si no, por el localizador del CRS (su referencia

@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.frontoffice.infra.outbox;
 import io.mateu.ecdemo1.contracts.testing.Contracts;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
 import io.mateu.ecdemo1.frontoffice.infra.audit.AuditOutbox;
-import io.mateu.ecdemo1.frontoffice.infra.crs.NoShows;
 import io.mateu.ecdemo1.integration.model.audit.AuditedAction;
 import io.mateu.ecdemo1.integration.model.command.CustomerCommand;
 import io.mateu.ecdemo1.messaging.Outbox;
@@ -23,7 +22,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * What the front office publishes, as its outboxes really write it (Jackson 3, their own mappers),
- * checked against the topics' schemas: no-show-reports, customer-commands and audit.
+ * checked against the topics' schemas: front-office-events, customer-commands and audit.
  */
 class FrontOfficeProducedContractsTest {
 
@@ -36,12 +35,21 @@ class FrontOfficeProducedContractsTest {
     }
 
     @Test
-    void aNoShowReportIsWhatTheSchemaSays() {
+    void theDesksEventsForThePmsAreWhatTheSchemaSays() {
         var walkIns = mock(WalkIns.class);
         when(walkIns.of("12E45")).thenReturn(Optional.empty());
-        new NoShows(walkIns, new CommandOutbox(outbox), "MRU01").report("12E45");
+        var links = mock(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.class);
+        when(links.ofStay("12E45")).thenReturn(Optional.of(new io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.Link(
+                "12E45", "39486034", "2026-09-29T10:00:00")));
+        var reports = new io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports("MRU01", "XMAR", walkIns, links,
+                new CommandOutbox(outbox));
 
-        Contracts.topic("no-show-reports").assertValid(written(CommandOutbox.NO_SHOW_REPORTS));
+        reports.noShow("12E45", 2, "ana");
+
+        var json = written(CommandOutbox.FRONT_OFFICE_EVENTS);
+        Contracts.topic("front-office-events").assertValid(json);
+        org.assertj.core.api.Assertions.assertThat(json).contains("\"type\":\"no-show-reported\"")
+                .contains("\"pmsReservationId\":\"39486034\"").contains("\"at\":\"");
     }
 
     @Test

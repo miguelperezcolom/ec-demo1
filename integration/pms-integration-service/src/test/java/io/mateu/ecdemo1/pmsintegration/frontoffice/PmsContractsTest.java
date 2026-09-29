@@ -97,6 +97,30 @@ class PmsContractsTest {
     }
 
     @Test
+    void howThePmsTookTheReceptionIsWhatTheFrontOfficeCommandsSchemaSays() throws Exception {
+        var outcomes = new ReceptionOutcomes(streamBridge, boot);
+        outcomes.done("XMAR", "39486034", "GSX4AK",
+                io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.ReceptionOperation.CHECK_OUT,
+                "Salida registrada en Opera", null, new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.Invoice(
+                        "OPERA", "XMAR377", java.time.LocalDate.of(2026, 5, 13), new java.math.BigDecimal("150.00"), "MUR",
+                        "JVBERi0xLjQK"));
+
+        var json = sentPayload(StayProjection.BINDING);
+        Contracts.topic("front-office-commands").assertValid(json);
+        assertThat(boot.readTree(json).get("type").asText()).isEqualTo("record-reception");
+        assertThat(boot.readTree(json).at("/invoice/date").asText()).isEqualTo("2026-05-13");
+    }
+
+    @Test
+    void aRefusalOfThePmsIsWhatTheFrontOfficeCommandsSchemaSays() {
+        new ReceptionOutcomes(streamBridge, boot).refused("XMAR", "39486034", "GSX4AK",
+                io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.ReceptionOperation.CHECK_IN,
+                "The guest's arrival is not scheduled for today. Check-in not possible.");
+
+        Contracts.topic("front-office-commands").assertValid(sentPayload(StayProjection.BINDING));
+    }
+
+    @Test
     void aReservationWrittenInThePmsIsWhatThePmsReservationsSchemaSays() {
         new PmsEvents(streamBridge, boot, clock).written("XMAR", "39484601", "MRU01", "12E45", null);
 

@@ -34,12 +34,17 @@ import java.time.Duration;
  * @param customReference    what every reservation this adapter writes carries in Opera's «Custom
  *                           Reference»: a search filter in Opera's reservation list, so the desk can
  *                           find the integration's reservations. Blank: not written
+ * @param cashierId          the cashier the integration posts and checks out with. OPERA takes the
+ *                           integration user's own cashier when none is sent, and the tenant's user has
+ *                           none (400 FOF00094 «Invalid Cashier»): XMAR's is 69721441, «EC-DEMO1
+ *                           Integración» (an InterfaceCashier). Blank: none is sent
  */
 @ConfigurationProperties("ohip")
 public record OhipProperties(String externalSystemCode, String versionUdf, String payAtHotelMethod, Duration timeout,
                              String crmExternalSystem, Boolean profileReferences, Boolean postDeposits,
-                             java.util.List<String> knownProperties, String customReference) {
+                             java.util.List<String> knownProperties, String customReference, String cashierId) {
 
+    @org.springframework.boot.context.properties.bind.ConstructorBinding
     public OhipProperties {
         if (externalSystemCode == null) externalSystemCode = "ECDEMO1";
         if (versionUdf == null) versionUdf = "CRS_VERSION";
@@ -50,5 +55,14 @@ public record OhipProperties(String externalSystemCode, String versionUdf, Strin
         if (postDeposits == null) postDeposits = true;
         if (knownProperties == null) knownProperties = java.util.List.of();
         if (customReference == null) customReference = "EC-DEMO1";
+        if (cashierId != null && cashierId.isBlank()) cashierId = null;
+    }
+
+    /** As before the cashier: none. */
+    public OhipProperties(String externalSystemCode, String versionUdf, String payAtHotelMethod, Duration timeout,
+                          String crmExternalSystem, Boolean profileReferences, Boolean postDeposits,
+                          java.util.List<String> knownProperties, String customReference) {
+        this(externalSystemCode, versionUdf, payAtHotelMethod, timeout, crmExternalSystem, profileReferences, postDeposits,
+                knownProperties, customReference, null);
     }
 }
