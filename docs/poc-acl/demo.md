@@ -325,8 +325,9 @@ Los **avisos de recepción** son de Salesforce (un Case sobre el contacto con *T
 allí o desde *Clientes*, y el front office los enseña al entrar y al salir.
 
 1. **Consola → Clientes →** el titular de una llegada de hoy (`deploy/demo/demo-prep.sh seed
-   arriving-today` si no hay) **→ Avisos de recepción**: texto «Pedir el pasaporte original», tipo
-   **Bloqueante**, *Mostrar en el check-in* → **Guardar aviso**. Sale *Pendiente de enviar* / *Enviado*;
+   arriving-today` si no hay) **→ Nuevo aviso** (un panel lateral): texto «Pedir el pasaporte original»,
+   tipo **Bloqueante**, *Mostrar en el check-in* → **Guardar aviso**. (**Avisos** lista los suyos para
+   editarlos o desactivarlos.) Sale *Pendiente de enviar* / *Enviado*;
    en unos segundos, **Confirmado** con el enlace a su Case en Salesforce (una llamada para escribirlo;
    vuelve por `AvisoRecepcionCambiado__e`, sin leer nada).
 2. **Front office →** la reserva: el titular lleva «⛔ Aviso bloqueante: …» en el carril. **Confirmar

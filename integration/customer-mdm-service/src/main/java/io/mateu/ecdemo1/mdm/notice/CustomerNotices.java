@@ -48,7 +48,9 @@ import java.util.stream.Collectors;
  * the net under a lost one.
  */
 @Slf4j
-@Component
+// Not "customerNotices": that is the name of the binding its messages leave by, which StreamBridge
+// looks up as a bean.
+@Component("receptionNotices")
 @RequiredArgsConstructor
 public class CustomerNotices {
 
@@ -380,6 +382,11 @@ public class CustomerNotices {
     /** In their declared order, comma separated: one spelling for one set. */
     static String moments(Set<NoticeMoment> moments) {
         return moments == null ? "" : moments.stream().sorted().map(Enum::name).collect(Collectors.joining(","));
+    }
+
+    /** The notice as the console shows it: what was asked and is pending, or else what Salesforce has. */
+    public static Draft shown(CustomerNotice n) {
+        return n.pending() && n.pendingText != null ? pendingDraft(n) : confirmedDraft(n);
     }
 
     static Draft confirmedDraft(CustomerNotice n) {
