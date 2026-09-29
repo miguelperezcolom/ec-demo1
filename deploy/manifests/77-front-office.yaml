@@ -40,7 +40,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: front-office
-          image: miguelperezcolom/ec-demo1-front-office:0.41.2
+          image: miguelperezcolom/ec-demo1-front-office:0.42.5
           env:
             # Traces to Tempo: taking a stay from front-office-commands joins the trace of the booking
             # that wrote it into Opera.
@@ -53,11 +53,16 @@ spec:
             - name: SERVER_PORT
               value: "8128"
             # The chain's MDM: the desk's changes to a guest go there, to be decided in Salesforce.
-            # The CRS's adapter: a reservation whose guests all failed to arrive is reported there as a no-show.
+            # The CRS's adapter: walk-ins are booked there. (A reservation nobody arrived for goes up to
+            # the PMS by Kafka, front-office-events, and from the PMS to the CRS.)
             - name: CRS_INTEGRATION_URL
               value: "http://crs-integration-service:8121"
             - name: MDM_URL
               value: "http://customer-mdm-service:8127"
+            # The PMS's connector, for the one query the check-in's room step needs now: the rooms of
+            # the stay's type as Opera's housekeeping has them.
+            - name: PMS_INTEGRATION_URL
+              value: "http://pms-integration-service:8123"
             - name: FRONT_OFFICE_HOTEL
               value: "MRU01"
             # The PMS property this front office consumes (pms-fo): its stays and catalogue come from

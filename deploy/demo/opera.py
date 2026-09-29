@@ -11,6 +11,12 @@ no credential is printed.
   opera.py rate-plans XMAR [text]      # the property's rate plans, filtered by a text
   opera.py rate-plan XMAR CODE         # one rate plan, whole (JSON)
   opera.py availability XMAR 2026-11-12 2026-11-16   # the room types Opera would sell those nights
+  opera.py business-date XMAR          # Opera's business date: a check-in is only for arrivals on it
+  opera.py rooms XMAR STDK             # the rooms of a type: housekeeping (Clean, Inspected, Dirty…) and
+                                       #   front office status (Vacant, Occupied)
+  opera.py reservation XMAR 39486034   # one reservation: status, room, and whether Opera would check it
+                                       #   in now (verifyCheckIns, read-only)
+  opera.py folios XMAR 39486034        # the folios its check-out closed (Opera's folio history): the invoice
 
 Exit status 0 when the answer is what was asked for, 1 when not (no reservation, unreadable…).
 """
@@ -132,6 +138,46 @@ def main(argv):
                         for r in s.get("roomRates", [])} - {None})
         print(f"{hotel} {start}..{end}: " + (", ".join(types) or "nothing available"))
         return 0 if types else 1
+    if what == "business-date":
+        hotel = argv[1]
+        ctx = get(hotel, f"/ent/config/v1/hotels/{hotel}/operaContext", access).get("hotelContext") or {}
+        print(f"{hotel}: business date {ctx.get('businessDate')} (timezone {ctx.get('timezone')})")
+        return 0 if ctx.get("businessDate") else 1
+    if what == "rooms":
+        hotel, room_type = argv[1], argv[2]
+        found = get(hotel, f"/fof/v1/hotels/{hotel}/rooms?roomType={urllib.parse.quote(room_type)}&limit=100", access)
+        rooms = (found.get("hotelRoomsDetails") or {}).get("room") or []
+        for r in rooms:
+            st = (r.get("housekeeping") or {}).get("roomStatus") or {}
+            print(f"{r.get('roomId')}\t{st.get('roomStatus')}\t{st.get('frontOfficeStatus')}")
+        return 0 if rooms else 1
+    if what == "reservation":
+        hotel, rid = argv[1], argv[2]
+        whole = get(hotel, f"/rsv/v1/hotels/{hotel}/reservations/{rid}", access)
+        res = ((whole.get("reservations") or {}).get("reservation") or [{}])[0]
+        out = summary(res)
+        out["room"] = ((res.get("roomStay") or {}).get("currentRoomInfo") or {}).get("roomId")
+        out["comments"] = [((c.get("comment") or {}).get("text") or {}).get("value")
+                           for c in res.get("comments") or []]
+        try:
+            verify = get(hotel, f"/fof/v1/hotels/{hotel}/reservations/{rid}/verifyCheckIns", access)
+            out["checkInNow"] = "possible"
+            out["suggestedRooms"] = [n for r in verify.get("reservation") or []
+                                     for n in ((r.get("roomStay") or {}).get("currentRoomInfo") or {})
+                                     .get("suggestedRoomNumbers") or []][:5]
+        except urllib.error.HTTPError as e:
+            out["checkInNow"] = f"no ({e.code}): " + e.read()[:200].decode(errors="replace")
+        print(json.dumps(out, indent=2))
+        return 0
+    if what == "folios":
+        hotel, rid = argv[1], argv[2]
+        found = get(hotel, f"/csh/v1/hotels/{hotel}/folioHistory?reservationIdId={rid}&reservationIdType=Reservation"
+                           f"&checkOut=true&limit=20", access)
+        for f in found.get("folioHistory") or []:
+            amount = f.get("folioAmount") or {}
+            print(f"{f.get('folioNoWithPrefix')}\t{f.get('folioStatus')}\t{f.get('start')}\t{amount.get('amount')} "
+                  f"{amount.get('currencyCode')}\twindow {f.get('folioWindowNo')}")
+        return 0
     if what == "rate-plan":
         hotel, code = argv[1], argv[2]
         print(json.dumps(get(hotel, f"/rtp/v1/hotels/{hotel}/ratePlans/{urllib.parse.quote(code)}", access), indent=2))
