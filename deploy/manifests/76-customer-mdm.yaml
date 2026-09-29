@@ -1,8 +1,10 @@
 # CRS-PMS integration PoC (docs/poc-acl), H11: the customer MDM (HLA CRM-MDM). Owner of the golden
 # record and of identity resolution — the connector asks it who a reservation's passengers are
 # before writing the guest profile — with Salesforce as its cleaning engine and stewardship surface:
-# it projects customers there as contacts, and hears merges back as ClienteConsolidado__e through
-# the Pub/Sub API (outbound gRPC to api.pubsub.salesforce.com:7443). Screens at /_mdm on the control
+# it projects customers there as contacts — marked by data quality (Estado MDM, Calidad del dato,
+# Origen) — and hears merges, decisions, contact changes and notices back as platform events through
+# the Pub/Sub API (outbound gRPC to api.pubsub.salesforce.com:7443, no NetworkPolicy restricts it),
+# resuming from persisted replay ids; its queries under them are a daily net. Screens at /_mdm on the control
 # console, and its business face — Clientes — at /_customers on the data plane. Without the ec-salesforce Secret it still resolves identities; cleaning just waits.
 # What it decides about a customer — a changed golden record, a merge — it publishes on the
 # `customers` topic and calls no one: pms-integration takes it to the front office's kardex and
@@ -49,7 +51,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: customer-mdm-service
-          image: miguelperezcolom/ec-demo1-customer-mdm-service:0.36.3
+          image: miguelperezcolom/ec-demo1-customer-mdm-service:0.37.0
           env:
             # Traces to Tempo, the one the engine exports to: a booking's trace runs from the CRS through
             # this service and the orchestrator (docs: deploy/observability, "Trazas de una reserva").
