@@ -192,17 +192,39 @@ en XMAR: hay que evitar repetir tomas sin necesidad.
 ## Flujo 4: no show
 
 1. **Reserva que llega hoy.** Call center → New: MRU01, llegada **hoy**, 2 noches, 2 adultos,
-   titular nuevo. Se espera a que esté en Opera y en el front office.
+   titular nuevo (o `demo-prep.sh seed arriving-today`). Se espera a que esté en Opera y en el front office.
    - **Rótulo:** «Una reserva que llega hoy.»
 2. **No show.** En el front office, en la estancia, se marca No show en cada huésped.
-   - **Rótulo:** «Nadie se presenta. Al marcar el último, el aviso sube al CRS.»
-3. **CRS.** Consola: proceso `registrar-no-show`, y la reserva en Call center.
+   - **Rótulo:** «Nadie se presenta. Al marcar el último, el no show sube al PMS.»
+3. **PMS.** Consola: proceso `registrar-no-show-pms`; en Opera, el comentario «No show — reported by
+   the front office…» en la reserva.
+   - **Rótulo:** «El PMS, maestro de la estancia, lo anota y lo sube al CRS.»
+4. **CRS.** Proceso `registrar-no-show`, y la reserva en Call center.
    - **Rótulo:** «El CRS aplica su regla: cancelada como no show (NOS), cargo del 25 %.»
    - **Se enseña:** la reserva cancelada, con el cargo y el precio original.
-4. **Bajada.** `proyectar-cancelacion` COMPLETED.
+5. **Bajada.** `proyectar-cancelacion` COMPLETED.
    - **Se enseña:** Opera, con la reserva cancelada con NOSHOW y el cargo, y el front office, con
-     la estancia en No show y el cargo.
+     la estancia en No show, el cargo y «Opera: no show anotado; el CRS aplica su cargo».
    - **Rótulo:** «La cancelación baja por la cadena: Opera y front office.»
+
+### Flujo 4 bis (opcional): check-in y check-out, que registra el PMS
+
+Solo con una reserva que llegue en la **fecha de negocio de Opera** (`demo-prep.sh seed
+arriving-opera-today`: XMAR está en 2026-05-13 y no hace el check-in de otra cosa).
+
+1. **Check-in.** En el front office, la estancia: *Cambiar* habitación → una **inspeccionada** de las
+   que ofrece (las de Opera, con su housekeeping); escanear, wifi, llave, firma, cobro, extras;
+   **Confirmar check-in**.
+   - **Se enseña:** *En otros sistemas → Opera*: «pendiente — check-in enviado» y, en segundos, «en casa ·
+     hab. …»; el proceso `registrar-checkin`; Opera *InHouse* en esa habitación.
+   - **Rótulo:** «El PMS es el maestro de la estancia: el check-in sube a Opera.»
+2. **Check-out.** *Check-out* → *Confirmar* el cobro.
+   - **Se enseña:** `registrar-checkout`; «salida registrada · factura XMAR…»; *Factura → Abrir factura
+     proforma (front office)*, con el número y el importe de la factura de Opera.
+   - **Rótulo:** «Opera cierra el folio y emite la factura; el front office la muestra.»
+3. **(Si se quiere enseñar una causa.)** Una habitación «Limpia, sin inspeccionar en Opera»: Opera la
+   rechaza, la causa aparece en la bandeja y la estancia dice por qué; *⋯ → Cambiar habitación* a una
+   inspeccionada y entra, y la causa se resuelve sola.
 
 ## Flujo 5: walk-in
 

@@ -164,20 +164,30 @@ public class OperaFrontDesk {
         ohip.put(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/earlyDeparture", body, hotelId, reservationId);
     }
 
-    /** What a folio window owes: its number, balance and currency. */
-    public record WindowBalance(int window, BigDecimal balance, String currency) {
+    /** A folio window: its number, what it owes, and whether anything was ever posted to it. */
+    public record WindowBalance(int window, BigDecimal balance, String currency, boolean posted) {
+
+        public WindowBalance(int window, BigDecimal balance, String currency) {
+            this(window, balance, currency, true);
+        }
+
+        public boolean owes() {
+            return balance != null && balance.signum() != 0;
+        }
     }
 
-    /** The reservation's folio windows that owe something. Read-only. */
+    /** The reservation's folio windows with postings — the ones with a folio to settle and generate. Read-only. */
     public List<WindowBalance> openBalances(String hotelId, String reservationId) {
         var answer = ohip.find(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Windowbalances",
                 hotelId, reservationId).orElse(null);
         var open = new ArrayList<WindowBalance>();
         for (var w : answer == null ? List.<JsonNode>of() : answer.path("reservationFolioInformation").path("folioWindows")) {
             var balance = w.path("balance").path("amount");
-            if (balance.isNumber() && balance.decimalValue().signum() != 0) {
-                open.add(new WindowBalance(w.path("folioWindowNo").asInt(1), balance.decimalValue(),
-                        w.path("balance").path("currencyCode").asText(null)));
+            var amount = balance.isNumber() ? balance.decimalValue() : BigDecimal.ZERO;
+            var posted = !w.path("emptyWindow").asBoolean(amount.signum() == 0);
+            if (posted || amount.signum() != 0) {
+                open.add(new WindowBalance(w.path("folioWindowNo").asInt(1), amount,
+                        w.path("balance").path("currencyCode").asText(null), true));
             }
         }
         return open;

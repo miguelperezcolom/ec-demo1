@@ -71,7 +71,7 @@ Salesforce (enlaces), y el perfil de Opera.
 | Customers | El maestro de clientes, lo técnico: golden records, su estado de proyección y las consolidaciones que llegan de Salesforce (la cara de negocio está en Clientes, en el plano de datos) |
 | Notifications | Lo que se ha comunicado y a quién; **destinatarios**: quién se entera de qué y por dónde (§11) |
 | Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
-| Workflow / Forms | Las definiciones de proceso: los siete de la PoC (`alta-integracion`, `alta-integracion-fo`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-estancia`, `proyectar-interlocutor`, `registrar-no-show`); formularios, hoy ninguno |
+| Workflow / Forms | Las definiciones de proceso: los diez de la PoC (`alta-integracion`, `alta-integracion-fo`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-estancia`, `proyectar-interlocutor`, `registrar-no-show`, y la recepción hacia el PMS: `registrar-checkin`, `registrar-checkout`, `registrar-no-show-pms`); formularios, hoy ninguno |
 | IA | El agente de mapeado y los MCP de cada servicio |
 | Usuarios | Quién puede hacer qué |
 
@@ -354,26 +354,86 @@ allí o desde *Clientes*, y el front office los enseña al entrar y al salir.
 4. El **agente de recepción** dice el aviso bloqueante antes de pedir confirmación del check-in, y el
    kárdex rechazado antes del check-out.
 
-## 10 bis. No show: el hotel lo dice y el CRS lo cobra
+## 10 bis. No show: el hotel lo dice, el PMS lo anota y el CRS lo cobra
 
-HLA F006: el no-show se detecta en el hotel, sube al CRS como estado, el CRS aplica su regla y el
-resultado baja por la proyección de siempre.
+HLA F006, por la cadena: el no-show se detecta en el hotel, **sube al PMS** —el maestro de la
+estancia—, el PMS lo sube al CRS —el maestro de la venta—, el CRS aplica su regla y el resultado baja
+por la proyección de siempre.
 
 1. En el front office, en la reserva (que llega hoy), se marca **No show** en cada huésped. Al marcar
-   el último, el front office avisa al CRS por Kafka (`no-show-reports`): la reserva entera es un no
-   show.
-2. Arranca el proceso **`registrar-no-show`** (*Admin → Processes*): el CRS **cancela la reserva como
-   no show** (motivo `NOS`) y la deja costando el **25 % de su precio original** (configurable,
-   `booking.no-show-fee-percent`). En *Call center* se ve cancelada, con su cargo y el precio original.
-3. La cancelación baja sola (`proyectar-cancelacion`):
+   el último, el front office publica el evento `NoShowReported` (`front-office-events`, desde su outbox,
+   en la misma transacción que la marca). La estancia dice «Opera: pendiente — no show enviado».
+2. La integración pms-fo arranca **`registrar-no-show-pms`** (*Admin → Processes*): con el candado de la
+   reserva, **anota el no show en la reserva de Opera** —un comentario «No show — reported by the front
+   office of MRU01 (stay …) at …; the CRS applies its fee»— y la integración crs-pms lo **sube al CRS**
+   (`report-no-show`). El estado «No Show» de Opera solo lo pone su auditoría nocturna: por OHIP no hay
+   otra forma de anotarlo. Si Opera tiene a los huéspedes en casa, no es un no show: queda una causa.
+3. Arranca **`registrar-no-show`**: el CRS **cancela la reserva como no show** (motivo `NOS`) y la deja
+   costando el **25 % de su precio original** (configurable, `booking.no-show-fee-percent`). En *Call
+   center* se ve cancelada, con su cargo y el precio original.
+4. La cancelación baja sola (`proyectar-cancelacion`):
    - **Opera**: primero la reserva pasa a costar el cargo (sus noches, al 25 %) y después se cancela
-     con el motivo **NOSHOW** («No Show»), con el cargo en la descripción. (El estado «No Show» de
-     Opera solo lo pone su Night Audit; por API es una cancelación.)
-   - **Front office**: la estancia pasa a **No show**, costando el cargo.
+     con el motivo **NOSHOW** («No Show»), con el cargo en la descripción.
+   - **Front office**: la estancia pasa a **No show**, costando el cargo, y dice «Opera: no show
+     anotado; el CRS aplica su cargo».
 
 Hace falta la equivalencia `NOS → NOSHOW` (motivo de cancelación, MRU01): desde cero hay que
-aprobarla en el alta, o la cancelación espera sin mapear en *Mapping → Dictionary*. Solo reservas que vienen del
-CRS.
+aprobarla en el alta, o la cancelación espera sin mapear en *Mapping → Dictionary*. Una reserva nacida en
+Opera se anota en Opera y no sube (el CRS no la tiene). Un walk-in que el CRS aún no ha reservado se queda
+en el front office.
+
+Probado en ec1 el 2026-09-30 con **RBQ7DG** (Opera 39486178): `registrar-no-show-pms` →
+`registrar-no-show` → `proyectar-cancelacion`, en 3 s; Opera cancelada con el comentario y NOSHOW; el
+front office en No show costando 93,00 (el 25 % de 372,00).
+
+## 10 quater. Check-in y check-out: el PMS los registra
+
+El PMS es el maestro de la estancia: lo que hace recepción **sube** a Opera por el motor (reintentos,
+causas), y lo que Opera tiene **vuelve** al front office por la proyección de la estancia. En la ficha
+de la estancia, *En otros sistemas → Opera*, se ve dónde está: «pendiente — check-in enviado», «en casa
+· hab. 5138», «salida registrada · factura XMAR385» o «rechazado (…) — el motivo de Opera».
+
+**Check-in.** Recepción confirma el check-in (el botón, con las operaciones hechas, o el asistente). El
+front office publica `GuestCheckedIn` y arranca **`registrar-checkin`**: con el candado de la reserva,
+`assign-room` asigna en Opera la habitación que dio recepción (sin elegir, la primera que sugiere
+Opera) y `check-in-reservation` hace el check-in. Al entrar, la estancia vuelve «en casa». Las
+habitaciones que ofrece recepción son las de Opera del tipo de la reserva, con lo que dice su
+housekeeping ahora: **XMAR solo asigna habitaciones inspeccionadas** — una «Limpia, sin inspeccionar en
+Opera» se rechaza (FOF00081) —. Un rechazo es una causa con su aviso en la bandeja, y la estancia lo
+dice; recepción puede **elegir otra habitación** (*⋯ → Cambiar habitación*): el check-in sube de nuevo
+con ella, y al entrar se resuelve sola la causa de la anterior.
+
+**Check-out.** Recepción cobra y confirma la salida; el front office publica `GuestCheckedOut` y
+arranca **`registrar-checkout`**: `check-out-reservation` hace, con el **cajero de la integración**
+(69721441, `OPERA_CASHIER_ID`), lo que Opera pide — si la salida no es su fecha de negocio, una **salida
+anticipada** (que pasa la salida a hoy y postea la noche); **saldar el folio** con lo que cobró recepción
+(un pago por lo que diga el folio de Opera, forma de pago `CASH`); **generar el folio** —la factura—; y
+el check-out —. Después, `fetch-invoice` manda la **factura de Opera** al front office: número, fecha e
+importe (XMAR385, 346 MUR).
+
+**«Abrir factura».** En la estancia cerrada, *En otros sistemas → Factura*: abre en otra pestaña un PDF
+servido por el front office (enlace firmado, caduca a las 8 h). Si Opera dio el documento de la factura,
+es ese; **XMAR no guarda los documentos de sus folios** (el folio se genera, pero sin `storedFolioId`),
+así que lo que se abre es la **«Factura proforma (front office)»**: el folio del front office, con el
+número e importe de la factura de Opera y el aviso de que no es el documento del PMS. Los cargos del
+front office no se postean en Opera: las cifras pueden no coincidir (en Opera, la noche y el desayuno).
+
+**Ojo, la fecha de negocio de Opera.** La de XMAR es **2026-05-13** y no avanza (es un UAT sin auditoría
+nocturna): Opera solo hace el check-in de lo que llega ese día. Una reserva que llega hoy por el
+calendario se **rechaza** en el check-in (FOF00067 «The guest's arrival is not scheduled for today»):
+queda una causa que no se puede resolver hasta que Opera cambie de día. Para el check-in y el check-out,
+`demo-prep.sh seed arriving-opera-today`: una reserva `JS-SEA` (SJMB, con habitaciones inspeccionadas)
+que llega en la fecha de Opera, y las habitaciones que Opera tiene inspeccionadas y libres. El no show no
+depende de la fecha de Opera.
+
+Probado en ec1 el 2026-09-30 con **Z9HJRJ** (Opera 39485828), desde la pantalla: check-in en la 5138 →
+`registrar-checkin` en 2 s, Opera *InHouse* en la 5138, el front office «en casa · hab. 5138»; check-out
+→ `registrar-checkout` en 4 s (salida anticipada, folio saldado y generado), Opera *CheckedOut*, factura
+**XMAR385** (346 MUR), el front office «salida registrada · factura XMAR385» y la proforma. Y con
+**FNPYDW**: la 206 («Limpia») rechazada (FOF00081), la causa en la bandeja, otra habitación (5136) desde
+la pantalla y la causa resuelta sola al entrar. En el *Recorrido* de la reserva: «Check-out en
+recepción → La integración pms-fo lo recibe → Proceso «Registrar check-out» → Hacer el check-out en
+Opera».
 
 ## 10 ter. Walk-in: el front office vende, el CRS reserva
 
@@ -640,11 +700,16 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
   la API.
 - `demo-prep.sh seed arriving-today` (flujo 4): una reserva que llega hoy, esperando a que esté en Opera
   y en el front office, para el no show.
+- `demo-prep.sh seed arriving-opera-today` (§10 quater): una reserva que llega en la **fecha de negocio
+  de Opera** (2026-05-13 en XMAR), la única que Opera deja hacer check-in, y las habitaciones que tiene
+  inspeccionadas y libres.
 - `demo-prep.sh seed walk-in` (flujo 5): nada que crear; los datos a teclear y las habitaciones libres.
 
 Se pueden lanzar a mitad de demo y repetir: lo que crean lleva la marca `demo-prep:<semilla>` en los
 comentarios de la reserva y se reutiliza. Para los flujos 6–8, `opera-outage.sh` y `ec1.py` (book,
-modify, cancel, show, rate-plan, ask-agent, proposal); `opera.py` lee Opera (solo GET).
+modify, cancel, show, rate-plan, ask-agent, proposal); `opera.py` lee Opera (solo GET: también
+`business-date`, `rooms XMAR SJMB`, `reservation XMAR <id>` —estado, habitación y si Opera haría el
+check-in ahora— y `folios XMAR <id>`, la factura).
 
 ### El cupo diario de la API de Salesforce
 
@@ -703,8 +768,9 @@ desde su cursor. Qué hacer:
 - [ ] Destinatarios reales en *Notifications → Recipients*: el email de *Urgent, by e-mail* (hoy un
       `example.com`, y el correo falla) y qué espacio de Google Chat recibe qué (el segundo está bloqueado
       por su administrador).
-- [ ] Probar el **no show** (§10 bis) desde la pantalla: en una reserva que venga del CRS y llegue hoy,
-      marcar No show en todos los huéspedes.
+- [x] Probar el **no show** (§10 bis) desde la pantalla: en una reserva que venga del CRS y llegue hoy,
+      marcar No show en todos los huéspedes (RBQ7DG, 2026-09-30: por el PMS y el CRS).
+- [x] Check-in y check-out desde la pantalla contra Opera (§10 quater): Z9HJRJ, 2026-09-30.
 - [ ] Probar el §10 desde la pantalla del front office (con usuario) y el Case desde la consola de
       Salesforce. Ojo: el Case lleva la sección *Cambio de datos de cliente (MDM)*; para poder añadirla
       se quitaron del layout de Case las acciones y el panel de resumen propios (quedan los de por

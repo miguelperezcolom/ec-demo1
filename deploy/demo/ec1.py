@@ -499,13 +499,15 @@ def seed_arriving_opera_today():
     not move with the calendar: a booking arriving today by the calendar is refused at the check-in."""
     business = opera_business_date()
     tag = f"{TAG}:arriving-opera-today"
-    ready = [b for b in tagged(tag) if b["arrival"] == business]
+    # JS-SEA is SJMB in XMAR, which has inspected rooms: XMAR assigns no room that is only clean
+    # (FOF00081), and its STDK rooms are all «Clean».
+    ready = [b for b in tagged(tag) if b["arrival"] == business and b["rooms"][0]["roomTypeCode"] == "JS-SEA"]
     if ready:
         locator = ready[0]["id"]
         print(f"Already there: {locator}, arriving on Opera's business date {business}")
     else:
-        locator = create_booking(channel="CALLCENTER", arrival=business, nights=1, tag=tag)
-        print(f"Created: {locator}, arriving {business} (Opera's business date), 1 night, 2 adults, STD-KING — "
+        locator = create_booking(channel="CALLCENTER", arrival=business, nights=1, room="JS-SEA", tag=tag)
+        print(f"Created: {locator}, arriving {business} (Opera's business date), 1 night, 2 adults, JS-SEA — "
               f"waiting for it to reach Opera and the front office")
     for _ in range(60):
         b = booking(locator)
@@ -513,10 +515,11 @@ def seed_arriving_opera_today():
             break
         time.sleep(3)
     show(locator)
-    code, out = opera("rooms", "XMAR", "STDK")
-    free = [line.split("\t")[0] for line in out.splitlines() if "\tVacant" in line and ("Clean" in line or "Inspected" in line)]
-    print(f"STDK rooms Opera has clean and vacant: {', '.join(free) or 'none — pick another type or clean one in Opera'}")
-    print(f"Check-in / check-out (front office → the stay {locator}): pick one of those rooms; Opera → «en casa».")
+    code, out = opera("rooms", "XMAR", "SJMB")
+    free = [line.split("\t")[0] for line in out.splitlines() if "\tInspected\tVacant" in line]
+    print(f"SJMB rooms Opera has inspected and vacant: {', '.join(free[:8]) or 'none — pick another type'}")
+    print(f"Check-in / check-out (front office → the stay {locator}): pick one of those rooms (a room only «Limpia, sin "
+          f"inspeccionar en Opera» is refused); Opera → «en casa». The check-out is an early departure (Opera's date).")
     return 0
 
 

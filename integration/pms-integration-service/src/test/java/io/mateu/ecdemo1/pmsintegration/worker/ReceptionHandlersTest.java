@@ -285,6 +285,21 @@ class ReceptionHandlersTest {
         verifyNoInteractions(events);
     }
 
+    @Test
+    void aReservationOperaHasCancelledHasNoCheckInToRecordNorAnythingToWaitFor() {
+        operaHas("Cancelled", null);
+
+        run("registrar-checkin", "assign-room", "assign-room@1", new Variable("pmsReservationId", "39486034"),
+                new Variable("roomNumber", "205"));
+        run("registrar-checkin", "check-in-reservation", "check-in-reservation@1", new Variable("pmsReservationId", "39486034"));
+
+        assertThat(sink.replies).containsExactly("COMPLETED [roomOutcome=STALE, pmsReservationId=39486034]",
+                "COMPLETED [checkInOutcome=STALE, pmsReservationId=39486034]");
+        assertThat(writes()).isEmpty();
+        verify(integration, never()).await(any(), any(), any(), any(), any(), any());
+        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:check-in-reservation"), anyString());
+    }
+
     // ── the check-out and its invoice ─────────────────────────────────────────────────────────────
 
     void operasDateIs(String date) {
@@ -315,8 +330,8 @@ class ReceptionHandlersTest {
         operasDateIs("2026-05-14");
         answers.put("GET /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"200", """
                 {"reservationFolioInformation": {"folioWindows": [
-                  {"folioWindowNo": 1, "balance": {"amount": 306, "currencyCode": "MUR"}},
-                  {"folioWindowNo": 2, "balance": {"amount": 0, "currencyCode": "MUR"}}]}}
+                  {"folioWindowNo": 1, "balance": {"amount": 306, "currencyCode": "MUR"}, "emptyWindow": false},
+                  {"folioWindowNo": 2, "balance": {"amount": 0, "currencyCode": "MUR"}, "emptyWindow": true}]}}
                 """});
         answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/payments", new String[]{"201", "{}"});
         answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"201", """
@@ -390,21 +405,39 @@ class ReceptionHandlersTest {
                   {"reservationInfo": {"reservationId": 39486034}, "folioNo": 377, "folioNoWithPrefix": "XMAR377", "folioWindowNo": 1,
                    "folioStatus": "Ok", "start": "2026-05-13", "folioAmount": {"amount": 150, "currencyCode": "MUR"}}]}
                 """});
-        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"201", """
-                {"folioWindows": [{"folioWindowNo": 1, "storedFolioId": {"id": "8812", "type": "StoredFolio"}}]}
-                """});
         answers.put("GET /csh/v1/hotels/XMAR/storedFolios/8812", new String[]{"200", """
                 {"storedFolioDetails": {"folioReportURL": "/reports/folio-8812.pdf", "hotelId": "XMAR"}}
                 """});
         answers.put("GET /reports/folio-8812.pdf", new String[]{"200", "%PDF-1.4 fake", "application/pdf"});
 
-        run("registrar-checkout", "fetch-invoice", "fetch-invoice@1", new Variable("pmsReservationId", "39486034"));
+        run("registrar-checkout", "fetch-invoice", "fetch-invoice@1", new Variable("pmsReservationId", "39486034"),
+                new Variable("storedFolioId", "8812"));
 
         assertThat(sink.replies).containsExactly("COMPLETED [invoiceOutcome=DONE]");
         verify(outcomes).done("XMAR", "39486034", "GSX4AK", ReceptionOperation.CHECK_OUT, "Salida registrada en Opera", null,
                 new Invoice("OPERA", "XMAR377", LocalDate.of(2026, 5, 13), new BigDecimal("150"), "MUR",
                         Base64.getEncoder().encodeToString("%PDF-1.4 fake".getBytes(StandardCharsets.ISO_8859_1))));
-        assertThat(writes()).singleElement().satisfies(w -> assertThat(w.body()).contains("\"cashierId\":69721441"));
+        assertThat(writes()).isEmpty();
+    }
+
+    @Test
+    void aFolioAlreadySettledIsGeneratedAllTheSameBeforeTheCheckOut() {
+        operaHas("InHouse", "205");
+        operasDateIs("2026-05-14");
+        answers.put("GET /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"200", """
+                {"reservationFolioInformation": {"folioWindows": [
+                  {"folioWindowNo": 1, "balance": {"amount": 0, "currencyCode": "MUR"}, "emptyWindow": false},
+                  {"folioWindowNo": 2, "balance": {"amount": 0, "currencyCode": "MUR"}, "emptyWindow": true}]}}
+                """});
+        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"201", "{\"folioWindows\": []}"});
+        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/checkOuts", new String[]{"201", "{}"});
+
+        run("registrar-checkout", "check-out-reservation", "check-out-reservation@1",
+                new Variable("pmsReservationId", "39486034"));
+
+        assertThat(sink.replies).containsExactly("COMPLETED [checkOutOutcome=DONE, pmsReservationId=39486034]");
+        assertThat(writes()).extracting(Call::path).containsExactly("/csh/v1/hotels/XMAR/reservations/39486034/folios",
+                "/csh/v1/hotels/XMAR/reservations/39486034/checkOuts");
     }
 
     @Test
@@ -433,9 +466,6 @@ class ReceptionHandlersTest {
         answers.put("GET /csh/v1/hotels/XMAR/folioHistory", new String[]{"200", """
                 {"folioHistory": [{"reservationInfo": {"reservationId": 39486034}, "folioNo": 377, "folioNoWithPrefix": "XMAR377",
                    "folioWindowNo": 1, "folioStatus": "Ok", "start": "2026-05-13", "folioAmount": {"amount": 0, "currencyCode": "MUR"}}]}
-                """});
-        answers.put("POST /csh/v1/hotels/XMAR/reservations/39486034/folios", new String[]{"400", """
-                {"title":"Folio window is empty","o:errorCode":"FOF01234"}
                 """});
 
         run("registrar-checkout", "fetch-invoice", "fetch-invoice@1", new Variable("pmsReservationId", "39486034"));

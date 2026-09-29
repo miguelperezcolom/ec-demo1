@@ -147,6 +147,14 @@ public class ReceptionHandlers {
         TaskHandlers.tag("opera.hotel", hotel);
         TaskHandlers.tag("opera.reservation.id", id);
         var current = OperaFrontDesk.room(r).orElse(null);
+        if (OperaFrontDesk.cancelled(r)) {
+            // Cancelled (in the CRS, and so in Opera) while the desk had the guests in: nothing to assign,
+            // and nothing to wait for. The desk is told.
+            log.info("{}/{}: Opera has it {}: no room to assign", hotel, id, OperaFrontDesk.status(r));
+            outcomes.refused(hotel, id, input.stayId(), ReceptionOperation.CHECK_IN,
+                    "Opera la tiene cancelada (" + OperaFrontDesk.status(r) + "): no hay check-in que registrar");
+            return new RoomAssigned(Outcome.STALE.name(), id, current);
+        }
         if (OperaFrontDesk.inHouse(r) || OperaFrontDesk.checkedOut(r)) {
             log.info("{}/{}: already {} in room {}, nothing to assign", hotel, id, OperaFrontDesk.status(r), current);
             return new RoomAssigned(Outcome.STALE.name(), id, current);
@@ -189,6 +197,12 @@ public class ReceptionHandlers {
         var id = OperaReservations.id(r);
         TaskHandlers.tag("opera.hotel", hotel);
         TaskHandlers.tag("opera.reservation.id", id);
+        if (OperaFrontDesk.cancelled(r)) {
+            log.info("{}/{}: Opera has it {}: no check-in to record", hotel, id, OperaFrontDesk.status(r));
+            TaskHandlers.tag("opera.action", "cancelled-in-opera");
+            supersede(input, "cancelled in Opera", ASSIGN_ROOM, CHECK_IN);
+            return new CheckedIn(Outcome.STALE.name(), id);
+        }
         if (OperaFrontDesk.inHouse(r) || OperaFrontDesk.checkedOut(r)) {
             log.info("{}/{}: Opera has it {} already", hotel, id, OperaFrontDesk.status(r));
             TaskHandlers.tag("opera.action", "already-in-house");
@@ -227,6 +241,7 @@ public class ReceptionHandlers {
             // to check out, and the desk's stay is its own.
             log.info("{}/{}: Opera has it {}: nothing to check out", hotel, id, OperaFrontDesk.status(r));
             TaskHandlers.tag("opera.action", "cancelled-in-opera");
+            supersede(input, "cancelled in Opera", CHECK_OUT);
             return new CheckedOut(Outcome.STALE.name(), id, null);
         }
         if (OperaFrontDesk.checkedOut(r)) {
@@ -252,8 +267,10 @@ public class ReceptionHandlers {
             // for what Opera's folio owes — the master of the folio says the amount.
             String stored = null;
             for (var window : desk.openBalances(hotel, id)) {
-                desk.settle(hotel, id, window, ohipProperties.payAtHotelMethod(), "Front office " + input.hotelCode() + " · " + input.stayId());
-                log.info("{}/{}: folio window {} settled in Opera: {} {}", hotel, id, window.window(), window.balance(), window.currency());
+                if (window.owes()) {
+                    desk.settle(hotel, id, window, ohipProperties.payAtHotelMethod(), "Front office " + input.hotelCode() + " · " + input.stayId());
+                    log.info("{}/{}: folio window {} settled in Opera: {} {}", hotel, id, window.window(), window.balance(), window.currency());
+                }
                 // The invoice: Opera checks out nothing whose folio it has not generated (FOF00125).
                 var generated = desk.generateFolio(hotel, id, window.window());
                 log.info("{}/{}: folio of window {} generated{}", hotel, id, window.window(),
@@ -281,14 +298,21 @@ public class ReceptionHandlers {
     public InvoiceFetched fetchInvoice(InvoiceTask input, TaskContext task) {
         var hotel = TaskHandlers.required(task, ProcessVariables.PMS_HOTEL_CODE, input.pmsHotelCode());
         var id = TaskHandlers.required(task, ProcessVariables.PMS_RESERVATION_ID, input.pmsReservationId());
+        var reservation = desk.reservation(hotel, id);
+        if (reservation.isPresent() && OperaFrontDesk.cancelled(reservation.get())) {
+            outcomes.refused(hotel, id, input.stayId(), ReceptionOperation.CHECK_OUT,
+                    "Opera la tiene cancelada (" + OperaFrontDesk.status(reservation.get()) + "): no hay salida ni factura");
+            return new InvoiceFetched(Outcome.SKIP.name());
+        }
         var folios = desk.checkOutFolios(hotel, id);
         var folio = folios.isEmpty() ? null : folios.getFirst();
         String pdf = null;
         try {
-            // The folio the check-out generated — its stored document —, or, failing that, one generated now.
+            // The folio the check-out generated — its stored document. None stored (XMAR keeps none): the
+            // figures alone; generating it again after the check-out finds no postings (OPERAWS-FOF01459).
             var document = input.storedFolioId() != null && !input.storedFolioId().isBlank()
                     ? desk.storedDocument(hotel, id, input.storedFolioId())
-                    : desk.folioDocument(hotel, id, folio == null ? 1 : folio.window());
+                    : java.util.Optional.<byte[]>empty();
             if (document.isPresent() && document.get().length <= MAX_PDF_BYTES) {
                 pdf = Base64.getEncoder().encodeToString(document.get());
             } else if (document.isPresent()) {
