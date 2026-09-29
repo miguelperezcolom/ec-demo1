@@ -52,6 +52,26 @@ public class Pending {
     }
 
     /**
+     * The hotels of every integration still in service with a CRS code no equivalence and no proposal
+     * covers — what "ask the agent" with nothing chosen asks about. A hotel whose codes cannot be read
+     * now is left out, not failed: the others are still worth asking for.
+     */
+    public List<String> hotelsWithPending() {
+        return clients.integrations().stream()
+                .filter(i -> i.status() != IntegrationStatus.DECOMMISSIONED && i.crsHotelCode() != null)
+                .map(i -> i.crsHotelCode())
+                .distinct()
+                .filter(hotel -> {
+                    try {
+                        return pendingCodes(hotel).stream().anyMatch(p -> !p.proposed());
+                    } catch (RuntimeException e) {
+                        return false;
+                    }
+                })
+                .toList();
+    }
+
+    /**
      * The PMS's codes for this hotel. Until the hotel itself is mapped only the PMS's hotels can be
      * listed — its property codes hang from the PMS's id for it.
      */
