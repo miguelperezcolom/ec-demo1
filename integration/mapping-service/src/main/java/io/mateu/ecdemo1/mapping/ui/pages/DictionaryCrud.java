@@ -157,7 +157,11 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
                 .encodeToString((hotel + "|" + type.name() + "|" + code).getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Asks the agent for a proposal for the integration chosen in the filters, or for the hotels of the selected rows. */
+    /**
+     * Asks the agent for a proposal: for the integration chosen in the filters; else for the hotels of
+     * the selected rows; else, with nothing chosen, for every hotel with something unmapped — whatever
+     * its integration.
+     */
     @ListToolbarButton(rowsSelectedRequired = false)
     @Toolbar(buttonStyle = ButtonStyle.primary, order = 0)
     public Object askTheAgent(List<EntryRow> selection, HttpRequest httpRequest) {
@@ -165,8 +169,14 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
         var hotels = chosen != null && !blank(chosen.toString()) ? List.of(chosen.toString())
                 : (selection == null ? List.<EntryRow>of() : selection).stream()
                         .map(EntryRow::scope).filter(s -> s != null && !"chain".equals(s)).distinct().toList();
+        if (hotels.isEmpty() && (selection == null || selection.isEmpty())) {
+            hotels = pending.hotelsWithPending();
+            if (hotels.isEmpty()) {
+                return refreshed(httpRequest, "Nothing is waiting for a mapping: every code of every hotel has an equivalence or a proposal");
+            }
+        }
         if (hotels.isEmpty()) {
-            return refreshed(httpRequest, "Choose an integration in the filters, or select rows of its hotel, to ask the agent");
+            return refreshed(httpRequest, "The selected rows are the chain's: choose an integration in the filters to ask the agent");
         }
         if (hotels.size() > 1) {
             hotels.forEach(agent::requestProposalInBackground);
