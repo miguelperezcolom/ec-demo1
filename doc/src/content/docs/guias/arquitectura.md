@@ -1,0 +1,114 @@
+---
+title: Arquitectura
+description: Cómo está organizado el código, la regla del maestro, la capa anticorrupción, el motor y cómo se hablan los servicios.
+---
+
+## El código, por sistema
+
+Cada módulo es su propio proyecto Maven y su propia imagen, con el nombre de su carpeta
+(`systems/erp` produce `ec-demo1-erp`). El `pom.xml` raíz solo los agrega.
+
+| Carpeta | Qué contiene |
+| :------ | :----------- |
+| `systems/` | Los sistemas de la cadena a los que sustituye la PoC, y el front office: `crs/booking` (el CRS), `erp`, `front-office`, `pms/opera-mock` (un doble de OHIP solo para la batería local) |
+| `integration/` | **El plano de datos**, la ACL: `crs-integration-service`, `pms-integration-service` (el conector de Opera), `mapping-service`, `customer-mdm-service`, `journey-service` |
+| `control-plane/` | **Quién gobierna el flujo**: `integrations-service` (una integración por hotel y su alta), `audit-service`, `communication-service` (avisos, destinatarios, bandeja), `users` y `grpc-interface` |
+| `consoles/` | Lo que ve la gente: `gateway`, `shell` (plano de datos) y `control-shell` (plano de control) |
+| `ai/` | Los agentes: `ia-agent`, `ia-control-plane` (los catálogos) y `api-mcp` |
+| `contracts/` | El lenguaje que hablan los servicios: librerías por contexto, esquemas de los topics y las tareas de cada worker. Ver [Contratos](/contratos/librerias-y-esquemas/) |
+| `supporting/` | `content` (un CRUD), `ui-commons` (lo que comparten las interfaces) y `messaging` (el outbox, su relay y el inbox que comparten los servicios con base de datos) |
+| `deploy/` | Manifiestos, el chart del motor (vendorizado), observabilidad, `deploy.sh`, `build-images.sh` y los scripts de la demo |
+| `e2e/` | Playwright contra el clúster desplegado, y la batería punta a punta local |
+| `gitops/` | El esquema público del catálogo de IA en YAML y un ejemplo |
+
+## Dos planos
+
+La PoC separa **lo que fluye** de **quién lo gobierna**, y cada plano tiene su consola:
+
+- **Plano de datos** — `ec1.mateu.io`: lo que usa el negocio. El CRS (*Call center*), el ERP,
+  *Clientes*, el recorrido de una reserva, los procesos del motor.
+- **Plano de control** — `console.ec1.mateu.io`: la configuración y la medida. IA, usuarios,
+  integraciones, mapeado, el MDM técnico, notificaciones, auditoría, las definiciones del motor.
+
+Cada servicio trae sus propias pantallas (un `@UI` de Mateu en su ruta, p. ej. `/_mapping`) y la
+consola las **federa** con un `RemoteMenu`. Ver [Consolas, gateway y seguridad](/guias/consolas-y-seguridad/).
+
+## Cada dato viaja desde su maestro
+
+La regla que ordena la integración (decisión del 27-09-2026, `docs/poc-acl/plan.md`): **cada dato
+viaja solo desde su maestro a sus consumidores**, en cadena o a través de un hub.
+
+| Dato | Maestro | Camino |
+| :--- | :------ | :----- |
+| Reserva | CRS | **CRS → Opera → front office**. No hay integración crs-fo: el front office recibe lo que **Opera tiene**, no lo que se le mandó a Opera |
+| Interlocutor | ERP | ERP → Opera (se exporta; el ERP anota qué perfil de Opera es) |
+| Cliente | Salesforce | Salesforce ↔ **MDM** (hub) → front office (kárdex) y Opera (perfil del huésped, por la reproyección de sus reservas). El CRS no recibe proyecciones: pregunta al MDM cuando enseña una reserva |
+| Catálogo de Opera | Opera | Opera → front office (integración pms-fo) |
+
+## La capa anticorrupción
+
+Los dos extremos tienen un adaptador que es lo único que conoce al sistema del otro lado:
+
+- **`crs-integration-service`** convierte lo que pasa en el CRS y el ERP en eventos de negocio,
+  relee la reserva y la traduce al **modelo canónico**, arranca el proceso que corresponde a cada
+  evento y anota en el CRS dónde ha quedado la reserva en Opera.
+- **`pms-integration-service`** es **el conector**: la única pieza que conoce la API de Opera (OHIP).
+  No tiene base de datos: su estado es el de Opera y el del motor.
+
+Entre ellos nadie conoce ni `booking` ni Opera: el mapeado traduce códigos, el MDM resuelve
+identidades y el motor ordena los pasos. Los adaptadores no tienen pantallas ni MCP: traducen, y no
+tienen operativa propia que enseñar.
+
+## El motor
+
+EventConductor lleva cada reserva por sus pasos. Los procesos están en ec-definitions y son siete:
+`proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `proyectar-estancia`,
+`registrar-no-show`, `alta-integracion` y `alta-integracion-fo`. Cada paso `ACTION` es una **tarea**
+que atiende un worker en un topic de Kafka (`mapping`, `pms-integration`, `crs-integration`,
+`integrations`, `booking`). Ver [Los procesos del motor](/guias/procesos/) y
+[Workers y tareas](/contratos/workers-y-tareas/).
+
+Dos decisiones marcan cómo están escritos:
+
+- **Espera, no falla.** Lo que no se resuelve solo es una **causa** registrada en `mapping-service`;
+  el proceso espera en un `WAIT_FOR_MESSAGE` correlado por su clave y, cuando se resuelve su última
+  causa, **relanza una instancia nueva** que relee la reserva (el motor no admite ciclos). Ver
+  [Causas, avisos y bandeja](/integracion/causas-y-avisos/).
+- **Ningún proceso tiene un estado final de fallo.** Los pasos externos reintentan con backoff
+  acotado y sin límite de intentos, con un aviso pasado un umbral.
+
+## Cómo se hablan los servicios: órdenes por Kafka, consultas por HTTP
+
+La regla (`docs/poc-acl/llamadas-sincronas.md`): entre servicios van **mensajes**. El emisor escribe
+la orden en **su outbox**, en la misma transacción que la decisión que la pide, y un relay la publica
+en Kafka. El receptor la consume con un **consumidor idempotente**: guarda el id del mensaje en su
+**inbox** (`inbox_entry`) en la misma transacción que lo que hace, así que un mensaje repetido no hace
+nada. **HTTP síncrono solo cuando hace falta la respuesta ahora**: una pantalla que espera, o leer
+datos (releer una reserva, la ficha de un cliente).
+
+- Cada orden lleva su `commandId`; en los pasos del motor es el `taskExecutionId`, así que un paso
+  repetido pide una sola vez.
+- La clave de Kafka es el hotel, la causa, el interlocutor o la reserva: las órdenes sobre lo mismo
+  llegan en orden.
+- Lo que el receptor rechaza de forma determinista se registra y se descarta; lo demás se reintenta.
+- Un paso del motor que escribe en otro sistema también es una orden: deja la orden en el outbox y
+  contesta al motor cuando ya va de camino.
+
+`pms-integration-service` es la excepción: no tiene base de datos ni outbox, así que publica con un
+productor síncrono y solo después contesta al motor; si Kafka no lo toma, el paso falla y el motor lo
+reintenta. Las órdenes que aún van por HTTP y por qué están en
+[`llamadas-sincronas.md`](https://github.com/miguelperezcolom/ec-demo1/blob/master/docs/poc-acl/llamadas-sincronas.md).
+
+La lista completa de topics, con productores y consumidores, está en
+[Topics de Kafka](/referencia/topics/).
+
+## Bases de datos
+
+Cada servicio con estado tiene **su base de datos** en el PostgreSQL del motor (creadas por
+`55-demo-db-init.yaml`), no un esquema dentro del del motor: el motor gestiona `workflow` con Flyway y
+valida su esquema al arrancar. Los servicios usan `ddl-auto: update` y no traen migraciones — sin
+historial que mantener, a cambio de que los renombres y las restricciones viejas se arreglen a mano
+(ver [Problemas conocidos](/operacion/problemas-conocidos/)).
+
+El plano de control de IA es la excepción: `cp-postgres`, un PostgreSQL propio con pgvector, porque
+guarda las credenciales de los LLM. Los dos PostgreSQL están en volúmenes (`hcloud-volumes`).
