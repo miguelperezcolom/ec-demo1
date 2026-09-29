@@ -274,6 +274,25 @@ class PmsStaysTest {
   }
 
   @Test
+  void aCheckOutThePmsMadeAnEarlyDepartureLeavesTheDesksStayAndSaysSo() {
+    pms.take(stay("R63", "LOC63", "2026-09-27T10:00:00"));
+    stays.save(stays.findById("LOC63").orElseThrow().assignRoom("1206", "Estándar King").completeCheckIn().completeCheckOut());
+    var out = stay("R63", "LOC63", "2026-09-27T12:00:00", PmsStatus.CHECKED_OUT, "BRKFST", "C-R63", List.of());
+    // Opera moved the departure to the arrival day (an early departure): no night between them.
+    var early = new WriteStay(id(), "XMAR", "R63", "CR63", "LOC63", List.of(), out.pmsVersion(), PmsStatus.CHECKED_OUT,
+        out.holder(), List.of(), "STDK", null, null, out.checkIn(), out.checkIn(), 2, "x", null, "EUR");
+
+    assertThat(pms.take(early)).isEqualTo(Outcome.WRITTEN);
+    assertThat(stays.findById("LOC63").orElseThrow().checkOut()).isEqualTo(LocalDate.of(2026, 11, 13));
+    assertThat(links.stateOf("LOC63")).contains("Opera: salida registrada");
+
+    // A day use born in Opera is no stay here: skipped, not retried for ever.
+    assertThat(pms.take(new WriteStay(id(), "XMAR", "R64", "CR64", null, List.of(), out.pmsVersion(), PmsStatus.RESERVED,
+        out.holder(), List.of(), "STDK", null, null, out.checkIn(), out.checkIn(), 1, "x", null, "EUR")))
+        .isEqualTo(Outcome.NOT_A_STAY);
+  }
+
+  @Test
   void anotherPropertysCommandsAreNotThisFrontOffices() {
     var other = stay("R50", "LOC50", "2026-09-27T10:00:00");
     assertThat(pms.take(new WriteStay(id(), "XMU", "R50", "C", "LOC50", List.of(), other.pmsVersion(), PmsStatus.RESERVED,

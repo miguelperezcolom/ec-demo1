@@ -43,7 +43,7 @@ public class PmsStays {
 
   /** What became of a command. */
   public enum Outcome { WRITTEN, CANCELLED, NO_SHOW, KEPT_BY_THE_DESK, STALE, UNKNOWN_STAY, CATALOGUE, DUPLICATE, OTHER_HOTEL,
-    RECEPTION }
+    RECEPTION, NOT_A_STAY }
 
   final String pmsHotel;
   final StayRepository stays;
@@ -179,6 +179,22 @@ public class PmsStays {
       return status == FrontOfficeCommand.PmsStatus.NO_SHOW ? Outcome.NO_SHOW : Outcome.CANCELLED;
     }
     var stayId = found.orElseGet(() -> newStayId(w));
+    if (status == FrontOfficeCommand.PmsStatus.CHECKED_OUT && found.isPresent()) {
+      // Checked out in the PMS: what the stay was is the desk's now — an early departure moves the PMS's
+      // departure to its arrival day, a stay no longer shaped as one. Only where it stands in the PMS.
+      links.link(stayId, w.pmsReservationId(), w.pmsVersion(), ratePlan(w));
+      links.state(stayId, "Opera: salida registrada" + invoices.of(stayId)
+          .map(i -> i.number() == null ? "" : " · factura " + i.number()).orElse(""));
+      log.info("PMS reservation {} v{} checked out: stay {} says so", w.pmsReservationId(), w.pmsVersion(), stayId);
+      return Outcome.WRITTEN;
+    }
+    if (w.checkIn() == null || w.checkOut() == null || !w.checkOut().isAfter(w.checkIn())) {
+      // Not a stay the front office can hold (a day use: no night between arrival and departure).
+      // Retrying cannot fix it, and it would hold every command behind it on the partition: skipped.
+      log.warn("PMS reservation {} v{} ({}..{}) is no stay this front office can hold, skipped", w.pmsReservationId(),
+          w.pmsVersion(), w.checkIn(), w.checkOut());
+      return Outcome.NOT_A_STAY;
+    }
     var holder = w.holder();
     var written = writes.write(stayId, new StayWrites.Booking(guestId(w),
             new StayWrites.Holder(holder == null ? "" : holder.name(), holder == null ? null : holder.document(),
