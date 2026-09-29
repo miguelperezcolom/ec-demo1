@@ -77,13 +77,19 @@ public class CheckInService {
       }
       stay = stays.save(stay.completeCheckIn());
       room.filter(Room::assignable).ifPresent(r -> rooms.save(r.occupy()));
+      Folio opened = null;
       if (folios.findByStayId(stay.id()).isEmpty()) {
         var contracted = stay.addOns().stream().map(SelectedAddOn::addOnId)
             .map(id -> addOnCatalog.findById(id).orElse(null)).filter(Objects::nonNull).toList();
-        folios.save(Folio.openAtCheckIn(stay, contracted));
+        opened = folios.save(Folio.openAtCheckIn(stay, contracted));
       }
-      // The PMS is the master of the stay: the check-in goes up to it, with this transaction.
+      // The PMS is the master of the stay: the check-in goes up to it, with this transaction — and the
+      // extras the folio opened with after it, onto the PMS's folio (the accommodation is the PMS's own).
       reception.checkedIn(stay, by);
+      if (opened != null) {
+        var id = stay.id();
+        opened.toThePms().forEach(line -> reception.chargePosted(id, line, by));
+      }
     }
     update(stayId, ops -> ops.withExtras(true));
     return stay;

@@ -3,7 +3,7 @@ package io.mateu.ecdemo1.frontoffice.domain.folio;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 import io.mateu.ecdemo1.frontoffice.domain.catalog.AddOnCatalogItem;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 
@@ -49,31 +49,58 @@ public record Folio(
    * contracted add-on that has a price (an add-on included in the package costs nothing here).
    */
   public static Folio openAtCheckIn(Stay stay, List<AddOnCatalogItem> contractedAddOns) {
+    // The accommodation is the PMS's to charge (its room charge); each extra is the desk's, and goes up.
     var folio = openFor(idFor(stay.id()), stay.id(), stay.total())
-        .post(FolioLine.charge("Alojamiento x" + stay.nights() + " noches", stay.total()));
+        .post(FolioLine.accommodation("Alojamiento x" + stay.nights() + " noches", stay.total()));
     for (var item : contractedAddOns) {
       if (item != null && item.price() != null) {
-        folio = folio.post(FolioLine.charge(item.title(), item.price()));
+        folio = folio.post(FolioLine.charged(ChargeKind.ADD_ON, item.id(), item.title(), item.price()));
       }
     }
     return folio;
   }
 
-  /** Whether the late check-out is contracted: its charge is on the folio. */
+  /** Whether the late check-out is contracted: its charge is on the folio, not voided. */
   public boolean lateCheckOutContracted() {
-    return lines.stream().anyMatch(l -> l.concept() != null && l.concept().startsWith("Late check-out"));
+    return lines.stream().anyMatch(l -> !l.voided() && l.concept() != null && l.concept().startsWith("Late check-out"));
   }
 
   /** Contracts the late check-out — charged once: contracted again, the same folio. */
   public Folio contractLateCheckOut() {
-    return lateCheckOutContracted() ? this : post(FolioLine.charge(LATE_CHECK_OUT, LATE_CHECK_OUT_FEE));
+    return lateCheckOutContracted() ? this
+        : post(FolioLine.charged(ChargeKind.LATE_CHECK_OUT, null, LATE_CHECK_OUT, LATE_CHECK_OUT_FEE));
   }
 
-  /** Outstanding balance: the sum of all line amounts (included lines count as zero). */
+  /** The line with this id, if the folio has it. */
+  public Optional<FolioLine> line(String lineId) {
+    return lineId == null ? Optional.empty() : lines.stream().filter(l -> lineId.equals(l.id())).findFirst();
+  }
+
+  /** The lines of the desk's charges that go onto the PMS's folio (voided ones too: their void goes up). */
+  public List<FolioLine> toThePms() {
+    return lines.stream().filter(FolioLine::toThePms).toList();
+  }
+
+  /**
+   * Takes a line back — voided, or refunded: it stays on the folio and counts for nothing. Only a
+   * charge of the desk (the accommodation is the PMS's); one voided already stays as it is.
+   */
+  public Folio voidLine(String lineId) {
+    var line = line(lineId).orElseThrow(() -> new IllegalArgumentException("No line " + lineId + " on folio " + id));
+    if (line.kind() == null || !line.kind().toThePms()) {
+      throw new IllegalArgumentException("Line " + lineId + " is not a charge of the desk: it cannot be voided");
+    }
+    if (line.voided()) {
+      return this;
+    }
+    return new Folio(id, stayId, preauthorized, lines.stream().map(l -> l == line ? l.asVoided() : l).toList());
+  }
+
+  /** Outstanding balance: the sum of the line amounts that count (included and voided lines count as zero). */
   public BigDecimal balance() {
     return lines.stream()
+        .filter(FolioLine::counts)
         .map(FolioLine::amount)
-        .filter(Objects::nonNull)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 

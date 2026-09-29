@@ -95,6 +95,12 @@ create table if not exists folio_line (
     included_label varchar(50),
     primary key (folio_id, idx)
 );
+-- A line the desk charges goes onto the PMS's folio (pms-fo, registrar-cargo): its id is the posting's
+-- reference there; what it is (kind, the catalogue's code); and whether the desk took it back.
+alter table folio_line add column if not exists line_id varchar(40);
+alter table folio_line add column if not exists kind varchar(20);
+alter table folio_line add column if not exists code varchar(40);
+alter table folio_line add column if not exists voided boolean default false;
 
 -- ── Room aggregate ───────────────────────────────────────────────────────────
 create table if not exists room (
@@ -254,4 +260,16 @@ create table if not exists stay_notice_ack (
     acknowledged_by varchar(200),
     acknowledged_at timestamp,
     primary key (stay_id, moment)
+);
+
+-- How the PMS took each charge of the desk and its void (RecordCharge): its posting — the transaction
+-- number on the PMS's folio — or its refusal. Its own table, written by the PMS's answers: the folio
+-- itself is the desk's.
+create table if not exists folio_line_pms (
+    line_id      varchar(40)  primary key,
+    stay_id      varchar(64)  not null,
+    posting_id   varchar(40),
+    reversal_id  varchar(40),
+    state        varchar(500),
+    updated_at   timestamp    not null
 );

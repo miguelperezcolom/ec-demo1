@@ -79,7 +79,17 @@ public class Invoices {
     if (invoice.isPresent() && invoice.get().hasDocument()) {
       return new Summary(true, "Abrir factura" + (invoice.get().number() == null ? "" : " · Opera " + invoice.get().number()));
     }
-    return new Summary(false, "Abrir factura proforma (front office)");
+    return new Summary(false, "Abrir factura proforma (front office)" + invoice.filter(i -> i.amount() != null)
+        .map(i -> " · Opera " + (i.number() == null ? "" : i.number() + " ") + amount(i.amount(), i.currency())
+            + (i.amount().compareTo(frontOfficeTotal(stayId)) == 0 ? ", coincide" : ", front office "
+                + frontOfficeTotal(stayId).toPlainString()))
+        .orElse(""));
+  }
+
+  /** What the front office's folio adds up to: its charges that count (not included, not voided). */
+  BigDecimal frontOfficeTotal(String stayId) {
+    var folio = queries.find(stayId).isEmpty() ? null : queries.view(stayId).folio();
+    return folio == null ? BigDecimal.ZERO : folio.balance();
   }
 
   /** Where the desk opens the invoice: the front office's own, signed for a few hours. */
@@ -126,9 +136,10 @@ public class Invoices {
     var lines = new ArrayList<String[]>();
     var total = BigDecimal.ZERO;
     for (var line : view.folio() == null ? List.<FolioLine>of() : view.folio().lines()) {
-      lines.add(new String[]{line.concept(), line.included() ? (line.includedLabel() == null ? "incluido" : line.includedLabel())
-          : euros(line.amount())});
-      if (line.amount() != null && !line.included()) {
+      lines.add(new String[]{line.concept() + (line.voided() ? " (" + euros(line.amount()) + ", anulado)" : ""),
+          line.included() ? (line.includedLabel() == null ? "incluido" : line.includedLabel())
+              : line.voided() ? "anulado" : euros(line.amount())});
+      if (line.counts()) {
         total = total.add(line.amount());
       }
     }
@@ -141,6 +152,7 @@ public class Invoices {
       text.add("Factura de Opera: " + pms.number() + (pms.amount() == null ? "" : " por " + pms.amount().toPlainString()
           + " " + (pms.currency() == null ? "" : pms.currency())) + " — Opera no ha dado su documento.");
     }
+    var totals = totals(total, pms);
     try (var document = new PDDocument(); var out = new ByteArrayOutputStream()) {
       var page = new PDPage(PDRectangle.A4);
       document.addPage(page);
@@ -166,8 +178,15 @@ public class Invoices {
           }
         }
         y -= 8;
-        y = write(content, bold, 12, 50, y, "Total");
+        y = write(content, bold, 12, 50, y, "Total del front office");
         write(content, bold, 12, 430, y + 16, euros(total));
+        if (pms != null && pms.amount() != null) {
+          y = write(content, bold, 12, 50, y, "Total de la factura de Opera " + (pms.number() == null ? "" : pms.number()));
+          write(content, bold, 12, 430, y + 16, amount(pms.amount(), pms.currency()));
+        }
+        for (var t : totals) {
+          y = write(content, regular, 9, 50, y - 2, t);
+        }
         write(content, regular, 8, 50, 40, "Factura proforma (front office) · generada " + DateTimeFormatter.ISO_INSTANT
             .format(clock.instant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)));
       }
@@ -176,6 +195,29 @@ public class Invoices {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  /**
+   * What the two totals say. Every charge of the desk went onto Opera's folio (registrar-cargo), and its
+   * voids too, so Opera's invoice covers them: the totals match. When they do not, why — in words the
+   * desk can act on.
+   */
+  static List<String> totals(BigDecimal frontOffice, StayInvoice pms) {
+    if (pms == null || pms.amount() == null) {
+      return List.of("Opera no ha dado aún el importe de su factura: solo el total del front office.");
+    }
+    if (pms.amount().compareTo(frontOffice) == 0) {
+      return List.of("Los totales coinciden: los cargos de recepción están en el folio de Opera.");
+    }
+    var difference = frontOffice.subtract(pms.amount());
+    return List.of("Los totales NO coinciden (diferencia " + difference.toPlainString() + "). Causas habituales: el alojamiento,",
+        "que Opera factura con su tarifa y sus noches (en una salida anticipada, solo las pasadas); un cargo que Opera",
+        "rechazó o que llegó después del check-out; o cargos del front office anteriores a subirlos a Opera.");
+  }
+
+  static String amount(BigDecimal amount, String currency) {
+    return currency == null ? euros(amount)
+        : String.format(Locale.forLanguageTag("es-ES"), "%,.2f %s", amount, currency);
   }
 
   static float write(PDPageContentStream content, PDType1Font font, float size, float x, float y, String text)

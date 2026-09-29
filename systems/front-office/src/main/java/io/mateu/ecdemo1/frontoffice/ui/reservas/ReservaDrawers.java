@@ -51,13 +51,45 @@ final class ReservaDrawers {
         .build();
   }
 
-  /** Drawer con el desglose del folio (Ledger) — gestión de folio. */
+  /**
+   * Drawer con el desglose del folio (Ledger) — gestión de folio: y, cargo a cargo, dónde está en el folio
+   * de Opera (el maestro del folio: allí va cada cargo de recepción) y «Anular» para quitarlo — queda
+   * anulado aquí y Opera anula su posteo.
+   */
   Drawer folio() {
+    var folio = r.view().folio();
+    var content = new ArrayList<Component>();
+    content.add(EstanciaPanel.ledger(folio).style("width: 100%;").build());
+    var cargos = folio == null ? List.<io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine>of() : folio.toThePms();
+    if (!cargos.isEmpty()) {
+      var enOpera = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.chargePostings(r.stayId);
+      content.add(Text.builder().text("Cargos en el folio de Opera").container(TextContainer.h3).style("margin: 0;").build());
+      content.add(StatusList.builder()
+          .compact(true)
+          .style("width: 100%;")
+          .items(cargos.stream().map(l -> {
+            var posting = enOpera.get(l.id());
+            var estado = posting == null ? "Opera: sin noticias" : posting.state();
+            var rechazado = posting != null && posting.refused();
+            return StatusItem.builder()
+                .id("linea-" + l.id())
+                .title(l.concept())
+                .description(GuestHeaders.euros(l.amount()) + (l.voided() ? " · anulado" : ""))
+                .status(estado)
+                .statusColor(rechazado ? "error" : estado.startsWith("Opera: en el folio") || estado.startsWith("Opera: anulado")
+                    ? "success" : "warning")
+                .actionLabel(l.voided() ? null : "Anular")
+                .actionId(l.voided() ? null : "anularCargo")
+                .actionIcon(l.voided() ? null : "vaadin:close-circle")
+                .build();
+          }).toList())
+          .build());
+    }
     return Drawer.builder()
         .id("drawer-folio")
         .headerTitle("Folio de la estancia")
         .width("34rem")
-        .content(EstanciaPanel.ledger(r.view().folio()).style("width: 100%;").build())
+        .content(VerticalLayout.builder().style("width: 100%; gap: .75rem;").content(content).build())
         .initialData(Map.of("stayId", r.stayId))
         .build();
   }

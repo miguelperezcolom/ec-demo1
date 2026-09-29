@@ -57,11 +57,13 @@ public class PmsStays {
   final Inbox inbox;
   final ReceptionReports reception;
   final StayInvoices invoices;
+  final io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings;
   final Clock clock = Clock.systemUTC();
 
   public PmsStays(@Value("${frontoffice.pms-hotel:XMAR}") String pmsHotel, StayRepository stays, WalkIns walkIns,
       StayWrites writes, PmsCatalogue catalogue, PmsLinks links, Inbox inbox, ReceptionReports reception,
-      StayInvoices invoices) {
+      StayInvoices invoices, io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings) {
+    this.chargePostings = chargePostings;
     this.pmsHotel = pmsHotel;
     this.stays = stays;
     this.walkIns = walkIns;
@@ -84,6 +86,7 @@ public class PmsStays {
       case WriteStay w -> w.pmsHotelCode();
       case ReplaceCatalogue c -> c.pmsHotelCode();
       case RecordReception r -> r.pmsHotelCode();
+      case FrontOfficeCommand.RecordCharge c -> c.pmsHotelCode();
     };
     if (!pmsHotel.equals(hotel)) {
       log.debug("Command {} is for PMS property {}, not {}: not this front office's", command.commandId(), hotel, pmsHotel);
@@ -102,7 +105,30 @@ public class PmsStays {
         yield Outcome.CATALOGUE;
       }
       case RecordReception r -> record(r);
+      case FrontOfficeCommand.RecordCharge c -> charge(c);
     };
+  }
+
+  /**
+   * How the PMS took a charge of the desk, or its void: posted on its folio (its transaction number),
+   * or refused — the line says why, and the process in the PMS waits on a cause someone resolves.
+   */
+  Outcome charge(FrontOfficeCommand.RecordCharge c) {
+    var stayId = Optional.ofNullable(c.stayId()).filter(id -> stays.findById(id).isPresent())
+        .or(() -> links.byPmsReservation(c.pmsReservationId()).map(PmsLinks.Link::stayId));
+    if (stayId.isEmpty()) {
+      log.info("PMS reservation {}: a charge for a stay this front office does not have", c.pmsReservationId());
+      return Outcome.UNKNOWN_STAY;
+    }
+    var what = c.reversal() ? "anulación" : "cargo";
+    var state = c.refused()
+        ? "Opera: rechazado (" + what + ") — " + (c.detail() == null ? "sin motivo" : c.detail())
+        : c.reversal() ? "Opera: anulado" + (c.pmsPostingId() == null ? "" : " · " + c.pmsPostingId())
+        : "Opera: en el folio" + (c.pmsPostingId() == null ? "" : " · " + c.pmsPostingId());
+    chargePostings.posted(stayId.get(), c.lineId(), c.reversal(), c.refused() ? null : c.pmsPostingId(), state,
+        clock.instant());
+    log.info("{}: line {} — {}", stayId.get(), c.lineId(), state);
+    return Outcome.RECEPTION;
   }
 
   /**

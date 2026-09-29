@@ -339,7 +339,8 @@ public class ReservaOverview
             "gestionFolio", "opPeticion", "registrarPeticion",
             "opIncidencia", "crearIncidencia", "enviarMensaje",
             "opExtras", "extras360", "cerrarExtras", "opFirma", "opFirmaDone",
-            "buscarCargos", "seleccionarCargo", "cambiarMetodo", "confirmPayment", "entendidoCheckout")
+            "buscarCargos", "seleccionarCargo", "cambiarMetodo", "confirmPayment", "entendidoCheckout",
+            "anularCargo", "comprobarHabitacion")
         .contains(actionId);
   }
 
@@ -451,13 +452,29 @@ public class ReservaOverview
             UICommand.closeModal());
       }
       case "postearCargo" -> {
-        var item = folios.postCharge(stayId, param(httpRequest, "_item")).orElse(null);
+        var item = folios.postCharge(stayId, param(httpRequest, "_item"), DeskUser.name()).orElse(null);
         if (item == null) {
           yield new Message("Cargo no encontrado: " + param(httpRequest, "_item"));
         }
         yield List.of(this,
             new Message("Cargo posteado — " + item.name() + " " + GuestHeaders.euros(item.price())),
             UICommand.closeModal());
+      }
+      case "anularCargo" -> {
+        // «Anular» en el folio: la línea queda anulada (no cuenta) y Opera anula su posteo
+        var lineId = param(httpRequest, "_item").replaceFirst("^linea-", "");
+        var voided = folios.voidCharge(stayId, lineId, DeskUser.name()).orElse(null);
+        if (voided == null) {
+          yield new Message("Ese cargo no se puede anular (el alojamiento es de Opera)");
+        }
+        yield List.of(this, new Message("Cargo anulado — " + voided.concept() + " " + GuestHeaders.euros(voided.amount())
+            + ". Se anula también en el folio de Opera."), UICommand.closeModal());
+      }
+      case "comprobarHabitacion" -> {
+        var readiness = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.refreshRoom(stay().roomNumber());
+        yield List.of(this, new Message(!readiness.known() ? "Opera no responde: " + readiness.reason()
+            : readiness.ready() ? "Habitación " + readiness.roomNumber() + " lista en Opera (" + readiness.state() + ")"
+            : "Habitación " + readiness.roomNumber() + " aún no lista: " + readiness.reason()));
       }
       case "resolverIncidencia" -> {
         incidents.resolve(stayId, param(httpRequest, "_item").replaceFirst("^inc-", ""));
@@ -537,7 +554,7 @@ public class ReservaOverview
         yield this;
       }
       case "seleccionarCargo" -> {
-        var item = folios.postCharge(stayId, param(httpRequest, "_item")).orElse(null);
+        var item = folios.postCharge(stayId, param(httpRequest, "_item"), DeskUser.name()).orElse(null);
         if (item == null) {
           yield new Message("Cargo no encontrado: " + param(httpRequest, "_item"));
         }
@@ -577,7 +594,11 @@ public class ReservaOverview
     } catch (GuestNotices.NotAcknowledged e) {
       return URI.create("/checkin/" + stayId);
     }
-    var mensaje = new Message("✅ Check-in completado — " + view().guest().name() + " · Hab " + checkedIn.roomNumber());
+    // la habitación que no está lista en Opera (XMAR: sin inspeccionar) puede hacer que Opera lo rechace
+    var lista = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.roomReadiness(checkedIn.roomNumber());
+    var mensaje = new Message("✅ Check-in completado — " + view().guest().name() + " · Hab " + checkedIn.roomNumber()
+        + (lista.known() && !lista.ready() ? " — ojo: en Opera aún no está lista (" + lista.reason()
+            + "), Opera puede rechazarla" : ""));
     // solo una reserva DE GRUPO propone seguir con la siguiente llegada del grupo
     // (simulado: mismo grupo = primera palabra de la agencia); sin grupo o sin más
     // llegadas pendientes → directamente de vuelta al listado
@@ -678,7 +699,7 @@ public class ReservaOverview
   }
 
   private Message lateCheckout() {
-    return folios.contractLateCheckOut(stayId)
+    return folios.contractLateCheckOut(stayId, DeskUser.name())
         ? new Message("Late check-out contratado — salida a las 15:00 (+ € 50,00)")
         : new Message("El late check-out ya estaba contratado — salida a las 15:00");
   }
