@@ -303,15 +303,15 @@ class CustomersScreensTest {
             assertThat(wire(route, "", CustomersHome.class.getName())).contains("\"route\":\"" + route + "\"")
                     .doesNotContain("Not found.").doesNotContain("\"variant\":\"error\"");
         }
-        // The customer's page: its data as fields, its links and its reception notices as Elements, its
-        // change requests as a grid; and the form to ask for a notice, with its actions.
+        // The customer's page: its data as fields, its reception notices and its links as the one Element,
+        // its change requests as a grid; and the actions that ask for a notice.
         var page = wire("/customers/search/" + ana, "/customers/search", CustomerSearchPage.class.getName());
         assertThat(page).doesNotContain("\"variant\":\"error\"")
                 .contains("Datos vigentes").contains("Solicitudes de cambio")
                 .contains("href=\\\"/booking/bookings/B1\\\"")
                 .contains("CR-" + ana)
-                .contains("Avisos de recepción").contains("No tiene avisos").contains("guardarAviso");
-        assertThat(page.split("\"type\":\"Element\"", -1)).hasSize(3);
+                .contains("Avisos de recepción").contains("No tiene avisos").contains("nuevoAviso");
+        assertThat(page.split("\"type\":\"Element\"", -1)).hasSize(2);
     }
 
     void withContact(String customerId, String contactId) {

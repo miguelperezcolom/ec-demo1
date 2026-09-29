@@ -116,9 +116,16 @@ public class CheckInWizard extends Wizard {
   /** Seeds the steps from the stay's reservation data — once per stay. */
   void populate() {
     var view = queries.view(stayId);
+    if (avisos == null) {
+      avisos = new AvisosStep();
+    }
     avisos.setStayId(stayId);
     avisos.setFingerprint(notices.checkInFingerprint(view.stay()));
     avisos.setLeido(false);
+    // Mateu instantiates the step it opens on from the state; with Avisos first, Identidad may not be yet
+    if (identidad == null) {
+      identidad = new IdentidadStep();
+    }
     identidad.setStayId(stayId);
     habitacion.setStayId(stayId);
     habitacion.setHabitacionSeleccionada(view.stay().roomNumber());

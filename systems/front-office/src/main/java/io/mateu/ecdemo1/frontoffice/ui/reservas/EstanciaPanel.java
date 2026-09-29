@@ -261,13 +261,15 @@ final class EstanciaPanel {
                 + (warnings.notices().isEmpty() ? "" : "Avisos de salida del cliente.")
             )
         .fullWidth(true);
-    if (!leido) {
-      notice.actionLabel("Entendido").actionId("entendidoCheckout");
-    }
     content.add(notice.build());
     var items = new ArrayList<StatusItem>(io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.kardexItems(warnings.kardex()));
     items.addAll(io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.items(warnings.notices()));
     content.add(StatusList.builder().items(items).compact(true).style("width: 100%;").build());
+    if (!leido) {
+      // a button of its own: a notice's action is not drawn by every renderer
+      content.add(io.mateu.uidl.data.Button.builder().label("Entendido").actionId("entendidoCheckout")
+          .buttonStyle(io.mateu.uidl.data.ButtonStyle.primary).build());
+    }
     return VerticalLayout.builder().style("width: 100%; gap: .5rem;").content(content).build();
   }
 

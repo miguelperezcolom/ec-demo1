@@ -156,7 +156,7 @@ public class ChangeRequests {
             return;
         }
         for (var pending : requests.findByStatusOrderByRequestedAtAsc(ChangeRequest.Status.PENDING.name())) {
-            if (pending.sentAt != null) {
+            if (pending.sentAt != null || refused(pending)) {
                 continue;
             }
             var customer = customers.findById(pending.customerId).orElse(null);
@@ -179,6 +179,14 @@ public class ChangeRequests {
             } catch (SalesforceClient.LimitExceeded e) {
                 // Waits for the allowance, as it is: nothing to say on the request.
                 return;
+            } catch (org.springframework.web.client.HttpClientErrorException e) {
+                // Salesforce answered, and refuses THIS one (an email it does not take…): it would refuse
+                // it again, so it is not sent again — and it does not hold back the ones behind it.
+                log.warn("{} refused by Salesforce, not sent again: {}", pending.id, e.getMessage());
+                tx.executeWithoutResult(s -> requests.findById(pending.id).ifPresent(r -> {
+                    r.sendError = cut(REFUSED + e.getStatusCode().value() + " " + e.getResponseBodyAsString(), 1000);
+                    requests.save(r);
+                }));
             } catch (RuntimeException e) {
                 // Tried again, but not every tick: a Case Salesforce refuses would otherwise be sent
                 // every five seconds, all day.
@@ -191,6 +199,17 @@ public class ChangeRequests {
                 return;
             }
         }
+    }
+
+    /** What {@code sendError} starts with when Salesforce refused the Case itself. */
+    static final String REFUSED = "Salesforce lo rechaza: ";
+
+    static String cut(String value, int length) {
+        return value.length() <= length ? value : value.substring(0, length - 1) + "…";
+    }
+
+    static boolean refused(ChangeRequest r) {
+        return r.sendError != null && r.sendError.startsWith(REFUSED);
     }
 
     /** Salesforce decided: approved, the contact already has it; rejected, it does not. Once. */
