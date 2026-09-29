@@ -94,6 +94,19 @@ ohip:
   # The cashier the check-outs and the folios are made with (XMAR: 69721441). OPERA uses the user's own
   # when none is sent, and the integration's user has none (FOF00094). Empty: none sent.
   cashier-id: ${OPERA_CASHIER_ID:}
+  # The Opera transaction code of each charge the front office posts (registrar-cargo), by
+  # <KIND>:<front office code> or <KIND> (config/ChargeCodes). XMAR's, from its transaction codes a
+  # user may post by hand: 1200 supplement (late check-out), 1402 drinks (minibar), 1403 food (room
+  # service, dinner), 1516 laundry, 1851 miscellaneous services (anything else).
+  charges:
+    default-code: ${OPERA_CHARGE_DEFAULT_CODE:1851}
+    codes:
+      LATE_CHECK_OUT: "1200"
+      "[ADD_ON:late]": "1200"
+      "[CONSUMPTION:MB-02]": "1402"
+      "[CONSUMPTION:RS-01]": "1403"
+      "[ADD_ON:cena]": "1403"
+      "[CONSUMPTION:LAU-04]": "1516"
 
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}

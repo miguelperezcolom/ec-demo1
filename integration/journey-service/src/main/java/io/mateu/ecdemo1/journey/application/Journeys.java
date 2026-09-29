@@ -116,7 +116,8 @@ public class Journeys {
     /** What a trace was, from its root alone — the list does not read every trace. */
     static String kindOf(TraceSummary trace) {
         var event = io.mateu.ecdemo1.journey.model.Kind.ofEvent(trace.matched().get("booking.event"));
-        if (event == io.mateu.ecdemo1.journey.model.Kind.CHECK_IN || event == io.mateu.ecdemo1.journey.model.Kind.CHECK_OUT) {
+        if (event == io.mateu.ecdemo1.journey.model.Kind.CHECK_IN || event == io.mateu.ecdemo1.journey.model.Kind.CHECK_OUT
+                || event == io.mateu.ecdemo1.journey.model.Kind.CHARGE || event == io.mateu.ecdemo1.journey.model.Kind.CHARGE_VOID) {
             return event.label();
         }
         var name = trace.rootName();

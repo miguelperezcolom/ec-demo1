@@ -255,6 +255,35 @@ class JourneyMapperTest {
         assertThat(hop(journey, "Hacer el check-in en Opera").detail()).isEqualTo("Check-in hecho en Opera, habitación 205");
     }
 
+    @Test
+    void aChargeOfTheDeskGoesOntoOperasFolio() {
+        var t0 = 1_000_000_000_000L;
+        var spans = List.of(
+                span("a", null, "front-office", "http post /mateu/v3/_reserva/run", "SERVER", t0, t0 + 100, java.util.Map.of()),
+                span("b", "a", "integrations", "front-office-events process", "CONSUMER", t0 + 200, t0 + 210,
+                        java.util.Map.of("booking.locator", "GSX4AK", "hotel.code", "MRU01", "booking.event", "charge",
+                                "eventconductor.business-key", "registrar-cargo:MRU01/GSX4AK:L-1")),
+                span("c", "b", "orchestrator", "Registrar cargo", "INTERNAL", t0 + 300, t0 + 1_000,
+                        java.util.Map.of("eventconductor.process.id", "p1", "eventconductor.workflow.id", "registrar-cargo",
+                                "eventconductor.process.status", "COMPLETED", "eventconductor.process.businessKey",
+                                "registrar-cargo:MRU01/GSX4AK:L-1")),
+                span("d", "c", "orchestrator", "Postear el cargo en el folio de Opera", "INTERNAL", t0 + 310, t0 + 900,
+                        java.util.Map.of("eventconductor.step.type", "ACTION", "eventconductor.step.id", "post-charge",
+                                "eventconductor.step.topic", "pms-integration", "eventconductor.step.status", "COMPLETED",
+                                "eventconductor.step.executionId", "x1")),
+                span("e", "d", "pms-integration", "eventconductor.task post-charge", "CONSUMER", t0 + 320, t0 + 890,
+                        java.util.Map.of("eventconductor.step.executionId", "x1", "opera.action", "charge-posted",
+                                "opera.transaction.code", "1200", "opera.hotel", "XMAR", "opera.reservation.id", "39486034")));
+        var journey = JourneyMapper.map("t", "GSX4AK", spans, LATER);
+
+        assertThat(journey.kind()).isEqualTo(Kind.CHARGE);
+        assertThat(journey.outcome()).isEqualTo(Outcome.DONE);
+        assertThat(titles(journey)).containsSubsequence("Cargo en recepción", "La integración pms-fo lo recibe",
+                "Proceso «Registrar cargo»", "Postear el cargo en el folio de Opera");
+        assertThat(hop(journey, "La integración pms-fo lo recibe").detail()).isEqualTo("Arranca «Registrar cargo»");
+        assertThat(hop(journey, "Postear el cargo en el folio de Opera").detail()).isEqualTo("Cargo en el folio de Opera (código 1200)");
+    }
+
     static TraceSpan span(String id, String parent, String service, String name, String kind, long start, long end,
                           java.util.Map<String, String> attributes) {
         return new TraceSpan(id, parent, service, name, kind, start, end, attributes, false, null);

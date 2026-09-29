@@ -395,6 +395,24 @@ class FrontOfficeIntegrationsTest {
                 "MRU01", "OP-268338062", null, "XMAR", "39486099", "207", "ana"))).isEqualTo("registrar-checkout:XMAR/39486099");
         assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.NoShowReported("E-3", at,
                 "MRU01", "KMNQ28", "KMNQ28", "XMAR", null, 2, "ana"))).isEqualTo("registrar-no-show-pms:MRU01/KMNQ28");
+        // The desk's charges: one process per folio line — its charge, and its void.
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.ChargePosted("E-5", at,
+                "MRU01", "GSX4AK", "GSX4AK", "XMAR", "39486034", "L-1",
+                io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.ChargeKind.LATE_CHECK_OUT, null,
+                "Late check-out (salida 15:00)", new java.math.BigDecimal("50.00"), "MUR", "ana")))
+                .isEqualTo("registrar-cargo:MRU01/GSX4AK:L-1");
+        assertThat(outbox("outboxUpstream")).filteredOn(p -> p.contains("registrar-cargo:MRU01/GSX4AK:L-1"))
+                .singleElement().satisfies(p -> assertThat(p)
+                        .contains("{\"name\":\"lineId\",\"value\":\"L-1\"}")
+                        .contains("{\"name\":\"chargeKind\",\"value\":\"LATE_CHECK_OUT\"}")
+                        .contains("{\"name\":\"amount\",\"value\":\"50.00\"}")
+                        .contains("{\"name\":\"currency\",\"value\":\"MUR\"}")
+                        .contains("{\"name\":\"pmsReservationId\",\"value\":\"39486034\"}"));
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.ChargeVoided("E-6", at,
+                "MRU01", "GSX4AK", "GSX4AK", "XMAR", "39486034", "L-1",
+                io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.ChargeKind.LATE_CHECK_OUT, null,
+                "Late check-out (salida 15:00)", new java.math.BigDecimal("50.00"), "MUR", "ana")))
+                .isEqualTo("anular-cargo:MRU01/GSX4AK:L-1");
         // A walk-in neither the CRS nor Opera has yet: nothing to record now.
         assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.GuestCheckedIn("E-4", at,
                 "MRU01", "FO-6XDAWR", null, "XMAR", null, "205", 1, "ana"))).isNull();

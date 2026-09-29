@@ -107,7 +107,7 @@ class PublishedLanguageTest {
                 TopicSpec.topic("front-office-commands")
                         .describedAs("What the front office is told: a stay written as the PMS has it, a property's "
                                 + "catalogue replaced whole, how the PMS took what the reception did (refused, the room, "
-                                + "the check-out's invoice).")
+                                + "the check-out's invoice, a charge's posting).")
                         .ownedBy("front-office").keyedBy("pmsHotelCode/pmsReservationId, or pmsHotelCode for a catalogue")
                         .producedBy("pms-integration-service", "integrations-service").consumedBy("front-office")
                         .messages(FrontOfficeCommand.class)
@@ -125,11 +125,14 @@ class PublishedLanguageTest {
                                 new FrontOfficeCommand.RecordReception("CMD-11", "XMAR", "123456", "12E45",
                                         FrontOfficeCommand.ReceptionOperation.CHECK_OUT, false, "Checked out in Opera", "205",
                                         new FrontOfficeCommand.Invoice("OPERA", "XMAR377", LocalDate.of(2026, 11, 7),
-                                                new BigDecimal("312.40"), "EUR", "JVBERi0xLjQK"))),
+                                                new BigDecimal("312.40"), "EUR", "JVBERi0xLjQK")),
+                                new FrontOfficeCommand.RecordCharge("CMD-12", "XMAR", "123456", "12E45", "L-7F3A2C1D",
+                                        false, false, "Posted to Opera's folio", "88731245")),
                 TopicSpec.topic("front-office-events")
                         .describedAs("What happened at a hotel's reception — a guest checked in, checked out, nobody "
-                                + "came. The PMS is the master of the stay: the pms-fo integration records each in it "
-                                + "through the engine, and a no-show goes on to the CRS for its fee.")
+                                + "came, a charge put on the stay's folio or taken back. The PMS is the master of the stay "
+                                + "and its folio: the pms-fo integration records each in it through the engine, and a "
+                                + "no-show goes on to the CRS for its fee.")
                         .ownedBy("front-office").keyedBy("hotelCode/stayId")
                         .producedBy("front-office").consumedBy("integrations-service")
                         .messages(FrontOfficeEvent.class)
@@ -138,7 +141,13 @@ class PublishedLanguageTest {
                                 new FrontOfficeEvent.GuestCheckedOut("E-5", AT, "MRU01", "12E45", "12E45", "XMAR",
                                         "123456", "205", "ana"),
                                 new FrontOfficeEvent.NoShowReported("E-6", AT, "MRU01", "12E45", "12E45", "XMAR",
-                                        "123456", 2, "ana")),
+                                        "123456", 2, "ana"),
+                                new FrontOfficeEvent.ChargePosted("E-7", AT, "MRU01", "12E45", "12E45", "XMAR", "123456",
+                                        "L-7F3A2C1D", FrontOfficeEvent.ChargeKind.LATE_CHECK_OUT, null,
+                                        "Late check-out (salida 15:00)", new BigDecimal("50.00"), "MUR", "ana"),
+                                new FrontOfficeEvent.ChargeVoided("E-8", AT, "MRU01", "12E45", "12E45", "XMAR", "123456",
+                                        "L-9B1E4A20", FrontOfficeEvent.ChargeKind.CONSUMPTION, "MB-02", "Minibar",
+                                        new BigDecimal("12.50"), "MUR", "ana")),
                 TopicSpec.topic("pms-reservations")
                         .describedAs("A reservation written in the PMS — for whoever follows the PMS (the pms-fo integration).")
                         .ownedBy("pms-integration-service").keyedBy("pmsHotelCode/pmsReservationId")

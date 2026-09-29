@@ -51,15 +51,20 @@ public class Causes {
 
     /**
      * What a successor is started with. The reception's processes (registrar-checkin, -checkout,
-     * -no-show-pms) name the stay too: the Opera reservation, the front office's stay, the room.
+     * -no-show-pms) name the stay too: the Opera reservation, the front office's stay, the room; the
+     * desk's charges (registrar-cargo, anular-cargo), the folio line too — its id, kind, code, concept,
+     * amount and currency.
      */
     static final Set<String> RELAUNCH_VARIABLES = Set.of(ProcessVariables.DEFINITION_ID, ProcessVariables.HOTEL_CODE,
             ProcessVariables.LOCATOR, ProcessVariables.PARTNER_CODE, ProcessVariables.VERSION, ProcessVariables.EVENT_ID, ProcessVariables.ORIGIN,
-            ProcessVariables.PMS_HOTEL_CODE, ProcessVariables.PMS_RESERVATION_ID, ProcessVariables.STAY_ID, ProcessVariables.ROOM_NUMBER);
+            ProcessVariables.PMS_HOTEL_CODE, ProcessVariables.PMS_RESERVATION_ID, ProcessVariables.STAY_ID, ProcessVariables.ROOM_NUMBER,
+            ProcessVariables.LINE_ID, ProcessVariables.CHARGE_KIND, ProcessVariables.CHARGE_CODE, ProcessVariables.DESCRIPTION,
+            ProcessVariables.AMOUNT, ProcessVariables.CURRENCY);
 
     /** The definitions whose waiters are a booking's: a relaunch names it on its span, for the booking's journey. */
     static final Set<String> BOOKING_DEFINITIONS = Set.of(Definitions.PROJECT_RESERVATION, Definitions.PROJECT_CANCELLATION,
-            Definitions.REGISTER_CHECK_IN, Definitions.REGISTER_CHECK_OUT, Definitions.REGISTER_NO_SHOW_PMS);
+            Definitions.REGISTER_CHECK_IN, Definitions.REGISTER_CHECK_OUT, Definitions.REGISTER_NO_SHOW_PMS,
+            Definitions.REGISTER_CHARGE, Definitions.REVERSE_CHARGE);
 
     final CauseRecordRepository causes;
     final WaiterRepository waiters;

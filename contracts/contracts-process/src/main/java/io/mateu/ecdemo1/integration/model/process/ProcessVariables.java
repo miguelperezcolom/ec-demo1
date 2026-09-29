@@ -42,6 +42,23 @@ public final class ProcessVariables {
     public static final String CHECK_IN_OUTCOME = "checkInOutcome";
     public static final String CHECK_OUT_OUTCOME = "checkOutOutcome";
     public static final String NO_SHOW_OUTCOME = "noShowOutcome";
+    /** The front office's folio line a charge process is about (registrar-cargo, anular-cargo): its idempotency key. */
+    public static final String LINE_ID = "lineId";
+    /** What the charge is: ADD_ON, LATE_CHECK_OUT, CONSUMPTION. */
+    public static final String CHARGE_KIND = "chargeKind";
+    /** The front office's code of the charge (its catalogue's, its add-on's); absent for a late check-out. */
+    public static final String CHARGE_CODE = "chargeCode";
+    /** The charge's amount, as a plain decimal ("50.00"). */
+    public static final String AMOUNT = "amount";
+    /** ISO 4217; absent for the PMS property's own. */
+    public static final String CURRENCY = "currency";
+    /** The folio line's concept. */
+    public static final String DESCRIPTION = "description";
+    public static final String CHARGE_OUTCOME = "chargeOutcome";
+    public static final String REVERSAL_OUTCOME = "reversalOutcome";
+    /** The PMS's posting of the charge, and of its reversal (their transaction numbers). */
+    public static final String PMS_POSTING_ID = "pmsPostingId";
+    public static final String PMS_REVERSAL_ID = "pmsReversalId";
 
     private ProcessVariables() {
     }

@@ -112,6 +112,17 @@ class PmsContractsTest {
     }
 
     @Test
+    void howThePmsTookAChargeOfTheDeskIsWhatTheFrontOfficeCommandsSchemaSays() throws Exception {
+        new ReceptionOutcomes(streamBridge, boot).charge("XMAR", "39486034", "GSX4AK", "L-7F3A2C1D", false, false,
+                "En el folio de Opera", "88731245");
+
+        var json = sentPayload(StayProjection.BINDING);
+        Contracts.topic("front-office-commands").assertValid(json);
+        assertThat(boot.readTree(json).get("type").asText()).isEqualTo("record-charge");
+        assertThat(boot.readTree(json).get("pmsPostingId").asText()).isEqualTo("88731245");
+    }
+
+    @Test
     void aRefusalOfThePmsIsWhatTheFrontOfficeCommandsSchemaSays() {
         new ReceptionOutcomes(streamBridge, boot).refused("XMAR", "39486034", "GSX4AK",
                 io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.ReceptionOperation.CHECK_IN,

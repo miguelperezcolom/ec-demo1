@@ -42,7 +42,27 @@ public class ReceptionOutcomes {
                 detail, roomNumber, invoice));
     }
 
+    /**
+     * How Opera took a charge of the desk, or its void: its posting (the transaction number), or its
+     * refusal and why.
+     */
+    public void charge(String pmsHotelCode, String pmsReservationId, String stayId, String lineId, boolean reversal,
+                       boolean refused, String detail, String pmsPostingId) {
+        var command = new FrontOfficeCommand.RecordCharge(UUID.randomUUID().toString(), pmsHotelCode, pmsReservationId, stayId,
+                lineId, reversal, refused, detail, pmsPostingId);
+        publish(command, command.key());
+        log.info("{} of line {} of stay {} ({}): told the front office ({})", reversal ? "Reversal" : "Charge", lineId, stayId,
+                command.key(), refused ? "refused: " + detail : "posting " + pmsPostingId);
+    }
+
     void send(RecordReception command) {
+        publish(command, command.key());
+        log.info("{} {} of stay {}: told the front office ({}{})", command.operation(), command.key(), command.stayId(),
+                command.refused() ? "refused: " + command.detail() : "done",
+                command.invoice() == null ? "" : ", invoice " + command.invoice().number());
+    }
+
+    void publish(FrontOfficeCommand command, String key) {
         byte[] payload;
         try {
             payload = objectMapper.writerFor(FrontOfficeCommand.class).writeValueAsBytes(command);
@@ -50,14 +70,11 @@ public class ReceptionOutcomes {
             throw new IllegalStateException("Cannot serialise " + command.commandId(), e);
         }
         var sent = streamBridge.send(StayProjection.BINDING, MessageBuilder.withPayload(payload)
-                .setHeader(KafkaHeaders.KEY, command.key())
+                .setHeader(KafkaHeaders.KEY, key)
                 .setHeader("contentType", MimeTypeUtils.APPLICATION_JSON_VALUE)
                 .build());
         if (!sent) {
-            throw new IllegalStateException("The front office's topic did not take " + command.key());
+            throw new IllegalStateException("The front office's topic did not take " + key);
         }
-        log.info("{} {} of stay {}: told the front office ({}{})", command.operation(), command.key(), command.stayId(),
-                command.refused() ? "refused: " + command.detail() : "done",
-                command.invoice() == null ? "" : ", invoice " + command.invoice().number());
     }
 }

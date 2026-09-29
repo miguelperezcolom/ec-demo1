@@ -37,7 +37,10 @@ import java.util.Optional;
  *       with the cashier) → {@code storedFolioId} → {@code GET /csh/v1/hotels/{h}/storedFolios/{id}}
  *       → {@code folioReportURL};</li>
  *   <li>a no-show: OHIP has no call that sets Opera's «No Show» (its Night Audit does); the reservation
- *       gets a comment saying who reported it and when.</li>
+ *       gets a comment saying who reported it and when;</li>
+ *   <li>the desk's charges: {@code POST /csh/v1/hotels/{h}/reservations/{id}/charges} (transaction code,
+ *       amount, {@code postingReference}, with the cashier) — a reversal is the same, negative; the
+ *       folio's postings, {@code GET …/folios?fetchInstructions=Postings}, found by their reference.</li>
  * </ul>
  *
  * <p>Every refusal is a {@link PmsRejectedException}, every «not now» a {@link PmsTransientException}
@@ -327,16 +330,111 @@ public class OperaFrontDesk {
         ohip.put(hotelId, "/rsv/v1/hotels/{h}/reservations/{id}", change, hotelId, reservationId);
     }
 
+    // ── the folio: the desk's charges (pms-fo, registrar-cargo / anular-cargo) ─────────────────────
+
+    /** A posting on the reservation's folio, as Opera lists it. */
+    public record Posting(String transactionNo, String transactionCode, BigDecimal amount, String reference, String remark,
+                          int window) {
+    }
+
+    /**
+     * The postings on the reservation's folio windows now — read-only ({@code GET …/folios
+     * ?fetchInstructions=Postings}). Opera nests them in each window's folios; read wherever they are.
+     */
+    public List<Posting> postings(String hotelId, String reservationId) {
+        var answer = ohip.find(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Postings"
+                + "&fetchInstructions=Windowbalances", hotelId, reservationId).orElse(null);
+        var found = new ArrayList<Posting>();
+        var seen = new java.util.HashSet<String>();
+        for (var w : answer == null ? List.<JsonNode>of() : answer.path("reservationFolioInformation").path("folioWindows")) {
+            collect(w, w.path("folioWindowNo").asInt(1), found, seen);
+        }
+        return found;
+    }
+
+    static void collect(JsonNode node, int window, List<Posting> found, java.util.Set<String> seen) {
+        if (node.isArray()) {
+            node.forEach(n -> collect(n, window, found, seen));
+            return;
+        }
+        if (!node.isObject()) {
+            return;
+        }
+        var no = node.path("transactionNo").asText("");
+        if (!no.isBlank() && node.has("transactionCode")) {
+            if (seen.add(no)) {
+                var amount = node.path("postedAmount").path("amount");
+                if (!amount.isNumber()) {
+                    amount = node.path("transactionAmount");
+                }
+                found.add(new Posting(no, node.path("transactionCode").asText(null),
+                        amount.isNumber() ? amount.decimalValue() : null, node.path("reference").asText(null),
+                        node.path("remark").asText(null), node.path("folioWindowNo").asInt(window)));
+            }
+            return;
+        }
+        node.forEach(n -> collect(n, window, found, seen));
+    }
+
+    /** The posting of the folio carrying this reference, if Opera has one. */
+    public Optional<Posting> posting(String hotelId, String reservationId, String reference) {
+        return postings(hotelId, reservationId).stream().filter(p -> reference.equals(p.reference())).findFirst();
+    }
+
+    /**
+     * Posts a charge to the reservation's folio (window 1) with the integration's cashier ({@code POST
+     * /csh/v1/hotels/{h}/reservations/{id}/charges}): the transaction code, the amount (negative: a
+     * reversal), and the reference the posting is found by again — what makes posting it idempotent.
+     * Opera's answer carries no transaction number: it is read back by the reference.
+     */
+    public void postCharge(String hotelId, String reservationId, String transactionCode, BigDecimal amount, String currency,
+                           String reference, String remark) {
+        var body = objectMapper.createObjectNode();
+        var criteria = body.putObject("criteria");
+        criteria.put("hotelId", hotelId);
+        criteria.putObject("reservationId").put("id", reservationId).put("type", "Reservation");
+        var charge = criteria.putArray("charges").addObject();
+        charge.put("transactionCode", transactionCode);
+        var price = charge.putObject("price").put("amount", amount);
+        if (currency != null && !currency.isBlank()) {
+            price.put("currencyCode", currency);
+        }
+        charge.put("postingQuantity", 1);
+        charge.put("postingReference", reference);
+        if (remark != null) {
+            charge.put("postingRemark", remark.length() > 200 ? remark.substring(0, 200) : remark);
+        }
+        charge.put("applyRoutingInstructions", true);
+        charge.put("folioWindowNo", 1);
+        cashier(charge);
+        cashier(criteria);
+        ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/charges", body, hotelId, reservationId);
+    }
+
     /** A room of the property, as Opera's housekeeping has it now. */
     public record RoomState(String roomId, String roomType, String housekeeping, String frontOffice) {
     }
 
     /** The property's rooms of a type, with their housekeeping and front office status. Read-only. */
     public List<RoomState> rooms(String hotelId, String roomType) {
-        var answer = ohip.get(hotelId, "/fof/v1/hotels/{h}/rooms?roomType={t}&limit=100", hotelId, roomType).body();
+        return rooms(hotelId, roomType, null);
+    }
+
+    /**
+     * The property's rooms of a type — or the one room given, which is cheaper — with their
+     * housekeeping and front office status. Read-only.
+     */
+    public List<RoomState> rooms(String hotelId, String roomType, String roomId) {
+        var answer = roomId != null && !roomId.isBlank()
+                ? ohip.get(hotelId, "/fof/v1/hotels/{h}/rooms?fromRoomNumber={r}&toRoomNumber={r}&limit=5", hotelId, roomId,
+                        roomId).body()
+                : ohip.get(hotelId, "/fof/v1/hotels/{h}/rooms?roomType={t}&limit=100", hotelId, roomType).body();
         var rooms = new ArrayList<RoomState>();
         for (var r : answer == null ? List.<JsonNode>of() : answer.path("hotelRoomsDetails").path("room")) {
             var status = r.path("housekeeping").path("roomStatus");
+            if (roomId != null && !roomId.isBlank() && !roomId.equals(r.path("roomId").asText())) {
+                continue;
+            }
             rooms.add(new RoomState(r.path("roomId").asText(), r.path("roomType").path("roomType").asText(roomType),
                     status.path("roomStatus").asText(null), status.path("frontOfficeStatus").asText(null)));
         }

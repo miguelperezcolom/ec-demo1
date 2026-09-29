@@ -21,7 +21,8 @@ import java.util.List;
  * The reception, up to the PMS — the master of the stay (pms-fo). The front office says what its desk
  * did ({@code front-office-events}); if the property feeds that front office and its integration is
  * active, the process that records it in the PMS starts: «registrar-checkin», «registrar-checkout»,
- * «registrar-no-show-pms» (which goes on to the CRS, the master of the sale, for its fee).
+ * «registrar-no-show-pms» (which goes on to the CRS, the master of the sale, for its fee), and, for the
+ * desk's charges, «registrar-cargo» and «anular-cargo» (onto the PMS's folio, per folio line).
  *
  * <p>One process per reservation and operation — a check-in, per room: its business key names them, and
  * the engine ignores a key it already has — the dedup, so an event taken twice records once. The key
@@ -68,11 +69,18 @@ public class ReceptionEvents {
             case FrontOfficeEvent.GuestCheckedIn ignored -> Definitions.REGISTER_CHECK_IN;
             case FrontOfficeEvent.GuestCheckedOut ignored -> Definitions.REGISTER_CHECK_OUT;
             case FrontOfficeEvent.NoShowReported ignored -> Definitions.REGISTER_NO_SHOW_PMS;
+            case FrontOfficeEvent.ChargePosted ignored -> Definitions.REGISTER_CHARGE;
+            case FrontOfficeEvent.ChargeVoided ignored -> Definitions.REVERSE_CHARGE;
         };
         // One check-in per room: the desk that picks another room after Opera refused one starts it again
-        // with the new room (and the one that waits on the refusal is resolved when this one gets in).
-        var key = definition + ":" + hotelCode + "/" + locator
-                + (event instanceof FrontOfficeEvent.GuestCheckedIn in ? ":" + (blank(in.roomNumber()) ? "-" : in.roomNumber()) : "");
+        // with the new room (and the one that waits on the refusal is resolved when this one gets in). One
+        // charge, and one void, per folio line.
+        var key = definition + ":" + hotelCode + "/" + locator + switch (event) {
+            case FrontOfficeEvent.GuestCheckedIn in -> ":" + (blank(in.roomNumber()) ? "-" : in.roomNumber());
+            case FrontOfficeEvent.ChargePosted charge -> ":" + charge.lineId();
+            case FrontOfficeEvent.ChargeVoided voided -> ":" + voided.lineId();
+            default -> "";
+        };
         var variables = new ArrayList<Variable>(List.of(
                 new Variable(ProcessVariables.PROCESS_KEY, key),
                 new Variable(ProcessVariables.DEFINITION_ID, definition),
@@ -89,6 +97,14 @@ public class ReceptionEvents {
         if (event instanceof FrontOfficeEvent.GuestCheckedIn in && !blank(in.roomNumber())) {
             variables.add(new Variable(ProcessVariables.ROOM_NUMBER, in.roomNumber()));
         }
+        switch (event) {
+            case FrontOfficeEvent.ChargePosted c -> charge(variables, c.lineId(), c.kind(), c.code(), c.description(),
+                    c.amount(), c.currency());
+            case FrontOfficeEvent.ChargeVoided v -> charge(variables, v.lineId(), v.kind(), v.code(), v.description(),
+                    v.amount(), v.currency());
+            default -> {
+            }
+        }
         // What the booking's journey (journey-service) finds this trace by, on the span that starts it.
         var span = io.opentelemetry.api.trace.Span.current();
         span.setAttribute("booking.locator", locator);
@@ -97,6 +113,8 @@ public class ReceptionEvents {
             case FrontOfficeEvent.GuestCheckedIn ignored -> "check-in";
             case FrontOfficeEvent.GuestCheckedOut ignored -> "check-out";
             case FrontOfficeEvent.NoShowReported ignored -> "no-show";
+            case FrontOfficeEvent.ChargePosted ignored -> "charge";
+            case FrontOfficeEvent.ChargeVoided ignored -> "charge-void";
         });
         span.setAttribute("eventconductor.business-key", key);
         writes.write(() -> {
@@ -106,6 +124,27 @@ public class ReceptionEvents {
         log.info("{} of stay {}/{}: «{}» started ({})", event.getClass().getSimpleName(), event.hotelCode(), event.stayId(),
                 definition, key);
         return key;
+    }
+
+    /** The folio line a charge process posts or reverses: its id, what it is, its concept and amount. */
+    static void charge(List<Variable> variables, String lineId, FrontOfficeEvent.ChargeKind kind, String code,
+                       String description, java.math.BigDecimal amount, String currency) {
+        variables.add(new Variable(ProcessVariables.LINE_ID, lineId));
+        if (kind != null) {
+            variables.add(new Variable(ProcessVariables.CHARGE_KIND, kind.name()));
+        }
+        if (!blank(code)) {
+            variables.add(new Variable(ProcessVariables.CHARGE_CODE, code));
+        }
+        if (!blank(description)) {
+            variables.add(new Variable(ProcessVariables.DESCRIPTION, description));
+        }
+        if (amount != null) {
+            variables.add(new Variable(ProcessVariables.AMOUNT, amount.toPlainString()));
+        }
+        if (!blank(currency)) {
+            variables.add(new Variable(ProcessVariables.CURRENCY, currency));
+        }
     }
 
     static boolean blank(String value) {
