@@ -42,7 +42,9 @@ Y lo que el front office **manda**, por su outbox:
 - un **cambio de datos del cliente**, a Salesforce vía MDM (`customer-commands`, `propose-change`);
 - un **documento escaneado**, al MDM (`customer-commands`, `record-scanned-identity`);
 - lo que hizo **recepción** — check-in, check-out, no show —, al PMS (`front-office-events`), que lo
-  registra en Opera; el no show sigue de Opera al CRS, que aplica su cargo.
+  registra en Opera; el no show sigue de Opera al CRS, que aplica su cargo;
+- cada **cargo** que recepción pone en el folio —extras del check-in, late check-out, consumos— y cada
+  anulación, al folio de Opera (`charge-posted`, `charge-voided`): el alojamiento no, que lo cobra Opera.
 
 ## El estado de Opera y la factura
 
@@ -54,7 +56,26 @@ reserva vuelve de Opera.
 
 Una estancia cerrada tiene **«Abrir factura»**: el documento que Opera emitió en el check-out si lo dio
 (el PMS es el maestro del folio); si no, una **«Factura proforma (front office)»** hecha con el folio del
-front office, que lo dice en la página. La sirve el front office (`/invoices/{estancia}`), nunca un
+front office, que lo dice en la página, con **los dos totales** —el del folio del front office y el de la
+factura de Opera— y si coinciden. Como los cargos de recepción están en el folio de Opera, coinciden;
+si no, la proforma dice por qué suele ser: el alojamiento (Opera factura sus noches con su tarifa; en una
+salida anticipada, solo las pasadas), un cargo que Opera rechazó o que llegó tarde, o cargos anteriores a
+subirlos a Opera.
+
+**Gestionar folio** lista los cargos de recepción con dónde está cada uno en Opera («Opera: en el folio ·
+88731245», «pendiente», «rechazado — motivo») y **«Anular»**: la línea queda en el folio, anulada y sin
+contar, y Opera anula su posteo.
+
+## Habitaciones listas
+
+El paso de habitación del check-in ofrece las habitaciones de Opera del tipo de la estancia, **primero
+las listas**: libres y con el estado de housekeeping que la propiedad exige para asignarlas
+(`frontoffice.pms-ready-statuses`; XMAR, solo **inspeccionadas** — una «limpia, sin inspeccionar» la
+rechaza con FOF00081). Las libres que aún no están listas se ven en gris con el motivo («No lista —
+Limpia, sin inspeccionar en Opera») y se pueden elegir a propósito (Opera puede rechazarla); las ocupadas
+o fuera de servicio no se pueden elegir. En la estancia que llega, un aviso dice si la habitación asignada
+está **lista en Opera** o por qué no, con **«Comprobar»** para preguntarlo otra vez (lo de Opera se
+guarda 20 s: una pantalla se repinta a cada clic). La sirve el front office (`/invoices/{estancia}`), nunca un
 enlace a Opera, con un enlace firmado que caduca (una pestaña nueva no lleva el token).
 
 ## Avisos de recepción, al entrar y al salir

@@ -415,8 +415,28 @@ importe (XMAR385, 346 MUR).
 servido por el front office (enlace firmado, caduca a las 8 h). Si Opera dio el documento de la factura,
 es ese; **XMAR no guarda los documentos de sus folios** (el folio se genera, pero sin `storedFolioId`),
 así que lo que se abre es la **«Factura proforma (front office)»**: el folio del front office, con el
-número e importe de la factura de Opera y el aviso de que no es el documento del PMS. Los cargos del
-front office no se postean en Opera: las cifras pueden no coincidir (en Opera, la noche y el desayuno).
+número e importe de la factura de Opera y el aviso de que no es el documento del PMS, con **los dos
+totales** —el del folio del front office y el de la factura de Opera— y si coinciden.
+
+**Los cargos de recepción, al folio de Opera.** Cada cargo que recepción pone en el folio —los extras del
+check-in, el late check-out (*Registrar petición → Late check-out*), un consumo (*Añadir cargo*)— sube a
+Opera: `charge-posted` → **`registrar-cargo`** → `post-charge` lo postea en el folio de la reserva con el
+cajero de la integración y el código de transacción de su tipo (late check-out, 1200 «Supl
+Alojamiento»; minibar, 1402; room service y cenas, 1403; lavandería, 1516; lo demás, 1851 «Ingr.Serv.
+Diversos»), con la referencia `FO:<línea>` — la clave de idempotencia: una línea se postea una vez —.
+Anular una línea (*Gestionar folio → Anular*) la deja anulada en el folio y sube como `charge-voided` →
+**`anular-cargo`** → el mismo importe en negativo en Opera. El alojamiento no sube: Opera cobra sus
+noches. En *Gestionar folio*, cada cargo dice dónde está en Opera («Opera: en el folio · 88731245»). Así
+el saldo que Opera cobra en el check-out incluye los cargos de recepción, y el total de su factura es el
+del folio del front office; si aún difieren, la proforma lo dice y por qué (el alojamiento, que Opera
+factura con su tarifa y, en una salida anticipada, solo las noches pasadas; un cargo rechazado o que llegó
+tarde).
+
+**Habitación lista.** El paso de habitación ofrece primero las habitaciones **listas** en Opera —libres e
+inspeccionadas, lo que XMAR exige—; las libres que aún no lo están salen en gris con el motivo («No lista
+— Limpia, sin inspeccionar en Opera») y se pueden elegir a propósito; las ocupadas no. En la estancia que
+llega, un aviso dice «✓ Habitación 5142 lista — Inspected · Vacant en Opera» o por qué no, con
+**«Comprobar»**.
 
 **Ojo, la fecha de negocio de Opera.** La de XMAR es **2026-05-13** y no avanza (es un UAT sin auditoría
 nocturna): Opera solo hace el check-in de lo que llega ese día. Una reserva que llega hoy por el
