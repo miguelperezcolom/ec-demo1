@@ -377,16 +377,18 @@ class FrontOfficeIntegrationsTest {
         assertThat(reception.on(checkIn)).isNull();
 
         var id = activeIntegration();
-        assertThat(reception.on(checkIn)).isEqualTo("registrar-checkin:MRU01/GSX4AK");
-        var started = outbox("outboxUpstream").stream().filter(p -> p.contains("registrar-checkin:MRU01/GSX4AK")).toList();
+        assertThat(reception.on(checkIn)).isEqualTo("registrar-checkin:MRU01/GSX4AK:205");
+        var started = outbox("outboxUpstream").stream().filter(p -> p.contains("registrar-checkin:MRU01/GSX4AK:205")).toList();
         assertThat(started).singleElement().satisfies(p -> assertThat(p)
                 .contains("\"workflowDefinitionId\":\"registrar-checkin\"")
                 .contains("{\"name\":\"pmsReservationId\",\"value\":\"39486034\"}")
                 .contains("{\"name\":\"roomNumber\",\"value\":\"205\"}")
                 .contains("{\"name\":\"stayId\",\"value\":\"GSX4AK\"}")
                 .contains("{\"name\":\"integrationId\",\"value\":\"" + id + "\"}"));
-        // The same key twice: the engine starts it once.
-        assertThat(reception.on(checkIn)).isEqualTo("registrar-checkin:MRU01/GSX4AK");
+        // The same key twice: the engine starts it once. Another room, after Opera refused this one: another check-in.
+        assertThat(reception.on(checkIn)).isEqualTo("registrar-checkin:MRU01/GSX4AK:205");
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.GuestCheckedIn("E-1b", at,
+                "MRU01", "GSX4AK", "GSX4AK", "XMAR", "39486034", "207", 2, "ana"))).isEqualTo("registrar-checkin:MRU01/GSX4AK:207");
 
         // Born in Opera: keyed by the property and Opera's id.
         assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.GuestCheckedOut("E-2", at,

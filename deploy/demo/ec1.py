@@ -16,7 +16,7 @@ credential is printed.
   ec1.py rate-plan HOTEL CODE "NAME" FACTOR # opens a rate plan in a hotel of the CRS (idempotent)
   ec1.py ask-agent HOTEL [--wait SECONDS]   # the mapping agent proposes the hotel's pending codes
   ec1.py proposal HOTEL CODE [--approve]    # the agent's proposal for one code; --approve approves only it
-  ec1.py seed returning-customer [--create] | arriving-today | walk-in
+  ec1.py seed returning-customer [--create] | arriving-today | arriving-opera-today | walk-in
 
 Every date is ISO (YYYY-MM-DD). Hotel MRU01 unless --hotel says otherwise.
 """
@@ -485,6 +485,44 @@ def seed_arriving_today():
     return 0
 
 
+def opera_business_date(hotel="XMAR"):
+    code, out = opera("business-date", hotel)
+    if code != 0 or "business date " not in out:
+        raise RuntimeError(f"Opera's business date not readable: {out}")
+    return out.split("business date ")[1].split()[0]
+
+
+def seed_arriving_opera_today():
+    """A booking arriving on Opera's business date: the one the check-in and check-out can be made with.
+
+    Opera checks in only what arrives on its business date (FOF00067 otherwise), and XMAR's UAT date does
+    not move with the calendar: a booking arriving today by the calendar is refused at the check-in."""
+    business = opera_business_date()
+    tag = f"{TAG}:arriving-opera-today"
+    # JS-SEA is SJMB in XMAR, which has inspected rooms: XMAR assigns no room that is only clean
+    # (FOF00081), and its STDK rooms are all «Clean».
+    ready = [b for b in tagged(tag) if b["arrival"] == business and b["rooms"][0]["roomTypeCode"] == "JS-SEA"]
+    if ready:
+        locator = ready[0]["id"]
+        print(f"Already there: {locator}, arriving on Opera's business date {business}")
+    else:
+        locator = create_booking(channel="CALLCENTER", arrival=business, nights=1, room="JS-SEA", tag=tag)
+        print(f"Created: {locator}, arriving {business} (Opera's business date), 1 night, 2 adults, JS-SEA — "
+              f"waiting for it to reach Opera and the front office")
+    for _ in range(60):
+        b = booking(locator)
+        if b.get("pmsReference") and stay(locator):
+            break
+        time.sleep(3)
+    show(locator)
+    code, out = opera("rooms", "XMAR", "SJMB")
+    free = [line.split("\t")[0] for line in out.splitlines() if "\tInspected\tVacant" in line]
+    print(f"SJMB rooms Opera has inspected and vacant: {', '.join(free[:8]) or 'none — pick another type'}")
+    print(f"Check-in / check-out (front office → the stay {locator}): pick one of those rooms (a room only «Limpia, sin "
+          f"inspeccionar en Opera» is refused); Opera → «en casa». The check-out is an early departure (Opera's date).")
+    return 0
+
+
 def seed_walk_in():
     free = psql("front_office", "select room_number, type from room where occupancy = 'FREE' order by room_number")
     print("Nothing to create: the walk-in starts at the front office (Reservas → ＋ Walk-in). Suggested data:")
@@ -544,7 +582,7 @@ def main(argv):
     p.add_argument("--approve", action="store_true")
     p.add_argument("--by", default="demo")
     p = sub.add_parser("seed")
-    p.add_argument("what", choices=["returning-customer", "arriving-today", "walk-in"])
+    p.add_argument("what", choices=["returning-customer", "arriving-today", "arriving-opera-today", "walk-in"])
     p.add_argument("--create", action="store_true")
     a = ap.parse_args(argv)
 
@@ -636,6 +674,8 @@ def main(argv):
             return seed_returning_customer(a.create)
         if a.what == "arriving-today":
             return seed_arriving_today()
+        if a.what == "arriving-opera-today":
+            return seed_arriving_opera_today()
         return seed_walk_in()
     return 2
 

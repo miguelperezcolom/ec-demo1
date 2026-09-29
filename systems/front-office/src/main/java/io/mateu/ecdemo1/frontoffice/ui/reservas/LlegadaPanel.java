@@ -181,7 +181,8 @@ final class LlegadaPanel {
         .actionId("elegirHabitacion")
         .columns(4)
         .recommendedLabel("RECOMENDADA")
-        .items(r.rooms.findByFloor(12).stream()
+        // The PMS's rooms of the stay's type, as Opera has them now (the check-in assigns it there).
+        .items(io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.roomsFor(stay, 12).stream()
             .map(room -> HabitacionStep.item(room, stay.roomNumber(), stay.roomNumber()))
             .toList())
         .build());

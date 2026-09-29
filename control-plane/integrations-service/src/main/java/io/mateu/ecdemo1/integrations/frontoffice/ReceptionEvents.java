@@ -23,10 +23,11 @@ import java.util.List;
  * active, the process that records it in the PMS starts: «registrar-checkin», «registrar-checkout»,
  * «registrar-no-show-pms» (which goes on to the CRS, the master of the sale, for its fee).
  *
- * <p>One process per reservation and operation: its business key names them, and the engine ignores a
- * key it already has — the dedup, so an event taken twice records once. The key ends in the stay's
- * reservation as the booking's journey finds it: {@code <definition>:<hotel>/<locator>} — the CRS's
- * hotel and locator, or, for a reservation born in the PMS, the property and the PMS's id.
+ * <p>One process per reservation and operation — a check-in, per room: its business key names them, and
+ * the engine ignores a key it already has — the dedup, so an event taken twice records once. The key
+ * names the stay's reservation as the booking's journey finds it: {@code <definition>:<hotel>/<locator>}
+ * (and {@code :<room>} for a check-in) — the CRS's hotel and locator, or, for a reservation born in the
+ * PMS, the property and the PMS's id.
  */
 @Component
 @RequiredArgsConstructor
@@ -68,7 +69,10 @@ public class ReceptionEvents {
             case FrontOfficeEvent.GuestCheckedOut ignored -> Definitions.REGISTER_CHECK_OUT;
             case FrontOfficeEvent.NoShowReported ignored -> Definitions.REGISTER_NO_SHOW_PMS;
         };
-        var key = definition + ":" + hotelCode + "/" + locator;
+        // One check-in per room: the desk that picks another room after Opera refused one starts it again
+        // with the new room (and the one that waits on the refusal is resolved when this one gets in).
+        var key = definition + ":" + hotelCode + "/" + locator
+                + (event instanceof FrontOfficeEvent.GuestCheckedIn in ? ":" + (blank(in.roomNumber()) ? "-" : in.roomNumber()) : "");
         var variables = new ArrayList<Variable>(List.of(
                 new Variable(ProcessVariables.PROCESS_KEY, key),
                 new Variable(ProcessVariables.DEFINITION_ID, definition),

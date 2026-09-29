@@ -44,7 +44,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: pms-integration-service
-          image: miguelperezcolom/ec-demo1-pms-integration-service:0.37.0
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.38.8
           env:
             # Traces to Tempo, the one the engine exports to: a booking's trace runs from the CRS through
             # the orchestrator to this service's steps, its calls to the MDM and to Opera, and on to the
@@ -95,6 +95,11 @@ spec:
               value: ""
             - name: OPERA_POST_DEPOSITS
               value: "false"
+            # The cashier check-outs and folios are made with (registrar-checkout): OPERA takes the
+            # integration user's own when none is sent, and ours has none (FOF00094 «Invalid Cashier»).
+            # 69721441 «EC-DEMO1 Integración», an InterfaceCashier created for the PoC on 2026-09-29.
+            - name: OPERA_CASHIER_ID
+              value: "69721441"
             # The client has no access to the hub (403 listing the chain's properties): these are
             # offered instead, each read on its own.
             - name: OPERA_PROPERTIES

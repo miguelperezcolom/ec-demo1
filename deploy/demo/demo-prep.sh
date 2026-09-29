@@ -11,6 +11,10 @@
 #                                                  #   --create makes that booking through the API instead
 #   deploy/demo/demo-prep.sh seed arriving-today   # flow 4: a booking arriving today, in Opera and the
 #                                                  #   front office, for the no show
+#   deploy/demo/demo-prep.sh seed arriving-opera-today
+#                                                  # the check-in / check-out: a booking arriving on Opera's
+#                                                  #   business date (XMAR's does not follow the calendar;
+#                                                  #   Opera checks in nothing else), and its clean rooms
 #   deploy/demo/demo-prep.sh seed walk-in          # flow 5: nothing to create; the data to type
 #
 # Without --zero nothing is reset. --zero runs zero.sh first (ec1 and Salesforce's contacts to zero, a
