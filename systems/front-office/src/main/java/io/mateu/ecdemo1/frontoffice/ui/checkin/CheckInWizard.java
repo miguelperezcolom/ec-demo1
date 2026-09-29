@@ -61,6 +61,9 @@ public class CheckInWizard extends Wizard {
   boolean populated;
   int selectedPax = 1;
 
+  @Label("Avisos")
+  AvisosStep avisos = new AvisosStep();
+
   @Label("Identidad")
   IdentidadStep identidad;
 
@@ -79,11 +82,14 @@ public class CheckInWizard extends Wizard {
   final StayQueries queries;
   final CheckInService checkIn;
   final RoomRepository rooms;
+  final io.mateu.ecdemo1.frontoffice.application.GuestNotices notices;
 
-  public CheckInWizard(StayQueries queries, CheckInService checkIn, RoomRepository rooms) {
+  public CheckInWizard(StayQueries queries, CheckInService checkIn, RoomRepository rooms,
+                       io.mateu.ecdemo1.frontoffice.application.GuestNotices notices) {
     this.queries = queries;
     this.checkIn = checkIn;
     this.rooms = rooms;
+    this.notices = notices;
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -110,6 +116,9 @@ public class CheckInWizard extends Wizard {
   /** Seeds the steps from the stay's reservation data — once per stay. */
   void populate() {
     var view = queries.view(stayId);
+    avisos.setStayId(stayId);
+    avisos.setFingerprint(notices.checkInFingerprint(view.stay()));
+    avisos.setLeido(false);
     identidad.setStayId(stayId);
     habitacion.setStayId(stayId);
     habitacion.setHabitacionSeleccionada(view.stay().roomNumber());
@@ -310,6 +319,9 @@ public class CheckInWizard extends Wizard {
       return true;
     }
     return switch (stepFieldName) {
+      // los avisos de recepción de los huéspedes, si tienen alguno para el check-in (Salesforce, vía el MDM)
+      case "avisos" -> !notices.forStay(queries.view(stayId).stay(),
+          io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice.Moment.CHECK_IN).isEmpty();
       case "identidad" -> queries.pendingPax(queries.view(stayId).stay()) > 0;
       case "habitacion" -> !queries.view(stayId).stay().hasRoom();
       case "extras" -> !queries.ops(stayId).extras();
@@ -321,7 +333,19 @@ public class CheckInWizard extends Wizard {
   @Label("Confirmar check-in")
   Object confirmarCheckin() {
     syncConfirmar();
-    checkIn.checkIn(stayId, habitacion.getHabitacionSeleccionada(), extras.addedIds());
+    var by = io.mateu.ecdemo1.frontoffice.infra.security.DeskUser.name();
+    var stay = queries.stay(stayId);
+    try {
+      // «He leído el aviso»: lo leído es lo que se le mostró; si ha cambiado, se vuelve a pedir
+      if (avisos.isLeido() && !notices.checkInAcknowledged(stay)) {
+        notices.acknowledgeCheckIn(stayId, by, avisos.getFingerprint());
+      }
+      checkIn.checkIn(stayId, habitacion.getHabitacionSeleccionada(), extras.addedIds(), by);
+    } catch (io.mateu.ecdemo1.frontoffice.application.GuestNotices.NotAcknowledged e) {
+      avisos.setLeido(false);
+      avisos.setFingerprint(notices.checkInFingerprint(stay));
+      return List.of(this, new Message("⛔ " + e.getMessage()));
+    }
     result = new ResultStep();
     result.setStayId(stayId);
     result.setHabitacionFinal(confirmar.getHabitacionAsignada());

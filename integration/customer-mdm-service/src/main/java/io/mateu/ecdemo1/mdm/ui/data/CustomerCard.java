@@ -7,7 +7,21 @@ import io.mateu.ecdemo1.mdm.application.CustomerQueries;
 import io.mateu.ecdemo1.mdm.store.Customer;
 import io.mateu.ecdemo1.mdm.store.SalesforceState;
 import io.mateu.ecdemo1.mdm.store.Xref;
+import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeMoment;
+import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeType;
+import io.mateu.ecdemo1.mdm.notice.CustomerNotices;
+import io.mateu.ecdemo1.mdm.store.CustomerNotice;
+import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Colspan;
+import io.mateu.uidl.annotations.Stereotype;
+import io.mateu.uidl.annotations.Toolbar;
+import io.mateu.uidl.data.FieldStereotype;
+import io.mateu.uidl.data.Message;
+import io.mateu.uidl.data.Option;
+import io.mateu.uidl.data.State;
+import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.interfaces.OptionsSupplier;
+import io.mateu.uidl.interfaces.StereotypeSupplier;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
@@ -18,21 +32,48 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
  * A customer, for the business: who it is now — the data Salesforce, the master, decided, as the MDM
  * keeps it — where it is known, its reservations in every system and the changes hotels asked for.
  * Read-only: a change is asked for at a hotel's reception and decided in Salesforce.
+ *
+ * <p>Except its reception notices — what the desk must know when the customer arrives or leaves —
+ * which are asked for here, added, changed or deactivated: Salesforce is their master, so each one
+ * is written there and shown as pending until Salesforce confirms it.
  */
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class CustomerCard implements Identifiable {
+public class CustomerCard implements Identifiable, OptionsSupplier, StereotypeSupplier {
+
+    /** A notice's type, as the desk reads it. */
+    public enum TipoAviso {
+        Informativo(NoticeType.INFORMATIVE), Importante(NoticeType.IMPORTANT), Bloqueante(NoticeType.BLOCKING);
+
+        final NoticeType type;
+
+        TipoAviso(NoticeType type) {
+            this.type = type;
+        }
+
+        static TipoAviso of(String type) {
+            for (var t : values()) {
+                if (t.type.name().equals(type)) {
+                    return t;
+                }
+            }
+            return Informativo;
+        }
+    }
 
     /** The badge in the header. */
     @ReadOnly
@@ -79,6 +120,35 @@ public class CustomerCard implements Identifiable {
     @Colspan(2)
     Callable<Component> systems = () -> Html.block(systemsMarkup());
 
+    /** The customer's notices and where each one stands with Salesforce. */
+    @Section("Avisos de recepción")
+    @Label("")
+    @Colspan(2)
+    Callable<Component> avisos = () -> Html.block(noticesMarkup());
+
+    /** Empty: a new notice. A notice's id: the one the actions change. */
+    @Section("Nuevo aviso o cambio")
+    @Label("Aviso")
+    String avisoSeleccionado;
+    @Label("Texto")
+    @Stereotype(FieldStereotype.textarea)
+    @Colspan(2)
+    String avisoTexto;
+    @Label("Tipo")
+    TipoAviso avisoTipo = TipoAviso.Informativo;
+    @Label("Activo")
+    boolean avisoActivo = true;
+    @Label("Desde")
+    LocalDate avisoDesde;
+    @Label("Hasta")
+    LocalDate avisoHasta;
+    @Label("Mostrar en el check-in")
+    boolean avisoCheckIn = true;
+    @Label("Mostrar en el check-out")
+    boolean avisoCheckOut;
+    @Label("Mostrar durante la estancia")
+    boolean avisoEstancia;
+
     @Section("Solicitudes de cambio")
     @ReadOnly
     @Label("")
@@ -88,6 +158,7 @@ public class CustomerCard implements Identifiable {
     final Footprint footprint;
     final Links links;
     final CustomerQueries customers;
+    final CustomerNotices notices;
 
     public CustomerCard load(Customer c) {
         status = Estados.customer(c.status);
@@ -108,6 +179,185 @@ public class CustomerCard implements Identifiable {
                 .map(r -> ChangeRequestRows.of(r, name))
                 .toList();
         return this;
+    }
+
+    // ── reception notices ──────────────────────────────────────────────────────
+
+    @Toolbar
+    @Action
+    public Object guardarAviso(HttpRequest httpRequest) {
+        var draft = new CustomerNotices.Draft(avisoTexto, avisoTipo == null ? null : avisoTipo.type, avisoDesde,
+                avisoHasta, moments(), avisoActivo);
+        var by = io.mateu.ecdemo1.uicommons.user.ConsoleUser.of(httpRequest);
+        CustomerNotice saved;
+        try {
+            saved = avisoSeleccionado == null || avisoSeleccionado.isBlank()
+                    ? notices.create(id, draft, by) : notices.change(avisoSeleccionado, draft, by);
+        } catch (IllegalArgumentException e) {
+            return new Message(e.getMessage());
+        }
+        clearNotice();
+        reload();
+        return List.of(new Message("Aviso " + saved.id + " enviado a Salesforce: pendiente hasta que lo confirme"),
+                new State(this));
+    }
+
+    @Toolbar
+    @Action
+    public Object editarAviso(HttpRequest httpRequest) {
+        if (avisoSeleccionado == null || avisoSeleccionado.isBlank()) {
+            return new Message("Elige en «Aviso» cuál quieres editar");
+        }
+        var n = notices.get(avisoSeleccionado);
+        var pending = n.pending() && n.pendingText != null;
+        avisoTexto = pending ? n.pendingText : n.text;
+        avisoTipo = TipoAviso.of(pending ? n.pendingType : n.type);
+        avisoDesde = pending ? n.pendingFrom : n.fromDate;
+        avisoHasta = pending ? n.pendingTo : n.toDate;
+        avisoActivo = pending ? Boolean.TRUE.equals(n.pendingActive) : n.active;
+        var showAt = pending ? n.pendingShowAt : n.showAt;
+        avisoCheckIn = showAt != null && showAt.contains(NoticeMoment.CHECK_IN.name());
+        avisoCheckOut = showAt != null && showAt.contains(NoticeMoment.CHECK_OUT.name());
+        avisoEstancia = showAt != null && showAt.contains(NoticeMoment.STAY.name());
+        return new State(this);
+    }
+
+    @Toolbar
+    @Action(confirmationRequired = true, confirmationTitle = "¿Desactivar el aviso?",
+            confirmationMessage = "Recepción deja de verlo en cuanto Salesforce lo confirme. Se puede volver a activar editándolo.")
+    public Object desactivarAviso(HttpRequest httpRequest) {
+        if (avisoSeleccionado == null || avisoSeleccionado.isBlank()) {
+            return new Message("Elige en «Aviso» cuál quieres desactivar");
+        }
+        var n = notices.deactivate(avisoSeleccionado, io.mateu.ecdemo1.uicommons.user.ConsoleUser.of(httpRequest));
+        clearNotice();
+        reload();
+        return List.of(new Message("Aviso " + n.id + " desactivado: pendiente hasta que Salesforce lo confirme"),
+                new State(this));
+    }
+
+    @Toolbar
+    @Action
+    public Object nuevoAviso(HttpRequest httpRequest) {
+        clearNotice();
+        return new State(this);
+    }
+
+    Set<NoticeMoment> moments() {
+        var set = EnumSet.noneOf(NoticeMoment.class);
+        if (avisoCheckIn) {
+            set.add(NoticeMoment.CHECK_IN);
+        }
+        if (avisoCheckOut) {
+            set.add(NoticeMoment.CHECK_OUT);
+        }
+        if (avisoEstancia) {
+            set.add(NoticeMoment.STAY);
+        }
+        return set;
+    }
+
+    void clearNotice() {
+        avisoSeleccionado = null;
+        avisoTexto = null;
+        avisoTipo = TipoAviso.Informativo;
+        avisoActivo = true;
+        avisoDesde = null;
+        avisoHasta = null;
+        avisoCheckIn = true;
+        avisoCheckOut = false;
+        avisoEstancia = false;
+    }
+
+    void reload() {
+        customers.find(id).ifPresent(this::load);
+    }
+
+    /** The notices of the customer, under any of its codes. */
+    List<CustomerNotice> customerNotices() {
+        var customer = id == null ? null : customers.find(id).orElse(null);
+        return customer == null ? List.of() : notices.of(footprint.codesOf(customer));
+    }
+
+    String noticesMarkup() {
+        var list = customerNotices();
+        if (list.isEmpty()) {
+            return Html.muted("No tiene avisos. Se añaden abajo, o en Salesforce como un caso del contacto con «Tipo de aviso».");
+        }
+        var rows = new ArrayList<List<String>>();
+        for (var n : list) {
+            var confirmed = n.version > 0;
+            rows.add(List.of(
+                    Html.escape(n.id),
+                    Html.escape(confirmed ? n.text : n.pendingText),
+                    Html.escape(TipoAviso.of(confirmed ? n.type : n.pendingType).name()),
+                    Html.escape(momentsLabel(confirmed ? n.showAt : n.pendingShowAt)),
+                    Html.escape(validity(confirmed ? n.fromDate : n.pendingFrom, confirmed ? n.toDate : n.pendingTo)),
+                    Html.escape(confirmed ? (n.active ? "Activo" : "Inactivo") : "—"),
+                    Html.escape(syncLabel(n)),
+                    n.salesforceId == null ? "" : Html.link("Caso " + n.salesforceId, links.salesforceRecord("Case", n.salesforceId))));
+        }
+        return Html.table(List.of("Aviso", "Texto", "Tipo", "Se muestra en", "Vigencia", "Estado", "Salesforce", "Caso"), rows);
+    }
+
+    /** Where the notice stands with Salesforce, and what is pending, in words. */
+    static String syncLabel(CustomerNotice n) {
+        var sync = n.sync == null ? CustomerNotice.Sync.CONFIRMED : CustomerNotice.Sync.valueOf(n.sync);
+        var asked = n.pendingText == null ? "" : " — pedido por " + n.requestedBy + ": «" + n.pendingText + "», "
+                + TipoAviso.of(n.pendingType).name().toLowerCase() + (Boolean.TRUE.equals(n.pendingActive) ? "" : ", inactivo");
+        return switch (sync) {
+            case CONFIRMED -> "Confirmado" + (n.origin == null ? "" : " (creado en " + n.origin + ")");
+            case PENDING -> "Pendiente de enviar a Salesforce" + asked;
+            case SENT -> "Enviado; pendiente de que Salesforce lo confirme" + asked;
+            case FAILED -> "Salesforce no lo aceptó: " + n.sendError + asked;
+        };
+    }
+
+    static String momentsLabel(String moments) {
+        if (moments == null || moments.isBlank()) {
+            return "";
+        }
+        var labels = new ArrayList<String>();
+        for (var m : moments.split(",")) {
+            labels.add(switch (NoticeMoment.valueOf(m)) {
+                case CHECK_IN -> "check-in";
+                case CHECK_OUT -> "check-out";
+                case STAY -> "estancia";
+            });
+        }
+        return String.join(", ", labels);
+    }
+
+    static String validity(LocalDate from, LocalDate to) {
+        if (from == null && to == null) {
+            return "Siempre";
+        }
+        return (from == null ? "…" : Estados.day(from)) + " → " + (to == null ? "…" : Estados.day(to));
+    }
+
+    /** «Aviso» is a select of the customer's notices, plus «nuevo». */
+    @Override
+    public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
+        return CustomerCard.class.equals(formType) && "avisoSeleccionado".equals(fieldName);
+    }
+
+    @Override
+    public List<Option> options(String fieldName, HttpRequest httpRequest) {
+        if (!"avisoSeleccionado".equals(fieldName)) {
+            return List.of();
+        }
+        var options = new ArrayList<Option>();
+        options.add(new Option("", "Nuevo aviso"));
+        for (var n : customerNotices()) {
+            var text = n.version > 0 ? n.text : n.pendingText;
+            options.add(new Option(n.id, n.id + " — " + (text == null ? "" : text.length() > 50 ? text.substring(0, 49) + "…" : text)));
+        }
+        return options;
+    }
+
+    @Override
+    public FieldStereotype stereotype(String memberName, HttpRequest httpRequest) {
+        return "avisoSeleccionado".equals(memberName) ? FieldStereotype.select : null;
     }
 
     /** Where the customer's data stands with Salesforce, in words. */

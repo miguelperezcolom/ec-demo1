@@ -76,6 +76,8 @@ class FrontDeskMcpToolsTest {
   @Autowired WalkIns walkIns;
   @Autowired CheckInService checkIn;
   @Autowired JdbcTemplate jdbc;
+  @Autowired io.mateu.ecdemo1.frontoffice.application.GuestNotices notices;
+  @Autowired io.mateu.ecdemo1.frontoffice.domain.guest.KardexChanges kardexChanges;
 
   @BeforeEach
   void aNewConversation() {
@@ -259,6 +261,49 @@ class FrontDeskMcpToolsTest {
   }
 
   @Test
+  void aBlockingNoticeIsInTheCheckInsSummaryAndConfirmingItIsReadingIt() {
+    var stayId = arrival(1);
+    var guestId = stays.findById(stayId).orElseThrow().guestId();
+    confirmNextTurn(token(tools.prepareKardexEdit(stayId, 1, "Y" + SEQ.incrementAndGet(), null, null, null)));
+    notices.take(new io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged("E-N" + stayId, Instant.now(),
+        "AV-" + stayId, 1, guestId, "Pedir el pasaporte original", 
+        io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeType.BLOCKING, null, null,
+        List.of(io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeMoment.CHECK_IN), true, null));
+
+    assertThat(tools.getNotices(stayId).notices()).singleElement()
+        .satisfies(n -> assertThat(n.type()).isEqualTo("BLOCKING"));
+    assertThat(tools.getStay(stayId).blockingNoticesRead()).isFalse();
+    var prepared = tools.prepareCheckIn(stayId, room(RoomOccupancy.FREE), List.of());
+    assertThat(prepared).contains("AVISO BLOQUEANTE").contains("Pedir el pasaporte original")
+        .contains("declara que ha leído el aviso");
+
+    assertThat(confirmNextTurn(token(prepared))).startsWith("Hecho.");
+    assertThat(stays.findById(stayId).orElseThrow().status()).isEqualTo(StayStatus.IN_HOUSE);
+    assertThat(audited(stayId)).anySatisfy(a -> assertThat(a).contains("Read check-in notices")
+        .contains("\"by\":\"reception-agent (ana)\""));
+  }
+
+  @Test
+  void aRejectedKardexIsInTheCheckOutsSummaryAndConfirmingItIsEntendido() {
+    var stayId = inHouse(LocalDate.now().plusDays(1));
+    var guestId = stays.findById(stayId).orElseThrow().guestId();
+    kardexChanges.save(new io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange(guestId, "CR-FO-" + stayId,
+        io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange.KardexStatus.REJECTED, "email",
+        List.of(new io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange.FieldChange("email", "a@old.example",
+            "a@new.example")), "No coincide", Instant.now(), Instant.now(), true));
+
+    assertThat(tools.getNotices(stayId).kardexWarnings()).singleElement()
+        .satisfies(k -> assertThat(k.status()).isEqualTo("REJECTED"));
+    var prepared = tools.prepareCheckOut(stayId);
+    assertThat(prepared).contains("RECHAZADO por Salesforce").contains("a@new.example").contains("No coincide")
+        .contains("Entendido");
+
+    assertThat(confirmNextTurn(token(prepared))).startsWith("Hecho.");
+    assertThat(stays.findById(stayId).orElseThrow().status()).isEqualTo(StayStatus.DEPARTED);
+    assertThat(audited(stayId)).anySatisfy(a -> assertThat(a).contains("Read check-out warnings"));
+  }
+
+  @Test
   void aNoShowOfTheWholeReservationSaysTheCrsIsTold() {
     var stayId = arrival(1);
 
@@ -282,7 +327,8 @@ class FrontDeskMcpToolsTest {
 
   @Test
   void theServerTellsTheAgentHowToConfirm() {
-    assertThat(tools.systemContext()).contains("confirmAction").contains("prepare");
+    assertThat(tools.systemContext()).contains("confirmAction").contains("prepare").contains("BLOQUEANTES")
+        .contains("getNotices");
   }
 
   // ── ───────────────────────────────────────────────────────────────────────────

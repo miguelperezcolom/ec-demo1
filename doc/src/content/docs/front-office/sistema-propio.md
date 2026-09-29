@@ -32,6 +32,7 @@ proyecta las pantallas para cada audiencia.
 | Reservas y estancias | Opera | `front-office-commands` (`write-stay`), ordenadas por la versión de Opera |
 | Catálogo (tipos, tarifas, paquetes, habitaciones) | Opera | `front-office-commands` (`replace-catalogue`) |
 | El cliente (kárdex) | El MDM, que lo tiene de Salesforce | Topic `customers` |
+| Avisos de recepción del cliente | Salesforce (su maestro), por el MDM | Topic `customer-notices` |
 | Precio y alta de un walk-in | El CRS | HTTP a `crs-integration-service`: la recepción necesita el localizador ya |
 
 Y lo que el front office **manda**, por su outbox (`command_outbox`):
@@ -39,6 +40,28 @@ Y lo que el front office **manda**, por su outbox (`command_outbox`):
 - un **cambio de datos del cliente**, a Salesforce vía MDM (`customer-commands`, `propose-change`);
 - un **documento escaneado**, al MDM (`customer-commands`, `record-scanned-identity`);
 - un **no show**, al CRS (`no-show-reports`) — solo en la PoC, ver abajo.
+
+## Avisos de recepción, al entrar y al salir
+
+Los avisos de cada cliente (ver [Clientes](/integracion/clientes/#avisos-de-recepción)) se guardan por su
+código: del titular y de los acompañantes que son clientes de la cadena.
+
+- **Check-in.** El asistente empieza por un paso *Avisos* si hay alguno para el check-in (activo, vigente
+  en las fechas de la estancia), y el carril de huéspedes de la reserva los lleva bajo cada pax. Uno
+  **Bloqueante** pide marcar **«He leído el aviso»**; sin eso, `CheckInService` rechaza el check-in —
+  venga del mostrador o del agente — y lo audita. Lo leído cubre los avisos de ese momento: uno nuevo
+  hay que volver a leerlo. La reserva con un bloqueante sin leer no hace el check-in directo: abre el
+  asistente.
+- **Check-out.** Si algún huésped tiene un cambio de kárdex **rechazado** por Salesforce (campo, lo
+  propuesto, lo que se queda, el motivo) o **pendiente** («la factura saldrá con el dato anterior»), o
+  avisos de check-out, el modo check-out los muestra arriba con **«Entendido»**; sin él,
+  `CheckOutService` rechaza el cobro y cierre, y lo audita.
+- **El agente de recepción** tiene `getNotices` y los recibe en `getStay`; `prepareCheckIn` y
+  `prepareCheckOut` los ponen en el resumen, y confirmar es declarar «He leído el aviso» / «Entendido»
+  (auditado como `reception-agent (persona)`).
+
+Todo reconocimiento y todo rechazo va al topic `audit` (`Read check-in notices`, `Check-in refused:
+unread notices`, `Read check-out warnings`, `Check-out refused: unread warnings`).
 
 ## Por qué un sistema propio y no una fachada de Opera
 

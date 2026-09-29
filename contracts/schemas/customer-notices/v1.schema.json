@@ -1,0 +1,108 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:customer-notices:v1",
+  "title" : "customer-notices v1",
+  "description" : "A customer's reception notices, as Salesforce (their master) has them: created, changed or deactivated — the whole notice each time; the highest version wins.",
+  "x-topic" : "customer-notices",
+  "x-version" : 1,
+  "x-owner" : "customer-mdm-service",
+  "x-key" : "customerId",
+  "x-producers" : [ "customer-mdm-service" ],
+  "x-consumers" : [ "front-office" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged",
+  "$ref" : "#/$defs/CustomerNoticeChanged",
+  "$defs" : {
+    "CustomerNoticeChanged" : {
+      "type" : "object",
+      "properties" : {
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "noticeId" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "customerId" : {
+          "type" : [ "string", "null" ]
+        },
+        "text" : {
+          "type" : [ "string", "null" ]
+        },
+        "type" : {
+          "$ref" : "#/$defs/CustomerNoticeChanged.NoticeType-nullable"
+        },
+        "from" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "to" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "showAt" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/CustomerNoticeChanged.NoticeMoment"
+          }
+        },
+        "active" : {
+          "type" : "boolean"
+        },
+        "salesforceId" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "eventId", "occurredAt", "noticeId", "version", "customerId", "text", "type", "from", "to", "showAt", "active", "salesforceId" ],
+      "additionalProperties" : false
+    },
+    "CustomerNoticeChanged.NoticeMoment" : {
+      "type" : "string",
+      "enum" : [ "CHECK_IN", "CHECK_OUT", "STAY" ]
+    },
+    "CustomerNoticeChanged.NoticeType" : {
+      "type" : "string",
+      "enum" : [ "INFORMATIVE", "IMPORTANT", "BLOCKING" ]
+    },
+    "CustomerNoticeChanged.NoticeType-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/CustomerNoticeChanged.NoticeType"
+      } ]
+    }
+  },
+  "examples" : [ {
+    "eventId" : "E-4",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "noticeId" : "AV-7F3A2C",
+    "version" : 2,
+    "customerId" : "C-00042",
+    "text" : "Pedir el pasaporte original: el del CRS está caducado",
+    "type" : "BLOCKING",
+    "from" : "2026-11-01",
+    "to" : null,
+    "showAt" : [ "CHECK_IN" ],
+    "active" : true,
+    "salesforceId" : "500d1000009XyZAAA0"
+  }, {
+    "eventId" : "E-5",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "noticeId" : "AV-7F3A2D",
+    "version" : 5,
+    "customerId" : "C-00042",
+    "text" : "Cliente alérgico a los frutos secos",
+    "type" : "IMPORTANT",
+    "from" : null,
+    "to" : null,
+    "showAt" : [ "CHECK_IN", "STAY" ],
+    "active" : false,
+    "salesforceId" : "500d1000009XyZBAA0"
+  } ]
+}

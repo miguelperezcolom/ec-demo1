@@ -43,13 +43,17 @@ final class HuespedesPanel {
     // El titular lleva, campo a campo, lo que recepción cambió y el maestro de clientes
     // (Salesforce) aún no ha aprobado — o ha rechazado. Aprobado, el dato se queda sin marca.
     var kardex = r.kardex.changeOf(guest.id()).filter(KardexChange::marked).orElse(null);
-    items.add(conKardex(paxItem(1, guest.name(), docAdulto(guest.document()),
-        guest.identityComplete(), ops.isNoShow(1)), ops.isNoShow(1) ? null : kardex, guest));
+    // los avisos de recepción de cada pax para el check-in (Salesforce, vía el MDM), bajo su fila
+    var avisos = r.notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice.Moment.CHECK_IN);
+    items.add(conAvisos(conKardex(paxItem(1, guest.name(), docAdulto(guest.document()),
+        guest.identityComplete(), ops.isNoShow(1)), ops.isNoShow(1) ? null : kardex, guest),
+        io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, 1)));
     var companions = stay.companions();
     for (int i = 0; i < companions.size(); i++) {
       var companion = companions.get(i);
-      items.add(paxItem(i + 2, companion.name(), companion.description(),
-          companion.identityComplete(), ops.isNoShow(i + 2)));
+      items.add(conAvisos(paxItem(i + 2, companion.name(), companion.description(),
+          companion.identityComplete(), ops.isNoShow(i + 2)),
+          io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, i + 2)));
     }
     for (int i = 2 + companions.size(); i <= stay.pax(); i++) {
       items.add(paxItem(i, "Acompañante " + i, "Pendiente de registro", false, ops.isNoShow(i)));
@@ -238,6 +242,25 @@ final class HuespedesPanel {
         .status(kardex.label())
         .statusColor(kardex.pending() ? "warning" : "error")
         .lines(kardex.lines(guest))
+        .build();
+  }
+
+  /** El pax con sus avisos de recepción, cada uno en una línea bajo las de su kárdex. */
+  static StatusItem conAvisos(StatusItem item, List<String> avisos) {
+    if (avisos.isEmpty()) {
+      return item;
+    }
+    var lines = new ArrayList<String>(item.lines() == null ? List.of() : item.lines());
+    lines.addAll(avisos);
+    return StatusItem.builder()
+        .id(item.id()).icon(item.icon()).avatar(item.avatar()).title(item.title())
+        .description(item.description())
+        .actionLabel(item.actionLabel()).actionId(item.actionId()).actionIcon(item.actionIcon())
+        .actionLabel2(item.actionLabel2()).actionId2(item.actionId2()).actionIcon2(item.actionIcon2())
+        .actionLabel3(item.actionLabel3()).actionId3(item.actionId3()).actionIcon3(item.actionIcon3())
+        .status(item.status())
+        .statusColor(item.statusColor())
+        .lines(lines)
         .build();
   }
 

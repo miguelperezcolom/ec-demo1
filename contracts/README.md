@@ -13,7 +13,7 @@ each service depends on the contexts it speaks and nothing else. The packages
 | Module | What | Topics | Used by |
 |---|---|---|---|
 | `contracts-reservation` | The canonical reservation (`Reservation`, `Room`, `Person`…), a projection asked for, a no-show reported, a reservation changed in the PMS | projection-requests, no-show-reports, pms-reservations | crs-integration, pms-integration, mapping, customer-mdm, integrations, front-office |
-| `contracts-customer` | `CustomerEvent`, `GoldenRecord`, identity resolution, `CustomerCommand` (needs `contracts-reservation`: a passenger is a `Person`) | customers, customer-commands | crs-integration, pms-integration, customer-mdm, front-office |
+| `contracts-customer` | `CustomerEvent`, `GoldenRecord`, identity resolution, `CustomerCommand`, `CustomerNoticeChanged` (needs `contracts-reservation`: a passenger is a `Person`) | customers, customer-notices, customer-commands | crs-integration, pms-integration, customer-mdm, front-office |
 | `contracts-partner` | The partner and its PMS profile | — (HTTP) | crs-integration, pms-integration, mapping, integrations |
 | `contracts-mapping` | Code types, translations, causes, `MappingCommand` | mapping-commands | crs-integration, pms-integration, mapping, integrations |
 | `contracts-integration` | An integration's lifecycle: status, connection, connectivity, future reservations and their codes (needs `contracts-mapping`); `ApiUsage`, what an external API (Salesforce, Opera) is spent | — (HTTP) | crs-integration, pms-integration, mapping, integrations, customer-mdm |
@@ -46,6 +46,7 @@ producer writes it.
 | partner-commands | erp | integrations, crs-integration | erp |
 | integration-events | crs-integration | crs-integration | crs-integration |
 | customers | contracts-schemas (customer-mdm's language) | customer-mdm | crs-integration, front-office |
+| customer-notices | contracts-schemas | customer-mdm | front-office |
 | customer-commands | contracts-schemas | front-office | customer-mdm |
 | projection-requests | contracts-schemas | integrations | crs-integration |
 | no-show-reports | contracts-schemas | front-office | crs-integration |

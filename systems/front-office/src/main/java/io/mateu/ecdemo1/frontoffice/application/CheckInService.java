@@ -31,14 +31,16 @@ public class CheckInService {
   final FolioRepository folios;
   final AddOnCatalogRepository addOnCatalog;
   final CheckInOpsRepository checkInOps;
+  final GuestNotices notices;
 
   public CheckInService(StayRepository stays, RoomRepository rooms, FolioRepository folios,
-                        AddOnCatalogRepository addOnCatalog, CheckInOpsRepository checkInOps) {
+                        AddOnCatalogRepository addOnCatalog, CheckInOpsRepository checkInOps, GuestNotices notices) {
     this.stays = stays;
     this.rooms = rooms;
     this.folios = folios;
     this.addOnCatalog = addOnCatalog;
     this.checkInOps = checkInOps;
+    this.notices = notices;
   }
 
   /**
@@ -46,11 +48,21 @@ public class CheckInService {
    * add-ons, moves the stay in house, occupies the room and opens the folio with the accommodation and
    * the add-ons' charges. The ancillaries selection is closed with it. A stay no longer arriving only
    * gets its selection closed.
+   *
+   * <p>Refused ({@link GuestNotices.NotAcknowledged}) while a guest has a blocking reception notice
+   * the desk has not said it read.
    */
   @Transactional
   public Stay checkIn(String stayId, String roomNumber, Collection<String> addOnIds) {
+    return checkIn(stayId, roomNumber, addOnIds, null);
+  }
+
+  /** As {@link #checkIn(String, String, Collection)}, saying who asks (for the audit of a refusal). */
+  @Transactional
+  public Stay checkIn(String stayId, String roomNumber, Collection<String> addOnIds, String by) {
     var stay = find(stayId);
     if (stay.status() == StayStatus.ARRIVING) {
+      notices.requireCheckIn(stay, by);
       var selected = roomNumber != null ? roomNumber : stay.roomNumber();
       var room = rooms.findByNumber(selected);
       stay = stay.assignRoom(selected, room.map(Room::typeLabel).orElse(stay.roomType()));

@@ -91,6 +91,29 @@ Un sistema nuevo que necesite el cliente es un suscriptor más.
 Si la decisión no llega por evento, el MDM pregunta por los Cases abiertos cada 5 min, y solo mientras
 haya alguno.
 
+## Avisos de recepción
+
+Lo que recepción tiene que saber de un cliente al llegar, durante la estancia o al irse («pedir el
+pasaporte original», «pago pendiente de la última estancia»). **Su maestro es Salesforce**; se crean allí
+o desde la ficha del cliente en *Clientes*.
+
+- **En Salesforce** un aviso es un **Case sobre el contacto con «Tipo de aviso»** (*Informativo*,
+  *Importante*, *Bloqueante*): el asunto es el texto; *Mostrar el aviso en* (check-in, check-out,
+  estancia), *Aviso desde/hasta* (opcionales) y *Aviso activo*. Desmarcarlo, o cerrar el Case, lo retira.
+  No es un objeto propio porque la Base Edition no admite más objetos personalizados.
+- Un flow publica **`AvisoRecepcionCambiado__e`** con el aviso **entero** al crearlo o cambiarlo: el MDM
+  lo guarda sin leer nada de Salesforce y lo publica en **`customer-notices`** (`CustomerNoticeChanged`,
+  clave el cliente, con versión).
+- **Desde *Clientes*** (sección *Avisos de recepción* de la ficha) se añade, edita o desactiva: el MDM lo
+  guarda como **pendiente** y lo escribe en Salesforce con los demás que esperan — una llamada para los
+  nuevos (upsert por `MdmAvisoId__c`), otra para los cambios —, parado si el cupo se agota. Solo cuando su
+  evento vuelve con lo pedido pasa a *Confirmado* y se publica: los hoteles ven lo que tiene Salesforce.
+  Si el evento se pierde, una consulta cada 5 min, solo por los escritos sin confirmar hace más de 2 min.
+- Una fusión pasa los avisos del absorbido al superviviente.
+
+El front office los guarda por cliente (titular y acompañantes que son clientes de la cadena) y los
+enseña en el check-in y el check-out: ver [Un sistema propio](/front-office/sistema-propio/).
+
 ## El documento escaneado es dato de confianza
 
 *Escanear* en recepción manda el documento del pasajero al MDM (`customer-commands`,

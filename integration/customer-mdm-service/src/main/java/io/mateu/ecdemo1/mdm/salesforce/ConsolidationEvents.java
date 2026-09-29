@@ -48,6 +48,7 @@ public class ConsolidationEvents implements SmartLifecycle {
     static final String TOPIC = "/event/ClienteConsolidado__e";
     static final String DECISIONS = "/event/CambioClienteResuelto__e";
     static final String CONTACT_CHANGES = "/event/ClienteActualizado__e";
+    static final String NOTICES = "/event/AvisoRecepcionCambiado__e";
     static final int BATCH = 25;
 
     /** A topic, where its replay position is kept, and what to do with each of its events. */
@@ -66,7 +67,8 @@ public class ConsolidationEvents implements SmartLifecycle {
     volatile ManagedChannel channel;
 
     public ConsolidationEvents(MdmProperties properties, SalesforceClient salesforce, Consolidations consolidations,
-                               CursorRepository cursors, io.mateu.ecdemo1.mdm.change.SalesforceInbox inbox) {
+                               CursorRepository cursors, io.mateu.ecdemo1.mdm.change.SalesforceInbox inbox,
+                               io.mateu.ecdemo1.mdm.notice.CustomerNotices notices) {
         this.properties = properties.salesforce();
         this.salesforce = salesforce;
         this.consolidations = consolidations;
@@ -80,7 +82,9 @@ public class ConsolidationEvents implements SmartLifecycle {
                         string(record, "RequestId__c"), string(record, "Estado__c"), "EVENT")),
                 // A contact's data changed in Salesforce, the master: the projection follows.
                 new Topic(CONTACT_CHANGES, "pubsub:ClienteActualizado__e", record -> inbox.contactChanged(
-                        string(record, "MdmId__c"))));
+                        string(record, "MdmId__c"))),
+                // A reception notice was created or changed in Salesforce, the master: whole, nothing to read.
+                new Topic(NOTICES, "pubsub:AvisoRecepcionCambiado__e", record -> notices.received(notice(record))));
     }
 
     @Override
@@ -221,6 +225,37 @@ public class ConsolidationEvents implements SmartLifecycle {
         });
         cursor.replayId = Base64.getEncoder().encodeToString(replayId.toByteArray());
         cursors.save(cursor);
+    }
+
+    /** The notice the event carries, as the MDM reads it. */
+    static io.mateu.ecdemo1.mdm.notice.NoticeEvent notice(GenericRecord record) {
+        return new io.mateu.ecdemo1.mdm.notice.NoticeEvent(string(record, "AvisoId__c"), string(record, "MdmAvisoId__c"),
+                string(record, "MdmId__c"), string(record, "Texto__c"), string(record, "Tipo__c"),
+                date(record, "Desde__c"), date(record, "Hasta__c"), string(record, "MostrarEn__c"),
+                bool(record, "Activo__c"));
+    }
+
+    /**
+     * A Date field of an event: Pub/Sub sends it as a number — days since the epoch, or milliseconds —
+     * and, read otherwise, as its ISO text.
+     */
+    static java.time.LocalDate date(GenericRecord record, String field) {
+        var value = record.hasField(field) ? record.get(field) : null;
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number n) {
+            var v = n.longValue();
+            return Math.abs(v) < 1_000_000 ? java.time.LocalDate.ofEpochDay(v)
+                    : java.time.Instant.ofEpochMilli(v).atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        }
+        var text = value.toString();
+        return text.isBlank() ? null : java.time.LocalDate.parse(text.length() > 10 ? text.substring(0, 10) : text);
+    }
+
+    static boolean bool(GenericRecord record, String field) {
+        var value = record.hasField(field) ? record.get(field) : null;
+        return value instanceof Boolean b ? b : value != null && Boolean.parseBoolean(value.toString());
     }
 
     static String string(GenericRecord record, String field) {

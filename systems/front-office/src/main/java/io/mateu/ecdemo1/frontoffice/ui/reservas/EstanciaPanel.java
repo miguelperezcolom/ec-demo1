@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.ui.reservas;
 
+import io.mateu.ecdemo1.frontoffice.application.GuestNotices;
 import io.mateu.ecdemo1.frontoffice.domain.folio.Folio;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Incident;
 import io.mateu.ecdemo1.frontoffice.domain.stay.IncidentStatus;
@@ -219,6 +220,43 @@ final class EstanciaPanel {
   }
 
   /** Modo check-out: el desglose del folio (vacío fuera del modo). */
+  /**
+   * Los avisos de la salida: el kárdex de algún huésped que Salesforce rechazó o aún no ha decidido
+   * (la factura saldrá con el dato anterior) y los avisos de check-out. Recepción pulsa «Entendido»
+   * antes de cobrar y cerrar — sin ello el check-out se rechaza.
+   */
+  Component avisosCheckout(Stay stay) {
+    if (!r.modoCheckout) {
+      return new VerticalLayout();
+    }
+    var warnings = r.notices.checkOutWarnings(stay);
+    if (!warnings.any()) {
+      return new VerticalLayout();
+    }
+    var leido = r.notices.checkOutAcknowledged(stay);
+    var ack = r.notices.acknowledgement(stay.id(),
+        io.mateu.ecdemo1.frontoffice.domain.stay.NoticeAcknowledgements.Moment.CHECK_OUT).orElse(null);
+    var content = new ArrayList<Component>();
+    var rechazado = warnings.kardex().stream().anyMatch(GuestNotices.KardexWarning::rejected);
+    var notice = Notice.builder()
+        .theme(leido ? "success" : rechazado ? "danger" : "warning")
+        .text(leido
+            ? "Avisos de salida leídos" + (ack == null ? "" : " — " + ack.by())
+            : "Antes del check-out: " + (warnings.kardex().isEmpty() ? "" : "datos del kárdex que Salesforce "
+                + (rechazado ? "ha rechazado o " : "") + "no ha aprobado — la factura saldrá con el dato anterior. ")
+                + (warnings.notices().isEmpty() ? "" : "Avisos de salida del cliente.")
+            )
+        .fullWidth(true);
+    if (!leido) {
+      notice.actionLabel("Entendido").actionId("entendidoCheckout");
+    }
+    content.add(notice.build());
+    var items = new ArrayList<StatusItem>(io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.kardexItems(warnings.kardex()));
+    items.addAll(io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.items(warnings.notices()));
+    content.add(StatusList.builder().items(items).compact(true).style("width: 100%;").build());
+    return VerticalLayout.builder().style("width: 100%; gap: .5rem;").content(content).build();
+  }
+
   Component checkoutFolioPanel() {
     if (!r.modoCheckout) {
       return new VerticalLayout();

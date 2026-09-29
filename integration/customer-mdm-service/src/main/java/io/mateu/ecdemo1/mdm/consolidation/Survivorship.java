@@ -39,6 +39,7 @@ public class Survivorship {
     final SourceRepository sources;
     final ConsolidationRepository consolidations;
     final io.mateu.ecdemo1.mdm.outbox.CustomerEvents events;
+    final io.mateu.ecdemo1.mdm.notice.CustomerNotices notices;
     final Clock clock;
 
     @Transactional
@@ -104,6 +105,8 @@ public class Survivorship {
         c.detail = survivor.survivorship;
         consolidations.save(c);
         events.merged(survivor, absorbedId);
+        // The absorbed customer's reception notices are the survivor's: the hotels learn it too.
+        notices.reassigned(absorbedId, survivorId);
         log.info("{} merged into {} (via {}): {}; {} reservation(s) to carry the new code",
                 absorbedId, survivorId, via, notes, reservations.size());
     }

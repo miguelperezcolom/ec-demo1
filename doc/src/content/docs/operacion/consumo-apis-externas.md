@@ -16,7 +16,7 @@ cuenta donde se hace.
 
 - **`customer-mdm-service`** etiqueta cada llamada a Salesforce con su propósito (`projection`,
   `change-case`, `decisions`, `reason`, `refresh`, `poll`, `merge`, `consolidation-read/write`,
-  `limits`, `token`) en cubos por hora guardados en `salesforce_api_calls`, y como
+  `notice-write`, `notice-poll`, `limits`, `token`) en cubos por hora guardados en `salesforce_api_calls`, y como
   `salesforce_api_calls_total{purpose,outcome}`. El total de la org lo toma de la cabecera
   `Sforce-Limit-Info` de cada respuesta (`salesforce_org_api_used` / `_max`,
   `salesforce_budget_paused`); si nadie lo ha dicho en 15 min, pregunta a `/limits` (una llamada). Avisa
