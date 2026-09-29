@@ -91,6 +91,9 @@ ohip:
   known-properties: ${OPERA_PROPERTIES:}
   # Opera's «Custom Reference» on every reservation written: a filter in Opera's reservation search.
   custom-reference: ${OPERA_CUSTOM_REFERENCE:EC-DEMO1}
+  # The cashier the check-outs and the folios are made with (XMAR: 69721441). OPERA uses the user's own
+  # when none is sent, and the integration's user has none (FOF00094). Empty: none sent.
+  cashier-id: ${OPERA_CASHIER_ID:}
 
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}

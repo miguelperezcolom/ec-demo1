@@ -15,7 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * definitions/tasks). Each is idempotent: the engine delivers at least once, and a retry after a lost
  * reply runs the step again.
  *
- * <p>Both write back to a system this adapter fronts, and neither needs its answer: each is a command
+ * <p>The annotations write back to a system this adapter fronts, and neither needs its answer: each is a command
  * to that system, written to the outbox before the step answers the engine — the step is done once
  * the command is surely on its way. Its id is the task execution's, so a step run twice asks once.
  */
@@ -32,8 +32,31 @@ public class TaskHandlers {
     public record PartnerProfile(String partnerCode, String pmsProfileIds, String pmsProfileType) {
     }
 
+    /** {@code report-no-show@1}'s input: the reservation in the CRS, and the front office's stay. */
+    public record NoShowToReport(String hotelCode, String locator, String stayId) {
+    }
+
+    /** {@code report-no-show@1}'s output. */
+    public record NoShowReported(String reportOutcome) {
+    }
+
     final Outbox outbox;
     final PlatformTransactionManager transactions;
+    final io.mateu.ecdemo1.crsintegration.noshow.NoShowReports noShows;
+
+    /**
+     * The no-show the PMS recorded (registrar-no-show-pms), up to the CRS — the master of the sale:
+     * «registrar-no-show» starts, and the CRS cancels the booking as a no-show with its fee. Once per
+     * booking; one the CRS does not have, or has cancelled already, is logged and goes no further.
+     */
+    public NoShowReported reportNoShow(NoShowToReport input, TaskContext task) {
+        var hotel = required(task, ProcessVariables.HOTEL_CODE, input.hotelCode());
+        var locator = required(task, ProcessVariables.LOCATOR, input.locator());
+        var answer = noShows.report(hotel, locator, "front office " + hotel
+                + (input.stayId() == null ? "" : " (stay " + input.stayId() + ")") + ", recorded in the PMS");
+        log.info("{}/{}: the PMS's no-show reported to the CRS: {}", hotel, locator, answer);
+        return new NoShowReported(answer.name());
+    }
 
     /** Writes the PMS's reservation id back to the CRS. Writing it twice writes the same thing. */
     public Void annotatePmsReference(PmsReference input, TaskContext task) {

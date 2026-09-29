@@ -1,0 +1,110 @@
+package io.mateu.ecdemo1.integrations.frontoffice;
+
+import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent;
+import io.mateu.ecdemo1.integration.model.process.Definitions;
+import io.mateu.ecdemo1.integration.model.process.ProcessVariables;
+import io.mateu.ecdemo1.integrations.lifecycle.Writes;
+import io.mateu.ecdemo1.integrations.outbox.Outbox;
+import io.mateu.ecdemo1.integrations.store.FoIntegrationStatus;
+import io.mateu.ecdemo1.integrations.store.FrontOfficeIntegrationRepository;
+import io.mateu.workflow.dtos.Variable;
+import io.mateu.workflow.dtos.events.integration.ProcessCreationRequested;
+import io.mateu.workflow.security.AuthorizationContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * The reception, up to the PMS — the master of the stay (pms-fo). The front office says what its desk
+ * did ({@code front-office-events}); if the property feeds that front office and its integration is
+ * active, the process that records it in the PMS starts: «registrar-checkin», «registrar-checkout»,
+ * «registrar-no-show-pms» (which goes on to the CRS, the master of the sale, for its fee).
+ *
+ * <p>One process per reservation and operation: its business key names them, and the engine ignores a
+ * key it already has — the dedup, so an event taken twice records once. The key ends in the stay's
+ * reservation as the booking's journey finds it: {@code <definition>:<hotel>/<locator>} — the CRS's
+ * hotel and locator, or, for a reservation born in the PMS, the property and the PMS's id.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class ReceptionEvents {
+
+    final FrontOfficeIntegrationRepository integrations;
+    final Outbox outbox;
+    final Writes writes;
+
+    /** The process key started for it, or null when there is none to start. */
+    public String on(FrontOfficeEvent event) {
+        var pmsHotel = event.pmsHotelCode();
+        if (pmsHotel == null) {
+            log.warn("{} of stay {}/{} names no PMS property: nothing to record", event.getClass().getSimpleName(),
+                    event.hotelCode(), event.stayId());
+            return null;
+        }
+        var active = integrations.findFirstByPmsHotelCodeAndStatusNot(pmsHotel, FoIntegrationStatus.DECOMMISSIONED)
+                .filter(i -> i.is(FoIntegrationStatus.ACTIVE));
+        if (active.isEmpty()) {
+            log.info("{} of stay {}/{}: no active front office integration for {}; the PMS is not told",
+                    event.getClass().getSimpleName(), event.hotelCode(), event.stayId(), pmsHotel);
+            return null;
+        }
+        var crsLocator = event.crsLocator();
+        var pmsReservationId = event.pmsReservationId();
+        if (blank(crsLocator) && blank(pmsReservationId)) {
+            // A walk-in the CRS has not booked yet: the front office tells it again once the booking is
+            // back from the PMS (and so linked to its reservation).
+            log.info("{} of stay {}/{}: neither in the CRS nor in the PMS yet; nothing to record", event.getClass().getSimpleName(),
+                    event.hotelCode(), event.stayId());
+            return null;
+        }
+        var hotelCode = blank(crsLocator) ? pmsHotel : event.hotelCode();
+        var locator = blank(crsLocator) ? pmsReservationId : crsLocator;
+        var definition = switch (event) {
+            case FrontOfficeEvent.GuestCheckedIn ignored -> Definitions.REGISTER_CHECK_IN;
+            case FrontOfficeEvent.GuestCheckedOut ignored -> Definitions.REGISTER_CHECK_OUT;
+            case FrontOfficeEvent.NoShowReported ignored -> Definitions.REGISTER_NO_SHOW_PMS;
+        };
+        var key = definition + ":" + hotelCode + "/" + locator;
+        var variables = new ArrayList<Variable>(List.of(
+                new Variable(ProcessVariables.PROCESS_KEY, key),
+                new Variable(ProcessVariables.DEFINITION_ID, definition),
+                new Variable(ProcessVariables.HOTEL_CODE, hotelCode),
+                new Variable(ProcessVariables.LOCATOR, locator),
+                new Variable(ProcessVariables.PMS_HOTEL_CODE, pmsHotel),
+                new Variable(ProcessVariables.STAY_ID, event.stayId()),
+                new Variable(ProcessVariables.EVENT_ID, event.eventId()),
+                new Variable(ProcessVariables.ORIGIN, "front-office:" + event.hotelCode()),
+                new Variable(ProcessVariables.INTEGRATION_ID, active.get().id)));
+        if (!blank(pmsReservationId)) {
+            variables.add(new Variable(ProcessVariables.PMS_RESERVATION_ID, pmsReservationId));
+        }
+        if (event instanceof FrontOfficeEvent.GuestCheckedIn in && !blank(in.roomNumber())) {
+            variables.add(new Variable(ProcessVariables.ROOM_NUMBER, in.roomNumber()));
+        }
+        // What the booking's journey (journey-service) finds this trace by, on the span that starts it.
+        var span = io.opentelemetry.api.trace.Span.current();
+        span.setAttribute("booking.locator", locator);
+        span.setAttribute("hotel.code", hotelCode);
+        span.setAttribute("booking.event", switch (event) {
+            case FrontOfficeEvent.GuestCheckedIn ignored -> "check-in";
+            case FrontOfficeEvent.GuestCheckedOut ignored -> "check-out";
+            case FrontOfficeEvent.NoShowReported ignored -> "no-show";
+        });
+        span.setAttribute("eventconductor.business-key", key);
+        writes.write(() -> {
+            outbox.appendToEngine(new ProcessCreationRequested(definition, key, variables, null, AuthorizationContext.SYSTEM));
+            return key;
+        });
+        log.info("{} of stay {}/{}: «{}» started ({})", event.getClass().getSimpleName(), event.hotelCode(), event.stayId(),
+                definition, key);
+        return key;
+    }
+
+    static boolean blank(String value) {
+        return value == null || value.isBlank();
+    }
+}

@@ -89,12 +89,18 @@ public class OperaReservations {
             }
         }
         // The shape a real tenant takes: the posting inside criteria (checked against OHIP UAT).
-        ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/depositPayments", Map.of("criteria", Map.of(
+        var criteria = new java.util.LinkedHashMap<String, Object>(Map.of(
                 "hotelId", hotelId,
                 "paymentMethod", Map.of("paymentMethod", methodCode),
                 "postingAmount", Map.of("amount", payment.amount(), "currencyCode", currency),
                 "postingReference", payment.paymentId(),
-                "comments", "Collected by the central office: " + payment.type())), hotelId, reservationId);
+                "comments", "Collected by the central office: " + payment.type()));
+        // Posting needs a cashier; the integration user has none of its own (FOF00094).
+        if (properties.cashierId() != null) {
+            criteria.put("cashierId", properties.cashierId());
+        }
+        ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/depositPayments", Map.of("criteria", criteria),
+                hotelId, reservationId);
         return true;
     }
 

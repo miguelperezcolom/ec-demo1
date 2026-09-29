@@ -18,6 +18,7 @@ public class CrsTasks {
 
     public static final String ANNOTATE_PMS_REFERENCE = "annotate-pms-reference";
     public static final String ANNOTATE_PARTNER_PROFILE = "annotate-partner-profile";
+    public static final String REPORT_NO_SHOW = "report-no-show";
 
     @Bean
     public TaskRegistration<TaskHandlers.PmsReference, Void> annotatePmsReferenceTask(TaskHandlers handlers) {
@@ -29,5 +30,11 @@ public class CrsTasks {
     public TaskRegistration<TaskHandlers.PartnerProfile, Void> annotatePartnerProfileTask(TaskHandlers handlers) {
         return new TaskRegistration<>(ANNOTATE_PARTNER_PROFILE, 1, TOPIC, TaskHandlers.PartnerProfile.class,
                 Void.class, Reasons.asBefore(handlers::annotatePartnerProfile));
+    }
+
+    @Bean
+    public TaskRegistration<TaskHandlers.NoShowToReport, TaskHandlers.NoShowReported> reportNoShowTask(TaskHandlers handlers) {
+        return new TaskRegistration<>(REPORT_NO_SHOW, 1, TOPIC, TaskHandlers.NoShowToReport.class,
+                TaskHandlers.NoShowReported.class, Reasons.asBefore(handlers::reportNoShow));
     }
 }

@@ -21,7 +21,8 @@ import java.util.UUID;
  * locator is the one in the integration's context, the rest go along for the front office to
  * recognise a stay by —, the first room rate's room type, rate plan and source, the stay's dates,
  * guests and total, the packages (the board: the first one; none is room only), the primary guest
- * and any other guest on it, the travel agent or company, and how it was cancelled: a cancellation
+ * and any other guest on it, the travel agent or company, whether the guests are in the house or
+ * checked out, and how it was cancelled: a cancellation
  * whose code is a no-show code, or whose description says «No show», is a no-show.
  */
 public final class StayMapper {
@@ -65,6 +66,13 @@ public final class StayMapper {
         var status = r.path("reservationStatus").asText("");
         if ("NoShow".equalsIgnoreCase(status)) {
             return PmsStatus.NO_SHOW;
+        }
+        // The reception's, recorded in Opera (registrar-checkin, -checkout) — or done in Opera itself.
+        if ("InHouse".equalsIgnoreCase(status) || "DueOut".equalsIgnoreCase(status)) {
+            return PmsStatus.IN_HOUSE;
+        }
+        if ("CheckedOut".equalsIgnoreCase(status)) {
+            return PmsStatus.CHECKED_OUT;
         }
         if (!"Cancelled".equalsIgnoreCase(status)) {
             return PmsStatus.RESERVED;

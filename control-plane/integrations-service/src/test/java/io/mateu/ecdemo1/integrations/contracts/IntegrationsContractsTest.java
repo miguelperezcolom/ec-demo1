@@ -113,9 +113,28 @@ class IntegrationsContractsTest {
     }
 
     @Test
+    void everyExampleOfFrontOfficeEventsIsTakenByTheConsumer() {
+        var reception = mock(io.mateu.ecdemo1.integrations.frontoffice.ReceptionEvents.class);
+        var consumer = new StreamFunctions(null, new TolerantReader(boot), reception).consumeFrontOfficeEvents();
+
+        var examples = Contracts.topic("front-office-events").examples();
+        examples.forEach(json -> consumer.accept(MessageBuilder.withPayload(json.getBytes()).build()));
+
+        var read = ArgumentCaptor.forClass(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.class);
+        verify(reception, times(examples.size())).on(read.capture());
+        assertThat(read.getAllValues()).hasSize(3).allSatisfy(e -> {
+            assertThat(e.eventId()).isNotBlank();
+            assertThat(e.stayId()).isNotBlank();
+            assertThat(e.pmsHotelCode()).isNotBlank();
+        });
+        assertThat(read.getAllValues()).extracting(e -> e.getClass().getSimpleName())
+                .containsExactly("GuestCheckedIn", "GuestCheckedOut", "NoShowReported");
+    }
+
+    @Test
     void everyExampleOfPmsReservationsIsTakenByTheConsumer() {
         var events = mock(PmsReservationEvents.class);
-        var consumer = new StreamFunctions(events, new TolerantReader(boot)).consumePmsReservations();
+        var consumer = new StreamFunctions(events, new TolerantReader(boot), null).consumePmsReservations();
 
         var examples = Contracts.topic("pms-reservations").examples();
         examples.forEach(json -> consumer.accept(MessageBuilder.withPayload(json.getBytes()).build()));

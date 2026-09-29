@@ -156,6 +156,8 @@ class FrontOfficeIntegrationsTest {
     @Autowired
     PmsReservationEvents events;
     @Autowired
+    ReceptionEvents reception;
+    @Autowired
     io.mateu.ecdemo1.integrations.config.StreamFunctions functions;
     @Autowired
     FrontOfficeIntegrationRepository integrations;
@@ -364,6 +366,36 @@ class FrontOfficeIntegrationsTest {
         lifecycle.stepActivate(id);
         assertThat(integration(id).getStatus()).isEqualTo(FoIntegrationStatus.ACTIVE);
         return id;
+    }
+
+    @Test
+    void theReceptionGoesUpToThePmsThroughTheEngine() {
+        var at = Instant.parse("2026-09-29T10:00:00Z");
+        var checkIn = new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.GuestCheckedIn("E-1", at, "MRU01",
+                "GSX4AK", "GSX4AK", "XMAR", "39486034", "205", 2, "ana");
+        // No active integration for the property: the PMS is not told (the desk's state stays in the front office).
+        assertThat(reception.on(checkIn)).isNull();
+
+        var id = activeIntegration();
+        assertThat(reception.on(checkIn)).isEqualTo("registrar-checkin:MRU01/GSX4AK");
+        var started = outbox("outboxUpstream").stream().filter(p -> p.contains("registrar-checkin:MRU01/GSX4AK")).toList();
+        assertThat(started).singleElement().satisfies(p -> assertThat(p)
+                .contains("\"workflowDefinitionId\":\"registrar-checkin\"")
+                .contains("{\"name\":\"pmsReservationId\",\"value\":\"39486034\"}")
+                .contains("{\"name\":\"roomNumber\",\"value\":\"205\"}")
+                .contains("{\"name\":\"stayId\",\"value\":\"GSX4AK\"}")
+                .contains("{\"name\":\"integrationId\",\"value\":\"" + id + "\"}"));
+        // The same key twice: the engine starts it once.
+        assertThat(reception.on(checkIn)).isEqualTo("registrar-checkin:MRU01/GSX4AK");
+
+        // Born in Opera: keyed by the property and Opera's id.
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.GuestCheckedOut("E-2", at,
+                "MRU01", "OP-268338062", null, "XMAR", "39486099", "207", "ana"))).isEqualTo("registrar-checkout:XMAR/39486099");
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.NoShowReported("E-3", at,
+                "MRU01", "KMNQ28", "KMNQ28", "XMAR", null, 2, "ana"))).isEqualTo("registrar-no-show-pms:MRU01/KMNQ28");
+        // A walk-in neither the CRS nor Opera has yet: nothing to record now.
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.GuestCheckedIn("E-4", at,
+                "MRU01", "FO-6XDAWR", null, "XMAR", null, "205", 1, "ana"))).isNull();
     }
 
     void assertGateSignalled(String id, String gate) {

@@ -1,0 +1,177 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:front-office-events:v1",
+  "title" : "front-office-events v1",
+  "description" : "What happened at a hotel's reception — a guest checked in, checked out, nobody came. The PMS is the master of the stay: the pms-fo integration records each in it through the engine, and a no-show goes on to the CRS for its fee.",
+  "x-topic" : "front-office-events",
+  "x-version" : 1,
+  "x-owner" : "front-office",
+  "x-key" : "hotelCode/stayId",
+  "x-producers" : [ "front-office" ],
+  "x-consumers" : [ "integrations-service" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent",
+  "x-discriminator" : "type",
+  "oneOf" : [ {
+    "$ref" : "#/$defs/FrontOfficeEvent.GuestCheckedIn"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeEvent.GuestCheckedOut"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeEvent.NoShowReported"
+  } ],
+  "$defs" : {
+    "FrontOfficeEvent.GuestCheckedIn" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "guest-checked-in"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "roomNumber" : {
+          "type" : [ "string", "null" ]
+        },
+        "pax" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "roomNumber", "pax", "by" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeEvent.GuestCheckedOut" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "guest-checked-out"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "roomNumber" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "roomNumber", "by" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeEvent.NoShowReported" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "no-show-reported"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "pax" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "pax", "by" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "type" : "guest-checked-in",
+    "eventId" : "E-4",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "roomNumber" : "205",
+    "pax" : 2,
+    "by" : "ana"
+  }, {
+    "type" : "guest-checked-out",
+    "eventId" : "E-5",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "roomNumber" : "205",
+    "by" : "ana"
+  }, {
+    "type" : "no-show-reported",
+    "eventId" : "E-6",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "pax" : 2,
+    "by" : "ana"
+  } ]
+}

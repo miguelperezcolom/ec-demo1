@@ -108,6 +108,30 @@ public class OhipClient {
     }
 
     /**
+     * A document Opera links to — a stored folio's report, say: the bytes, read with the same headers
+     * as any call. {@code url} is a path of the gateway or a full URL (Opera answers with either).
+     */
+    public byte[] document(String hotelId, String url) {
+        var connection = connection(hotelId);
+        var rest = rest(connection);
+        var target = url.startsWith("http") ? java.net.URI.create(url)
+                : java.net.URI.create(connection.gatewayUrl().replaceAll("/+$", "") + (url.startsWith("/") ? url : "/" + url));
+        try {
+            return rest.get().uri(target)
+                    .header("x-app-key", connection.appKey())
+                    .header("x-hotelid", hotelId)
+                    .header("x-request-id", UUID.randomUUID().toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(rest, connection))
+                    .accept(MediaType.APPLICATION_PDF, MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL)
+                    .retrieve().body(byte[].class);
+        } catch (RestClientResponseException e) {
+            throw classify(HttpMethod.GET, url, e);
+        } catch (ResourceAccessException e) {
+            throw new PmsTransientException("OHIP unreachable on GET %s: %s".formatted(url, e.getMessage()), e);
+        }
+    }
+
+    /**
      * Tries a connection before anyone relies on it (HLA F010, «Registrar y verificar
      * conectividad»): a token of its own — never one already held — and a read on the property,
      * which is what shows the client may see that hotel.

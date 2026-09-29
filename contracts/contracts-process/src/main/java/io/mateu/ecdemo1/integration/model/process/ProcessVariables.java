@@ -34,6 +34,14 @@ public final class ProcessVariables {
     public static final String PMS_HOTEL_CODE = "pmsHotelCode";
     public static final String PMS_PROFILE_IDS = "pmsProfileIds";
     public static final String CAUSES = "causes";
+    /** The front office's stay a reception process is about (registrar-checkin, -checkout, -no-show-pms). */
+    public static final String STAY_ID = "stayId";
+    /** The room the desk gave the guests at the check-in; absent when it chose none. */
+    public static final String ROOM_NUMBER = "roomNumber";
+    public static final String ROOM_OUTCOME = "roomOutcome";
+    public static final String CHECK_IN_OUTCOME = "checkInOutcome";
+    public static final String CHECK_OUT_OUTCOME = "checkOutOutcome";
+    public static final String NO_SHOW_OUTCOME = "noShowOutcome";
 
     private ProcessVariables() {
     }

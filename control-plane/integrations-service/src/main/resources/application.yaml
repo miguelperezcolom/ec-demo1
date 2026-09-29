@@ -17,7 +17,7 @@ spring:
 
   cloud:
     function:
-      definition: consumeWorkerEvent;consumePmsReservations
+      definition: consumeWorkerEvent;consumePmsReservations;consumeFrontOfficeEvents
     stream:
       kafka:
         binder:
@@ -114,6 +114,11 @@ spring:
         consumePmsReservations-in-0:
           destination: pms-reservations
           group: ec-demo1-integrations-pms-reservations
+        # IN: what a front office's desk did — check-in, check-out, no-show; the PMS records it
+        # (pms-fo: «registrar-checkin», «registrar-checkout», «registrar-no-show-pms»).
+        consumeFrontOfficeEvents-in-0:
+          destination: front-office-events
+          group: ec-demo1-integrations-front-office-events
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/integrations}
