@@ -428,9 +428,23 @@ Anular una línea (*Gestionar folio → Anular*) la deja anulada en el folio y s
 **`anular-cargo`** → el mismo importe en negativo en Opera. El alojamiento no sube: Opera cobra sus
 noches. En *Gestionar folio*, cada cargo dice dónde está en Opera («Opera: en el folio · 88731245»). Así
 el saldo que Opera cobra en el check-out incluye los cargos de recepción, y el total de su factura es el
-del folio del front office; si aún difieren, la proforma lo dice y por qué (el alojamiento, que Opera
-factura con su tarifa y, en una salida anticipada, solo las noches pasadas; un cargo rechazado o que llegó
-tarde).
+del folio del front office (cuyo alojamiento es el total de Opera con el desayuno BRKFST, que Opera postea
+aparte de la tarifa); si aún difieren, la proforma lo dice y por qué (el alojamiento, que Opera factura
+con su tarifa y, en una salida anticipada, solo las noches pasadas; un cargo rechazado o que llegó tarde).
+
+Probado en ec1 el 2026-09-30, desde la pantalla (Redwood, usuario demo):
+- **W3CMU6** (Opera 39486183): habitación 5226 (inspeccionada: «✓ Habitación 5226 lista») y el extra
+  *Transfer aeropuerto* en el check-in; late check-out y lavandería en recepción → en el folio de Opera
+  547653336 (1851, 45), 547653339 (1200, 50), 547653342 (1516, 18); check-out → factura **XMAR388, 459
+  MUR** = folio del front office 459,00 (346 alojamiento con el desayuno + 113); la proforma «Los totales
+  coinciden».
+- **V75Y5M** (Opera 39486180): minibar 547653311 (1402, 12,50) anulado en *Gestionar folio* → reversión
+  **547653314** (1402, −12,50), la línea «Anulado · 547653314»; el late check-out 547653683 (1200, 50).
+  Su factura XMAR386 (396 MUR) no coincide con el folio (401): la estancia se proyectó antes de sumar el
+  desayuno al alojamiento, y su extra del check-in se quedó sin postear por la carrera del candado que
+  arregla EventConductor 2.23.4 — la proforma dice los dos totales y por qué.
+- **97R5DW** (Opera 39485830): el check-in y el cargo de su extra arrancan a la vez y el candado los
+  ordena (2.23.4): transfer 547653686, late check-out 547653324, room service 547653327 (1403, 25).
 
 **Habitación lista.** El paso de habitación ofrece primero las habitaciones **listas** en Opera —libres e
 inspeccionadas, lo que XMAR exige—; las libres que aún no lo están salen en gris con el motivo («No lista
