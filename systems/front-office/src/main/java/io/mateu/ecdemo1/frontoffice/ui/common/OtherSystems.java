@@ -20,21 +20,7 @@ public final class OtherSystems {
   private OtherSystems() {}
 
   public static Component of(String stayId) {
-    var links = new java.util.ArrayList<CrossLinks.Link>();
-    // The PMS is the master of the stay: which Opera reservation it is, and where the desk's check-in,
-    // check-out or no-show stands there.
-    var pms = FrontOffice.pmsReservation(stayId);
-    var state = FrontOffice.pmsState(stayId);
-    if (pms.isPresent() || state.isPresent()) {
-      links.add(new CrossLinks.Link("Opera", pms.map(id -> "Reserva " + id).orElse("Reserva sin enlazar")
-          + state.map(s -> " — " + s).orElse(""), null));
-    }
-    // A closed stay's invoice: the PMS's, or the front office's proforma — in a tab of its own.
-    var stay = FrontOffice.stayView(stayId).stay();
-    if (stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED) {
-      links.add(new CrossLinks.Link("Factura", FrontOffice.invoice(stayId).label(), FrontOffice.invoiceLink(stayId)));
-    }
-    links.addAll(CrossLinks.of(stayId));
+    var links = links(stayId);
     if (links.isEmpty()) {
       return Text.builder().text("Esta estancia no viene de la central de reservas.").noMargins(true).build();
     }
@@ -52,6 +38,45 @@ public final class OtherSystems {
     }
     html.append("</tbody></table>");
     return Element.html("div", Map.of("style", "width: 100%;"), html.toString());
+  }
+
+  /**
+   * The same, as a list the arrival's foldout draws in a panel: the Redwood renderer mounts an
+   * {@link Element} only in the page's content, not inside a foldout panel, so there it would stay
+   * empty. What and where, as text — the links open from the stay and the departure, where the
+   * table is a page section.
+   */
+  public static Component asList(String stayId) {
+    var links = links(stayId);
+    if (links.isEmpty()) {
+      return Text.builder().text("Esta estancia no viene de la central de reservas.").noMargins(true).build();
+    }
+    return io.mateu.uidl.data.StatusList.builder().compact(true).frameless(true).style("width: 100%;")
+        .items(links.stream().map(link -> io.mateu.uidl.data.StatusItem.builder()
+            .id(link.what())
+            .title(link.what())
+            .description(link.label())
+            .build()).toList())
+        .build();
+  }
+
+  static java.util.List<CrossLinks.Link> links(String stayId) {
+    var links = new java.util.ArrayList<CrossLinks.Link>();
+    // The PMS is the master of the stay: which Opera reservation it is, and where the desk's check-in,
+    // check-out or no-show stands there.
+    var pms = FrontOffice.pmsReservation(stayId);
+    var state = FrontOffice.pmsState(stayId);
+    if (pms.isPresent() || state.isPresent()) {
+      links.add(new CrossLinks.Link("Opera", pms.map(id -> "Reserva " + id).orElse("Reserva sin enlazar")
+          + state.map(s -> " — " + s).orElse(""), null));
+    }
+    // A closed stay's invoice: the PMS's, or the front office's proforma — in a tab of its own.
+    var stay = FrontOffice.stayView(stayId).stay();
+    if (stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED) {
+      links.add(new CrossLinks.Link("Factura", FrontOffice.invoice(stayId).label(), FrontOffice.invoiceLink(stayId)));
+    }
+    links.addAll(CrossLinks.of(stayId));
+    return links;
   }
 
   public static String escape(String text) {
