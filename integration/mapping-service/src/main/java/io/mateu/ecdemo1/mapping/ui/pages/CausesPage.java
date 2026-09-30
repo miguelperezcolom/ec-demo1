@@ -35,6 +35,7 @@ public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<Caus
 
     final CauseQueries causes;
     final ObjectProvider<CauseViewModel> detail;
+    final DiscardForm discardForm;
 
     /** Filtered by the cause's key, ordered (open first, oldest first) and paged by the database. */
     @Override
@@ -48,6 +49,38 @@ public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<Caus
 
     @Override
     public CauseViewModel view(String key, HttpRequest httpRequest) {
-        return detail.getObject().load(causes.cause(key).orElseThrow(() -> new NoSuchElementException("No cause " + key)));
+        return detail.getObject().load(causes.cause(key).orElseThrow(() -> new NoSuchElementException("No cause " + key)),
+                !redwood(httpRequest));
+    }
+
+    /**
+     * «Descartar» on a waiting process's row, in a cause's page. A row action is dispatched to the
+     * listing the page was opened from — this one — with the cause's state and the clicked row: it
+     * opens the cause's discard dialog with that process picked.
+     */
+    public Object discardWaiter(HttpRequest httpRequest) {
+        var request = httpRequest.runActionRq();
+        var state = request.componentState();
+        var causeKey = state == null || state.get("key") == null ? null : String.valueOf(state.get("key"));
+        if (causeKey == null) {
+            return io.mateu.uidl.data.Message.error("Open the cause to discard its processes");
+        }
+        return discardForm.dialogFor(causeKey, CauseViewModel.clickedProcess(httpRequest),
+                request.route() == null || request.route().isBlank() ? "/mapping/causes/" + causeKey : request.route());
+    }
+
+    /**
+     * Whether the page is drawn by the Redwood console: its renderer draws a row action inside a
+     * form's grid as «[object Object]», so there the rows carry none and discarding is from the
+     * toolbar's «Descartar…», which picks the process in the dialog.
+     */
+    static boolean redwood(HttpRequest httpRequest) {
+        for (var header : new String[] {"Origin", "Referer", "X-Forwarded-Host", "Host"}) {
+            var value = httpRequest.getHeaderValue(header);
+            if (value != null && (value.contains("://rw-") || value.contains("://rw.") || value.startsWith("rw-") || value.startsWith("rw."))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
