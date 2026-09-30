@@ -48,7 +48,14 @@ final class LlegadaPanel {
   /** One row of the check-in operations checklist. */
   record Op(
       String id, String icon, String title, String pendiente, String hecha,
-      boolean done, String actionLabel, String actionId, String actionIcon) {}
+      boolean done, String actionLabel, String actionId, String actionIcon,
+      String actionLabel2, String actionId2, String actionIcon2) {
+
+    Op(String id, String icon, String title, String pendiente, String hecha,
+       boolean done, String actionLabel, String actionId, String actionIcon) {
+      this(id, icon, title, pendiente, hecha, done, actionLabel, actionId, actionIcon, null, null, null);
+    }
+  }
 
   /** "N de M" — operaciones de check-in completadas, para el header del panel. */
   String opsResumen(Stay stay) {
@@ -77,7 +84,9 @@ final class LlegadaPanel {
             habitacionLista ? "Habitación " + stay.roomNumber() : "Habitación",
             "Sin habitación asignada — elegir una para la estancia",
             stay.roomType() + " asignada · " + listaEnOpera(stay),
-            habitacionLista, "Cambiar", "opHabitacion", "vaadin:exchange"),
+            habitacionLista, "Cambiar", "opHabitacion", "vaadin:exchange",
+            // preguntar otra vez a Opera si está lista: en la tarjeta, que es donde se dice
+            habitacionLista ? "Comprobar" : null, habitacionLista ? "comprobarHabitacion" : null, "vaadin:refresh"),
         new Op("wifi", "📶", "Tarjeta wifi",
             "Crear las credenciales de acceso del huésped",
             "Credenciales creadas y entregadas",
@@ -114,34 +123,35 @@ final class LlegadaPanel {
   }
 
   /**
-   * «Habitación lista»: lo que Opera dice ahora de la habitación asignada a una llegada — lista (libre e
-   * inspeccionada, lo que XMAR exige para asignarla) o aún no, y por qué —, con «Comprobar» para
-   * preguntarlo otra vez. Vacío sin habitación asignada.
+   * El aviso de una habitación asignada que Opera no da por lista (libre e inspeccionada, lo que XMAR
+   * exige para asignarla), o de la que aún no ha dicho nada — con «Comprobar» dentro para preguntarlo
+   * otra vez. Lista, no es un aviso: la tarjeta de la habitación ya lo dice, y lleva su «Comprobar».
+   * Vacío también sin habitación asignada.
    */
   Component habitacionLista(Stay stay) {
     if (!stay.hasRoom()) {
       return new VerticalLayout();
     }
     var readiness = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.roomReadiness(stay.roomNumber());
+    if (readiness.known() && readiness.ready()) {
+      return new VerticalLayout();
+    }
     var texto = !readiness.known()
         ? "Habitación " + stay.roomNumber() + ": Opera no ha dicho aún si está lista — " + readiness.reason()
-        : readiness.ready()
-            ? "✓ Habitación " + stay.roomNumber() + " lista — " + readiness.state() + " en Opera"
-            : "Habitación " + stay.roomNumber() + " aún no lista — " + readiness.reason()
+        : "Habitación " + stay.roomNumber() + " aún no lista — " + readiness.reason()
                 + (readiness.state() == null ? "" : " (" + readiness.state() + ")")
                 + ". Opera puede rechazar el check-in hasta que lo esté; o cambia de habitación.";
-    return HorizontalLayout.builder()
-        .spacing(true).wrap(true)
-        .style("width: 100%; align-items: center;")
-        .content(List.of(
-            io.mateu.uidl.data.Notice.builder()
-                .theme(readiness.ready() ? "success" : readiness.known() ? "warning" : "info")
-                .text(texto)
-                .slim(true)
-                .style("flex: 1 1 20rem;")
-                .build(),
-            // un botón propio: la acción de un Notice no la pinta cualquier renderer
-            Button.builder().label("Comprobar").actionId("comprobarHabitacion").build()))
+    // «Comprobar» va dentro del aviso, como su contenido en la misma línea: Redwood pinta los botones
+    // del contenido de un Notice dentro de él, y el web los pone junto al texto (inlineContent). La
+    // acción propia del Notice (actionLabel) no la pinta Redwood; un botón suelto al lado se salía del
+    // aviso y pisaba la primera fila de tarjetas.
+    return io.mateu.uidl.data.Notice.builder()
+        .theme(readiness.known() ? "warning" : "info")
+        .text(texto)
+        .slim(true)
+        .inlineContent(true)
+        .content(List.of(Button.builder().label("Comprobar").actionId("comprobarHabitacion").build()))
+        .style("width: 100%;")
         .build();
   }
 
@@ -187,6 +197,9 @@ final class LlegadaPanel {
                       .actionLabel(conAccion ? op.actionLabel() : null)
                       .actionId(conAccion ? op.actionId() : null)
                       .actionIcon(conAccion ? op.actionIcon() : null)
+                      .actionLabel2(op.actionLabel2())
+                      .actionId2(op.actionId2())
+                      .actionIcon2(op.actionLabel2() != null ? op.actionIcon2() : null)
                       .build();
                 })
                 .toList())
