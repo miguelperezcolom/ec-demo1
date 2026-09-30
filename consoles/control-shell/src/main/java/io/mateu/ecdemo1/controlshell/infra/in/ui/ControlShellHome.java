@@ -137,6 +137,14 @@ public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu customers = new RemoteMenu("/_mdm").withLabel("Customers");
 
+    /**
+     * Which of a guest's data each destination's law requires at registration — by country or hotel,
+     * nationality, age and role — served by the registration-rules service; every front office applies
+     * them at check-in.
+     */
+    @Menu
+    RemoteMenu registration = new RemoteMenu("/_registration-rules").withLabel("Registro");
+
     /** What the integration told people, and who is told what. */
     @Menu
     RemoteMenu notifications = new RemoteMenu("/_communication").withLabel("Notifications");

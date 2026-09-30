@@ -63,6 +63,12 @@
         </dependency>
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-registration</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>contracts-testing</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

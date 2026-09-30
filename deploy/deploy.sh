@@ -272,6 +272,9 @@ kubectl apply -f deploy/manifests/78-audit.yaml
 kubectl apply -f deploy/manifests/80-journey.yaml
 # The reception notices (data plane): a reservation's and a partner's, and the customers' from Salesforce.
 kubectl apply -f deploy/manifests/83-notices.yaml
+# The registration rules (control plane): which of a guest's data each destination requires; the front
+# office applies them at check-in. Sample rules: deploy/demo/registration-rules-seed.sh.
+kubectl apply -f deploy/manifests/84-registration-rules.yaml
 # The documentation site (doc/), behind basic auth.
 kubectl apply -f deploy/manifests/81-docs.yaml
 # The control console: its database first, then the service, then its shell.

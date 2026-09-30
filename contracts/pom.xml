@@ -20,6 +20,7 @@
         contracts-communication  notifications, notification-resolutions
         contracts-audit          audit
         contracts-notices        notices (reception notices of a customer, a reservation or a partner)
+        contracts-registration   registration-rules (the guest data a destination requires at registration)
         contracts-process        definition ids, gates, variable names, outcomes (ec-definitions)
         contracts-testing        test scope only: JSON Schema generation, validation and examples
         contracts-schemas        the schemas of the topics above, generated from these records
@@ -43,6 +44,7 @@
         <module>contracts-communication</module>
         <module>contracts-audit</module>
         <module>contracts-notices</module>
+        <module>contracts-registration</module>
         <module>contracts-process</module>
         <module>contracts-testing</module>
         <module>contracts-schemas</module>

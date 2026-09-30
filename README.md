@@ -80,6 +80,7 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `control-plane/integrations-service/` | One integration per hotel and its onboarding, gate by gate, to activation |
 | `control-plane/audit-service/` | Who did what (F016) |
 | `control-plane/communication-service/` | Notifications, recipients, the inbox and its badge |
+| `control-plane/registration-rules/` | The kárdex's registration rules: which of a guest's data each destination's law requires (by the hotel's country or the hotel, nationality, age, role), kept by compliance on the control console and audited. They go out on `registration-rules`; every front office keeps its copy and applies them at check-in |
 | `control-plane/users/` | Users, groups, roles and permissions, plus a gRPC endpoint that serves a user's roles and scopes |
 | `control-plane/grpc-interface/` | The generated stubs for `users`' gRPC contract. Not an application; no image |
 | **`consoles/`** | **What people see** |

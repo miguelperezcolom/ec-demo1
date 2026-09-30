@@ -1,0 +1,180 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:registration-rules:v1",
+  "title" : "registration-rules v1",
+  "description" : "Which of a guest's data a destination's law requires when the hotel registers them, by the hotel's country or the hotel, the guest's nationality, age and role — kept in the control plane by compliance; the whole rule each time, the highest version wins.",
+  "x-topic" : "registration-rules",
+  "x-version" : 1,
+  "x-owner" : "registration-rules",
+  "x-key" : "scope:scopeCode",
+  "x-producers" : [ "registration-rules" ],
+  "x-consumers" : [ "front-office" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.registration.RegistrationRuleChanged",
+  "$ref" : "#/$defs/RegistrationRuleChanged",
+  "$defs" : {
+    "RegistrationRuleChanged" : {
+      "type" : "object",
+      "properties" : {
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "ruleId" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "name" : {
+          "type" : [ "string", "null" ]
+        },
+        "scope" : {
+          "$ref" : "#/$defs/RegistrationRuleChanged.Scope-nullable"
+        },
+        "scopeCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "nationalityMatch" : {
+          "$ref" : "#/$defs/RegistrationRuleChanged.NationalityMatch-nullable"
+        },
+        "nationalities" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "minAge" : {
+          "type" : [ "integer", "null" ],
+          "format" : "int32"
+        },
+        "maxAge" : {
+          "type" : [ "integer", "null" ],
+          "format" : "int32"
+        },
+        "role" : {
+          "$ref" : "#/$defs/RegistrationRuleChanged.Role-nullable"
+        },
+        "requiredFields" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/RegistrationRuleChanged.Field"
+          }
+        },
+        "exemptFields" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/RegistrationRuleChanged.Field"
+          }
+        },
+        "moments" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/RegistrationRuleChanged.Moment"
+          }
+        },
+        "legalBasis" : {
+          "type" : [ "string", "null" ]
+        },
+        "from" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "to" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "active" : {
+          "type" : "boolean"
+        }
+      },
+      "required" : [ "eventId", "occurredAt", "ruleId", "version", "name", "scope", "scopeCode", "nationalityMatch", "nationalities", "minAge", "maxAge", "role", "requiredFields", "exemptFields", "moments", "legalBasis", "from", "to", "active" ],
+      "additionalProperties" : false
+    },
+    "RegistrationRuleChanged.Field" : {
+      "type" : "string",
+      "enum" : [ "DOCUMENT_TYPE", "DOCUMENT_NUMBER", "DOCUMENT_ISSUING_COUNTRY", "DOCUMENT_EXPIRY", "BIRTH_DATE", "BIRTH_PLACE", "NATIONALITY", "SEX", "ADDRESS", "CITY", "POSTAL_CODE", "COUNTRY_OF_RESIDENCE", "SIGNATURE", "GUARDIAN" ]
+    },
+    "RegistrationRuleChanged.Moment" : {
+      "type" : "string",
+      "enum" : [ "PRE_ARRIVAL", "CHECK_IN", "ONLINE_CHECK_IN" ]
+    },
+    "RegistrationRuleChanged.NationalityMatch" : {
+      "type" : "string",
+      "enum" : [ "ANY", "IN", "NOT_IN" ]
+    },
+    "RegistrationRuleChanged.NationalityMatch-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/RegistrationRuleChanged.NationalityMatch"
+      } ]
+    },
+    "RegistrationRuleChanged.Role" : {
+      "type" : "string",
+      "enum" : [ "ANY", "HOLDER", "COMPANION" ]
+    },
+    "RegistrationRuleChanged.Role-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/RegistrationRuleChanged.Role"
+      } ]
+    },
+    "RegistrationRuleChanged.Scope" : {
+      "type" : "string",
+      "enum" : [ "COUNTRY", "HOTEL" ]
+    },
+    "RegistrationRuleChanged.Scope-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/RegistrationRuleChanged.Scope"
+      } ]
+    }
+  },
+  "examples" : [ {
+    "eventId" : "E-9",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "ruleId" : "RR-ES-1",
+    "version" : 2,
+    "name" : "España · registro de viajeros",
+    "scope" : "COUNTRY",
+    "scopeCode" : "ES",
+    "nationalityMatch" : "ANY",
+    "nationalities" : [ ],
+    "minAge" : 14,
+    "maxAge" : null,
+    "role" : "ANY",
+    "requiredFields" : [ "DOCUMENT_TYPE", "DOCUMENT_NUMBER", "NATIONALITY", "BIRTH_DATE", "ADDRESS" ],
+    "exemptFields" : [ ],
+    "moments" : [ "CHECK_IN", "ONLINE_CHECK_IN" ],
+    "legalBasis" : "RD 933/2021 · SES.Hospedajes",
+    "from" : "2026-01-01",
+    "to" : null,
+    "active" : true
+  }, {
+    "eventId" : "E-10",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "ruleId" : "RR-MRU01-1",
+    "version" : 1,
+    "name" : "Fuera de la UE: el documento",
+    "scope" : "HOTEL",
+    "scopeCode" : "MRU01",
+    "nationalityMatch" : "NOT_IN",
+    "nationalities" : [ "EU", "MU" ],
+    "minAge" : null,
+    "maxAge" : null,
+    "role" : "HOLDER",
+    "requiredFields" : [ "DOCUMENT_EXPIRY", "DOCUMENT_ISSUING_COUNTRY" ],
+    "exemptFields" : [ "ADDRESS" ],
+    "moments" : [ "CHECK_IN" ],
+    "legalBasis" : "Ejemplo",
+    "from" : null,
+    "to" : null,
+    "active" : false
+  } ]
+}

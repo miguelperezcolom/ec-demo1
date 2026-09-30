@@ -121,6 +121,14 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_notices/**
 
+        # Registro de huéspedes: the registration rules — governance, so on the control hosts only, and
+        # only its screens: its REST API (/rules) and its MCP server stay inside the cluster.
+        - id: registration-rules
+          uri: ${REGISTRATION_RULES_URL:http://registration-rules:8132}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_registration-rules/**
+
         # A booking's journey across the chain, drawn from its traces in Tempo by journey-service:
         # the data plane's screen behind "Ver recorrido". Only the screens — the service reads Tempo
         # from inside the cluster; the browser never talks to Tempo.

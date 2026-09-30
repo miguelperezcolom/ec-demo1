@@ -90,7 +90,10 @@ export default defineConfig({
 				},
 				{
 					label: 'Front office',
-					items: [{ label: 'Un sistema propio', slug: 'front-office/sistema-propio' }],
+					items: [
+						{ label: 'Un sistema propio', slug: 'front-office/sistema-propio' },
+						{ label: 'Reglas de registro del kárdex', slug: 'front-office/reglas-de-registro' },
+					],
 				},
 				{
 					label: 'IA',

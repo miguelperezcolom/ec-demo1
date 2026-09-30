@@ -9,10 +9,19 @@ package io.mateu.ecdemo1.frontoffice.domain.stay;
  */
 public record PendingStep(Kind kind, int pax, String label) {
 
-  public enum Kind { DOCUMENT, SIGNATURE }
+  public enum Kind { DOCUMENT, SIGNATURE, REGISTRATION }
 
   public static PendingStep document(int pax, String name) {
     return new PendingStep(Kind.DOCUMENT, pax, "Documento de " + name + " (pax " + pax + ")");
+  }
+
+  /**
+   * Data the destination's registration rules require of a pax and the kárdex does not have yet
+   * ({@code missing}, in the desk's words), and why ({@code legalBasis}, may be empty).
+   */
+  public static PendingStep registration(int pax, String name, java.util.List<String> missing, String legalBasis) {
+    return new PendingStep(Kind.REGISTRATION, pax, "Datos de registro de " + name + " (pax " + pax + "): "
+        + String.join(", ", missing) + (legalBasis == null || legalBasis.isBlank() ? "" : " — " + legalBasis));
   }
 
   public static PendingStep signature() {

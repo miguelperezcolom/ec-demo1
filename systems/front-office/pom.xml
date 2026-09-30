@@ -114,6 +114,13 @@
             <artifactId>contracts-notices</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <!-- The registration rules (registration-rules), as the control plane publishes them, and how
+             one reads: the same reading as the control plane's «Probar». -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-registration</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>contracts-frontoffice</artifactId>

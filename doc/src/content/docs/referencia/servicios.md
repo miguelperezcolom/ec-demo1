@@ -43,6 +43,7 @@ de `deploy/manifests/` (los de esta tabla son los del momento de escribirla). La
 | `integrations-service` | `control-plane/integrations-service` | 8126 | `/_integrations`, `/_api-usage` | `integrations` |
 | `communication-service` | `control-plane/communication-service` | 8125 | `/_communication`, `/_inbox` | `communication` |
 | `audit-service` | `control-plane/audit-service` | 8129 | `/_audit` | `audit` |
+| `registration-rules` | `control-plane/registration-rules` | 8132 | `/_registration-rules` | `registration_rules` |
 | `users` | `control-plane/users` | 8102, gRPC 9191 | `/_users` | `users` |
 
 ## IA

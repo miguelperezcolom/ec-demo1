@@ -79,9 +79,16 @@ public class StayQueries {
     return CheckInChecklist.pendingPax(stay, guests.findById(stay.guestId()).orElse(null), ops(stay.id()));
   }
 
-  /** Whether the desk can check the stay in with no question left to ask. */
+  /** Whether the desk can check the stay in with no question left to ask — the registration rules' data included. */
   public boolean readyForDirectCheckIn(Stay stay) {
     return CheckInChecklist.readyForDirectCheckIn(stay, guests.findById(stay.guestId()).orElse(null),
-        ops(stay.id()));
+        ops(stay.id())) && (registration == null || registration.missing(stay).isEmpty());
+  }
+
+  RegistrationRequirementsService registration;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setRegistration(RegistrationRequirementsService registration) {
+    this.registration = registration;
   }
 }

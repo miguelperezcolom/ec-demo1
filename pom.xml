@@ -37,6 +37,7 @@
         <module>control-plane/integrations-service</module>
         <module>control-plane/audit-service</module>
         <module>control-plane/communication-service</module>
+        <module>control-plane/registration-rules</module>
         <module>control-plane/grpc-interface</module>
         <module>control-plane/users</module>
         <!-- consoles: what people see -->

@@ -197,7 +197,11 @@ arriba es la estimación de quien dirigió el trabajo, no una medida.
   de OPERA Cloud, pero es de la interfaz y no aplica a lo que entra por OHIP (check-in online, app,
   integraciones). Responde al «PDTE» de *Configuración de campos de Kardex* del AF PMS-CRM: esa
   configuración pertenece al Riu Front Office, que es quien captura los datos en todos los canales.
-  Pendiente de confirmación por Oracle.
+  Pendiente de confirmación por Oracle. **Hecho en la PoC** (rama `feat/registration-rules`): las
+  reglas se definen en el plano de control (`registration-rules`: por país u hotel, nacionalidad,
+  edad y rol, auditadas) y cada front office guarda su copia (topic `registration-rules`) y las
+  aplica en sus servicios — el check-in se rechaza o se fuerza hasta tener los datos, lo pida el
+  mostrador, el agente o un check-in online. Ver `doc/…/front-office/reglas-de-registro.md`.
 
 ### Siguientes pasos (a 2026-09-30)
 

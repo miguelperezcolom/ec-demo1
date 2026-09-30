@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.frontoffice.application;
 
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIn;
 import io.mateu.ecdemo1.frontoffice.infra.crs.WalkInDesk;
+import io.mateu.ecdemo1.integration.model.registration.RegistrationRuleChanged.Field;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +41,30 @@ public class WalkInService {
     return missing;
   }
 
+  /** The destination's registration rules; none (in a test that does not wire them), the baseline alone. */
+  RegistrationRequirementsService registration;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setRegistration(RegistrationRequirementsService registration) {
+    this.registration = registration;
+  }
+
+  /**
+   * What the holder still lacks: the baseline (nombre, apellidos, documento) and, of what the walk-in
+   * takes down — nationality, document type and number —, what the destination's registration rules
+   * require of a holder of that nationality. The rest the rules ask for is the check-in's, as for any stay.
+   */
+  public List<String> missingFor(WalkInDesk.Holder holder, java.time.LocalDate arrival) {
+    var missing = missing(holder);
+    if (registration == null) {
+      return missing;
+    }
+    var required = registration.requiredOfHolder(holder.nationality(), arrival);
+    if (required.requires(Field.NATIONALITY) && blank(holder.nationality())) missing.add("nacionalidad");
+    if (required.requires(Field.DOCUMENT_TYPE) && blank(holder.documentType())) missing.add("tipo de documento");
+    return missing;
+  }
+
   /**
    * Opens the stay at the price the CRS quoted and asks the CRS for the booking. The stay is there
    * whatever the CRS answers: one that does not answer is asked again; a refusal is the desk's to see.
@@ -49,7 +74,7 @@ public class WalkInService {
     var params = StayAudit.params("arrival", request.arrival(), "departure", request.departure(),
         "roomType", request.roomTypeCode(), "ratePlan", request.ratePlanCode(), "board", request.boardCode(),
         "adults", request.adults(), "total", quotedTotal);
-    var missing = missing(request.holder());
+    var missing = missingFor(request.holder(), request.arrival());
     if (!missing.isEmpty()) {
       var why = "Falta del titular: " + String.join(", ", missing) + ".";
       audit.failed("Walk-in", null, null, params, why);

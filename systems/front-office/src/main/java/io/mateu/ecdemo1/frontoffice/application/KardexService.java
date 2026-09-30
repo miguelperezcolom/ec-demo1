@@ -3,6 +3,8 @@ package io.mateu.ecdemo1.frontoffice.application;
 import io.mateu.ecdemo1.frontoffice.domain.guest.Guest;
 import io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository;
 import io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange;
+import io.mateu.ecdemo1.frontoffice.domain.registration.PaxRegistrationData;
+import io.mateu.ecdemo1.integration.model.registration.RegistrationRuleChanged.Field;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
@@ -87,6 +89,16 @@ public class KardexService {
           document.lastName(), document.documentType(), document.documentNumber(), document.birthDate(),
           document.nationality(), "front office " + hotel + " · " + stayId + " pax " + pax);
       outbox.append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), command);
+      // what the document says is registration data too: the rules may ask for it
+      if (registrationData != null) {
+        var read = new java.util.EnumMap<Field, String>(Field.class);
+        read.put(Field.DOCUMENT_TYPE, document.documentType());
+        read.put(Field.DOCUMENT_NUMBER, document.documentNumber());
+        read.put(Field.NATIONALITY, document.nationality());
+        read.put(Field.BIRTH_DATE, document.birthDate() == null ? null : document.birthDate().toString());
+        read.values().removeIf(v -> v == null || v.isBlank());
+        registrationData.put(stayId, pax, read);
+      }
       // the document may be the last step a forced check-in owed
       incomplete.settle(stayId, null);
     });
@@ -121,6 +133,33 @@ public class KardexService {
     }
     // the document may be the last step a forced check-in owed
     transaction.executeWithoutResult(status -> incomplete.settle(stayId, null));
+  }
+
+  /** Where each pax's registration data is kept; none in a test that does not wire it. */
+  PaxRegistrationData registrationData;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setRegistrationData(PaxRegistrationData registrationData) {
+    this.registrationData = registrationData;
+  }
+
+  /**
+   * The pax's registration data — nationality, birth date, address… — as the desk wrote it: what the
+   * destination's registration rules ask for. Audited by the fields written, not their values.
+   */
+  public void registrationData(String stayId, int pax, java.util.Map<Field, String> values) {
+    var fields = values.keySet().stream().map(Enum::name).sorted().toList();
+    audit.run("Registration data", stayId, null, StayAudit.params("pax", pax, "fields", fields), () -> {
+      transaction.executeWithoutResult(status -> {
+        stay(stayId);
+        if (registrationData != null) {
+          registrationData.put(stayId, pax, values);
+        }
+        // the data may be the last step a forced check-in owed
+        incomplete.settle(stayId, null);
+      });
+      return true;
+    }, ok -> "Datos de registro del pax " + pax + " guardados");
   }
 
   /** The pax's contact, as the desk took it down. */
