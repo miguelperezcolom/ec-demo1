@@ -69,7 +69,9 @@ orchestrator:
   # everything that talks to it. It still moves if its node goes away for another reason.
   podAnnotations:
     karpenter.sh/do-not-disrupt: "true"
-  imageTag: "2.23.1"
+  # 2.23.4: two processes taking a free LOCK key at the same instant (a check-in and the charge of its
+  # extra) no longer park the loser's step on the dead-letter topic (PostgreSQL 25P02).
+  imageTag: "2.23.4"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
