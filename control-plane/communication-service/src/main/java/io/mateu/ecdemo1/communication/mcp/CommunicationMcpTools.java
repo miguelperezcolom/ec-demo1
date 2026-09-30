@@ -78,7 +78,7 @@ public class CommunicationMcpTools implements McpSystemContext {
     }
 
     @Tool(description = "Add a recipient: who (users and/or roles, or an e-mail address), what (types, tasks, hotel) and where "
-            + "(channels). Types: CAUSE_OPENED, PROPOSAL_READY, RETRYING_TOO_LONG, PMS_REJECTED, INTEGRATION_NEEDS_ATTENTION, CHECK_IN_INCOMPLETE; "
+            + "(channels). Types: CAUSE_OPENED, PROPOSAL_READY, RETRYING_TOO_LONG, PMS_REJECTED, INTEGRATION_NEEDS_ATTENTION, CHECK_IN_INCOMPLETE, PLATFORM_ALERT, PLATFORM_ALERT_CRITICAL; "
             + "none is all. Channels: INBOX, WEB_PUSH (the consoles' browsers), FRONT_DESK_PUSH (the front office's browsers) — these three need "
             + "users or roles —, EMAIL (needs the address), GOOGLE_CHAT")
     public String addRecipient(String name,

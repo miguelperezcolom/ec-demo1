@@ -61,6 +61,12 @@ public class RecipientViewModel implements Identifiable {
     @Label("Incomplete check-ins (front desk)")
     @Help("A forced check-in still lacks a guest's document past the traveller's-registration deadline")
     boolean checkInIncomplete;
+    @Label("Platform alerts")
+    @Help("A Prometheus alert of the platform fired: an external API degraded (Salesforce, Opera)")
+    boolean platformAlert;
+    @Label("Critical platform alerts")
+    @Help("Opera or Salesforce not answering, a service down, a pod crash-looping")
+    boolean platformAlertCritical;
     @Label("Tasks of the forms engine")
     boolean tasks;
     @Label("Hotel")
@@ -99,6 +105,8 @@ public class RecipientViewModel implements Identifiable {
         if (pmsRejected) types.add(NotificationType.PMS_REJECTED);
         if (integrationNeedsAttention) types.add(NotificationType.INTEGRATION_NEEDS_ATTENTION);
         if (checkInIncomplete) types.add(NotificationType.CHECK_IN_INCOMPLETE);
+        if (platformAlert) types.add(NotificationType.PLATFORM_ALERT);
+        if (platformAlertCritical) types.add(NotificationType.PLATFORM_ALERT_CRITICAL);
         return recipients.save(new Recipients.RecipientChange(id, name, active, blankToNull(users), blankToNull(roles),
                 blankToNull(email), types, tasks, hotelCode == null || hotelCode.isBlank() ? null : hotelCode.trim(),
                 channels, byGoogleChat ? blankToNull(chatSpaces) : null));
@@ -118,6 +126,8 @@ public class RecipientViewModel implements Identifiable {
         pmsRejected = types.contains(NotificationType.PMS_REJECTED.name());
         integrationNeedsAttention = types.contains(NotificationType.INTEGRATION_NEEDS_ATTENTION.name());
         checkInIncomplete = types.contains(NotificationType.CHECK_IN_INCOMPLETE.name());
+        platformAlert = types.contains(NotificationType.PLATFORM_ALERT.name());
+        platformAlertCritical = types.contains(NotificationType.PLATFORM_ALERT_CRITICAL.name());
         tasks = r.tasks;
         hotelCode = r.hotelCode;
         var channels = r.channelSet();

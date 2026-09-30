@@ -9,8 +9,54 @@
 # One node for the whole stack rather than one each: Prometheus, Grafana, Loki and Tempo are the
 # thing that has to keep working while the engine is being stressed, and what they must not share
 # is the engine, not each other.
+# Alertmanager: the alerts go to people, through communication-service — its recipients table says
+# who, its inbox and Web Push are how (control-plane/communication-service, AlertmanagerWebhook). Only
+# the rules labelled notify: ec-demo1 (prometheus-rules.yaml) are sent; the chart's own defaults —
+# the always-firing Watchdog, the control-plane components a managed cluster does not expose — go to
+# the null receiver. No ingress: nobody opens its UI from outside, and the webhook it calls is
+# cluster-internal (the gateway routes nothing to /alerts).
+#
+# Its state (silences, the notification log) is on an emptyDir, like Prometheus' TSDB and for the same
+# reason — the CSI refuses the operator's PVC. A restart forgets silences and may send a still-firing
+# alert once more; communication-service dedupes it by the alert's fingerprint and start.
 alertmanager:
-  enabled: false
+  enabled: true
+  ingress:
+    enabled: false
+  alertmanagerSpec:
+    nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+    retention: 120h
+    resources:
+      requests: { memory: "32Mi", cpu: "10m" }
+      limits:   { memory: "128Mi" }
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: "null"
+      group_by: [alertname]
+      group_wait: 30s
+      group_interval: 5m
+      # A firing alert already in someone's inbox is not news every hour: communication-service keeps
+      # it open until it resolves. Four hours is how often an unattended one is sent again, deduped
+      # there all the same.
+      repeat_interval: 4h
+      routes:
+        - receiver: communication
+          matchers: [ 'notify = "ec-demo1"' ]
+    receivers:
+      - name: "null"
+      - name: communication
+        webhook_configs:
+          - url: http://communication-service.ec-demo1.svc.cluster.local:8125/alerts/alertmanager
+            send_resolved: true
+            max_alerts: 50
+    # A critical alert silences the warnings of the same service: an Opera outage does not also send
+    # "Opera fails a quarter of its calls".
+    inhibit_rules:
+      - source_matchers: [ 'severity = "critical"' ]
+        target_matchers: [ 'severity = "warning"' ]
+        equal: [ service ]
 
 nodeExporter:
   enabled: true

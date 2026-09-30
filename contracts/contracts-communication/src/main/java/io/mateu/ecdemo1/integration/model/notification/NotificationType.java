@@ -15,5 +15,13 @@ public enum NotificationType {
      * A stay the front desk let in with a forced check-in still lacks a guest's document past the
      * traveller's-registration deadline (24 h from the arrival): reception must complete it.
      */
-    CHECK_IN_INCOMPLETE
+    CHECK_IN_INCOMPLETE,
+    /**
+     * The platform itself: a Prometheus alert fired — an external API degraded, a service down.
+     * Alertmanager's, not an integration's: it arrives on communication-service's webhook, not on the
+     * notifications topic.
+     */
+    PLATFORM_ALERT,
+    /** As {@link #PLATFORM_ALERT}, for an alert of severity critical: Opera or Salesforce not answering, a pod down. */
+    PLATFORM_ALERT_CRITICAL
 }

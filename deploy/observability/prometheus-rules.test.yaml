@@ -1,0 +1,111 @@
+# promtool unit tests for prometheus-rules.yaml — run with deploy/observability/test-rules.sh, which
+# extracts the PrometheusRule groups into rules.yaml first (promtool does not read the operator's
+# objects).
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # 2026-09-29, as it happened: pms-integration polls OHIP about once a minute and every call goes
+  # through; then the reservations API answers 502/500 "downstream system" to every call, for hours.
+  - interval: 1m
+    input_series:
+      - series: 'opera_api_calls_total{service="pms-integration",purpose="reservations",outcome="ok"}'
+        values: '0+1x60 60x120'
+      - series: 'opera_api_calls_total{service="pms-integration",purpose="reservations",outcome="error"}'
+        values: '0x60 1+1x120'
+      - series: 'opera_api_calls_total{service="pms-integration",purpose="token",outcome="ok"}'
+        values: '0+0x60 1x120'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: OperaNotAnswering
+        exp_alerts: []
+      - eval_time: 95m
+        alertname: OperaNotAnswering
+        exp_alerts:
+          - exp_labels: { service: pms-integration, severity: critical, notify: ec-demo1 }
+            exp_annotations:
+              link: "https://console.ec1.mateu.io/_api-usage/apis"
+              summary: "Opera no responde a pms-integration"
+              description: "Every call pms-integration made to OHIP in the last 10 minutes failed (5xx, no answer): reservations and stays wait in the engine and go on their own when it answers again. If the token still works it is Oracle's side — open an incident with the tenant, the module and since when."
+      # everything failing is "Opera does not answer", not also "Opera fails a quarter of the time"
+      - eval_time: 95m
+        alertname: OperaErrorRateHigh
+        exp_alerts: []
+
+  # A degraded Opera: half the calls fail, half go through — a warning, not "Opera does not answer".
+  - interval: 1m
+    input_series:
+      - series: 'opera_api_calls_total{service="pms-integration",purpose="reservations",outcome="ok"}'
+        values: '0+1x60'
+      - series: 'opera_api_calls_total{service="pms-integration",purpose="reservations",outcome="error"}'
+        values: '0+1x60'
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: OperaErrorRateHigh
+        exp_alerts:
+          - exp_labels: { service: pms-integration, severity: warning, notify: ec-demo1 }
+            exp_annotations:
+              link: "https://console.ec1.mateu.io/_api-usage/apis"
+              summary: "50% of pms-integration's calls to OHIP fail"
+              description: "More than a quarter of the calls to Opera fail but some still go through: an OHIP module degraded, or one kind of request refused. See the dashboard External APIs by endpoint."
+      - eval_time: 45m
+        alertname: OperaNotAnswering
+        exp_alerts: []
+
+  # A quiet Opera — no calls at all — is not an outage.
+  - interval: 1m
+    input_series:
+      - series: 'opera_api_calls_total{service="pms-integration",purpose="reservations",outcome="ok"}'
+        values: '5x60'
+      - series: 'opera_api_calls_total{service="pms-integration",purpose="reservations",outcome="error"}'
+        values: '0x60'
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: OperaNotAnswering
+        exp_alerts: []
+
+  # Salesforce refusing every call of the MDM (not its daily allowance).
+  - interval: 1m
+    input_series:
+      - series: 'salesforce_api_calls_total{purpose="projection",outcome="error"}'
+        values: '0+1x60'
+      - series: 'salesforce_api_calls_total{purpose="projection",outcome="ok"}'
+        values: '10x60'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: SalesforceNotAnswering
+        exp_alerts:
+          - exp_labels: { severity: critical, notify: ec-demo1 }
+            exp_annotations:
+              link: "https://console.ec1.mateu.io/_api-usage/apis"
+              summary: "Salesforce no responde al MDM"
+              description: "Every call the MDM made to Salesforce in the last 15 minutes failed (not the daily allowance — that is SalesforceAllowanceCritical): customers wait to be projected and change requests to be opened. Check the org and the MDM's credentials."
+
+  # A service Prometheus stops reaching, and a crash-looping pod.
+  - interval: 1m
+    input_series:
+      - series: 'up{namespace="ec-demo1",pod="booking-5d8f",job="annotated-pods"}'
+        values: '1x10 0x20'
+      - series: 'up{namespace="ec-demo1",pod="users-7a1c",job="annotated-pods"}'
+        values: '1x30'
+      - series: 'kube_pod_container_status_waiting_reason{namespace="ec-demo1",pod="notices-9c2e",container="notices",reason="CrashLoopBackOff"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: { namespace: ec-demo1, pod: booking-5d8f, job: annotated-pods, severity: critical, notify: ec-demo1 }
+            exp_annotations:
+              link: "https://grafana.ec1.mateu.io"
+              summary: "booking-5d8f no responde a Prometheus"
+              description: "Prometheus has not been able to scrape booking-5d8f (annotated-pods) for 5 minutes: the pod is down, stuck or not ready. kubectl -n ec-demo1 describe pod booking-5d8f."
+      - eval_time: 10m
+        alertname: PodCrashLooping
+        exp_alerts:
+          - exp_labels: { pod: notices-9c2e, container: notices, severity: critical, notify: ec-demo1 }
+            exp_annotations:
+              link: "https://grafana.ec1.mateu.io"
+              summary: "notices-9c2e se reinicia en bucle"
+              description: "Container notices of notices-9c2e is in CrashLoopBackOff: it starts and dies. kubectl -n ec-demo1 logs notices-9c2e -c notices --previous."

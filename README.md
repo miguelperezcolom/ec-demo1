@@ -294,7 +294,11 @@ once spent all of it. So every call is counted where it is made:
   costs Salesforce nothing.
 - Grafana: **External APIs** (`deploy/observability/dashboards/external-apis.json`); alerts in
   `deploy/observability/prometheus-rules.yaml` (org ≥ 80 % / ≥ 95 % or paused, our pace projected over
-  10k/day, others spending > 5k, OHIP 429s).
+  10k/day, others spending > 5k, OHIP 429s, Opera or Salesforce not answering, a service down, a pod
+  crash-looping). Alertmanager sends them to communication-service (`POST /alerts/alertmanager`,
+  cluster-internal), which puts them in the administrators' inbox as PLATFORM_ALERT /
+  PLATFORM_ALERT_CRITICAL and closes them when they resolve. `deploy/observability/test-rules.sh` runs
+  the promtool tests.
 
 ### Propagating users to Keycloak
 

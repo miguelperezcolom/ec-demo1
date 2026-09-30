@@ -34,6 +34,8 @@ cuenta donde se hace.
   nuestras de la última hora, llamadas a Opera de hoy—. Al pulsarlas se abre *APIs externas*
   (`/usage/apis`), con la cuota de la org, las nuestras frente a las de otros, las rechazadas y los
   desgloses por propósito y por endpoint de OHIP.
+- **Alertas que avisan**: si OHIP o Salesforce dejan de contestar, o el cupo se acaba, la bandeja de los
+  administradores lo dice (ver [Observabilidad](/operacion/observabilidad/#quién-se-entera)).
 - **Grafana**: el dashboard *External APIs* y las alertas de
   [Observabilidad](/operacion/observabilidad/).
 - **`deploy/demo/demo-prep.sh health`**: da WARN por debajo de `SF_API_RESERVE` llamadas libres (1000

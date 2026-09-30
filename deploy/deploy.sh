@@ -288,8 +288,11 @@ helm upgrade --install loki grafana/loki -n "$OBS_NS" -f deploy/observability/lo
 helm upgrade --install tempo grafana/tempo --version 1.24.4 -n "$OBS_NS" -f deploy/observability/tempo.yaml --timeout 15m
 helm upgrade --install alloy grafana/alloy -n "$OBS_NS" -f deploy/observability/alloy.yaml --timeout 15m
 kubectl apply -f deploy/observability/servicemonitors.yaml
-# The external APIs' alerts (Salesforce's allowance, OHIP's 429s): a PrometheusRule the operator picks
-# up by its release: kps label, like the ServiceMonitors above.
+# The alerts — the external APIs (Salesforce's allowance and errors, OHIP not answering, its 429s) and
+# the platform's health (a service down, a pod crash-looping): PrometheusRules the operator picks up by
+# their release: kps label, like the ServiceMonitors above. Alertmanager (enabled in
+# kube-prometheus-stack.yaml) sends the ones labelled notify: ec-demo1 to communication-service, which
+# puts them in the administrators' inbox. deploy/observability/test-rules.sh tests them with promtool.
 kubectl apply -f deploy/observability/prometheus-rules.yaml
 
 # The dashboards written for this deployment, as ConfigMaps the Grafana sidecar picks up — never
