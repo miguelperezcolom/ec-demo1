@@ -469,6 +469,33 @@ la pantalla y la causa resuelta sola al entrar. En el *Recorrido* de la reserva:
 recepción → La integración pms-fo lo recibe → Proceso «Registrar check-out» → Hacer el check-out en
 Opera».
 
+### 10 quater · forzado. Check-in incompleto: entra sin todo, y no sale hasta completarlo
+
+Un check-in completo es el **documento de cada pax** (los no show aparte) y el **registro firmado** en la
+tablet. Sin eso, «Confirmar check-in» no pasa (lo niega el servicio, no la pantalla: también al agente).
+Si el huésped tiene que entrar igualmente, el paso *Confirmar* del asistente dice qué falta y ofrece
+**«Forzar check-in»** —cualquier recepcionista— con un **motivo obligatorio**: queda auditado quién,
+cuándo, por qué y qué faltaba (`Forced check-in` en la auditoría). El check-in **sube a Opera** como
+cualquier otro (`GuestCheckedIn` → `registrar-checkin`).
+
+La estancia queda **«Check-in incompleto»**: un badge en *Reservas* y la vista **Check-in incompleto**
+para encontrarlas; en la ficha, un aviso **ámbar** con lo que falta y **«Completar»**, que abre el
+asistente solo en lo que falta (la documentación; la firma, en *Confirmar*). Al escanear el último
+documento o firmar, se completa solo (`Forced check-in completed`). **El check-out está bloqueado**
+mientras tanto: el botón lleva a «Completar», y el servicio lo niega igualmente (`Check-out refused:
+check-in incomplete`).
+
+**Parte de viajeros: 24 h.** Si pasadas **24 h de la llegada** sigue faltando un documento (la firma sola
+no cuenta), el aviso pasa a **rojo** («PARTE DE VIAJEROS VENCIDO»), el badge dice «parte vencido» y el
+front office manda **una vez** un aviso `CHECK_IN_INCOMPLETE` a la bandeja de recepción (communication
+service; lo cierra al completarse). Lo comprueba cada minuto; el plazo es configurable
+(`FORCED_CHECKIN_DOCUMENT_DEADLINE`, `PT24H`). En la bandeja lo ve quien tenga un destinatario con ese
+tipo (*Recipients → Incomplete check-ins*).
+
+El agente de recepción lo sabe: `getStay` trae `checkIn` (completo o no, qué falta, quién lo forzó, por
+qué, cuándo vencen los documentos y si han vencido); `prepareCheckIn` rechaza con lo que falta;
+**`prepareForcedCheckIn`** pide el motivo; `prepareCheckOut` rechaza un check-in incompleto.
+
 ## 10 ter. Walk-in: el front office vende, el CRS reserva
 
 El CRS es el dueño de todas las reservas; el front office es un canal más (`WALKIN`).
