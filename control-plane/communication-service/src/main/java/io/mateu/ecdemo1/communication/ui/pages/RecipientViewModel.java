@@ -58,6 +58,9 @@ public class RecipientViewModel implements Identifiable {
     boolean pmsRejected;
     @Label("Integrations that need attention")
     boolean integrationNeedsAttention;
+    @Label("Incomplete check-ins (front desk)")
+    @Help("A forced check-in still lacks a guest's document past the traveller's-registration deadline")
+    boolean checkInIncomplete;
     @Label("Tasks of the forms engine")
     boolean tasks;
     @Label("Hotel")
@@ -95,6 +98,7 @@ public class RecipientViewModel implements Identifiable {
         if (retryingTooLong) types.add(NotificationType.RETRYING_TOO_LONG);
         if (pmsRejected) types.add(NotificationType.PMS_REJECTED);
         if (integrationNeedsAttention) types.add(NotificationType.INTEGRATION_NEEDS_ATTENTION);
+        if (checkInIncomplete) types.add(NotificationType.CHECK_IN_INCOMPLETE);
         return recipients.save(new Recipients.RecipientChange(id, name, active, blankToNull(users), blankToNull(roles),
                 blankToNull(email), types, tasks, hotelCode == null || hotelCode.isBlank() ? null : hotelCode.trim(),
                 channels, byGoogleChat ? blankToNull(chatSpaces) : null));
@@ -113,6 +117,7 @@ public class RecipientViewModel implements Identifiable {
         retryingTooLong = types.contains(NotificationType.RETRYING_TOO_LONG.name());
         pmsRejected = types.contains(NotificationType.PMS_REJECTED.name());
         integrationNeedsAttention = types.contains(NotificationType.INTEGRATION_NEEDS_ATTENTION.name());
+        checkInIncomplete = types.contains(NotificationType.CHECK_IN_INCOMPLETE.name());
         tasks = r.tasks;
         hotelCode = r.hotelCode;
         var channels = r.channelSet();

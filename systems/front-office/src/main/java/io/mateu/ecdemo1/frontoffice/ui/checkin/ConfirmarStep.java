@@ -23,7 +23,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @FormLayout(columns = 1)
-public class ConfirmarStep implements WizardStep {
+public class ConfirmarStep implements WizardStep, io.mateu.uidl.interfaces.VisibilitySupplier {
 
   @Hidden String stayId;
   @Hidden Double totalEstancia;
@@ -41,6 +41,24 @@ public class ConfirmarStep implements WizardStep {
   @Section(value = "", frameless = true)
   @Label("")
   Callable<Component> header = () -> GuestHeaders.arrivalHeader(stayId);
+
+  // What the check-in still lacks (documents, signature): arriving, «Confirmar check-in» does not go
+  // through without it — «Forzar check-in», with a reason, does —; in house (a forced check-in being
+  // completed), what «Completar» still waits for. Nothing missing, nothing shown.
+  @Label("")
+  Callable<Component> pendientes = () -> ForcedCheckInViews.pendingInWizard(stayId);
+
+  @Label("Motivo del check-in forzado")
+  @io.mateu.uidl.annotations.Help("Obligatorio para forzar: por qué entra sin lo que falta (queda auditado)")
+  String motivoForzado;
+
+  @Label("")
+  Callable<Component> forzar = () -> io.mateu.uidl.data.Button.builder()
+      .id("forzar-checkin")
+      .label("Forzar check-in")
+      .actionId("forzarCheckin")
+      .color(io.mateu.uidl.data.ButtonColor.error)
+      .build();
 
   // The reservation summary as a read-only property list (label left, value right).
   @Section(value = "Resumen", propertyList = true)
@@ -223,6 +241,15 @@ public class ConfirmarStep implements WizardStep {
                         .build()))
             .build();
       };
+
+  /** The reason and «Forzar check-in» only for an arriving stay with something missing. */
+  @Override
+  public boolean isHidden(String memberName, io.mateu.uidl.interfaces.HttpRequest httpRequest) {
+    if ("motivoForzado".equals(memberName) || "forzar".equals(memberName)) {
+      return !ForcedCheckInViews.canForce(stayId);
+    }
+    return false;
+  }
 
   /** The key/wristband row per llaveEstado: encode button → "Grabando…" chip → green "Grabada". */
   private StatusItem llaveItem() {

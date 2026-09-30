@@ -39,6 +39,7 @@ class FolioChargesTest {
   @Autowired ChargePostings postings;
   @Autowired GuestRepository guests;
   @Autowired StayRepository stays;
+  @Autowired io.mateu.ecdemo1.frontoffice.domain.stay.CheckInOpsRepository ops;
   @Autowired RoomRepository rooms;
   @Autowired FolioRepository folios;
   @Autowired CommandOutbox outbox;
@@ -51,7 +52,7 @@ class FolioChargesTest {
   void theDesksChargesGoUpToThePmsFolioButNotTheAccommodation() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
 
-    checkIn.checkIn(a.stayId(), null, List.of("transfer"));
+    checkIn.checkIn(complete(a), null, List.of("transfer"));
     folioService.contractLateCheckOut(a.stayId(), "ana");
     folioService.postCharge(a.stayId(), "MB-02", "ana");
 
@@ -75,7 +76,7 @@ class FolioChargesTest {
   @Test
   void aVoidTakesTheLineBackHereAndInThePms() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
     folioService.postCharge(a.stayId(), "MB-02", "ana");
     var folio = folios.findByStayId(a.stayId()).orElseThrow();
     var minibar = folio.lines().getLast();
@@ -106,7 +107,7 @@ class FolioChargesTest {
   @Test
   void thePmsAnswerIsKeptPerLine() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
     folioService.postCharge(a.stayId(), "RS-01", "ana");
     var line = folios.findByStayId(a.stayId()).orElseThrow().lines().getLast();
 
@@ -130,7 +131,7 @@ class FolioChargesTest {
   @Test
   void theProformaSaysBothTotalsAndWhetherTheyMatch() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
     folioService.contractLateCheckOut(a.stayId(), "ana");
     checkOut.checkOut(a.stayId());
     var total = folios.findByStayId(a.stayId()).orElseThrow().balance(); // 300 + 50
@@ -149,5 +150,10 @@ class FolioChargesTest {
         .contains("NO coinciden (diferencia 250.00)").contains("alojamiento");
     assertThat(new String(invoices.document(a.stayId()).orElseThrow().pdf(), 0, 5,
         java.nio.charset.StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
+  }
+
+  /** The arrival with its documents seen and its registration signed: nothing missing for the check-in. */
+  String complete(Fixtures.Arrival a) {
+    return Fixtures.complete(a.stayId(), guests, stays, ops);
   }
 }

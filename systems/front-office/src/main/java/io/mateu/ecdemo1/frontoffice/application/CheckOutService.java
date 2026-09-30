@@ -17,18 +17,22 @@ public class CheckOutService {
   final RoomRepository rooms;
   final GuestNotices notices;
   final ReceptionReports reception;
+  final IncompleteCheckIns incomplete;
 
-  public CheckOutService(StayRepository stays, RoomRepository rooms, GuestNotices notices, ReceptionReports reception) {
+  public CheckOutService(StayRepository stays, RoomRepository rooms, GuestNotices notices, ReceptionReports reception,
+                         IncompleteCheckIns incomplete) {
     this.stays = stays;
     this.rooms = rooms;
     this.notices = notices;
     this.reception = reception;
+    this.incomplete = incomplete;
   }
 
   /**
    * Checks the stay out and frees its room (to be cleaned). A stay not in house is left as it is.
    * Refused ({@link GuestNotices.NotAcknowledged}) while its warnings — a kárdex change Salesforce
-   * rejected or has not decided, a check-out notice — are not acknowledged («Entendido»).
+   * rejected or has not decided, a check-out notice — are not acknowledged («Entendido»); and
+   * ({@link IncompleteCheckIns.CheckInIncomplete}) while its check-in, forced, is still incomplete.
    */
   @Transactional
   public Stay checkOut(String stayId) {
@@ -42,6 +46,7 @@ public class CheckOutService {
     if (!stay.inHouse()) {
       return stay;
     }
+    incomplete.requireComplete(stay, by);
     notices.requireCheckOut(stay, by);
     var departed = stays.save(stay.completeCheckOut());
     rooms.findByNumber(stay.roomNumber()).map(Room::release).ifPresent(rooms::save);

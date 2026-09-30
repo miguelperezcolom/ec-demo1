@@ -273,3 +273,19 @@ create table if not exists folio_line_pms (
     state        varchar(500),
     updated_at   timestamp    not null
 );
+
+-- ── Forced check-ins (check-in incompleto) ─────────────────────────────────
+-- A check-in the desk forced with steps missing (documents, signature): who, when, why and what was
+-- missing then. Open until its steps are completed; the stay cannot check out meanwhile. Reception is
+-- told once (overdue_notified_at) when a document is still missing past the traveller's-registration
+-- deadline (24 h from the arrival).
+create table if not exists forced_check_in (
+    stay_id             varchar(64)   primary key,
+    forced_by           varchar(200),
+    forced_at           timestamp     not null,
+    reason              varchar(1000) not null,
+    missing             varchar(2000),
+    completed_by        varchar(200),
+    completed_at        timestamp,
+    overdue_notified_at timestamp
+);

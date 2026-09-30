@@ -83,10 +83,13 @@ public class CheckInWizard extends Wizard {
   final CheckInService checkIn;
   final RoomRepository rooms;
   final io.mateu.ecdemo1.frontoffice.application.GuestNotices notices;
+  final io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete;
 
   public CheckInWizard(StayQueries queries, CheckInService checkIn, RoomRepository rooms,
-                       io.mateu.ecdemo1.frontoffice.application.GuestNotices notices) {
+                       io.mateu.ecdemo1.frontoffice.application.GuestNotices notices,
+                       io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete) {
     this.queries = queries;
+    this.incomplete = incomplete;
     this.checkIn = checkIn;
     this.rooms = rooms;
     this.notices = notices;
@@ -271,9 +274,12 @@ public class CheckInWizard extends Wizard {
             Mono.delay(Duration.ofSeconds(5))
                 .map(tick -> (Object) UICommand.dispatchEvent("firma-capturada")));
       }
+      case "forzarCheckin" -> {
+        return forzarCheckin();
+      }
       case "firmaCapturada" -> {
         confirmar.setFirmaEstado("firmada");
-        checkIn.registrationSigned(stayId);
+        checkIn.registrationSigned(stayId, io.mateu.ecdemo1.frontoffice.infra.security.DeskUser.name());
         return List.of(this, new Message("Firma capturada"));
       }
       default -> {
@@ -305,7 +311,8 @@ public class CheckInWizard extends Wizard {
             "refrescarIdentidad",
             "firmaCapturada",
             "preautorizado",
-            "llaveGrabada")) {
+            "llaveGrabada",
+            "forzarCheckin")) {
       actions.add(Action.builder().id(id).build());
     }
     // stream two increments each: the in-flight state now, the confirmation 5 s later
@@ -319,11 +326,20 @@ public class CheckInWizard extends Wizard {
 
   /** Solo lo que FALTA — cada paso pregunta por SU operación de check-in: identidad si hay
    *  documentación pendiente; habitación si la estancia no tiene ninguna asignada;
-   *  extras si la selección de ancillaries no se cerró aún. Confirmación, siempre. */
+   *  extras si la selección de ancillaries no se cerró aún. Confirmación, siempre.
+   *  Una estancia ya en casa (un check-in forzado que se completa, «Completar») solo abre lo que
+   *  el check-in le debe: la documentación y la firma (en Confirmar). */
   @Override
   protected boolean stepApplies(String stepFieldName) {
     if (stayId == null || stayId.isBlank()) {
       return true;
+    }
+    if (completando()) {
+      return switch (stepFieldName) {
+        case "identidad" -> queries.pendingPax(queries.view(stayId).stay()) > 0;
+        case "avisos", "habitacion", "extras" -> false;
+        default -> true;
+      };
     }
     return switch (stepFieldName) {
       // los avisos de recepción de los huéspedes, si tienen alguno para el check-in (Salesforce, vía el MDM)
@@ -336,12 +352,57 @@ public class CheckInWizard extends Wizard {
     };
   }
 
+  /** The stay is already in (its check-in was forced): the wizard completes what it owes. */
+  boolean completando() {
+    return queries.find(stayId).map(s -> s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE)
+        .orElse(false);
+  }
+
+  /**
+   * «Forzar check-in»: in with steps missing, and a reason — the stay stays «Check-in incompleto»
+   * (audited) and goes up to the PMS like any check-in.
+   */
+  Object forzarCheckin() {
+    syncConfirmar();
+    var motivo = confirmar.getMotivoForzado();
+    if (motivo == null || motivo.isBlank()) {
+      return List.of(this, new Message("⛔ Para forzar el check-in hay que escribir el motivo"));
+    }
+    var by = io.mateu.ecdemo1.frontoffice.infra.security.DeskUser.name();
+    var stay = queries.stay(stayId);
+    var falta = incomplete.status(stay).missingText();
+    try {
+      if (avisos.isLeido() && !notices.checkInAcknowledged(stay)) {
+        notices.acknowledgeCheckIn(stayId, by, avisos.getFingerprint());
+      }
+      checkIn.forceCheckIn(stayId, habitacion.getHabitacionSeleccionada(), extras.addedIds(), motivo, by);
+    } catch (io.mateu.ecdemo1.frontoffice.application.GuestNotices.NotAcknowledged e) {
+      avisos.setLeido(false);
+      avisos.setFingerprint(notices.checkInFingerprint(stay));
+      return List.of(this, new Message("⛔ " + e.getMessage()));
+    }
+    confirmar.setMotivoForzado(null);
+    return List.of(
+        new Message("⚠️ Check-in forzado — " + confirmar.getHuespedPrincipal() + " · queda pendiente: " + falta),
+        UICommand.navigateTo("/reservas/" + stayId));
+  }
+
   @WizardCompletionAction
   @Label("Confirmar check-in")
   Object confirmarCheckin() {
     syncConfirmar();
     var by = io.mateu.ecdemo1.frontoffice.infra.security.DeskUser.name();
     var stay = queries.stay(stayId);
+    if (completando()) {
+      // «Completar»: el check-in forzado queda completo si ya no falta nada
+      try {
+        incomplete.complete(stayId, by);
+      } catch (io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns.CheckInIncomplete e) {
+        return List.of(this, new Message("⛔ " + e.getMessage()));
+      }
+      return List.of(new Message("✅ Check-in completado — " + confirmar.getHuespedPrincipal()),
+          UICommand.navigateTo("/reservas/" + stayId));
+    }
     try {
       // «He leído el aviso»: lo leído es lo que se le mostró; si ha cambiado, se vuelve a pedir
       if (avisos.isLeido() && !notices.checkInAcknowledged(stay)) {
@@ -352,6 +413,8 @@ public class CheckInWizard extends Wizard {
       avisos.setLeido(false);
       avisos.setFingerprint(notices.checkInFingerprint(stay));
       return List.of(this, new Message("⛔ " + e.getMessage()));
+    } catch (io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns.CheckInIncomplete e) {
+      return List.of(this, new Message("⛔ " + e.getMessage() + " («Forzar check-in», más arriba)"));
     }
     result = new ResultStep();
     result.setStayId(stayId);

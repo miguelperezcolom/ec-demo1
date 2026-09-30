@@ -118,6 +118,12 @@
             <artifactId>contracts-audit</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <!-- The notices it asks the communication service to deliver (an incomplete check-in overdue). -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-communication</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <!-- Its messages checked against the topics' schemas (contracts/schemas). -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>

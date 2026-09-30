@@ -36,10 +36,11 @@ public class CheckInService {
   final CheckInOpsRepository checkInOps;
   final GuestNotices notices;
   final ReceptionReports reception;
+  final IncompleteCheckIns incomplete;
 
   public CheckInService(StayRepository stays, RoomRepository rooms, FolioRepository folios,
                         AddOnCatalogRepository addOnCatalog, CheckInOpsRepository checkInOps, GuestNotices notices,
-                        ReceptionReports reception) {
+                        ReceptionReports reception, IncompleteCheckIns incomplete) {
     this.stays = stays;
     this.rooms = rooms;
     this.folios = folios;
@@ -47,6 +48,7 @@ public class CheckInService {
     this.checkInOps = checkInOps;
     this.notices = notices;
     this.reception = reception;
+    this.incomplete = incomplete;
   }
 
   /**
@@ -56,7 +58,9 @@ public class CheckInService {
    * gets its selection closed.
    *
    * <p>Refused ({@link GuestNotices.NotAcknowledged}) while a guest has a blocking reception notice
-   * the desk has not said it read.
+   * the desk has not said it read; and ({@link IncompleteCheckIns.CheckInIncomplete}) while a step is
+   * missing — a pax's document, the registration's signature —: those are done first, or the check-in
+   * is forced ({@link #forceCheckIn}).
    */
   @Transactional
   public Stay checkIn(String stayId, String roomNumber, Collection<String> addOnIds) {
@@ -69,29 +73,61 @@ public class CheckInService {
     var stay = find(stayId);
     if (stay.status() == StayStatus.ARRIVING) {
       notices.requireCheckIn(stay, by);
-      var selected = roomNumber != null ? roomNumber : stay.roomNumber();
-      var room = rooms.findByNumber(selected);
-      stay = stay.assignRoom(selected, room.map(Room::typeLabel).orElse(stay.roomType()));
-      for (var addOnId : addOnIds) {
-        stay = stay.addAddOn(addOnId);
-      }
-      stay = stays.save(stay.completeCheckIn());
-      room.filter(Room::assignable).ifPresent(r -> rooms.save(r.occupy()));
-      Folio opened = null;
-      if (folios.findByStayId(stay.id()).isEmpty()) {
-        var contracted = stay.addOns().stream().map(SelectedAddOn::addOnId)
-            .map(id -> addOnCatalog.findById(id).orElse(null)).filter(Objects::nonNull).toList();
-        opened = folios.save(Folio.openAtCheckIn(stay, contracted));
-      }
-      // The PMS is the master of the stay: the check-in goes up to it, with this transaction — and the
-      // extras the folio opened with after it, onto the PMS's folio (the accommodation is the PMS's own).
-      reception.checkedIn(stay, by);
-      if (opened != null) {
-        var id = stay.id();
-        opened.toThePms().forEach(line -> reception.chargePosted(id, line, by));
+      incomplete.requireCompleteCheckIn(stay, by);
+      stay = checkInNow(stay, roomNumber, addOnIds, by);
+    }
+    update(stayId, ops -> ops.withExtras(true));
+    return stay;
+  }
+
+  /**
+   * The check-in forced with steps missing — the pax's documents, the registration's signature —, which
+   * any receptionist can do with a {@code reason}: the guest is let in as with any check-in (up to the
+   * PMS too), and the stay is left «Check-in incompleto» — audited, who, when, why and what was missing
+   * — until the steps are done; it cannot check out meanwhile. A blocking reception notice must still be
+   * read. With nothing missing it is a plain check-in.
+   */
+  @Transactional
+  public Stay forceCheckIn(String stayId, String roomNumber, Collection<String> addOnIds, String reason, String by) {
+    if (reason == null || reason.isBlank()) {
+      throw new IllegalArgumentException("Forzar el check-in necesita un motivo");
+    }
+    var stay = find(stayId);
+    if (stay.status() == StayStatus.ARRIVING) {
+      notices.requireCheckIn(stay, by);
+      var missing = incomplete.missing(stay);
+      stay = checkInNow(stay, roomNumber, addOnIds, by);
+      if (!missing.isEmpty()) {
+        incomplete.recordForced(stay, reason, missing, by);
       }
     }
     update(stayId, ops -> ops.withExtras(true));
+    return stay;
+  }
+
+  /** Checks the arriving stay in: room, add-ons, in house, the room occupied, the folio opened; up to the PMS. */
+  Stay checkInNow(Stay stay, String roomNumber, Collection<String> addOnIds, String by) {
+    var selected = roomNumber != null ? roomNumber : stay.roomNumber();
+    var room = rooms.findByNumber(selected);
+    stay = stay.assignRoom(selected, room.map(Room::typeLabel).orElse(stay.roomType()));
+    for (var addOnId : addOnIds) {
+      stay = stay.addAddOn(addOnId);
+    }
+    stay = stays.save(stay.completeCheckIn());
+    room.filter(Room::assignable).ifPresent(r -> rooms.save(r.occupy()));
+    Folio opened = null;
+    if (folios.findByStayId(stay.id()).isEmpty()) {
+      var contracted = stay.addOns().stream().map(SelectedAddOn::addOnId)
+          .map(id -> addOnCatalog.findById(id).orElse(null)).filter(Objects::nonNull).toList();
+      opened = folios.save(Folio.openAtCheckIn(stay, contracted));
+    }
+    // The PMS is the master of the stay: the check-in goes up to it, with this transaction — and the
+    // extras the folio opened with after it, onto the PMS's folio (the accommodation is the PMS's own).
+    reception.checkedIn(stay, by);
+    if (opened != null) {
+      var id = stay.id();
+      opened.toThePms().forEach(line -> reception.chargePosted(id, line, by));
+    }
     return stay;
   }
 
@@ -107,7 +143,15 @@ public class CheckInService {
 
   @Transactional
   public CheckInOps registrationSigned(String stayId) {
-    return update(stayId, ops -> ops.withFirma(true));
+    return registrationSigned(stayId, null);
+  }
+
+  /** The registration signed — which may be the last step a forced check-in owed. */
+  @Transactional
+  public CheckInOps registrationSigned(String stayId, String by) {
+    var ops = update(stayId, o -> o.withFirma(true));
+    incomplete.settle(stayId, by);
+    return ops;
   }
 
   @Transactional

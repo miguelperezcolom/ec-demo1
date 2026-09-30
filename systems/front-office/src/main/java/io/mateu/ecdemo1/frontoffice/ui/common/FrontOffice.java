@@ -37,14 +37,17 @@ public class FrontOffice {
   private final io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms;
   private final io.mateu.ecdemo1.frontoffice.application.Invoices invoices;
   private final io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings;
+  private final io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incompleteCheckIns;
 
   public FrontOffice(StayQueries queries, StayReadModel stayReads, RoomRepository rooms,
                      AddOnCatalogRepository addOnCatalog, io.mateu.ecdemo1.frontoffice.application.GuestNotices notices,
                      io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks pmsLinks,
                      io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms,
                      io.mateu.ecdemo1.frontoffice.application.Invoices invoices,
-                     io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings) {
+                     io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings,
+                     io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incompleteCheckIns) {
     this.chargePostings = chargePostings;
+    this.incompleteCheckIns = incompleteCheckIns;
     this.queries = queries;
     this.stayReads = stayReads;
     this.rooms = rooms;
@@ -54,6 +57,19 @@ public class FrontOffice {
     this.pmsRooms = pmsRooms;
     this.invoices = invoices;
     instance = this;
+  }
+
+  /**
+   * Where the stay's check-in stands: what it still lacks (documents, signature) and, if it was forced,
+   * who forced it, why, and whether the documents' deadline passed.
+   */
+  public static io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns.Status checkInStatus(String stayId) {
+    return instance.incompleteCheckIns.status(stayId);
+  }
+
+  /** The hours a forced check-in's documents are due after the arrival (24). */
+  public static long forcedDeadlineHours() {
+    return instance.incompleteCheckIns.documentDeadline().toHours();
   }
 
   /** Where the stay stands in the PMS — «Opera: en casa», «Opera: rechazado — …» —, if it was ever told. */
