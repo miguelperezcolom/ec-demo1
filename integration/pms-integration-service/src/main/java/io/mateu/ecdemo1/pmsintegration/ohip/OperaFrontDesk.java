@@ -40,7 +40,7 @@ import java.util.Optional;
  *       gets a comment saying who reported it and when;</li>
  *   <li>the desk's charges: {@code POST /csh/v1/hotels/{h}/reservations/{id}/charges} (transaction code,
  *       amount, {@code postingReference}, with the cashier) — a reversal is the same, negative; the
- *       folio's postings, {@code GET …/folios?fetchInstructions=Postings}, found by their reference.</li>
+ *       folio's postings, {@code GET …/folios?fetchInstructions=Postings&summaryOnly=false}, found by their reference (padded by Opera with a blank).</li>
  * </ul>
  *
  * <p>Every refusal is a {@link PmsRejectedException}, every «not now» a {@link PmsTransientException}
@@ -342,8 +342,9 @@ public class OperaFrontDesk {
      * ?fetchInstructions=Postings}). Opera nests them in each window's folios; read wherever they are.
      */
     public List<Posting> postings(String hotelId, String reservationId) {
+        // Without summaryOnly=false XMAR answers the windows' totals and no postings at all.
         var answer = ohip.find(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Postings"
-                + "&fetchInstructions=Windowbalances", hotelId, reservationId).orElse(null);
+                + "&summaryOnly=false&limit=200", hotelId, reservationId).orElse(null);
         var found = new ArrayList<Posting>();
         var seen = new java.util.HashSet<String>();
         for (var w : answer == null ? List.<JsonNode>of() : answer.path("reservationFolioInformation").path("folioWindows")) {
@@ -367,8 +368,10 @@ public class OperaFrontDesk {
                 if (!amount.isNumber()) {
                     amount = node.path("transactionAmount");
                 }
+                // Opera pads the reference it keeps with a blank ("FO:L-F0909D43 "): trimmed, it is ours.
+                var reference = node.path("reference").asText(null);
                 found.add(new Posting(no, node.path("transactionCode").asText(null),
-                        amount.isNumber() ? amount.decimalValue() : null, node.path("reference").asText(null),
+                        amount.isNumber() ? amount.decimalValue() : null, reference == null ? null : reference.trim(),
                         node.path("remark").asText(null), node.path("folioWindowNo").asInt(window)));
             }
             return;

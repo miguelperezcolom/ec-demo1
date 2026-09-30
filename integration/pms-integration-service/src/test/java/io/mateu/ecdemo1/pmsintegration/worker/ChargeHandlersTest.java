@@ -90,7 +90,8 @@ class ChargeHandlersTest {
                           "reservationStatus": "%s"}]}}
                         """.formatted(status));
             } else if (method.equals("GET") && uri.startsWith("/csh/v1/hotels/XMAR/reservations/39486034/folios")) {
-                reply(exchange, 200, folioAnswer());
+                // As XMAR: the postings only with summaryOnly=false; the windows' totals otherwise.
+                reply(exchange, 200, uri.contains("summaryOnly=false") ? folioAnswer() : "{\"reservationFolioInformation\": {}}");
             } else if (method.equals("POST") && uri.equals("/csh/v1/hotels/XMAR/reservations/39486034/charges")) {
                 if (refusal != null) {
                     reply(exchange, 400, refusal);
@@ -142,7 +143,7 @@ class ChargeHandlersTest {
             }
             postings.append("""
                     {"transactionNo": %s, "transactionCode": "%s", "postedAmount": {"amount": %s, "currencyCode": "MUR"},
-                     "reference": "%s", "remark": "x", "folioWindowNo": 1}""".formatted(p.no(), p.code(), p.amount(), p.reference()));
+                     "reference": "%s ", "remark": "x", "folioWindowNo": 1}""".formatted(p.no(), p.code(), p.amount(), p.reference()));
         }
         return """
                 {"reservationFolioInformation": {"folioWindows": [
