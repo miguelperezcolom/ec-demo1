@@ -11,7 +11,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.util.NoSuchElementException;
 
-/** Replaces the booking's terms as a whole and prices it again, as a CRS modification does. */
+/**
+ * Replaces the booking's terms as a whole and prices it again, as a CRS modification does. Terms
+ * that say the same as the booking's are not a modification: nothing is saved, versioned, audited or
+ * projected again, and the answer says so — whether the change came from the console, the API or an
+ * agent's tool.
+ */
 @Service
 @RequiredArgsConstructor
 public class UpdateBookingUseCase {
@@ -21,15 +26,20 @@ public class UpdateBookingUseCase {
     final Clock clock;
     final BookingAudit audit;
 
+    /** @return whether the booking changed; false when the terms were the same. */
     @Transactional
-    public void handle(UpdateBookingCommand command) {
-        var hotel = repository.findById(new BookingId(command.id())).map(b -> b.getHotelCode()).orElse(null);
-        audit.run("Booking modified", command.id(), hotel, null, () -> {
-            var booking = repository.findByIdForUpdate(new BookingId(command.id()))
-                    .orElseThrow(() -> new NoSuchElementException("Booking not found: " + command.id()));
-            booking.update(termsFactory.terms(booking.getHotelCode(), command.booking()), clock.instant());
+    public boolean handle(UpdateBookingCommand command) {
+        var booking = repository.findByIdForUpdate(new BookingId(command.id()))
+                .orElseThrow(() -> new NoSuchElementException("Booking not found: " + command.id()));
+        var terms = termsFactory.terms(booking.getHotelCode(), command.booking());
+        if (booking.getTerms().sameAs(terms)) {
+            return false;
+        }
+        audit.run("Booking modified", command.id(), booking.getHotelCode(), null, () -> {
+            booking.update(terms, clock.instant());
             return repository.save(booking);
         }, b -> "Modificada");
+        return true;
     }
 
 }

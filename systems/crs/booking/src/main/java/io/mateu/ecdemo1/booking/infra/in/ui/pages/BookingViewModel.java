@@ -21,9 +21,12 @@ import io.mateu.uidl.annotations.DetailFormCustomisation;
 import io.mateu.uidl.annotations.FoldoutDetail;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInEditor;
+import io.mateu.uidl.annotations.HiddenInView;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.ReadOnly;
+import io.mateu.uidl.annotations.PageWidth;
+import io.mateu.uidl.annotations.PageWidthStyle;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.annotations.Toolbar;
@@ -64,6 +67,7 @@ import java.util.concurrent.Callable;
 // in foldout panels beside it: eleven stacked cards were a long scroll to what matters, and half of
 // them empty. What has no value is left out of the page; the editor keeps every field.
 @FoldoutDetail(overview = {"Booking", "Amounts"}, folded = {"Tracking"})
+@PageWidth(PageWidthStyle.EDGE_TO_EDGE)
 public class BookingViewModel implements Identifiable, VisibilitySupplier {
 
     static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
@@ -102,14 +106,28 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     String holderPhone;
     String holderNationality;
 
+    /**
+     * On the booking's page, each room with its people, together: two lists side by side made the
+     * reader match guests to rooms by line number. The editor keeps the two lists below.
+     */
+    @Section("Rooms and guests")
+    @HiddenInCreate
+    @HiddenInEditor
+    @Label("")
+    @Colspan(2)
+    Callable<Component> roomsAndGuests = this::roomsAndGuests;
+
     // The lists show a few columns each and open a row in a modal, where all of its fields fit: a
-    // row edited beside the list had too many fields for the space left to it.
+    // row edited beside the list had too many fields for the space left to it. Only in the editor:
+    // the page shows them together, above.
     @Section("Rooms")
+    @HiddenInView
     @DetailFormCustomisation(position = FormPosition.modal)
     @Colspan(2)
     List<RoomViewModel> rooms;
 
     @Section("Guests")
+    @HiddenInView
     @DetailFormCustomisation(position = FormPosition.modal)
     @Colspan(2)
     List<GuestViewModel> guests;
@@ -189,8 +207,12 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
         if (!stored.hotelCode().equals(hotelCode)) {
             throw new IllegalArgumentException("A booking cannot move to another hotel: cancel it and create a new one");
         }
-        updateBookingUseCase.handle(new UpdateBookingCommand(id, request()));
-        BookingRequests.registerNewPayments(registerPaymentUseCase, id, payments);
+        var changed = updateBookingUseCase.handle(new UpdateBookingCommand(id, request()));
+        var paid = BookingRequests.registerNewPayments(registerPaymentUseCase, id, payments);
+        if (!changed && !paid) {
+            // nothing to save: say so instead of "saved" (Mateu's crud reads this attribute)
+            httpRequest.setAttribute("mateu.savedMessage", "Sin cambios");
+        }
     }
 
     @Toolbar
@@ -277,6 +299,32 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
                         .status(e.succeeded() ? "Done" : "Not done")
                         .statusColor(e.succeeded() ? "success" : "danger")
                         .build()).toList())
+                .build();
+    }
+
+    /** Each room line — type, occupancy, price — and the people in it, one line each. */
+    Component roomsAndGuests() {
+        var byLine = new java.util.LinkedHashMap<Integer, List<GuestViewModel>>();
+        (guests == null ? List.<GuestViewModel>of() : guests)
+                .forEach(g -> byLine.computeIfAbsent(g.roomLine(), l -> new java.util.ArrayList<>()).add(g));
+        return io.mateu.uidl.data.StatusList.builder().compact(true).frameless(true).style("width: 100%;")
+                .items((rooms == null ? List.<RoomViewModel>of() : rooms).stream().map(room -> {
+                    int line = room.line() == null ? 0 : room.line();
+                    var people = byLine.getOrDefault(line, List.of());
+                    var children = room.childrenAges() == null ? 0 : room.childrenAges().size();
+                    return io.mateu.uidl.data.StatusItem.builder()
+                            .id("room-" + line)
+                            .title("Room " + line + " · " + room.roomTypeCode())
+                            .description(room.adults() + (room.adults() == 1 ? " adult" : " adults")
+                                    + (children == 0 ? "" : " · " + children + (children == 1 ? " child" : " children"))
+                                    + (room.boardCode() == null ? "" : " · " + room.boardCode()))
+                            .status(room.total() == null ? "" : room.total().toPlainString())
+                            .statusColor("neutral")
+                            .lines(people.isEmpty() ? List.of("No guests named yet")
+                                    : people.stream().map(g -> g.firstName() + " " + g.lastName()
+                                    + (g.type() == null ? "" : " · " + g.type())).toList())
+                            .build();
+                }).toList())
                 .build();
     }
 

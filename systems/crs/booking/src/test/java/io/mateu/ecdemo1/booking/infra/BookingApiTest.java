@@ -191,6 +191,22 @@ class BookingApiTest {
     }
 
     @Test
+    void savingTheSameTermsIsNotAModification() throws Exception {
+        var id = create(REQUEST);
+        var before = repository.findById(new BookingId(id)).orElseThrow().getVersion();
+        mvc.perform(put("/bookings/{id}", id).contentType(MediaType.APPLICATION_JSON).content(REQUEST))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("X-Booking-Changed", "false"));
+        assertThat(repository.findById(new BookingId(id)).orElseThrow().getVersion()).isEqualTo(before);
+        mvc.perform(put("/bookings/{id}", id).contentType(MediaType.APPLICATION_JSON)
+                        .content(REQUEST.replace("2026-10-08", "2026-10-09")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("X-Booking-Changed", "true"));
+        assertThat(repository.findById(new BookingId(id)).orElseThrow().getVersion()).isEqualTo(before + 1);
+    }
+
+    @Test
     void aChangeMadeOnAStaleCopyIsRefusedInsteadOfReusingAVersion() throws Exception {
         var id = create(REQUEST);
         var stale = repository.findById(new BookingId(id)).orElseThrow();
