@@ -55,7 +55,7 @@ public class RouteDBQueryService implements RouteQueryService {
 
     static RouteDto toDto(RouteEntity e) {
         return new RouteDto(e.getId(), e.getName(), e.getPriority(), e.getRole(), e.getTenant(),
-                e.getLocale(), e.getRoutePrefix(), e.getTargetAgentId(),
+                e.getLocale(), e.getRoutePrefix(), e.getChannel(), e.getTargetAgentId(),
                 IdList.split(e.getInputGuardrailAgentIds()), IdList.split(e.getOutputGuardrailAgentIds()),
                 e.getGuardrailFailure() == null ? "CLOSED" : e.getGuardrailFailure(),
                 e.isEnabled(), e.getCreated());

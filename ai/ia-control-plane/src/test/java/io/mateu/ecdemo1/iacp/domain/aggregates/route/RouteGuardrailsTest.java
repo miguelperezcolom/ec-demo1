@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RouteGuardrailsTest {
 
     static Route route(String target, Guardrails guardrails) {
-        return Route.of(new RouteId("r"), new Name("r"), 10, null, null, null, null, target, guardrails);
+        return Route.of(new RouteId("r"), new Name("r"), 10, null, null, null, null, null, target, guardrails);
     }
 
     @Test
@@ -38,7 +38,7 @@ class RouteGuardrailsTest {
     @Test
     void norCanAnUpdateMakeItOneAndARefusedUpdateChangesNothing() {
         var r = route("front", new Guardrails(List.of("guard"), List.of(), null));
-        assertThatThrownBy(() -> r.update(new Name("renamed"), 1, null, null, null, null, "guard",
+        assertThatThrownBy(() -> r.update(new Name("renamed"), 1, null, null, null, null, null, "guard",
                 r.getGuardrails(), Enabled.yes()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(r.getName().value()).isEqualTo("r");

@@ -21,8 +21,11 @@ config repo (private)                 this deployment
 
 One entry per file. The `kind` field (`llm` | `mcp` | `apimcp` | `rag` | `agent` | `budget` |
 `route`) says which catalogue it is; the schema keys everything else off that. Budgets cap token
-spend on a subject per window; routes pick which agent answers by the caller's context. Both
-reconcile under the same provenance rule as the rest.
+spend on a subject per window; routes pick which agent answers by the caller's context — role,
+tenant, locale, screen (`routePrefix`) and console (`channel`: `data-plane`, `control-plane` or
+`front-office`, which the gateway stamps from the host). With no route matching, the console's own
+default agent answers (the gateway stamps that too), else the catalogue's (`cp.default-agent-id`).
+Both reconcile under the same provenance rule as the rest.
 
 **`mcp` and `apimcp` are not two spellings of one thing.** An `mcp` entry is a server somebody else
 runs, and it lists no tools on purpose — the server declares its own, they change without this

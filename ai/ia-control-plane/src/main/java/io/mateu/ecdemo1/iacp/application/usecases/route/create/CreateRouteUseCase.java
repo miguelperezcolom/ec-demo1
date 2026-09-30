@@ -22,7 +22,7 @@ public class CreateRouteUseCase {
             throw new IllegalArgumentException("A route with id '" + command.id() + "' already exists");
         }
         repository.save(Route.of(id, new Name(command.name()), command.priority(), command.role(),
-                command.tenant(), command.locale(), command.routePrefix(), command.targetAgentId(),
+                command.tenant(), command.locale(), command.routePrefix(), command.channel(), command.targetAgentId(),
                 new Guardrails(command.inputGuardrailAgentIds(), command.outputGuardrailAgentIds(),
                         Guardrails.Failure.parse(command.guardrailFailure()))));
         return id.value();

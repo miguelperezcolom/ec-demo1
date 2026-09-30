@@ -4,36 +4,41 @@ description: Cómo contesta un prompt el agente — configuración pedida al pla
 ---
 
 `ia-agent` es la otra mitad del panel de chat. **No implementa nada**: cada respuesta es una llamada a
-una herramienta o una negativa. No tiene pantallas, ni base de datos, ni configuración propia; sabe dos
-cosas de sí mismo: dónde está el plano de control (`IA_CONTROL_PLANE_URL`) y qué agente es por defecto
-(`AGENT_ID`).
+una herramienta o una negativa. No tiene pantallas, ni base de datos, ni configuración propia; solo sabe
+dónde está el plano de control (`IA_CONTROL_PLANE_URL`). **No tiene agente propio**: qué agente contesta
+se decide en cada petición.
 
-La misma imagen corre en tres despliegues:
+Un solo despliegue, `ia-agent`, atiende el chat de todas las consolas. El gateway marca cada petición
+a `/ai/**` según el host, y borra lo que el navegador hubiera mandado con esos nombres:
 
-| Despliegue | Agente | Dónde |
-| :--------- | :----- | :---- |
-| `ia-agent` | `console-agent` | `/ai/**` de las consolas del plano de datos (`ec1`, `rw.ec1`) |
-| `ia-agent-front-office` | `reception-agent` (solo el MCP del front office) | `/ai/**` de `front.ec1` |
-| `ia-agent-control-plane` | `control-plane-agent` | `/ai/**` de las consolas de control (`console.ec1`, `rw-console.ec1`), con rol `ai-admin` |
+| Host | `X-Agent-Channel` | `X-Default-Agent` |
+| :--- | :---------------- | :---------------- |
+| `ec1`, `rw.ec1` | `data-plane` | `console-agent` |
+| `console.ec1`, `rw-console.ec1` (con rol `ai-admin`) | `control-plane` | `control-plane-agent` |
+| `front.ec1` | `front-office` | `reception-agent` |
 
-El front office y el control plane tienen su propio pod porque el plano de control enruta por la ruta
-de la pantalla, y la ruta no basta: las del front office (`/reservas`, `/bienvenida`…) no comparten un
-prefijo que una regla pueda usar, y el control plane comparte pantallas con el plano de datos
-(`/mapping`). Lo que dice de dónde viene la pregunta es el host. Las reglas de ruta del catálogo se
-siguen aplicando antes: desde las pantallas de mapeado contesta `mapping-agent`.
+Los agentes por defecto son configuración del gateway (`DATA_PLANE_AGENT`, `CONTROL_PLANE_AGENT`,
+`FRONT_OFFICE_AGENT`), no del pod.
 
-:::note[Previsto, sin hacer]
-Un solo despliegue para todos: el gateway pondría en cada petición el canal y el agente por defecto
-según el host, `ia-agent` los pasaría a `/internal/agents/resolve` y las reglas de ruta del catálogo
-decidirían con ellos. `AGENT_ID` dejaría de fijarse en el pod.
-:::
+`ia-agent` pasa el canal y el agente por defecto a `/internal/agents/resolve`, y el plano de control
+elige, en este orden:
+
+1. la primera **regla de ruta** que encaje (por prioridad), con sus condiciones: rol, tenant, locale,
+   prefijo de pantalla y **canal**. El canal existe porque la pantalla no basta: las del front office
+   no comparten prefijo y el control plane comparte pantallas con el plano de datos (`/mapping`);
+2. si ninguna encaja, el **agente por defecto de la petición**;
+3. si la petición no trae ninguno —una llamada desde dentro del clúster—, el **agente por defecto del
+   catálogo** (`cp.default-agent-id`, por defecto `console-agent`; `GET /internal/agents/default`).
+
+Desde las pantallas de mapeado de cualquier consola contesta `mapping-agent`, por la regla
+`mapping-screens-to-mapping-agent`.
 
 ## Un prompt
 
 1. El panel de chat hace POST a `/ai/api/agent/stream` con el token de la sesión (el gateway lo exige:
    cada prompt se factura).
 2. El agente resuelve **qué agente contesta** (`/internal/agents/resolve`, por la ruta de la pantalla,
-   el rol y el locale) y pide su **configuración**: modelo, credencial, prompt, servidores MCP, fuentes
+   el rol, el locale y el canal, con el agente por defecto que marcó el gateway) y pide su **configuración**: modelo, credencial, prompt, servidores MCP, fuentes
    RAG y agentes pares.
 3. Abre una **conexión nueva a cada servidor MCP** —por prompt, no en un pool: el cliente MCP que
    autoconfigura Spring AI mantiene una conexión SSE persistente y, si se cae, queda roto para toda la
@@ -44,11 +49,15 @@ decidirían con ellos. `AGENT_ID` dejaría de fijarse en el pod.
 
 ## La configuración, en caché
 
-- **30 segundos de caché**, y la **última copia buena sobrevive** al plano de control: una ráfaga de
-  prompts es una sola consulta, y un cambio en la consola llega en uno o dos prompts. Si la
-  actualización falla, se sirve la copia anterior, con un aviso en el log y `degraded` en la salud.
-- **La disponibilidad sigue a la configuración.** Un pod que nunca ha llegado al plano de control se
-  declara DOWN y queda fuera del Service: sin modelo solo produciría errores más despacio. Perder el plano
+- **30 segundos de caché por agente**, y la **última copia buena sobrevive** al plano de control: una
+  ráfaga de prompts es una sola consulta, y un cambio en la consola llega en uno o dos prompts. Cada
+  configuración que da el plano de control —pedida por id o resuelta por contexto— se guarda con el id
+  de su agente. Si `/resolve` no contesta, el prompt se responde con la última copia buena **del agente
+  que pedía** (el por defecto de su consola), o del agente por defecto del catálogo si no pedía ninguno;
+  con un aviso en el log y `degraded` en la salud. Una negativa (409: agente inservible, presupuesto
+  agotado) no se tapa con la caché.
+- **La disponibilidad sigue al plano de control.** Un pod que nunca ha llegado a él se declara DOWN y
+  queda fuera del Service: sin modelo solo produciría errores más despacio. Perder el plano
   de control **después** no lo tumba. La sonda de *readiness* es también el bucle que refresca; la de
   *liveness* ignora todo esto (reiniciar no arregla que otro servicio no conteste).
 - **Sin configuración local de respaldo**: una segunda fuente que solo aparece cuando falla la primera

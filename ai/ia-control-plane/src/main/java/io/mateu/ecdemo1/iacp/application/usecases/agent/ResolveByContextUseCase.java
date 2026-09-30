@@ -18,8 +18,9 @@ import java.util.List;
  * only if it is within budget.
  *
  * <p>Three steps, in order. <strong>Route</strong>: the enabled rules are tried in priority order
- * and the first that matches the caller's roles, tenant, locale and screen picks the agent; if none
- * matches, the caller's default agent stands in, so routing is additive — a deployment with no rules
+ * and the first that matches the caller's roles, tenant, locale, screen and console (channel) picks
+ * the agent; if none matches, the request's default agent stands in — the gateway stamps one per
+ * console — and, if it names none, the catalogue's own (cp.default-agent-id), so routing is additive — a deployment with no rules
  * behaves exactly as before. <strong>Resolve</strong>: the chosen agent is turned into a
  * configuration by {@link ResolveAgentConfigUseCase}, which already drops what is unusable and
  * refuses an agent with no model. <strong>Check</strong>: the budgets are consulted for that agent,
@@ -44,9 +45,27 @@ public class ResolveByContextUseCase {
     private final CheckBudgetUseCase checkBudget;
     private final AgentRepository agents;
 
+    /**
+     * The catalogue-wide default agent (cp.default-agent-id): the last word when no route matches and
+     * the request names no default. The request's own default — the gateway stamps one per console —
+     * comes first; this is for a caller inside the cluster that names none.
+     */
+    @org.springframework.beans.factory.annotation.Value("${cp.default-agent-id:console-agent}")
+    String defaultAgentId = "console-agent";
+
+    public String defaultAgentId() {
+        return defaultAgentId;
+    }
+
     /** What the agent knows about a request: who is asking, and from where. */
     public record RequestContext(String userId, List<String> roles, String tenant, String locale,
-                                 String route, String defaultAgentId) {
+                                 String route, String channel, String defaultAgentId) {
+
+        /** As before channels: from any console. */
+        public RequestContext(String userId, List<String> roles, String tenant, String locale,
+                              String route, String defaultAgentId) {
+            this(userId, roles, tenant, locale, route, null, defaultAgentId);
+        }
     }
 
     /** A budget stood in the way. Distinct from AgentNotUsable so the message can say which. */
@@ -59,7 +78,9 @@ public class ResolveByContextUseCase {
     @Transactional(readOnly = true)
     public ResolveAgentConfigUseCase.Resolved handle(RequestContext context) {
         var route = route(context);
-        var agentId = route != null ? route.getTargetAgentId() : context.defaultAgentId();
+        var agentId = route != null ? route.getTargetAgentId()
+                : context.defaultAgentId() != null && !context.defaultAgentId().isBlank() ? context.defaultAgentId()
+                : defaultAgentId;
         var resolved = resolveAgentConfig.handle(agentId);
 
         var verdict = checkBudget.check(agentId, resolved.llm().id(), context.userId(),
@@ -108,7 +129,7 @@ public class ResolveByContextUseCase {
     /** The first enabled rule that matches, or null when none does and the caller's default stands. */
     private Route route(RequestContext ctx) {
         for (var route : routes.findEnabledOrderedByPriority()) {
-            if (route.matches(ctx.roles(), ctx.tenant(), ctx.locale(), ctx.route())) {
+            if (route.matches(ctx.roles(), ctx.tenant(), ctx.locale(), ctx.route(), ctx.channel())) {
                 log.debug("Route '{}' matched — using agent '{}'", route.getId(), route.getTargetAgentId());
                 return route;
             }

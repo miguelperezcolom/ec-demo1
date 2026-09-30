@@ -1,4 +1,8 @@
-# The chat agent behind the console's chat panel.
+# The chat agent behind every console's chat panel — the data plane's, the control plane's and the
+# front office's. One deployment for all of them: which agent answers a prompt is not this pod's to
+# know. The gateway stamps each console's route with X-Agent-Channel (data-plane, control-plane,
+# front-office) and X-Default-Agent (console-agent, control-plane-agent, reception-agent), and the
+# control plane's routes may pick another agent by screen, role, locale, tenant or channel.
 #
 # It implements no screens, holds no database, and — since the control plane exists — holds no
 # configuration either. A prompt arrives at /ai/api/agent/stream; this pod asks the control plane
@@ -6,8 +10,8 @@
 # connection to each of those servers, hands the LLM whatever tools they advertise, and streams
 # the answer back.
 #
-# So there are exactly two things it knows about itself, and they are the only two variables below
-# that are not plumbing: where the control plane is, and which agent it is.
+# So there is exactly one thing it knows about itself, and it is the only variable below that is not
+# plumbing: where the control plane is.
 #
 # A connection per prompt, and not a pool, deliberately — Spring AI's auto-configured MCP client
 # holds one persistent SSE connection and stays broken for the life of the pod once it drops.
@@ -15,10 +19,10 @@
 # Three things to know before this is running in front of anyone:
 #   • Every prompt is billed to whatever credential the control plane serves. The gateway requires
 #     a Keycloak token on /ai/**, which is what keeps that from being an open endpoint.
-#   • Its readiness follows the configuration: a pod that has never reached the control plane
-#     reports DOWN and stays out of the Service's endpoints, because it has no model to answer
-#     with. Losing the control plane *later* does not do that — the last good configuration keeps
-#     being served and the pod reports UP with a `degraded` detail.
+#   • Its readiness follows the control plane: a pod that has never reached it reports DOWN and
+#     stays out of the Service's endpoints, because it has no model to answer with. Losing the
+#     control plane *later* does not do that — each agent's last good configuration keeps being
+#     served and the pod reports UP with a `degraded` detail.
 #   • The Anthropic key is no longer here. It lives in the control plane's catalogue, encrypted,
 #     and reaches this pod per prompt.
 apiVersion: apps/v1
@@ -58,10 +62,6 @@ spec:
             # pod-to-pod, carries no user token, and /internal/** has no gateway route at all.
             - name: IA_CONTROL_PLANE_URL
               value: http://ia-control-plane:8110
-            # Which agent this pod is. It has to name one that exists in the catalogue — the
-            # control plane seeds `console-agent` on a brand-new deployment.
-            - name: AGENT_ID
-              value: console-agent
             # Traces to Tempo, like the engines'. One span per prompt (invoke_agent <agent>), one
             # per model round trip (chat <model>) and one per tool call (execute_tool <tool>), with
             # the agent, the model, the tokens, the durations and the tools. The trace continues

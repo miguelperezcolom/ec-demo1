@@ -20,9 +20,9 @@ con Mateu, pintado por Redwood.
 | *Automatizaciones* | Solo para el personal |
 | Kárdex | Los datos del huésped, con los cambios pendientes de Salesforce |
 
-La cabecera tiene el **agente de recepción**: el mismo `ia-agent` en un pod propio
-(`ia-agent-front-office`, agente `reception-agent`), cuyo único servidor MCP es el del front office. El
-gateway manda el `/ai/**` de `front.ec1` a ese pod. Y un selector **Modo** (Staff / Cliente) que
+La cabecera tiene el **agente de recepción** (`reception-agent`), cuyo único servidor MCP es el del
+front office. Lo atiende el mismo `ia-agent` que las consolas: el gateway manda el `/ai/**` de
+`front.ec1` marcado con el canal `front-office` y `reception-agent` como agente por defecto. Y un selector **Modo** (Staff / Cliente) que
 proyecta las pantallas para cada audiencia.
 
 ## De dónde toma cada dato

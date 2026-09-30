@@ -16,8 +16,8 @@ import java.util.Collection;
 /**
  * A rule that picks which agent answers, given who is asking and where from.
  *
- * <p>Four conditions, each optional: a required {@code role}, a {@code tenant}, a {@code locale} and
- * a {@code routePrefix} (the UI screen the prompt came from). A null condition means "don't care", so
+ * <p>Five conditions, each optional: a required {@code role}, a {@code tenant}, a {@code locale}, a
+ * {@code routePrefix} (the UI screen the prompt came from) and a {@code channel} (the console). A null condition means "don't care", so
  * a rule with none set matches everything — a catch-all default — and a rule with several set is an
  * AND of them. The routes are tried in {@code priority} order and the first match wins, which is
  * what makes a specific rule beat a general one: give it a lower number.
@@ -42,13 +42,19 @@ public class Route extends AggregateRoot {
     String tenant;
     String locale;
     String routePrefix;
+    /**
+     * The console the prompt came from — {@code data-plane}, {@code control-plane} or
+     * {@code front-office}, which the gateway stamps from the host (X-Agent-Channel). The screens
+     * cannot tell them apart: both consoles have a /mapping, and the front office has no prefix.
+     */
+    String channel;
     String targetAgentId;
     Guardrails guardrails;
     Enabled enabled;
     Time created;
 
     public static Route of(RouteId id, Name name, int priority, String role, String tenant,
-                           String locale, String routePrefix, String targetAgentId,
+                           String locale, String routePrefix, String channel, String targetAgentId,
                            Guardrails guardrails) {
         var route = new Route();
         route.guardrails = checked(targetAgentId, guardrails);
@@ -59,6 +65,7 @@ public class Route extends AggregateRoot {
         route.tenant = blankToNull(tenant);
         route.locale = blankToNull(locale);
         route.routePrefix = blankToNull(routePrefix);
+        route.channel = blankToNull(channel);
         route.targetAgentId = targetAgentId;
         route.enabled = Enabled.yes();
         route.created = new Time(LocalDateTime.now());
@@ -66,7 +73,7 @@ public class Route extends AggregateRoot {
     }
 
     public void update(Name name, int priority, String role, String tenant, String locale,
-                       String routePrefix, String targetAgentId, Guardrails guardrails,
+                       String routePrefix, String channel, String targetAgentId, Guardrails guardrails,
                        Enabled enabled) {
         // First, so a refused update leaves nothing half-applied.
         this.guardrails = checked(targetAgentId, guardrails);
@@ -76,6 +83,7 @@ public class Route extends AggregateRoot {
         this.tenant = blankToNull(tenant);
         this.locale = blankToNull(locale);
         this.routePrefix = blankToNull(routePrefix);
+        this.channel = blankToNull(channel);
         this.targetAgentId = targetAgentId;
         this.enabled = enabled;
     }
@@ -99,6 +107,15 @@ public class Route extends AggregateRoot {
 
     /** True when every condition this route sets is satisfied by the request. Unset conditions pass. */
     public boolean matches(Collection<String> roles, String reqTenant, String reqLocale, String reqRoute) {
+        return matches(roles, reqTenant, reqLocale, reqRoute, null);
+    }
+
+    /** As above, and the console it came from: a route with a channel matches only prompts from it. */
+    public boolean matches(Collection<String> roles, String reqTenant, String reqLocale, String reqRoute,
+                           String reqChannel) {
+        if (channel != null && (reqChannel == null || !channel.equalsIgnoreCase(reqChannel))) {
+            return false;
+        }
         if (role != null && (roles == null || !roles.contains(role))) {
             return false;
         }

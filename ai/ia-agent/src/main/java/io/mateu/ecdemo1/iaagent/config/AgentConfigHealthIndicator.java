@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
  * Readiness follows the configuration, not the process.
  *
  * <p>A pod that started but has never reached the control plane has no model, no credential and no
- * tools; it would answer every prompt with an error. Reporting DOWN keeps it out of the Service's
+ * tools, for any agent; it would answer every prompt with an error. Reporting DOWN keeps it out of the Service's
  * endpoints, so the gateway's route has nowhere to send a prompt and the panel fails at the door
  * rather than after a round trip — and, in a deployment with more than one replica, sends the
  * prompt to a pod that can serve it.
@@ -34,25 +34,20 @@ public class AgentConfigHealthIndicator implements HealthIndicator {
 
     @Override
     public Health health() {
-        // This call is what actually fetches, and it has to be here rather than only on the
-        // prompt path: without it a pod that starts before the control plane is up would never
-        // become ready — nothing would fetch until a prompt arrived, and no prompt can arrive
-        // while readiness is DOWN. The probe interval becomes the retry, and the client's own TTL
-        // keeps it to at most one request per 30s however often Kubernetes asks.
-        client.current();
+        // This call is what actually reaches the control plane, and it has to be here rather than
+        // only on the prompt path: without it a pod that starts before the control plane is up
+        // would never become ready. The client's TTL keeps it to one request per 30s.
+        var defaultAgent = client.defaultAgentId();
 
         var failure = client.lastFetchFailed();
         if (!client.hasEverResolved()) {
             return Health.down()
-                    .withDetail("agent", client.agentId())
-                    .withDetail("reason", failure == null
-                            ? "no configuration fetched yet"
-                            : failure)
+                    .withDetail("reason", failure == null ? "control plane not reached yet" : failure)
                     .build();
         }
-        var health = Health.up().withDetail("agent", client.agentId());
+        var health = Health.up().withDetail("defaultAgent", String.valueOf(defaultAgent));
         if (failure != null) {
-            health.withDetail("degraded", "serving the last good configuration; last refresh failed")
+            health.withDetail("degraded", "serving the last good configurations; last call failed")
                     .withDetail("lastFailure", failure);
         }
         return health.build();

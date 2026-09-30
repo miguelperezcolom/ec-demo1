@@ -75,7 +75,7 @@ class ChatGuardrailsTest {
         }
     };
 
-    final AgentConfigClient configClient = new AgentConfigClient("http://cp.invalid", "front-agent");
+    final AgentConfigClient configClient = new AgentConfigClient("http://cp.invalid");
 
     final IaAgentController controller = new IaAgentController(
             configClient,
@@ -94,7 +94,8 @@ class ChatGuardrailsTest {
             },
             new AgentResolver(configClient, "http://cp.invalid", TRACE) {
                 @Override
-                public Resolution resolve(CallerIdentity caller, String locale, String route) {
+                public Resolution resolve(CallerIdentity caller, String locale, String route, String channel,
+                                          String defaultAgentId) {
                     return new Resolution(config, null);
                 }
             },

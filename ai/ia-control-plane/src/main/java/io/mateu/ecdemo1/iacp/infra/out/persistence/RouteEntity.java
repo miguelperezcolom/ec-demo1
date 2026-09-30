@@ -33,6 +33,8 @@ public class RouteEntity {
     String tenant;
     String locale;
     String routePrefix;
+    /** data-plane, control-plane or front-office; null matches any. A String, not an enum column. */
+    String channel;
     String targetAgentId;
     @Column(length = 4096)
     String inputGuardrailAgentIds;

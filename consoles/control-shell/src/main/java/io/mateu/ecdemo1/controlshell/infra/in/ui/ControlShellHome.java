@@ -55,9 +55,9 @@ import java.util.List;
 // banner, but Redwood asks for a home route with no class to build it from, and was answered
 // "Not found": its home stayed on "…".
 // The chat panel, as on the data plane: Mateu's client POSTs the prompt here and reads the answer as
-// a stream. The gateway routes this host's /ai/** to an ia-agent of its own, whose agent is the
-// control plane's (82-ia-agent-control-plane.yaml), and requires ai-admin on it like on the rest of
-// this host. That agent reaches the integrations, the mapping, the customer MDM, the notifications
+// a stream. The gateway routes this host's /ai/** to the one ia-agent, stamped as the control plane's
+// console (X-Agent-Channel) with control-plane-agent as its default (X-Default-Agent), and requires
+// ai-admin on it like on the rest of this host. That agent reaches the integrations, the mapping, the customer MDM, the notifications
 // and the engines over MCP — what this console governs.
 @AI(sse = "/ai/api/agent/stream")
 public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {

@@ -145,9 +145,10 @@ public class IaAgentController {
      * and rules that key on a screen or a locale start working the moment the frontend carries
      * those fields, with no change here.
      */
-    private AgentConfig resolveConfig(String authorization, ChatRequest request) {
+    private AgentConfig resolveConfig(String authorization, ChatRequest request, Console console) {
         var caller = jwtIdentityReader.read(authorization);
-        var resolution = agentResolver.resolve(caller, request.locale(), request.currentRoute());
+        var resolution = agentResolver.resolve(caller, request.locale(), request.currentRoute(),
+                console.channel(), console.defaultAgent());
         if (!resolution.allowed()) {
             throw new NoConfigurationException(resolution.deniedReason());
         }
@@ -276,11 +277,31 @@ public class IaAgentController {
         return new ParsedResponse(cleanText, navEvents);
     }
 
+    /**
+     * Which console the prompt came from and the agent that answers there unless a route says
+     * otherwise — stamped by the gateway from the host (X-Agent-Channel, X-Default-Agent), after it
+     * dropped whatever the browser sent. A caller inside the cluster may send them itself, or not:
+     * with neither, the control plane's routes and its own default decide.
+     */
+    public record Console(String channel, String defaultAgent) {
+    }
+
+    public static final String CHANNEL_HEADER = "X-Agent-Channel";
+    public static final String DEFAULT_AGENT_HEADER = "X-Default-Agent";
+
     // ── /chat  (POST, non-streaming) ─────────────────────────────────────────
+
+    /** As {@link #chat(ChatRequest, String, String, String)}, from no console in particular. */
+    public String chat(ChatRequest request, String authorization) {
+        return chat(request, authorization, null, null);
+    }
 
     @PostMapping(value = "/chat", produces = "text/plain;charset=UTF-8")
     public String chat(@RequestBody ChatRequest request,
-                       @RequestHeader(value = "Authorization", required = false) String authorization) {
+                       @RequestHeader(value = "Authorization", required = false) String authorization,
+                       @RequestHeader(value = CHANNEL_HEADER, required = false) String channel,
+                       @RequestHeader(value = DEFAULT_AGENT_HEADER, required = false) String defaultAgent) {
+        var console = new Console(channel, defaultAgent);
         String sessionId = request.sessionId();
         // What happened goes to the log; what was said goes to the trace, and only when
         // IA_CAPTURE_CONTENT says so. The text itself is here at DEBUG, for a local run.
@@ -294,7 +315,7 @@ public class IaAgentController {
             // Resolved before anything else: it decides the agent (by the caller's context), the
             // model, the credential, the prompt and which MCP servers to even open a connection to
             // — and refuses an over-budget request here rather than after spending on it.
-            AgentConfig config = resolveConfig(authorization, request);
+            AgentConfig config = resolveConfig(authorization, request, console);
             tagAgent(observation, config);
 
             var input = checkInput(observation, config, request.message(), authorization);
@@ -377,9 +398,17 @@ public class IaAgentController {
      *   <li>{@code data: <text>} — the actual response text</li>
      * </ul>
      */
+    /** As {@link #stream(ChatRequest, String, String, String)}, from no console in particular. */
+    public Flux<ServerSentEvent<String>> stream(ChatRequest request, String authorization) {
+        return stream(request, authorization, null, null);
+    }
+
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest request,
-                                                @RequestHeader(value = "Authorization", required = false) String authorization) {
+                                                @RequestHeader(value = "Authorization", required = false) String authorization,
+                                                @RequestHeader(value = CHANNEL_HEADER, required = false) String channel,
+                                                @RequestHeader(value = DEFAULT_AGENT_HEADER, required = false) String defaultAgent) {
+        var console = new Console(channel, defaultAgent);
         String sessionId = request.sessionId();
         log.info("Stream request session={}: {} chars", sessionId, length(request.message()));
         log.debug("Stream request session={}: '{}'", sessionId, request.message());
@@ -397,7 +426,7 @@ public class IaAgentController {
         Mono<LlmResult> resultMono = Mono.fromCallable(() -> {
                     var observation = startPromptObservation(requestObservation, sessionId, request.message());
                     try (var scope = observation.openScope()) {
-                        return streamPrompt(observation, request, authorization, sessionId, history);
+                        return streamPrompt(observation, request, authorization, console, sessionId, history);
                     } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
                         tagResponse(observation, e.getMessage());
                         outcome(observation, "refused");
@@ -449,11 +478,11 @@ public class IaAgentController {
 
     /** The body of one /stream prompt, inside its observation. */
     private LlmResult streamPrompt(Observation observation, ChatRequest request, String authorization,
-                                   String sessionId,
+                                   Console console, String sessionId,
                                    List<org.springframework.ai.chat.messages.Message> history) {
         // Same order as /chat: resolve first, because it decides which agent, which
         // servers to connect to and with which model to answer — and can refuse.
-        AgentConfig config = resolveConfig(authorization, request);
+        AgentConfig config = resolveConfig(authorization, request, console);
         tagAgent(observation, config);
         var input = checkInput(observation, config, request.message(), authorization);
         if (input.blocked()) {

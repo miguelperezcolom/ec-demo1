@@ -430,6 +430,11 @@
           "type": "string",
           "description": "A prefix the current UI route must start with. Omit for any."
         },
+        "channel": {
+          "type": "string",
+          "enum": ["data-plane", "control-plane", "front-office"],
+          "description": "The console the prompt comes from, as the gateway stamps it from the host (X-Agent-Channel). Omit for any."
+        },
         "targetAgent": {
           "type": "string",
           "description": "The id of the agent that answers when this rule matches."
