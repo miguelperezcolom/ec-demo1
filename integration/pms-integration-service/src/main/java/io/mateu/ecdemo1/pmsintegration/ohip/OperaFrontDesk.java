@@ -389,10 +389,12 @@ public class OperaFrontDesk {
      */
     public void postCharge(String hotelId, String reservationId, String transactionCode, BigDecimal amount, String currency,
                            String reference, String remark) {
+        // As Oracle's own examples of postBillingCharges: the reservation in the path only, and the
+        // cashier on the criteria — a body with the reservation in the criteria, the cashier on the
+        // charge and a window got OHIP 500s from XMAR (2026-09-30).
         var body = objectMapper.createObjectNode();
         var criteria = body.putObject("criteria");
         criteria.put("hotelId", hotelId);
-        criteria.putObject("reservationId").put("id", reservationId).put("type", "Reservation");
         var charge = criteria.putArray("charges").addObject();
         charge.put("transactionCode", transactionCode);
         var price = charge.putObject("price").put("amount", amount);
@@ -404,9 +406,7 @@ public class OperaFrontDesk {
         if (remark != null) {
             charge.put("postingRemark", remark.length() > 200 ? remark.substring(0, 200) : remark);
         }
-        charge.put("applyRoutingInstructions", true);
-        charge.put("folioWindowNo", 1);
-        cashier(charge);
+        criteria.put("postIt", false);
         cashier(criteria);
         ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/charges", body, hotelId, reservationId);
     }
