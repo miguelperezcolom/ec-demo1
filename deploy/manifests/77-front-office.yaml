@@ -40,7 +40,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: front-office
-          image: miguelperezcolom/ec-demo1-front-office:0.43.1
+          image: miguelperezcolom/ec-demo1-front-office:0.44.1
           env:
             # Traces to Tempo: taking a stay from front-office-commands joins the trace of the booking
             # that wrote it into Opera.
@@ -75,6 +75,13 @@ spec:
             # The data plane's console: a stay links to its CRS booking and its customers (Clientes) there.
             - name: CONSOLE_URL
               value: "https://ec1.mateu.io"
+            # Its own URL: the inbox notice of a forced check-in overdue (CHECK_IN_INCOMPLETE) links to the stay.
+            - name: FRONT_OFFICE_URL
+              value: "https://front.ec1.mateu.io"
+            # A forced check-in's documents are due 24 h after the arrival (parte de viajeros); past it,
+            # reception is told once. Checked every minute.
+            - name: FORCED_CHECKIN_DOCUMENT_DEADLINE
+              value: "PT24H"
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/front_office
             - name: DB_USERNAME
