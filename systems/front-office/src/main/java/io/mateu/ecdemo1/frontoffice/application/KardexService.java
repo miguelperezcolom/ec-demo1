@@ -37,10 +37,11 @@ public class KardexService {
   final CommandOutbox outbox;
   final String hotel;
   final TransactionTemplate transaction;
+  final IncompleteCheckIns incomplete;
 
   public KardexService(StayRepository stays, GuestRepository guests, Kardex kardex, DemoScanner scanner,
                        WalkIns walkIns, CommandOutbox outbox, @Value("${frontoffice.hotel:MRU01}") String hotel,
-                       PlatformTransactionManager transactions) {
+                       PlatformTransactionManager transactions, IncompleteCheckIns incomplete) {
     this.stays = stays;
     this.guests = guests;
     this.kardex = kardex;
@@ -49,6 +50,7 @@ public class KardexService {
     this.outbox = outbox;
     this.hotel = hotel;
     this.transaction = new TransactionTemplate(transactions);
+    this.incomplete = incomplete;
   }
 
   /**
@@ -78,6 +80,8 @@ public class KardexService {
           document.lastName(), document.documentType(), document.documentNumber(), document.birthDate(),
           document.nationality(), "front office " + hotel + " · " + stayId + " pax " + pax);
       outbox.append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), command);
+      // the document may be the last step a forced check-in owed
+      incomplete.settle(stayId, null);
     });
     return document;
   }
@@ -91,10 +95,12 @@ public class KardexService {
   public void registered(String stayId, int pax, String document, String name, String email, String phone) {
     if (pax <= 1) {
       guestEdited(stayId, g -> g.registeredAtDesk(document, name, email, phone));
-      return;
+    } else {
+      transaction.executeWithoutResult(status ->
+          stays.save(stay(stayId).registerCompanionAtDesk(pax, document, name, email, phone)));
     }
-    transaction.executeWithoutResult(status ->
-        stays.save(stay(stayId).registerCompanionAtDesk(pax, document, name, email, phone)));
+    // the document may be the last step a forced check-in owed
+    transaction.executeWithoutResult(status -> incomplete.settle(stayId, null));
   }
 
   /** The pax's contact, as the desk took it down. */

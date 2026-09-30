@@ -10,5 +10,10 @@ public enum NotificationType {
     /** The PMS refused a write in a way retrying will not fix. */
     PMS_REJECTED,
     /** A hotel's onboarding stopped at a gate a person has to open: credentials, configuration, gaps, activation. */
-    INTEGRATION_NEEDS_ATTENTION
+    INTEGRATION_NEEDS_ATTENTION,
+    /**
+     * A stay the front desk let in with a forced check-in still lacks a guest's document past the
+     * traveller's-registration deadline (24 h from the arrival): reception must complete it.
+     */
+    CHECK_IN_INCOMPLETE
 }

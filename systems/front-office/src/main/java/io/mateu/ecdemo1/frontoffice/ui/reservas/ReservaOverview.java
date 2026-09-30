@@ -218,7 +218,9 @@ public class ReservaOverview
       // y el slot INFO (huéspedes + salida) como complementario; los fondos y el
       // ancho del info los pone el propio template
       return dosZonas(
-          List.of(titulo("Estancia · " + estancia().balanceResumen()), estancia().paraInHouse(stay)),
+          List.of(titulo("Estancia · " + estancia().balanceResumen()),
+              io.mateu.ecdemo1.frontoffice.ui.checkin.ForcedCheckInViews.onTheStay(stayId),
+              estancia().paraInHouse(stay)),
           huespedes().infoSecundaria(stay));
     }
     if (stay.status() != StayStatus.ARRIVING) {
@@ -340,7 +342,7 @@ public class ReservaOverview
             "opIncidencia", "crearIncidencia", "enviarMensaje",
             "opExtras", "extras360", "cerrarExtras", "opFirma", "opFirmaDone",
             "buscarCargos", "seleccionarCargo", "cambiarMetodo", "confirmPayment", "entendidoCheckout",
-            "anularCargo", "comprobarHabitacion")
+            "anularCargo", "comprobarHabitacion", "completarCheckin")
         .contains(actionId);
   }
 
@@ -351,9 +353,17 @@ public class ReservaOverview
       case "siguienteReserva" -> URI.create("/reservas/" + param(httpRequest, "_item"));
       case "volverListado" -> URI.create("/reservas?vista=LLEGADAS_HOY");
       case "irCheckout" -> {
+        // un check-in forzado aún incompleto no sale: primero «Completar» (el servidor lo niega igual)
+        var incompleto = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.checkInStatus(stayId);
+        if (incompleto.incomplete()) {
+          yield List.of(new Message("⛔ Check-in incompleto: falta " + incompleto.missingText()
+                  + ". Complétalo antes del check-out."),
+              UICommand.navigateTo("/checkin/" + stayId));
+        }
         modoCheckout = true;
         yield this;
       }
+      case "completarCheckin" -> URI.create("/checkin/" + stayId);
       case "volverReserva" -> {
         modoCheckout = false;
         cargoBusqueda = null;
@@ -527,7 +537,7 @@ public class ReservaOverview
                   .map(i -> progress.step(PASOS_FIRMA[i - 1], i / 3.0)));
       case "opFirmaDone" -> {
         firmaEnviada = false;
-        checkIn.registrationSigned(stayId);
+        checkIn.registrationSigned(stayId, DeskUser.name());
         yield List.of(this, new Message("Firma capturada — registro firmado por el huésped"));
       }
       case "elegirHabitacion" -> {
@@ -591,7 +601,8 @@ public class ReservaOverview
     Stay checkedIn;
     try {
       checkedIn = checkIn.checkIn(stayId, null, List.of(), DeskUser.name());
-    } catch (GuestNotices.NotAcknowledged e) {
+    } catch (GuestNotices.NotAcknowledged
+             | io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns.CheckInIncomplete e) {
       return URI.create("/checkin/" + stayId);
     }
     // la habitación que no está lista en Opera (XMAR: sin inspeccionar) puede hacer que Opera lo rechace
@@ -688,6 +699,9 @@ public class ReservaOverview
       checkOut.checkOut(stayId, DeskUser.name());
     } catch (GuestNotices.NotAcknowledged e) {
       return List.of(this, new Message("⛔ " + e.getMessage()));
+    } catch (io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns.CheckInIncomplete e) {
+      modoCheckout = false;
+      return List.of(new Message("⛔ " + e.getMessage()), UICommand.navigateTo("/checkin/" + stayId));
     }
     modoCheckout = false;
     return List.of(

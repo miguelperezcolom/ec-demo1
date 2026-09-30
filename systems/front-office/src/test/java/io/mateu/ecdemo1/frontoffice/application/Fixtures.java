@@ -32,6 +32,26 @@ final class Fixtures {
     return new Arrival(stayId, guestId, room);
   }
 
+  /**
+   * Everything the check-in needs, done: the holder's and every companion's document seen and the
+   * registration signed — a check-in without them is refused unless it is forced. The stay's id.
+   */
+  static String complete(String stayId, GuestRepository guests, StayRepository stays,
+                         io.mateu.ecdemo1.frontoffice.domain.stay.CheckInOpsRepository ops) {
+    var stay = stays.findById(stayId).orElseThrow();
+    guests.findById(stay.guestId()).filter(g -> !g.identityComplete())
+        .ifPresent(g -> guests.save(g.verifyIdentity(g.document() == null ? "DOC-" + g.id() : g.document())));
+    for (int pax = 2; pax <= stay.pax(); pax++) {
+      var companion = stay.companionAt(pax);
+      if (companion == null || !companion.identityComplete()) {
+        stay = stay.scanCompanion(pax, "DOC-" + stayId + "-" + pax);
+      }
+    }
+    stays.save(stay);
+    ops.save(stayId, ops.of(stayId).withFirma(true));
+    return stayId;
+  }
+
   static String freeRoom(RoomRepository rooms) {
     var room = String.valueOf(9900 + SEQ.incrementAndGet());
     rooms.save(new Room(room, 99, "Suite test", RoomOccupancy.FREE, HousekeepingStatus.CLEAN, null));

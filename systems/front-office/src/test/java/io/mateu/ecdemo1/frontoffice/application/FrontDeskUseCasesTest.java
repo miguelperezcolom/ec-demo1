@@ -50,7 +50,7 @@ class FrontDeskUseCasesTest {
   void aCheckInMovesTheStayInOccupiesTheRoomOpensTheFolioAndClosesTheExtras() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
 
-    var stay = checkIn.checkIn(a.stayId(), null, List.of("transfer"));
+    var stay = checkIn.checkIn(complete(a), null, List.of("transfer"));
 
     assertThat(stay.status()).isEqualTo(StayStatus.IN_HOUSE);
     assertThat(stays.findById(a.stayId()).orElseThrow().status()).isEqualTo(StayStatus.IN_HOUSE);
@@ -72,7 +72,9 @@ class FrontDeskUseCasesTest {
     kardex.scanned(a.stayId(), 1);
     assertThat(queries.pendingPax(stay)).isZero();
     checkIn.extrasClosed(a.stayId());
+    assertThat(queries.readyForDirectCheckIn(stay)).isFalse(); // the registration is not signed yet
 
+    checkIn.registrationSigned(a.stayId());
     assertThat(queries.readyForDirectCheckIn(stay)).isTrue();
   }
 
@@ -89,7 +91,7 @@ class FrontDeskUseCasesTest {
   @Test
   void aCheckOutFreesTheRoomToBeCleaned() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
 
     var departed = checkOut.checkOut(a.stayId());
 
@@ -102,7 +104,7 @@ class FrontDeskUseCasesTest {
   @Test
   void aGuestInTheHouseWhoChangesRoomLeavesTheOldOneAndTakesTheNew() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
     var other = Fixtures.freeRoom(rooms);
 
     var moved = roomChange.changeRoom(a.stayId(), other);
@@ -135,7 +137,7 @@ class FrontDeskUseCasesTest {
   void aCheckInAndACheckOutGoUpToThePmsWithTheirTransactions() {
     var a = Fixtures.arrival(guests, stays, rooms, 2);
 
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
     checkOut.checkOut(a.stayId());
 
     // Events of the desk, for the PMS (the master of the stay), in the outbox with the decisions.
@@ -227,5 +229,10 @@ class FrontDeskUseCasesTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Falta del titular: documento.");
     assertThat(walkInStore.pending()).isEmpty();
+  }
+
+  /** The arrival with its documents seen and its registration signed: nothing missing for the check-in. */
+  String complete(Fixtures.Arrival a) {
+    return Fixtures.complete(a.stayId(), guests, stays, ops);
   }
 }

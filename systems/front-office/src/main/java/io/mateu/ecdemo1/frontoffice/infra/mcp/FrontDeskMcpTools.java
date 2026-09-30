@@ -65,13 +65,15 @@ public class FrontDeskMcpTools {
   final PendingConfirmations confirmations;
   final GuestNotices notices;
   final McpCaller caller;
+  final io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete;
 
   public FrontDeskMcpTools(StayQueries queries, StayRepository stays, GuestRepository guests, FolioRepository folios,
                            RoomRepository rooms, AddOnCatalogRepository addOns, WalkIns walkIns,
                            CheckInService checkIn, CheckOutService checkOut, NoShowService noShows,
                            RoomChangeService roomChange, FolioService folioService, KardexService kardex,
                            WalkInService walkInService, PendingConfirmations confirmations, GuestNotices notices,
-                           McpCaller caller) {
+                           McpCaller caller, io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete) {
+    this.incomplete = incomplete;
     this.queries = queries;
     this.stays = stays;
     this.guests = guests;
@@ -113,6 +115,14 @@ public class FrontDeskMcpTools {
           declarar «He leído el aviso» (queda auditado). Antes de un check-out, avisa de los cambios de kárdex
           rechazados (campo, lo propuesto y lo que se queda, y el motivo) o pendientes («la factura saldrá con el
           dato anterior») y de los avisos de salida: confirmar es decir «Entendido».
+        - Check-in completo = documento verificado de cada pax (no shows aparte) y el registro firmado (la
+          firma se captura en la tablet del mostrador: tú no puedes firmar). Si falta algo, prepareCheckIn lo
+          rechaza diciendo qué falta. Si la persona quiere que entre igualmente, prepareForcedCheckIn con un
+          MOTIVO obligatorio (pregúntaselo; queda auditado quién, cuándo y por qué): el check-in sube a Opera
+          como cualquier otro, pero la estancia queda «Check-in incompleto» y NO puede hacer el check-out
+          hasta completarlo (en el front office, «Completar» en la estancia). getStay lo dice (checkIn:
+          incomplete, missing, forcedBy, reason, documentsDue, overdue); pasadas 24 h de la llegada sin un
+          documento, el parte de viajeros está vencido y recepción recibe un aviso en su bandeja.
         - Un no show de toda la reserva se comunica al CRS; un walk-in reserva en el CRS; los cambios de nombre,
           documento o contacto del titular se proponen al maestro de clientes (Salesforce). Dilo en el resumen.
         """;
@@ -158,7 +168,26 @@ public class FrontDeskMcpTools {
                            List<String> addOns, List<Integer> noShowPax, Map<String, Boolean> checkInTasks,
                            List<IncidentView> incidents, String vipNote, String walkIn, BigDecimal folioBalance,
                            List<NoticeView> notices, List<KardexWarningView> kardexWarnings,
-                           Boolean blockingNoticesRead, Boolean checkOutWarningsRead) {}
+                           Boolean blockingNoticesRead, Boolean checkOutWarningsRead,
+                           CheckInCompleteness checkIn) {}
+
+  /**
+   * Where a stay's check-in stands: what it still lacks (documents, signature) and, if it was forced,
+   * who forced it, when and why, and when its documents are due (overdue once past).
+   */
+  public record CheckInCompleteness(boolean complete, boolean incomplete, List<String> missing, boolean forced,
+                                    String forcedBy, java.time.Instant forcedAt, String reason,
+                                    java.time.Instant documentsDue, boolean overdue, String completedBy) {}
+
+  CheckInCompleteness completeness(Stay stay) {
+    var status = incomplete.status(stay);
+    var forced = status.forced();
+    return new CheckInCompleteness(status.missing().isEmpty(), status.incomplete(),
+        status.missing().stream().map(io.mateu.ecdemo1.frontoffice.domain.stay.PendingStep::label).toList(),
+        forced != null, forced == null ? null : forced.forcedBy(), forced == null ? null : forced.forcedAt(),
+        forced == null ? null : forced.reason(), status.documentsDue(), status.overdue(),
+        forced == null ? null : forced.completedBy());
+  }
 
   public record NoticeView(int pax, String guest, String type, String text, List<String> showAt, LocalDate from,
                            LocalDate to) {}
@@ -190,7 +219,9 @@ public class FrontDeskMcpTools {
   }
 
   @Tool(description = "One stay in full: its status, room, dates, pax and companions, add-ons, the desk's check-in "
-      + "tasks, pax marked as no-show, incidents, walk-in state and folio balance")
+      + "tasks, pax marked as no-show, incidents, walk-in state and folio balance; and checkIn: whether its check-in "
+      + "is complete, what it still lacks (documents, signature) and — if it was FORCED — who, when, why, when its "
+      + "documents are due and whether they are overdue. An incomplete (forced) check-in blocks the check-out")
   public StayDetail getStay(@ToolParam(description = "The stay's front-office id (FO-… for a walk-in) or its CRS locator")
                             String stayRef) {
     var stay = stay(stayRef);
@@ -217,7 +248,7 @@ public class FrontDeskMcpTools {
             i.title(), i.status() == null ? null : i.status().name(), i.complaint())).toList(),
         stay.vipNote(), walkIns.of(stay.id()).map(WalkIn::label).orElse(null),
         folio.map(Folio::balance).orElse(null), noticeViews(notices.activeForStay(stay)), kardexViews(stay),
-        notices.checkInAcknowledged(stay), notices.checkOutAcknowledged(stay));
+        notices.checkInAcknowledged(stay), notices.checkOutAcknowledged(stay), completeness(stay));
   }
 
   public record FieldChangeView(String field, String before, String after) {}
@@ -323,7 +354,14 @@ public class FrontDeskMcpTools {
     var pending = queries.pendingPax(stay);
     if (pending > 0) {
       return refuse(pending + " pax de " + stay.id() + " sin identidad verificada: regístralos antes con "
-          + "prepareKardexEdit, o que los escaneen en el mostrador.");
+          + "prepareKardexEdit, o que los escaneen en el mostrador. Si tiene que entrar igualmente, "
+          + "prepareForcedCheckIn con el motivo.");
+    }
+    var missing = incomplete.missing(stay);
+    if (!missing.isEmpty()) {
+      return refuse("al check-in de " + stay.id() + " le falta: " + String.join("; ", missing.stream()
+          .map(io.mateu.ecdemo1.frontoffice.domain.stay.PendingStep::label).toList()) + " (la firma, en la tablet "
+          + "del mostrador). Si tiene que entrar igualmente, prepareForcedCheckIn con el motivo.");
     }
     var number = roomNumber == null || roomNumber.isBlank() ? stay.roomNumber() : roomNumber.trim();
     if (number == null || number.isBlank()) {
@@ -378,12 +416,94 @@ public class FrontDeskMcpTools {
     });
   }
 
+  @Tool(description = "Prepare the check-in of an arriving stay FORCED with steps missing (a pax's document, the "
+      + "registration's signature): only when the person says the guest must go in anyway, and with the REASON they "
+      + "give (mandatory, audited: who, when, why). It goes up to Opera like any check-in; the stay is left «Check-in "
+      + "incompleto» and cannot check out until it is completed at the desk («Completar»). A blocking reception "
+      + "notice must still be read. Nothing is done until the person confirms (confirmAction)")
+  public String prepareForcedCheckIn(
+      @ToolParam(description = "The stay's front-office id or CRS locator") String stayRef,
+      @ToolParam(description = "Why it goes in with steps missing — the person's words; mandatory") String reason,
+      @ToolParam(description = "Room number to assign; empty to keep the reservation's", required = false)
+      String roomNumber,
+      @ToolParam(description = "Add-on ids to contract, from listAddOns; empty for none", required = false)
+      List<String> addOnIds) {
+    var stay = stay(stayRef);
+    if (stay.status() != StayStatus.ARRIVING) {
+      return refuse("la estancia " + stay.id() + " no está pendiente de llegada (" + stay.status() + ").");
+    }
+    if (reason == null || reason.isBlank()) {
+      return refuse("forzar el check-in necesita un motivo: pregúntaselo a la persona.");
+    }
+    var missing = incomplete.missing(stay);
+    if (missing.isEmpty()) {
+      return refuse("al check-in de " + stay.id() + " no le falta nada: usa prepareCheckIn.");
+    }
+    var number = roomNumber == null || roomNumber.isBlank() ? stay.roomNumber() : roomNumber.trim();
+    if (number == null || number.isBlank()) {
+      return refuse("la estancia no tiene habitación: indica una libre (listAvailableRooms).");
+    }
+    var room = rooms.findByNumber(number).orElse(null);
+    if (room == null) {
+      return refuse("no existe la habitación " + number + ".");
+    }
+    if (!room.assignable() && !number.equals(stay.roomNumber())) {
+      return refuse("la habitación " + number + " no está libre.");
+    }
+    var chosen = addOnIds == null ? List.<String>of() : addOnIds.stream().filter(Objects::nonNull).map(String::trim)
+        .filter(id -> !id.isBlank()).distinct().toList();
+    for (var id : chosen) {
+      if (addOns.findById(id).isEmpty()) {
+        return refuse("no hay ningún extra con id " + id + " (listAddOns).");
+      }
+    }
+    var falta = String.join("; ", missing.stream().map(io.mateu.ecdemo1.frontoffice.domain.stay.PendingStep::label)
+        .toList());
+    var guest = guests.findById(stay.guestId()).map(Guest::name).orElse(stay.guestId());
+    var summary = ("Check-in FORZADO de %s (%s), %d pax, en la habitación %s, con pasos pendientes: %s. Motivo: «%s». "
+        + "Sube a Opera como cualquier check-in; la estancia queda «Check-in incompleto» y no podrá hacer el "
+        + "check-out hasta completarlo; si falta un documento pasadas %d h, el parte de viajeros vence y recepción "
+        + "recibe un aviso. Queda auditado quién, cuándo y por qué.").formatted(stay.id(), guest, stay.pax(), number,
+        falta, reason.trim(), incomplete.documentDeadline().toHours());
+    var mustRead = !notices.checkInAcknowledged(stay);
+    var fingerprint = notices.checkInFingerprint(stay);
+    var blocking = notices.blockingAtCheckIn(stay);
+    if (!blocking.isEmpty() && mustRead) {
+      summary += " AVISO BLOQUEANTE: " + String.join(" ", blocking.stream()
+          .map(p -> "de " + p.guestName() + ": «" + p.notice().text() + "».").toList())
+          + " Al confirmar, la persona declara que lo ha leído (queda auditado).";
+    }
+    var params = params("stayId", stay.id(), "roomNumber", number, "addOnIds", chosen, "reason", reason.trim(),
+        "missing", falta, "blockingNotices", fingerprint);
+    var stayId = stay.id();
+    var motivo = reason.trim();
+    return confirmations.prepare("Forced check-in", summary, params, () -> {
+      var by = PendingConfirmations.actor(caller.person());
+      if (mustRead) {
+        notices.acknowledgeCheckIn(stayId, by, fingerprint);
+      }
+      var done = checkIn.forceCheckIn(stayId, number, chosen, motivo, by);
+      if (done.status() != StayStatus.IN_HOUSE) {
+        throw new IllegalStateException("la estancia ya no estaba pendiente de llegada (" + done.status() + ")");
+      }
+      return "Check-in forzado de " + stayId + " hecho: en casa, habitación " + done.roomNumber()
+          + ". Check-in incompleto: falta " + falta + ".";
+    });
+  }
+
   @Tool(description = "Prepare the check-out of an in-house stay: it leaves and its room is freed to be cleaned. "
-      + "Nothing is done until the person confirms (confirmAction)")
+      + "Refused while its check-in, forced, is incomplete (a document or the signature missing: completed first at "
+      + "the desk). Nothing is done until the person confirms (confirmAction)")
   public String prepareCheckOut(@ToolParam(description = "The stay's front-office id or CRS locator") String stayRef) {
     var stay = stay(stayRef);
     if (!stay.inHouse()) {
       return refuse("la estancia " + stay.id() + " no está en casa (" + stay.status() + ").");
+    }
+    var checkInStatus = incomplete.status(stay);
+    if (checkInStatus.incomplete()) {
+      return refuse("el check-in de " + stay.id() + " se forzó y sigue incompleto: falta " + checkInStatus.missingText()
+          + (checkInStatus.overdue() ? " (el parte de viajeros ya está vencido)" : "")
+          + ". No puede salir hasta completarlo en el front office («Completar» en la estancia).");
     }
     var balance = folios.findByStayId(stay.id()).map(Folio::balance).orElse(BigDecimal.ZERO);
     var summary = "Check-out de %s, habitación %s (salida prevista %s). Saldo del folio: %s €. La habitación queda libre y sucia."

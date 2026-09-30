@@ -109,6 +109,7 @@ class McpServerOverHttpTest {
     rooms.save(new Room("7701", 77, "Doble", RoomOccupancy.FREE, HousekeepingStatus.CLEAN, null));
     stays.save(Stay.fromReservation("HTTP-1", "C-HTTP1", "Doble", "SA", LocalDate.now().minusDays(1),
         LocalDate.now().plusDays(1), 1, null, new BigDecimal("100.00"), List.of()));
+    checkIn.registrationSigned("HTTP-1");
     checkIn.checkIn("HTTP-1", "7701", List.of());
 
     String token;

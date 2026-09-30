@@ -50,6 +50,7 @@ Los tipos (`NotificationType`):
 | `RETRYING_TOO_LONG` | Un paso que escribe en Opera lleva más del umbral fallando |
 | `PMS_REJECTED` | Opera rechaza una escritura |
 | `INTEGRATION_NEEDS_ATTENTION` | Una puerta del alta necesita a alguien |
+| `CHECK_IN_INCOMPLETE` | Un check-in forzado sigue sin el documento de un huésped pasadas 24 h de la llegada (parte de viajeros); lo manda el front office a recepción |
 
 Los avisos llegan por Kafka (`notifications`) y se cierran por Kafka (`notification-resolutions`): un
 aviso se va de todas las bandejas cuando lo que lo causó se resuelve.

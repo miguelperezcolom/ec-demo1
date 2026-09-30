@@ -42,8 +42,11 @@ public class ReservasListing
   final StayReadModel stayReads;
   final StayRepository stays;
   final DemoReservationsService demoReservations;
+  final io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIns forcedCheckIns;
 
-  public ReservasListing(StayReadModel stayReads, StayRepository stays, DemoReservationsService demoReservations) {
+  public ReservasListing(StayReadModel stayReads, StayRepository stays, DemoReservationsService demoReservations,
+                         io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIns forcedCheckIns) {
+    this.forcedCheckIns = forcedCheckIns;
     this.stayReads = stayReads;
     this.stays = stays;
     this.demoReservations = demoReservations;
@@ -60,7 +63,9 @@ public class ReservasListing
     @Label("Salidas hoy")
     SALIDAS_HOY,
     @Label("In house")
-    IN_HOUSE
+    IN_HOUSE,
+    @Label("Check-in incompleto")
+    CHECKIN_INCOMPLETO
   }
 
   public static class Filtros {
@@ -74,17 +79,21 @@ public class ReservasListing
       @Label("Habitación") String habitacion,
       @Label("Noches") long noches,
       @Label("Estado") String estado,
+      @Label("Check-in") Status checkin,
       @Label("Tier") Status tier) {}
 
   @Override
   public ListingData<Reserva> search(SearchRequest request, HttpRequest httpRequest) {
     var searchText = request.searchText();
     var filtros = filters(request);
+    // los check-in forzados aún incompletos (una consulta): su badge, y la vista que los reúne
+    var incompletos = new java.util.HashMap<String, io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIn>();
+    forcedCheckIns.open().forEach(f -> incompletos.put(f.stayId(), f));
     // Una consulta (estancia + huésped, sin colecciones); el filtro, el orden y la búsqueda sobre la
     // fila ya pintada siguen en memoria, que es lo que permite buscar por "Llega mañana".
     var rows =
         stayReads.rows().stream()
-            .filter(s -> matchesVista(s, filtros == null ? null : filtros.vista))
+            .filter(s -> matchesVista(s, filtros == null ? null : filtros.vista, incompletos.keySet()))
             .sorted(
                 java.util.Comparator.comparing((StayRow s) -> s.status().ordinal())
                     .thenComparing(
@@ -92,14 +101,14 @@ public class ReservasListing
                             s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
                                 ? s.checkIn()
                                 : s.checkOut()))
-            .map(this::row)
+            .map(s -> row(s, incompletos.get(s.id())))
             .filter(row -> matches(row, searchText))
             .toList();
     return Paging.page(rows, request);
   }
 
   /** El selector rápido: llegadas de hoy / salidas de hoy / en casa. */
-  private static boolean matchesVista(StayRow stay, Vista vista) {
+  private static boolean matchesVista(StayRow stay, Vista vista, java.util.Set<String> incompletos) {
     if (vista == null) {
       return true;
     }
@@ -114,10 +123,22 @@ public class ReservasListing
               && stay.checkOut().isEqual(today);
       case IN_HOUSE ->
           stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE;
+      case CHECKIN_INCOMPLETO ->
+          stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE && incompletos.contains(stay.id());
     };
   }
 
-  private Reserva row(StayRow stay) {
+  /** «Check-in incompleto» (amber) — red once reception was told the documents are overdue. */
+  static Status checkinBadge(StayRow stay, io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIn forced) {
+    if (forced == null || stay.status() != io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE) {
+      return null;
+    }
+    return forced.overdueNotifiedAt() != null
+        ? new Status(io.mateu.uidl.data.StatusType.DANGER, "Check-in incompleto · parte vencido")
+        : new Status(io.mateu.uidl.data.StatusType.WARNING, "Check-in incompleto");
+  }
+
+  private Reserva row(StayRow stay, io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIn forced) {
     var habitacion = stay.roomNumber() == null || stay.roomNumber().isBlank()
         ? "Sin asignar" : "Hab " + stay.roomNumber();
     return new Reserva(
@@ -126,6 +147,7 @@ public class ReservasListing
         habitacion + " · " + stay.roomType(),
         java.time.temporal.ChronoUnit.DAYS.between(stay.checkIn(), stay.checkOut()),
         estadoLabel(stay.status(), stay.checkIn(), stay.checkOut()),
+        checkinBadge(stay, forced),
         Tiers.badge(stay.guestTier()));
   }
 
@@ -134,7 +156,8 @@ public class ReservasListing
       return true;
     }
     // The locator too: it is what the desk reads off a voucher or a call.
-    var hay = (row.id() + " " + row.huesped() + " " + row.habitacion() + " " + row.estado() + " " + (row.tier() == null ? "" : row.tier().message()))
+    var hay = (row.id() + " " + row.huesped() + " " + row.habitacion() + " " + row.estado() + " "
+        + (row.checkin() == null ? "" : row.checkin().message()) + " " + (row.tier() == null ? "" : row.tier().message()))
         .toLowerCase();
     for (var word : searchText.trim().toLowerCase().split("\\s+")) {
       if (!hay.contains(word)) {

@@ -226,6 +226,22 @@ arriving-opera-today`: XMAR está en 2026-05-13 y no hace el check-in de otra co
    rechaza, la causa aparece en la bandeja y la estancia dice por qué; *⋯ → Cambiar habitación* a una
    inspeccionada y entra, y la causa se resuelve sola.
 
+### Flujo 4 ter (opcional): check-in forzado, incompleto hasta completarlo
+
+Con otra reserva en la fecha de negocio de Opera (`demo-prep.sh seed arriving-opera-today`), de 2 pax.
+
+1. **Forzar.** *Confirmar check-in* → el asistente: escanear solo al titular, firma; en *Confirmar*, el
+   aviso de lo que falta («Documento de … (pax 2)»), el **motivo** («El acompañante trae el pasaporte
+   mañana») y **Forzar check-in**.
+   - **Se enseña:** en *Reservas*, el badge «Check-in incompleto» (y la vista del mismo nombre); en la
+     ficha, el aviso ámbar con lo que falta y «Completar»; Opera *InHouse*.
+   - **Rótulo:** «Entra sin todo, con motivo y auditado; el PMS lo registra igual.»
+2. **Check-out bloqueado.** *Check-out* → «⛔ Check-in incompleto…» y lleva a completar.
+   - **Rótulo:** «No sale hasta completar el check-in: el parte de viajeros va primero.»
+3. **Completar.** «Completar» → escanear el documento que faltaba → la ficha sin aviso; *Check-out*
+   ya se puede.
+   - **Rótulo:** «A las 24 h sin documento, el aviso pasa a rojo y recepción lo recibe en su bandeja.»
+
 ## Flujo 5: walk-in
 
 1. **Formulario.** Front office → Reservas → «＋ Walk-in»: habitación, tarifa y régimen, llegada

@@ -249,6 +249,7 @@ class FrontDeskMcpToolsTest {
     assertThat(guests.findById(stays.findById(stayId).orElseThrow().guestId()).orElseThrow().identityComplete()).isTrue();
 
     var room = room(RoomOccupancy.FREE);
+    checkIn.registrationSigned(stayId); // signed at the desk's tablet: the agent cannot sign
     var prepared = tools.prepareCheckIn(stayId, room, List.of());
     assertThat(prepared).contains("Check-in de " + stayId).contains("habitación " + room);
     assertThat(stays.findById(stayId).orElseThrow().status()).isEqualTo(StayStatus.ARRIVING);
@@ -258,6 +259,31 @@ class FrontDeskMcpToolsTest {
     assertThat(stay.status()).isEqualTo(StayStatus.IN_HOUSE);
     assertThat(stay.roomNumber()).isEqualTo(room);
     assertThat(audited(stayId)).hasSize(2);
+  }
+
+  @Test
+  void aForcedCheckInNeedsAReasonGoesInIncompleteAndBlocksTheCheckOut() {
+    var stayId = arrival(1); // the holder's document not seen, the registration not signed
+    var room = room(RoomOccupancy.FREE);
+
+    assertThat(tools.prepareCheckIn(stayId, room, List.of())).contains("prepareForcedCheckIn");
+    assertThat(tools.prepareForcedCheckIn(stayId, " ", room, List.of())).contains("motivo");
+    var prepared = tools.prepareForcedCheckIn(stayId, "Llega de madrugada sin documentos", room, List.of());
+    assertThat(prepared).contains("Check-in FORZADO").contains("Firma del registro")
+        .contains("«Llega de madrugada sin documentos»").contains("no podrá hacer el check-out");
+    assertThat(stays.findById(stayId).orElseThrow().status()).isEqualTo(StayStatus.ARRIVING);
+
+    assertThat(confirmNextTurn(token(prepared))).startsWith("Hecho.");
+    var detail = tools.getStay(stayId);
+    assertThat(detail.stay().status()).isEqualTo("IN_HOUSE");
+    assertThat(detail.checkIn().incomplete()).isTrue();
+    assertThat(detail.checkIn().forcedBy()).isEqualTo("reception-agent (ana)");
+    assertThat(detail.checkIn().reason()).isEqualTo("Llega de madrugada sin documentos");
+    assertThat(detail.checkIn().missing()).hasSize(2);
+    assertThat(detail.checkIn().documentsDue()).isNotNull();
+    assertThat(tools.prepareCheckOut(stayId)).contains("sigue incompleto").contains("Completar");
+    assertThat(audited(stayId)).anySatisfy(a -> assertThat(a).contains("Forced check-in")
+        .contains("Llega de madrugada sin documentos"));
   }
 
   @Test
@@ -273,6 +299,7 @@ class FrontDeskMcpToolsTest {
     assertThat(tools.getNotices(stayId).notices()).singleElement()
         .satisfies(n -> assertThat(n.type()).isEqualTo("BLOCKING"));
     assertThat(tools.getStay(stayId).blockingNoticesRead()).isFalse();
+    checkIn.registrationSigned(stayId);
     var prepared = tools.prepareCheckIn(stayId, room(RoomOccupancy.FREE), List.of());
     assertThat(prepared).contains("AVISO BLOQUEANTE").contains("Pedir el pasaporte original")
         .contains("declara que ha leído el aviso");
@@ -373,6 +400,7 @@ class FrontDeskMcpToolsTest {
     var room = room(RoomOccupancy.FREE);
     stays.save(Stay.fromReservation(stayId, guestId, "Doble", "Desayuno", checkOut.minusDays(2), checkOut, 1,
         null, new BigDecimal("200.00"), List.of()));
+    checkIn.registrationSigned(stayId);
     checkIn.checkIn(stayId, room, List.of());
     return stayId;
   }

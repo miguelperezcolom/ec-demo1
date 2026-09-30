@@ -40,6 +40,7 @@ class GuestNoticesTest {
   @Autowired CheckOutService checkOut;
   @Autowired GuestRepository guests;
   @Autowired StayRepository stays;
+  @Autowired io.mateu.ecdemo1.frontoffice.domain.stay.CheckInOpsRepository ops;
   @Autowired RoomRepository rooms;
   @Autowired KardexChanges kardex;
   @Autowired JdbcTemplate jdbc;
@@ -52,14 +53,14 @@ class GuestNoticesTest {
 
     assertThat(notices.blockingAtCheckIn(stay)).singleElement()
         .satisfies(p -> assertThat(p.pax()).isEqualTo(1));
-    assertThatThrownBy(() -> checkIn.checkIn(a.stayId(), null, List.of(), "ana"))
+    assertThatThrownBy(() -> checkIn.checkIn(complete(a), null, List.of(), "ana"))
         .isInstanceOf(GuestNotices.NotAcknowledged.class).hasMessageContaining("He leído el aviso");
     assertThat(stays.findById(a.stayId()).orElseThrow().status()).isEqualTo(StayStatus.ARRIVING);
     assertThat(audited(a.stayId())).singleElement().asString()
         .contains("Check-in refused").contains("\"succeeded\":false").contains("\"by\":\"ana\"");
 
     notices.acknowledgeCheckIn(a.stayId(), "ana", null);
-    assertThat(checkIn.checkIn(a.stayId(), null, List.of(), "ana").status()).isEqualTo(StayStatus.IN_HOUSE);
+    assertThat(checkIn.checkIn(complete(a), null, List.of(), "ana").status()).isEqualTo(StayStatus.IN_HOUSE);
     assertThat(audited(a.stayId())).hasSize(2).last().asString()
         .contains("Read check-in notices").contains("\"succeeded\":true").contains("He leído el aviso");
   }
@@ -82,7 +83,7 @@ class GuestNoticesTest {
       assertThat(p.pax()).isEqualTo(2);
       assertThat(p.guestName()).isEqualTo("Luis Acompañante");
     });
-    assertThatThrownBy(() -> checkIn.checkIn(a.stayId(), null, List.of()))
+    assertThatThrownBy(() -> checkIn.checkIn(complete(a), null, List.of()))
         .isInstanceOf(GuestNotices.NotAcknowledged.class);
   }
 
@@ -100,7 +101,7 @@ class GuestNoticesTest {
     var stay = stays.findById(a.stayId()).orElseThrow();
     assertThat(notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice.Moment.CHECK_IN))
         .singleElement().satisfies(p -> assertThat(p.notice().typeLabel()).isEqualTo("Importante"));
-    assertThat(checkIn.checkIn(a.stayId(), null, List.of()).status()).isEqualTo(StayStatus.IN_HOUSE);
+    assertThat(checkIn.checkIn(complete(a), null, List.of()).status()).isEqualTo(StayStatus.IN_HOUSE);
   }
 
   @Test
@@ -116,7 +117,7 @@ class GuestNoticesTest {
     // As prepared before the new one, the reading no longer covers what there is.
     assertThatThrownBy(() -> notices.acknowledgeCheckIn(a.stayId(), "agent", prepared))
         .isInstanceOf(GuestNotices.NotAcknowledged.class).hasMessageContaining("han cambiado");
-    assertThatThrownBy(() -> checkIn.checkIn(a.stayId(), null, List.of()))
+    assertThatThrownBy(() -> checkIn.checkIn(complete(a), null, List.of()))
         .isInstanceOf(GuestNotices.NotAcknowledged.class);
   }
 
@@ -140,7 +141,7 @@ class GuestNoticesTest {
   @Test
   void aKardexChangeSalesforceRejectedStopsTheCheckOutUntilEntendido() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
     var now = Instant.now();
     kardex.save(new KardexChange(a.guestId(), "CR-FO-1", KardexChange.KardexStatus.REJECTED, "email",
         List.of(new KardexChange.FieldChange("email", "ana@old.example", "ana@new.example")), "No es su email",
@@ -170,7 +171,7 @@ class GuestNoticesTest {
   @Test
   void aKardexChangeStillPendingWarnsThatTheInvoiceKeepsTheOldData() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
     kardex.save(KardexChange.pending(a.guestId(),
         List.of(new KardexChange.FieldChange("nombre", "Ana Test", "Ana Nueva")), Instant.now()).sent("CR-FO-2"));
 
@@ -186,7 +187,7 @@ class GuestNoticesTest {
   @Test
   void aStayWithNothingToWarnOfLeavesAsBefore() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
-    checkIn.checkIn(a.stayId(), null, List.of());
+    checkIn.checkIn(complete(a), null, List.of());
 
     assertThat(notices.checkOutWarnings(stays.findById(a.stayId()).orElseThrow()).any()).isFalse();
     assertThat(checkOut.checkOut(a.stayId()).status()).isEqualTo(StayStatus.DEPARTED);
@@ -203,5 +204,10 @@ class GuestNoticesTest {
     var needle = "\\\"stayId\\\":\\\"" + stayId + "\\\"";
     return jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class)
         .stream().filter(p -> p.contains(needle)).toList();
+  }
+
+  /** The arrival with its documents seen and its registration signed: nothing missing for the check-in. */
+  String complete(Fixtures.Arrival a) {
+    return Fixtures.complete(a.stayId(), guests, stays, ops);
   }
 }
