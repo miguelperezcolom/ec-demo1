@@ -196,7 +196,11 @@ class ChargeHandlersTest {
             assertThat(charge.path("price").path("currencyCode").asText()).isEqualTo("MUR");
             assertThat(charge.path("postingReference").asText()).isEqualTo("FO:L-1");
             assertThat(charge.path("postingRemark").asText()).isEqualTo("Late check-out (salida 15:00)");
-            assertThat(charge.path("cashierId").asLong()).isEqualTo(69721441L);
+            // The cashier on the criteria, as Oracle's examples; no reservation nor window in the body.
+            var criteria = mapper.readTree(w.body()).path("criteria");
+            assertThat(criteria.path("cashierId").asLong()).isEqualTo(69721441L);
+            assertThat(criteria.has("reservationId")).isFalse();
+            assertThat(charge.has("folioWindowNo")).isFalse();
         });
         verify(outcomes).charge("XMAR", "39486034", "GSX4AK", "L-1", false, false, "En el folio de Opera", "88731245");
         // A void of it that waited for it to be there has it now.
