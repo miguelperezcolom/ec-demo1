@@ -33,11 +33,13 @@ public class CustomerEvents implements DisposableBean {
       .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
   final Kardex kardex;
+  final io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNationalities nationalities;
   final ConcurrentMessageListenerContainer<String, byte[]> container;
 
-  public CustomerEvents(Kardex kardex, @Value("${frontoffice.kafka-brokers}") String brokers,
-      ObjectProvider<ObservationRegistry> observations) {
+  public CustomerEvents(Kardex kardex, io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNationalities nationalities,
+      @Value("${frontoffice.kafka-brokers}") String brokers, ObjectProvider<ObservationRegistry> observations) {
     this.kardex = kardex;
+    this.nationalities = nationalities;
     this.container = KafkaListeners.start(brokers, TOPIC, GROUP, observations.getIfAvailable(), this::take);
   }
 
@@ -51,6 +53,11 @@ public class CustomerEvents implements DisposableBean {
       return;
     }
     apply(kardex, event);
+    // The flag next to the name: the golden record's nationality, whatever it is now — kept for a
+    // guest and for a companion alike (the kardex above only has the guests).
+    if (event.data() != null) {
+      nationalities.put(event.customerId(), event.data().nationality(), "MDM");
+    }
   }
 
   /** The event into the kardex; false if this front office has no guest for the customer. */

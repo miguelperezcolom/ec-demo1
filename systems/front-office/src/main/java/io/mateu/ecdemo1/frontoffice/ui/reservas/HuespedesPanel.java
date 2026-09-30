@@ -46,13 +46,13 @@ final class HuespedesPanel {
     // los avisos de recepción de cada pax para el check-in (Salesforce, vía el MDM), bajo su fila
     var avisos = r.notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.PRE_ARRIVAL,
         io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.CHECK_IN);
-    items.add(conAvisos(conKardex(paxItem(1, guest.name(), docAdulto(guest.document()),
+    items.add(conAvisos(conKardex(paxItem(1, io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), 1, guest.id(), guest.name()), docAdulto(guest.document()),
         guest.identityComplete(), ops.isNoShow(1)), ops.isNoShow(1) ? null : kardex, guest),
         io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, 1)));
     var companions = stay.companions();
     for (int i = 0; i < companions.size(); i++) {
       var companion = companions.get(i);
-      items.add(conAvisos(paxItem(i + 2, companion.name(), companion.description(),
+      items.add(conAvisos(paxItem(i + 2, io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), i + 2, companion.companionId(), companion.name()), companion.description(),
           companion.identityComplete(), ops.isNoShow(i + 2)),
           io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, i + 2)));
     }
@@ -100,10 +100,12 @@ final class HuespedesPanel {
     var guest = r.view().guest();
     var contenido = new ArrayList<Component>();
     contenido.add(Text.builder().text("Huéspedes").container(TextContainer.h3).style("margin: 0;").build());
-    contenido.add(Text.builder().text(guest.name()).noMargins(true).build());
+    contenido.add(Text.builder().text(io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), 1, guest.id(), guest.name())).noMargins(true).build());
     contenido.add(Text.builder().text(docAdulto(guest.document())).size(TextSize.xs).noMargins(true).build());
-    for (var companion : stay.companions()) {
-      contenido.add(Text.builder().text(companion.name()).noMargins(true).build());
+    for (int i = 0; i < stay.companions().size(); i++) {
+      var companion = stay.companions().get(i);
+      contenido.add(Text.builder().text(io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), i + 2, companion.companionId(), companion.name()))
+          .noMargins(true).build());
       contenido.add(Text.builder().text(companion.description()).size(TextSize.xs).noMargins(true).build());
     }
     contenido.add(Text.builder().text("Incidencias (" + stay.incidents().size() + ")")
@@ -139,10 +141,13 @@ final class HuespedesPanel {
     var contenido = new ArrayList<Component>();
     contenido.add(Text.builder().text("Información").container(TextContainer.h2).style("margin: 0;").build());
     contenido.add(Text.builder().text("Huéspedes").container(TextContainer.h3).style("margin: 0;").build());
-    contenido.add(Text.builder().text(view.guest().name()).noMargins(true).build());
+    contenido.add(Text.builder().text(io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), 1, view.guest().id(), view.guest().name()))
+        .noMargins(true).build());
     contenido.add(Text.builder().text(docAdulto(view.guest().document())).size(TextSize.xs).noMargins(true).build());
-    for (var companion : stay.companions()) {
-      contenido.add(Text.builder().text(companion.name()).noMargins(true).build());
+    for (int i = 0; i < stay.companions().size(); i++) {
+      var companion = stay.companions().get(i);
+      contenido.add(Text.builder().text(io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), i + 2, companion.companionId(), companion.name()))
+          .noMargins(true).build());
       // la descripción del acompañante ya incluye su documento
       contenido.add(Text.builder().text(companion.description()).size(TextSize.xs).noMargins(true).build());
     }

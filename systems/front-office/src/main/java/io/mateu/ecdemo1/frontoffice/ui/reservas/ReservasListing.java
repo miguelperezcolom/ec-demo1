@@ -143,7 +143,7 @@ public class ReservasListing
         ? "Sin asignar" : "Hab " + stay.roomNumber();
     return new Reserva(
         stay.id(),
-        stay.guestName(),
+        io.mateu.ecdemo1.frontoffice.ui.common.Flags.before(stay.guestNationality(), stay.guestName()),
         habitacion + " · " + stay.roomType(),
         java.time.temporal.ChronoUnit.DAYS.between(stay.checkIn(), stay.checkOut()),
         estadoLabel(stay.status(), stay.checkIn(), stay.checkOut()),

@@ -232,9 +232,12 @@ final class EstanciaPanel {
         .size(io.mateu.uidl.data.TextSize.xs).noMargins(true).build());
     contenido.add(Text.builder().text("Huéspedes")
         .container(TextContainer.h3).style("margin: 1.5rem 0 0;").build());
-    contenido.add(Text.builder().text(view.guest().name()).noMargins(true).build());
-    for (var companion : stay.companions()) {
-      contenido.add(Text.builder().text(companion.name()).noMargins(true).build());
+    contenido.add(Text.builder().text(io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), 1, view.guest().id(), view.guest().name()))
+        .noMargins(true).build());
+    for (int i = 0; i < stay.companions().size(); i++) {
+      var companion = stay.companions().get(i);
+      contenido.add(Text.builder().text(io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), i + 2, companion.companionId(), companion.name()))
+          .noMargins(true).build());
     }
     return VerticalLayout.builder().style("width: 100%; gap: .25rem;").content(contenido).build();
   }

@@ -39,6 +39,30 @@ public class FrontOffice {
   private final io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings;
   private final io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incompleteCheckIns;
   private final io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns walkIns;
+  private io.mateu.ecdemo1.frontoffice.application.Nationalities nationalities;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void nationalities(io.mateu.ecdemo1.frontoffice.application.Nationalities nationalities) {
+    this.nationalities = nationalities;
+  }
+
+  /**
+   * A pax's name with the flag of their nationality in front, when it is known: what the desk scanned
+   * for that pax, else the customer's (see {@link io.mateu.ecdemo1.frontoffice.application.Nationalities}).
+   *
+   * @param pax        1 the holder, 2… the companions
+   * @param customerId the guest's or companion's customer code
+   */
+  public static String withFlag(String stayId, int pax, String customerId, String name) {
+    if (instance == null || instance.nationalities == null || name == null) {
+      return name;
+    }
+    try {
+      return Flags.before(instance.nationalities.of(stayId, pax, customerId), name);
+    } catch (RuntimeException e) {
+      return name;   // a flag is decoration: never the reason a screen does not open
+    }
+  }
 
   public FrontOffice(StayQueries queries, StayReadModel stayReads, RoomRepository rooms,
                      AddOnCatalogRepository addOnCatalog, io.mateu.ecdemo1.frontoffice.application.GuestNotices notices,

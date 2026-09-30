@@ -321,3 +321,13 @@ create table if not exists pax_registration_data (
     updated_at timestamp,
     primary key (stay_id, pax, field)
 );
+
+-- The nationality of each customer the front office has (a guest or a companion, by customer code),
+-- for the flag next to their name: the MDM's golden record, or the walk-in's holder. A null
+-- nationality is kept too — asked for and unknown, not asked for again.
+create table if not exists customer_nationality (
+    customer_id varchar(64) primary key,
+    nationality varchar(3),
+    source      varchar(20),
+    updated_at  timestamp
+);
