@@ -19,6 +19,7 @@ import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.PaymentType;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -114,8 +115,10 @@ public class BookingController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Modify a booking: replaces its terms as a whole and prices it again")
-    public void update(@PathVariable String id, @RequestBody BookingRequest booking) {
-        updateBookingUseCase.handle(new UpdateBookingCommand(id, booking));
+    public ResponseEntity<Void> update(@PathVariable String id, @RequestBody BookingRequest booking) {
+        // 200 either way; X-Booking-Changed says whether it was a modification
+        var changed = updateBookingUseCase.handle(new UpdateBookingCommand(id, booking));
+        return ResponseEntity.ok().header("X-Booking-Changed", String.valueOf(changed)).build();
     }
 
     @PostMapping("/{id}/confirm")

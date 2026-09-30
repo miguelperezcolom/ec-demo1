@@ -87,10 +87,20 @@ public class Booking extends AggregateRoot {
         return create(id, hotelCode, currency, terms, List.of(), null, now);
     }
 
-    public void update(BookingTerms terms, Instant now) {
+    /**
+     * Replaces the terms. Terms that say the same as the current ones are not a modification: nothing
+     * is versioned, announced or projected again.
+     *
+     * @return whether anything changed
+     */
+    public boolean update(BookingTerms terms, Instant now) {
         requireAlive("modified");
+        if (this.terms.sameAs(terms)) {
+            return false;
+        }
         this.terms = terms;
         modified(BookingChange.TermsUpdated, now);
+        return true;
     }
 
     /**

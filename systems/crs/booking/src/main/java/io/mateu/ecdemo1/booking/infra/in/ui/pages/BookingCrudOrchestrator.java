@@ -4,6 +4,8 @@ import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ListToolbarButton;
+import io.mateu.uidl.annotations.PageWidth;
+import io.mateu.uidl.annotations.PageWidthStyle;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.Message;
@@ -28,6 +30,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Scope("prototype")
 @Title("Bookings")
+// Edge to edge, the listing and the booking's page: a grid of bookings and a foldout of panels both
+// want the width, and the fixed page left most of a wide screen empty.
+@PageWidth(PageWidthStyle.EDGE_TO_EDGE)
 public class BookingCrudOrchestrator extends Crud<
         BookingViewModel,
         BookingViewModel,

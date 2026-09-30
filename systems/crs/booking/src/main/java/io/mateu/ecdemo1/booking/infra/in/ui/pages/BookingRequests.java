@@ -71,9 +71,12 @@ final class BookingRequests {
     }
 
     /** Registers the payments not registered yet on a booking that already exists. */
-    static void registerNewPayments(RegisterPaymentUseCase useCase, String bookingId, List<PaymentViewModel> payments) {
-        newPayments(payments).forEach(p -> useCase.handle(new RegisterPaymentCommand(
+    /** @return whether there was any new payment to register */
+    static boolean registerNewPayments(RegisterPaymentUseCase useCase, String bookingId, List<PaymentViewModel> payments) {
+        var fresh = newPayments(payments);
+        fresh.forEach(p -> useCase.handle(new RegisterPaymentCommand(
                 bookingId, p.type(), p.methodCode(), p.amount(), p.date(), p.reference())));
+        return !fresh.isEmpty();
     }
 
     private BookingRequests() {

@@ -7,7 +7,10 @@ import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingChange;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingCreated;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingEvent;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.events.BookingModified;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookedRoom;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingId;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingTerms;
+import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.NightlyRate;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingStatus;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.Payment;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.PaymentType;
@@ -86,6 +89,25 @@ class BookingTest {
 
         assertThat(booking.popEvents()).map(e -> ((BookingEvent) e).version()).containsExactly(1L, 2L, 3L, 4L);
         assertThat(booking.getVersion()).isEqualTo(4);
+    }
+
+    @Test
+    void theSameTermsAreNotAModificationEvenSpelledDifferently() {
+        var booking = created();
+        booking.popEvents();
+        var same = Fixtures.terms(3);
+        // what a form sends back: 150 instead of 150.00, a blank comment instead of none
+        var room = same.rooms().getFirst();
+        var respelled = new BookingTerms(same.channelCode(), "", " ", same.stay(), same.holder(),
+                java.util.List.of(new BookedRoom(room.line(), room.roomTypeCode(), room.ratePlanCode(), room.boardCode(),
+                        room.adults(), room.childrenAges(), room.guests(), room.nightlyRates().stream()
+                        .map(r -> new NightlyRate(r.date(), new java.math.BigDecimal("150"))).toList())), "");
+
+        assertThat(booking.update(respelled, NOW)).isFalse();
+        assertThat(booking.popEvents()).isEmpty();
+        assertThat(booking.getVersion()).isEqualTo(1);
+        assertThat(booking.update(Fixtures.terms(4), NOW)).isTrue();
+        assertThat(booking.getVersion()).isEqualTo(2);
     }
 
     @Test

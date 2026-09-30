@@ -44,6 +44,43 @@ public record BookingTerms(String channelCode,
         }
     }
 
+    /**
+     * Whether these terms say the same as others: blank and missing text are the same, as are 150 and
+     * 150.00 — what a form sends back and what the store read are not always spelled alike. Saving a
+     * booking with the same terms is not a modification.
+     */
+    public boolean sameAs(BookingTerms other) {
+        return other != null && canonical(this).equals(canonical(other));
+    }
+
+    static Object canonical(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof CharSequence text) {
+            var trimmed = text.toString().trim();
+            return trimmed.isEmpty() ? null : trimmed;
+        }
+        if (value instanceof BigDecimal number) {
+            return number.stripTrailingZeros();
+        }
+        if (value instanceof java.util.Collection<?> collection) {
+            return collection.stream().map(BookingTerms::canonical).toList();
+        }
+        if (value instanceof Record record) {
+            var parts = new java.util.ArrayList<Object>();
+            for (var component : record.getClass().getRecordComponents()) {
+                try {
+                    parts.add(canonical(component.getAccessor().invoke(record)));
+                } catch (ReflectiveOperationException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+            return parts;
+        }
+        return value;
+    }
+
     public BigDecimal total() {
         return rooms.stream().map(BookedRoom::total).reduce(BigDecimal.ZERO, BigDecimal::add);
     }

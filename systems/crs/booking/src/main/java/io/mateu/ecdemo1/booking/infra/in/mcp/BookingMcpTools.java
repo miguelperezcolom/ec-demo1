@@ -106,8 +106,9 @@ public class BookingMcpTools implements McpSystemContext {
     public String modifyBooking(String id, BookingRequest booking) {
         log.info("MCP modifyBooking {}", id);
         return attempt(() -> {
-            updateBookingUseCase.handle(new UpdateBookingCommand(id, booking));
-            return "Booking %s modified".formatted(id);
+            return updateBookingUseCase.handle(new UpdateBookingCommand(id, booking))
+                    ? "Booking %s modified".formatted(id)
+                    : "Booking %s unchanged: the terms sent are the ones it has".formatted(id);
         });
     }
 
