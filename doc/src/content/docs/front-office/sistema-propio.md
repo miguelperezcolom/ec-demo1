@@ -59,8 +59,9 @@ Una estancia cerrada tiene **«Abrir factura»**: el documento que Opera emitió
 front office, que lo dice en la página, con **los dos totales** —el del folio del front office y el de la
 factura de Opera— y si coinciden. Como los cargos de recepción están en el folio de Opera, coinciden;
 si no, la proforma dice por qué suele ser: el alojamiento (Opera factura sus noches con su tarifa; en una
-salida anticipada, solo las pasadas), un cargo que Opera rechazó o que llegó tarde, o cargos anteriores a
-subirlos a Opera.
+salida anticipada, solo las pasadas; y el paquete del régimen aparte — en XMAR, el desayuno BRKFST, 40 MUR
+por noche, que no está en el total de la reserva ni, por tanto, en el folio del front office), un cargo
+que Opera rechazó o que llegó tarde, o cargos anteriores a subirlos a Opera.
 
 **Gestionar folio** lista los cargos de recepción con dónde está cada uno en Opera («Opera: en el folio ·
 88731245», «pendiente», «rechazado — motivo») y **«Anular»**: la línea queda en el folio, anulada y sin
