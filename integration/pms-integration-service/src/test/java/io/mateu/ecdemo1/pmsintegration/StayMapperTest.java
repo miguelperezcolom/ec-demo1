@@ -181,4 +181,26 @@ class StayMapperTest {
         assertThat(StayMapper.isoLocal("2026-03-13")).isEqualTo("2026-03-13T00:00:00");
         assertThat(StayMapper.isoLocal(null)).isEmpty();
     }
+
+    @Test
+    void thePackagesOperaPostsApartAreInTheStaysTotal() throws Exception {
+        var json = (com.fasterxml.jackson.databind.node.ObjectNode) new com.fasterxml.jackson.databind.ObjectMapper().readTree("""
+                {"reservationIdList": [{"id": "39485830", "type": "Reservation"}],
+                 "reservationStatus": "Reserved",
+                 "roomStay": {"arrivalDate": "2026-05-13", "departureDate": "2026-05-14", "total": {"amountBeforeTax": 306},
+                              "roomRates": [{"roomType": "SJMB", "ratePlanCode": "406484DIRXM",
+                                             "rates": {"rate": [{"base": {"amountBeforeTax": 306, "currencyCode": "MUR"}}]}}]},
+                 "reservationPackages": [
+                   {"packageCode": "BRKFST", "packageHeaderType": {"postingAttributes": {"addToRate": false}},
+                    "scheduleList": [{"consumptionDate": "2026-05-13", "unitPrice": 40, "totalQuantity": 1, "computedResvPrice": 40}]},
+                   {"packageCode": "INCL", "packageHeaderType": {"postingAttributes": {"addToRate": true}},
+                    "scheduleList": [{"consumptionDate": "2026-05-13", "unitPrice": 10, "totalQuantity": 1, "computedResvPrice": 10}]}]}
+                """);
+
+        var stay = io.mateu.ecdemo1.pmsintegration.frontoffice.StayMapper.toWriteStay("XMAR", json,
+                NO_CUSTOMER);
+
+        // The rate (306) and the breakfast Opera posts apart (40): what Opera's folio will carry for the stay.
+        assertThat(stay.total()).isEqualByComparingTo(new BigDecimal("346"));
+    }
 }

@@ -59,7 +59,7 @@ public final class StayMapper {
                 isoLocal(r.path("lastModifyDateTime").asText(r.path("createDateTime").asText(""))), status(r, context),
                 holder, companions(r), text(rate.path("roomType")), text(rate.path("ratePlanCode")), board(r),
                 OperaStays.date(stay.path("arrivalDate")), OperaStays.date(stay.path("departureDate")), pax,
-                agency(r, rate), total(stay, rate), currency(rate));
+                agency(r, rate), total(r, stay, rate, context), currency(rate));
     }
 
     static PmsStatus status(JsonNode r, Context context) {
@@ -181,6 +181,40 @@ public final class StayMapper {
         }
         var source = rate.path("sourceCodeDescription").asText(rate.path("sourceCode").asText(""));
         return source.isBlank() ? "Directo" : "Directo · " + source;
+    }
+
+    /**
+     * What the stay costs as Opera will charge it: its rate's total and, but for a no-show's fee or a
+     * cancellation, the packages Opera posts apart from the rate ({@code addToRate} false) — the board at
+     * XMAR (BRKFST, 40 MUR a night): Opera's folio, and so its invoice, carries them, and the front
+     * office's accommodation line must too for the totals to match.
+     */
+    static BigDecimal total(JsonNode r, JsonNode stay, JsonNode rate, Context context) {
+        var total = total(stay, rate);
+        var status = status(r, context);
+        if (total == null || status == PmsStatus.NO_SHOW || status == PmsStatus.CANCELLED) {
+            return total;
+        }
+        return total.add(packagesApart(r));
+    }
+
+    /** The reservation's packages Opera posts apart from the rate, over the stay. */
+    static BigDecimal packagesApart(JsonNode r) {
+        var sum = BigDecimal.ZERO;
+        for (var p : r.path("reservationPackages")) {
+            if (p.path("packageHeaderType").path("postingAttributes").path("addToRate").asBoolean(false)) {
+                continue;
+            }
+            for (var day : p.path("scheduleList")) {
+                var price = day.path("computedResvPrice");
+                if (price.isNumber()) {
+                    sum = sum.add(price.decimalValue());
+                } else if (day.path("unitPrice").isNumber()) {
+                    sum = sum.add(day.path("unitPrice").decimalValue().multiply(BigDecimal.valueOf(day.path("totalQuantity").asInt(1))));
+                }
+            }
+        }
+        return sum;
     }
 
     static BigDecimal total(JsonNode stay, JsonNode rate) {
