@@ -95,12 +95,11 @@ quién hizo qué con la reserva).
 `TEMPO_URL=http://tempo.observability.svc.cluster.local:3200`,
 `GRAFANA_URL=https://grafana.ec1.mateu.io`, y las URL del CRS, el MDM y el mapeado.
 
-### ia-agent e ia-agent-front-office
+### ia-agent
 
 | Variable | Valor | Para qué |
 | :------- | :---- | :------- |
-| `IA_CONTROL_PLANE_URL` | `http://ia-control-plane:8110` | De dónde saca su configuración |
-| `AGENT_ID` | `console-agent` / `reception-agent` | El agente por defecto |
+| `IA_CONTROL_PLANE_URL` | `http://ia-control-plane:8110` | De dónde saca su configuración. No tiene agente propio: el agente por defecto llega en cada petición (`X-Default-Agent`, del gateway) |
 | `IA_CAPTURE_CONTENT` | `full` | Qué de la conversación va a Tempo (`none`, `redacted`, `full`) |
 | `IA_CAPTURE_MAX_CHARS` | 16384 por defecto | Corte de cada valor capturado |
 | `IA_A2A_MAX_DEPTH` | 2 por defecto | Saltos A2A |
@@ -109,6 +108,7 @@ quién hizo qué con la reserva).
 
 | Variable | Valor | Para qué |
 | :------- | :---- | :------- |
+| `CP_DEFAULT_AGENT_ID` | `console-agent` por defecto | El agente por defecto del catálogo: contesta cuando ninguna regla encaja y la petición no trae agente por defecto (`GET /internal/agents/default`) |
 | `DB_URL` | `jdbc:postgresql://cp-postgres:5432/controlplane` | Su propia base de datos |
 | `DB_USERNAME`, `DB_PASSWORD` | (Secret `ec-cp-postgres`) | |
 | `CP_CRYPTO_KEY` | (Secret `ec-cp-crypto`) | Cifra las credenciales de los LLM. **No regenerar** |

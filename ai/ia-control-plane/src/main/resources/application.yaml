@@ -27,6 +27,10 @@ cp:
   # Where the agents answer A2A calls: a peer's URL in a resolved configuration is this plus
   # /a2a/{agentId}. Any ia-agent pod serves any agent there, so one address covers them all.
   a2a-base-url: ${A2A_BASE_URL:http://ia-agent:8095}
+  # The catalogue's default agent: what answers a prompt no route matches and that names no default
+  # of its own. The gateway stamps a default per console (X-Default-Agent), so this is for a caller
+  # inside the cluster that names none. GET /internal/agents/default says which.
+  default-agent-id: ${CP_DEFAULT_AGENT_ID:console-agent}
 
   # Seeded once, only onto a control plane whose four catalogues are all empty — see
   # CatalogueSeeder. It is what keeps `deploy.sh` producing a console whose chat panel works,

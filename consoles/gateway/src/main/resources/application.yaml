@@ -147,21 +147,31 @@ spring:
 
         # The chat agent, at the path Mateu's @AI client posts to. Not a Mateu UI and so not a
         # /_ prefix: the shell's chat panel calls /ai/api/agent/stream directly.
+        #
+        # One ia-agent serves every console; the host is what says which console a prompt comes
+        # from, and only the gateway knows it. So each console's route stamps it: X-Agent-Channel
+        # (data-plane, control-plane, front-office) — a condition the control plane's routes may key
+        # on, since the screens cannot tell the consoles apart (both have a /mapping) — and
+        # X-Default-Agent, the agent that answers there unless a route picks another.
+        # SetRequestHeader replaces: whatever a browser sent under these names never reaches the agent.
         - id: ia-agent
           uri: ${IA_AGENT_URL:http://ia-agent:8095}
           predicates:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/ai/**
+          filters:
+            - SetRequestHeader=X-Agent-Channel, data-plane
+            - SetRequestHeader=X-Default-Agent, ${DATA_PLANE_AGENT:console-agent}
 
-        # The control console's chat: the same path as the demo console's, to an ia-agent of its own
-        # whose agent is the control plane's (AGENT_ID, 82-ia-agent-control-plane.yaml). Its host is
-        # what says the question comes from the control plane — no route prefix could: the routing
-        # rules key on the screen's route, and both consoles have screens like /mapping.
+        # The control console's chat: the same agent pod, stamped as the control plane's console.
         - id: control-plane-agent
-          uri: ${IA_AGENT_CONTROL_PLANE_URL:http://ia-agent-control-plane:8095}
+          uri: ${IA_AGENT_URL:http://ia-agent:8095}
           predicates:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/ai/**
+          filters:
+            - SetRequestHeader=X-Agent-Channel, control-plane
+            - SetRequestHeader=X-Default-Agent, ${CONTROL_PLANE_AGENT:control-plane-agent}
 
         # Agent-to-agent (/a2a/{agentId}) is for agents inside the cluster calling each other, never
         # for a browser. Nothing above routes it to ia-agent anyway; this says so on every host, so
@@ -216,14 +226,17 @@ spring:
             - SetStatus=404
 
         # Its chat: the same path as the consoles' (Mateu's @AI client posts to /ai/api/agent/stream),
-        # to an ia-agent of its own whose agent is the reception one (AGENT_ID) — the front office's
-        # routes do not share a prefix a routing rule could key on, and its host is what says the
-        # question comes from the front desk.
+        # to the same agent pod, stamped as the front office's console — its routes do not share a
+        # prefix a routing rule could key on, and its host is what says the question comes from the
+        # front desk.
         - id: front-office-agent
-          uri: ${IA_AGENT_FRONT_OFFICE_URL:http://ia-agent-front-office:8095}
+          uri: ${IA_AGENT_URL:http://ia-agent:8095}
           predicates:
             - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
             - Path=/ai/**
+          filters:
+            - SetRequestHeader=X-Agent-Channel, front-office
+            - SetRequestHeader=X-Default-Agent, ${FRONT_OFFICE_AGENT:reception-agent}
 
         # Web Push at the front desk: the same script, service worker and subscriptions as the
         # consoles' — the push paths of the inbox and nothing else of it (the desk has no inbox). A

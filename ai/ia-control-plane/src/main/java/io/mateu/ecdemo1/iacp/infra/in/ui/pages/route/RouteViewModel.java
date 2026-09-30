@@ -30,7 +30,7 @@ import java.util.List;
 /**
  * The editor for a routing rule.
  *
- * <p>The four conditions are all optional and empty means "any": a rule with none set is a
+ * <p>The five conditions are all optional and empty means "any": a rule with none set is a
  * catch-all, one with several is an AND. Rules are tried low priority first, and the first that
  * matches picks the agent — so a specific rule needs a lower number than the general one it should
  * beat.
@@ -73,6 +73,11 @@ public class RouteViewModel implements CatalogueEditor<RouteDto>, OptionsSupplie
     @Help("A prefix the current UI route must start with — e.g. /bookings. Empty matches any screen.")
     String routePrefix;
 
+    @Stereotype(FieldStereotype.select)
+    @Help("The console the prompt comes from, as the gateway stamps it from the host. Empty matches "
+            + "any. Both consoles have screens like /mapping: this is what tells them apart.")
+    String channel;
+
     @Section("Target")
     @NotEmpty
     @Lookup(search = CatalogueReferenceOptions.class, label = CatalogueReferenceOptions.class)
@@ -107,14 +112,18 @@ public class RouteViewModel implements CatalogueEditor<RouteDto>, OptionsSupplie
 
     public String create(HttpRequest httpRequest) {
         return createRouteUseCase.handle(new CreateRouteCommand(newId, name, priority, role, tenant,
-                locale, routePrefix, targetAgentId, inputGuardrailAgentIds, outputGuardrailAgentIds,
-                failure()));
+                locale, routePrefix, blankToNull(channel), targetAgentId, inputGuardrailAgentIds,
+                outputGuardrailAgentIds, failure()));
     }
 
     public void save(HttpRequest httpRequest) {
         updateRouteUseCase.handle(new UpdateRouteCommand(id, name, priority, role, tenant, locale,
-                routePrefix, targetAgentId, inputGuardrailAgentIds, outputGuardrailAgentIds, failure(),
-                enabled));
+                routePrefix, blankToNull(channel), targetAgentId, inputGuardrailAgentIds,
+                outputGuardrailAgentIds, failure(), enabled));
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s;
     }
 
     private String failure() {
@@ -128,6 +137,11 @@ public class RouteViewModel implements CatalogueEditor<RouteDto>, OptionsSupplie
     @Override
     public List<Option> options(String fieldName, HttpRequest httpRequest) {
         return switch (fieldName) {
+            case "channel" -> List.of(
+                    new Option("", "Any", "Every console"),
+                    new Option("data-plane", "Data plane", "ec1 / rw"),
+                    new Option("control-plane", "Control plane", "console / rw-console"),
+                    new Option("front-office", "Front office", "front"));
             case "guardrailFailure" -> List.of(
                     new Option("CLOSED", "CLOSED", "Block the text"),
                     new Option("OPEN", "OPEN", "Let it through and log a warning"));
@@ -153,6 +167,7 @@ public class RouteViewModel implements CatalogueEditor<RouteDto>, OptionsSupplie
         tenant = dto.tenant();
         locale = dto.locale();
         routePrefix = dto.routePrefix();
+        channel = dto.channel();
         targetAgentId = dto.targetAgentId();
         inputGuardrailAgentIds = new ArrayList<>(dto.inputGuardrailAgentIds());
         outputGuardrailAgentIds = new ArrayList<>(dto.outputGuardrailAgentIds());

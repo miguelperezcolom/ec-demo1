@@ -20,7 +20,7 @@ public class UpdateRouteUseCase {
         var route = repository.findById(new RouteId(command.id()))
                 .orElseThrow(() -> new IllegalArgumentException("No route with id '" + command.id() + "'"));
         route.update(new Name(command.name()), command.priority(), command.role(), command.tenant(),
-                command.locale(), command.routePrefix(), command.targetAgentId(),
+                command.locale(), command.routePrefix(), command.channel(), command.targetAgentId(),
                 new Guardrails(command.inputGuardrailAgentIds(), command.outputGuardrailAgentIds(),
                         Guardrails.Failure.parse(command.guardrailFailure())),
                 new Enabled(command.enabled()));

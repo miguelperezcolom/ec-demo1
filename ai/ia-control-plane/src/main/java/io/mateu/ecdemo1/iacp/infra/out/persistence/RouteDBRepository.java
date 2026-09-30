@@ -29,6 +29,7 @@ public class RouteDBRepository implements RouteRepository {
         e.setTenant(route.getTenant());
         e.setLocale(route.getLocale());
         e.setRoutePrefix(route.getRoutePrefix());
+        e.setChannel(route.getChannel());
         e.setTargetAgentId(route.getTargetAgentId());
         e.setInputGuardrailAgentIds(IdList.join(route.getGuardrails().input()));
         e.setOutputGuardrailAgentIds(IdList.join(route.getGuardrails().output()));
@@ -74,6 +75,7 @@ public class RouteDBRepository implements RouteRepository {
                 e.getTenant(),
                 e.getLocale(),
                 e.getRoutePrefix(),
+                e.getChannel(),
                 e.getTargetAgentId(),
                 new Guardrails(IdList.split(e.getInputGuardrailAgentIds()),
                         IdList.split(e.getOutputGuardrailAgentIds()),

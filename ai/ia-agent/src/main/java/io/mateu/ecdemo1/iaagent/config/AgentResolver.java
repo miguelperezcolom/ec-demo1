@@ -27,8 +27,12 @@ import java.util.List;
  * answer the user should see, so it is returned as a denial and <strong>not</strong> retried or
  * papered over with a cached config, which would be spending past a budget that just said no.
  * Anything else — the control plane unreachable, a 500 — falls back to {@link AgentConfigClient}'s
- * cached default configuration, so a brief outage degrades to "the default agent, last known good"
- * rather than a dead panel. The resilience lives there, once, and this reuses it.
+ * last good configuration of the agent the request asked for (the console's default, which the
+ * gateway stamps), or of the catalogue's default when it named none — so a brief outage degrades to
+ * "that agent, last known good" rather than a dead panel.
+ *
+ * <p>Which console the prompt came from ({@code channel}) and its default agent travel with every
+ * request; this pod has no agent of its own.
  */
 @Component
 public class AgentResolver {
@@ -68,16 +72,24 @@ public class AgentResolver {
     }
 
     private record ResolveRequest(String userId, String username, List<String> roles, String tenant,
-                                  String locale, String route, String defaultAgentId) {
+                                  String locale, String route, String channel, String defaultAgentId) {
     }
 
     private record Problem(String agentId, String reason) {}
 
+    /** As before channels: no console and no default agent said — the control plane decides. */
     public Resolution resolve(CallerIdentity caller, String locale, String route) {
+        return resolve(caller, locale, route, null, null);
+    }
+
+    public Resolution resolve(CallerIdentity caller, String locale, String route, String channel,
+                              String defaultAgentId) {
         var id = caller == null ? CallerIdentity.anonymous() : caller;
+        var channelSaid = blankToNull(channel);
+        var defaultSaid = blankToNull(defaultAgentId);
         try {
             var body = mapper.writeValueAsString(new ResolveRequest(id.userId(), id.username(),
-                    id.roles(), id.tenant(), locale, route, configClient.agentId()));
+                    id.roles(), id.tenant(), locale, route, channelSaid, defaultSaid));
             var response = http.send(traceHeaders.applyTo(HttpRequest.newBuilder(URI.create(url)))
                             .timeout(Duration.ofSeconds(5))
                             .header("Content-Type", "application/json")
@@ -85,7 +97,10 @@ public class AgentResolver {
                             .POST(HttpRequest.BodyPublishers.ofString(body)).build(),
                     HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
-                return Resolution.allow(mapper.readValue(response.body(), AgentConfig.class));
+                var config = mapper.readValue(response.body(), AgentConfig.class);
+                configClient.remember(config);
+                log.debug("Resolved agent {} (channel {}, default {})", config.agentId(), channelSaid, defaultSaid);
+                return Resolution.allow(config);
             }
             if (response.statusCode() == 409) {
                 // A deliberate refusal. Show its reason; do not fall back — that would answer past a
@@ -94,21 +109,33 @@ public class AgentResolver {
                 log.info("Resolve refused (409): {}", reason);
                 return Resolution.deny(reason);
             }
-            log.warn("Resolve answered {} — falling back to the cached default configuration.",
+            log.warn("Resolve answered {} — falling back to the last good configuration.",
                     response.statusCode());
-            return fallback();
+            return fallback(defaultSaid);
         } catch (Exception e) {
-            log.warn("Resolve unreachable ({}) — falling back to the cached default configuration.",
+            log.warn("Resolve unreachable ({}) — falling back to the last good configuration.",
                     e.toString());
-            return fallback();
+            return fallback(defaultSaid);
         }
     }
 
-    private Resolution fallback() {
-        return configClient.current()
-                .map(Resolution::allow)
-                .orElseGet(() -> Resolution.deny("El plano de control no responde y no hay "
-                        + "configuración en caché. Inténtalo de nuevo en un momento."));
+    /** The last good configuration of the agent asked for, or of the catalogue's default. */
+    private Resolution fallback(String defaultAgentId) {
+        var agent = defaultAgentId != null ? defaultAgentId : configClient.defaultAgentId();
+        var last = configClient.lastGood(agent);
+        if (last.isPresent()) {
+            return Resolution.allow(last.get());
+        }
+        try {
+            return Resolution.allow(configClient.configOf(agent));
+        } catch (AgentConfigClient.Unavailable e) {
+            return Resolution.deny("El plano de control no responde y no hay "
+                    + "configuración en caché. Inténtalo de nuevo en un momento.");
+        }
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     private String readReason(String body) {

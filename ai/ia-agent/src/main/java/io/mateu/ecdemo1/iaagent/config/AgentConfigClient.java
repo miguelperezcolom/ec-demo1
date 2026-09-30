@@ -19,21 +19,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Where this agent's model, prompt and tool list come from: the control plane, not this pod's
- * configuration file.
+ * Where the agents' model, prompt and tool list come from: the control plane, not this pod's
+ * configuration file — and not a fixed agent either. This pod serves every agent of the catalogue:
+ * which one answers a prompt is decided per request (the gateway stamps the console's default agent,
+ * the control plane's routes may pick another), so nothing here is "this pod's agent".
  *
- * <p><strong>Cached for {@code TTL}, and the last good answer outlives the control plane.</strong>
- * Those are two separate decisions and both matter.
+ * <p><strong>Cached for {@code TTL} per agent, and the last good answer outlives the control
+ * plane.</strong> The cache keeps the control plane off the hot path; serving the stale copy when a
+ * fetch fails keeps a chat panel up while the catalogue is briefly unreachable. Every configuration
+ * the control plane hands out — by id, or resolved by context — is remembered under its agent's id,
+ * so the fallback for a prompt is the last good configuration of the agent it asked for.
  *
- * <p>The cache is what keeps the control plane off the hot path — a burst of prompts is one fetch,
- * not one per message — and 30 seconds is short enough that changing a model in the console shows
- * up in the next prompt or two, which is what an operator expects from a control plane.
- *
- * <p>Serving the stale copy when the fetch fails is the more important half. The alternative is a
- * chat panel that goes down because a catalogue is briefly unreachable, and there is no version of
- * that trade that is worth taking: the configuration a moment ago is almost certainly still right.
- * It is logged at warn every time, so "running on stale configuration" is visible rather than
- * silent, and {@link #lastFetchFailed()} lets the health endpoint say so too.
+ * <p>The catalogue's own default agent (what answers a prompt that names none) is asked of the
+ * control plane too, and remembered the same way.
  *
  * <p>What it deliberately does not do is fall back to a locally configured model. There is one
  * source of truth, and a second one that only appears when the first is unreachable is how two
@@ -54,100 +52,84 @@ public class AgentConfigClient {
             // The control plane may add fields; this one should not care.
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    private final String url;
-    private final String agentId;
     private final String controlPlaneUrl;
 
-    /** Other agents' configurations, for the A2A calls this pod answers on their behalf. */
-    private final Map<String, Cached> others = new ConcurrentHashMap<>();
+    /** Every agent's last good configuration, by id. */
+    private final Map<String, Cached> configs = new ConcurrentHashMap<>();
 
-    /** Last good configuration and when it was fetched. Null until the first success. */
-    private final AtomicReference<Cached> cache = new AtomicReference<>();
+    /** The catalogue's default agent, as last said, and when. */
+    private final AtomicReference<CachedId> defaultAgent = new AtomicReference<>();
     private final AtomicReference<String> lastFailure = new AtomicReference<>();
 
     private record Cached(AgentConfig config, Instant fetchedAt) {}
 
-    public AgentConfigClient(
-            @Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl,
-            @Value("${ia.agent-id:console-agent}") String agentId) {
-        this.agentId = agentId;
+    private record CachedId(String agentId, Instant fetchedAt) {}
+
+    public AgentConfigClient(@Value("${ia.control-plane.url:http://localhost:8110}") String controlPlaneUrl) {
         this.controlPlaneUrl = controlPlaneUrl.replaceAll("/+$", "");
-        this.url = this.controlPlaneUrl + "/internal/agents/" + agentId + "/config";
-        log.info("Agent configuration comes from {}", url);
+        log.info("Agent configurations come from {}/internal/agents", this.controlPlaneUrl);
+    }
+
+    /** Remembers a configuration the control plane handed out, under its agent's id. */
+    public void remember(AgentConfig config) {
+        if (config != null && config.agentId() != null) {
+            configs.put(config.agentId(), new Cached(config, Instant.now()));
+        }
+    }
+
+    /** The last good configuration of an agent, without asking anyone — the fallback's answer. */
+    public Optional<AgentConfig> lastGood(String agentId) {
+        var cached = agentId == null ? null : configs.get(agentId);
+        return cached == null ? Optional.empty() : Optional.of(cached.config());
     }
 
     /**
-     * The configuration to answer the next prompt with, or empty when the control plane has never
-     * been reached. Empty means this pod cannot serve anything, which is what the health
-     * indicator reports and what keeps it out of the Service's endpoints.
+     * The catalogue's default agent: the control plane's answer, kept for {@code TTL}, and the last
+     * one known when it does not answer. Null when it has never answered.
      */
-    public Optional<AgentConfig> current() {
-        var cached = cache.get();
+    public String defaultAgentId() {
+        var cached = defaultAgent.get();
         if (cached != null && Duration.between(cached.fetchedAt(), Instant.now()).compareTo(TTL) < 0) {
-            return Optional.of(cached.config());
+            return cached.agentId();
         }
-        return Optional.ofNullable(refresh(cached));
-    }
-
-    /** Refreshes, falling back to {@code stale} — which may be null — on any failure. */
-    private AgentConfig refresh(Cached stale) {
         try {
             var response = http.send(
-                    HttpRequest.newBuilder(URI.create(url))
+                    HttpRequest.newBuilder(URI.create(controlPlaneUrl + "/internal/agents/default"))
                             .timeout(REQUEST_TIMEOUT)
                             .header("Accept", "application/json")
                             .GET().build(),
                     HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
-                var config = mapper.readValue(response.body(), AgentConfig.class);
-                cache.set(new Cached(config, Instant.now()));
+                var id = mapper.readTree(response.body()).path("agentId").asText(null);
+                defaultAgent.set(new CachedId(id, Instant.now()));
                 lastFailure.set(null);
-                if (config.warnings() != null && !config.warnings().isEmpty()) {
-                    // The control plane already dropped what it could not resolve. Repeating the
-                    // warnings here is what makes them visible in this pod's logs, next to the
-                    // prompts that were answered with fewer tools than the catalogue implies.
-                    log.warn("Agent {} resolved with warnings: {}", agentId, config.warnings());
-                }
-                log.info("Agent {} configuration refreshed: model {}, {} MCP server(s)",
-                        agentId, config.llm().model(), config.mcps().size());
-                return config;
+                return id;
             }
-            // 409 is the control plane refusing to serve this agent — disabled, no credential, no
-            // such LLM. Its body says which, and that message is the whole diagnosis.
-            return failed("control plane answered " + response.statusCode() + ": " + response.body(), stale);
+            lastFailure.set("control plane answered " + response.statusCode() + " for the default agent");
         } catch (Exception e) {
-            return failed(e.getClass().getSimpleName()
-                    + (e.getMessage() == null ? "" : ": " + e.getMessage()), stale);
+            lastFailure.set(e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage()));
         }
-    }
-
-    private AgentConfig failed(String reason, Cached stale) {
-        lastFailure.set(reason);
-        if (stale != null) {
-            log.warn("Could not refresh agent {} configuration ({}). Serving the copy from {} —"
-                    + " this pod is running on stale configuration.", agentId, reason, stale.fetchedAt());
-            return stale.config();
+        if (cached != null) {
+            log.warn("Could not ask the control plane for the default agent ({}); keeping '{}'",
+                    lastFailure.get(), cached.agentId());
+            return cached.agentId();
         }
-        log.error("Could not fetch agent {} configuration and there is nothing cached ({}). "
-                + "This pod cannot answer prompts until the control plane is reachable and the "
-                + "agent is servable.", agentId, reason);
         return null;
     }
 
     /**
-     * Any agent's configuration, by id — what the A2A endpoint answers with, since every pod serves
-     * every agent there. Its own agent goes through {@link #current()}; the others get the same TTL
-     * and the same last-good fallback, one entry each.
+     * Any agent's configuration, by id — what the A2A endpoint answers with, and the fallback of a
+     * prompt whose resolve failed. The same TTL and the same last-good fallback for every agent.
      *
      * @throws Unavailable with the control plane's reason when there is nothing to serve — a 409
      *         (disabled, no usable model) or never reachable. A 409 is not papered over with a
-     *         stale copy: the catalogue said no, and an A2A caller should hear that.
+     *         stale copy: the catalogue said no, and the caller should hear that.
      */
     public AgentConfig configOf(String requestedAgentId) {
-        if (agentId.equals(requestedAgentId)) {
-            return current().orElseThrow(() -> new Unavailable(lastFetchFailed()));
+        if (requestedAgentId == null || requestedAgentId.isBlank()) {
+            throw new Unavailable("No agent named, and the control plane did not say which answers");
         }
-        var cached = others.get(requestedAgentId);
+        var cached = configs.get(requestedAgentId);
         if (cached != null && Duration.between(cached.fetchedAt(), Instant.now()).compareTo(TTL) < 0) {
             return cached.config();
         }
@@ -163,11 +145,17 @@ public class AgentConfigClient {
                     HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
                 var config = mapper.readValue(response.body(), AgentConfig.class);
-                others.put(requestedAgentId, new Cached(config, Instant.now()));
+                configs.put(requestedAgentId, new Cached(config, Instant.now()));
+                lastFailure.set(null);
+                if (config.warnings() != null && !config.warnings().isEmpty()) {
+                    log.warn("Agent {} resolved with warnings: {}", requestedAgentId, config.warnings());
+                }
+                log.info("Agent {} configuration refreshed: model {}, {} MCP server(s)",
+                        requestedAgentId, config.llm().model(), config.mcps().size());
                 return config;
             }
             if (response.statusCode() == 409) {
-                others.remove(requestedAgentId);
+                configs.remove(requestedAgentId);
                 throw new Unavailable(reasonOf(response.body()));
             }
             reason = "control plane answered " + response.statusCode();
@@ -176,9 +164,10 @@ public class AgentConfigClient {
         } catch (Exception e) {
             reason = e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage());
         }
+        lastFailure.set(reason);
         if (cached != null) {
-            log.warn("Could not refresh agent {} configuration ({}). Serving the copy from {}.",
-                    requestedAgentId, reason, cached.fetchedAt());
+            log.warn("Could not refresh agent {} configuration ({}). Serving the copy from {} —"
+                    + " running on stale configuration.", requestedAgentId, reason, cached.fetchedAt());
             return cached.config();
         }
         throw new Unavailable("Agent '" + requestedAgentId + "' has no configuration: " + reason);
@@ -198,17 +187,13 @@ public class AgentConfigClient {
         public Unavailable(String message) { super(message); }
     }
 
-    public String agentId() {
-        return agentId;
-    }
-
-    /** Null when the last fetch succeeded; the reason otherwise. */
+    /** Null when the last call to the control plane succeeded; the reason otherwise. */
     public String lastFetchFailed() {
         return lastFailure.get();
     }
 
-    /** Whether a configuration has ever been resolved. */
+    /** Whether the control plane has ever answered, or any configuration is held. */
     public boolean hasEverResolved() {
-        return cache.get() != null;
+        return defaultAgent.get() != null || !configs.isEmpty();
     }
 }

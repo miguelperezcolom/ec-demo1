@@ -59,7 +59,7 @@ class ResolveGuardrailsTest {
     void theMatchingRoutesGuardrailsComeInOrderWithTheirA2aAddress() {
         agent("pii");
         agent("toxicity");
-        routes.save(Route.of(new RouteId("r"), new Name("r"), 1, "support", null, null, null, "front",
+        routes.save(Route.of(new RouteId("r"), new Name("r"), 1, "support", null, null, null, null, "front",
                 new Guardrails(List.of("toxicity", "pii"), List.of("pii"), Guardrails.Failure.OPEN)));
 
         var resolved = ask("support");
@@ -80,7 +80,7 @@ class ResolveGuardrailsTest {
         off.update(off.getName(), off.getSystemPrompt(), off.getLlmId(), List.of(), List.of(), List.of(), null,
                 Enabled.no());
         agent("pii");
-        routes.save(Route.of(new RouteId("r"), new Name("r"), 1, "support", null, null, null, "front",
+        routes.save(Route.of(new RouteId("r"), new Name("r"), 1, "support", null, null, null, null, "front",
                 new Guardrails(List.of("gone", "pii"), List.of("off"), null)));
 
         var resolved = ask("support");
@@ -96,7 +96,7 @@ class ResolveGuardrailsTest {
 
     @Test
     void noMatchingRouteNoGuardrails() {
-        routes.save(Route.of(new RouteId("r"), new Name("r"), 1, "support", null, null, null, "front",
+        routes.save(Route.of(new RouteId("r"), new Name("r"), 1, "support", null, null, null, null, "front",
                 new Guardrails(List.of("front-guard"), List.of(), null)));
 
         var resolved = ask("guest");

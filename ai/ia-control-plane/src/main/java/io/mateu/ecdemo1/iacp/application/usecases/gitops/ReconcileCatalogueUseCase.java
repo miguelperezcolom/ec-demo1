@@ -384,15 +384,15 @@ public class ReconcileCatalogueUseCase {
             var output = m.outputGuardrails() == null ? List.<String>of() : m.outputGuardrails();
             if (exists) {
                 updateRoute.handle(new UpdateRouteCommand(m.id(), name, priority, m.role(),
-                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), input, output,
+                        m.tenant(), m.locale(), m.routePrefix(), m.channel(), m.targetAgent(), input, output,
                         m.guardrailFailure(), enabled(m.enabled())));
             } else {
                 createRoute.handle(new CreateRouteCommand(m.id(), name, priority, m.role(),
-                        m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), input, output,
+                        m.tenant(), m.locale(), m.routePrefix(), m.channel(), m.targetAgent(), input, output,
                         m.guardrailFailure()));
                 if (!enabled(m.enabled())) {
                     updateRoute.handle(new UpdateRouteCommand(m.id(), name, priority, m.role(),
-                            m.tenant(), m.locale(), m.routePrefix(), m.targetAgent(), input, output,
+                            m.tenant(), m.locale(), m.routePrefix(), m.channel(), m.targetAgent(), input, output,
                             m.guardrailFailure(), false));
                 }
             }

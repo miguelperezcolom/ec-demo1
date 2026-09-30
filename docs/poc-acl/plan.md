@@ -375,10 +375,12 @@ Lo que se ha ido añadiendo tras los hitos, cada cosa en su PR y desplegada en `
 | **Auditoría de recepción y del CRS**, con el «Historial» de la reserva | #147 (desplegándose) |
 | Mateu 3.0-alpha.373 → 376 (Redwood: markdown del chat, acciones de página, confirmaciones, formularios en diálogo) | #110, #119, #139 |
 
-**Previsto, sin hacer:** un solo despliegue de `ia-agent` para todos los canales. Hoy hay tres
-(`ia-agent`, `ia-agent-front-office`, `ia-agent-control-plane`) que solo difieren en el agente por
-defecto; el plan es que el gateway ponga en cada petición el canal y el agente por defecto según el
-host, y que las reglas de ruta del catálogo decidan con ellos.
+**Hecho después:** un solo despliegue de `ia-agent` para todos los canales. Los tres que había
+(`ia-agent`, `ia-agent-front-office`, `ia-agent-control-plane`) solo diferían en el agente por defecto.
+Ahora el gateway pone en cada petición el canal (`X-Agent-Channel`) y el agente por defecto
+(`X-Default-Agent`) según el host; las reglas de ruta del catálogo pueden usar el canal como condición,
+y si ninguna encaja contesta el agente por defecto de la petición, o el del catálogo
+(`cp.default-agent-id`).
 
 ## Pendiente de recibir
 

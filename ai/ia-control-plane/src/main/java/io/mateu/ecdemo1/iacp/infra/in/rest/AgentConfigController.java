@@ -63,7 +63,8 @@ public class AgentConfigController {
         try {
             var resolved = resolveByContext.handle(new ResolveByContextUseCase.RequestContext(
                     request.userId(), request.roles() == null ? List.of() : request.roles(),
-                    request.tenant(), request.locale(), request.route(), request.defaultAgentId()));
+                    request.tenant(), request.locale(), request.route(), request.channel(),
+                    request.defaultAgentId()));
             return ResponseEntity.ok(resolved);
         } catch (ResolveByContextUseCase.BudgetExceededException e) {
             log.warn("Resolve refused (budget) for default agent {}: {}", agentId, e.getMessage());
@@ -76,7 +77,20 @@ public class AgentConfigController {
 
     /** What the agent posts to {@code /resolve}: its identity read from the token, plus context. */
     public record ResolveRequest(String userId, String username, List<String> roles, String tenant,
-                                 String locale, String route, String defaultAgentId) {
+                                 String locale, String route, String channel, String defaultAgentId) {
+    }
+
+    /**
+     * The catalogue's default agent: the one that answers a prompt no route matches and that names
+     * no default of its own. The agent pod asks it to know what to serve — and what to keep a
+     * last-good copy of — when nothing in the request says.
+     */
+    @GetMapping("/default")
+    public DefaultAgent defaultAgent() {
+        return new DefaultAgent(resolveByContext.defaultAgentId());
+    }
+
+    public record DefaultAgent(String agentId) {
     }
 
     public record Problem(String agentId, String reason) {}

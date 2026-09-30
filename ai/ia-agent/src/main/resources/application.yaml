@@ -54,11 +54,11 @@ spring:
         include-content: false
 
 ia:
-  # The two things this pod knows about itself. Everything else — model, credential, system
-  # prompt, MCP servers — comes from the control plane at /internal/agents/{agent-id}/config.
+  # Where the agents come from. This pod has no agent of its own: which one answers is decided per
+  # request — the gateway stamps the console (X-Agent-Channel) and its default agent
+  # (X-Default-Agent), and the control plane's routes may pick another at /internal/agents/resolve.
   control-plane:
     url: ${IA_CONTROL_PLANE_URL:http://localhost:8110}
-  agent-id: ${AGENT_ID:console-agent}
   # Agent-to-agent. Every pod serves every agent of the catalogue at /a2a/{agentId} (card at
   # /a2a/{agentId}/.well-known/agent-card.json, JSON-RPC message/send on POST), and calls the peers
   # the control plane lists for an agent as tools — see io.mateu.ecdemo1.iaagent.a2a.
