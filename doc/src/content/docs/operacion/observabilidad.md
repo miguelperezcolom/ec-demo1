@@ -37,19 +37,45 @@ segundo se rechace sin aviso. Por eso el de los nodos se guarda con la clave `ev
 
 ## Alertas
 
-`deploy/observability/prometheus-rules.yaml`, una `PrometheusRule` con la etiqueta `release: kps`, que es
-por lo que el operador selecciona reglas:
+`deploy/observability/prometheus-rules.yaml`: dos `PrometheusRule` con la etiqueta `release: kps`, que es
+por lo que el operador selecciona reglas.
 
-| Alerta | Cuándo |
-| :----- | :----- |
-| `SalesforceAllowanceHigh` | La org ha gastado el 80 % de su cupo diario |
-| `SalesforceAllowanceCritical` | El 95 %, o el MDM ha pausado sus llamadas porque se agotó |
-| `SalesforceOurCallRateHigh` | Nuestro ritmo de llamadas, proyectado a 24 h, pasa de 10.000 |
-| `SalesforceOthersSpending` | Otros (no ec1) han gastado más de 5.000 |
-| `OperaThrottled` | OHIP ha contestado 429 |
+| Alerta | Gravedad | Cuándo |
+| :----- | :------- | :----- |
+| `SalesforceAllowanceHigh` | warning | La org ha gastado el 80 % de su cupo diario |
+| `SalesforceAllowanceCritical` | critical | El 95 %, o el MDM ha pausado sus llamadas porque se agotó |
+| `SalesforceOurCallRateHigh` | warning | Nuestro ritmo de llamadas, proyectado a 24 h, pasa de 10.000 |
+| `SalesforceOthersSpending` | warning | Otros (no ec1) han gastado más de 5.000 |
+| `SalesforceNotAnswering` | critical | Todas las llamadas del MDM a Salesforce fallan desde hace 15 min (no es el cupo) |
+| `OperaThrottled` | warning | OHIP ha contestado 429 |
+| `OperaNotAnswering` | critical | Todas las llamadas de un servicio a OHIP fallan desde hace 10 min — la caída del 29/09 |
+| `OperaErrorRateHigh` | warning | Más de un 25 % de las llamadas a OHIP fallan, pero alguna pasa |
+| `ServiceDown` | critical | Prometheus no llega a un pod de `ec-demo1` desde hace 5 min |
+| `PodCrashLooping` | critical | Un contenedor de `ec-demo1` está en CrashLoopBackOff |
 
-**Alertmanager está apagado** en este despliegue: las alertas se ven en Prometheus y en la lista de
-alertas de Grafana, pero no avisan a nadie.
+Se prueban con `deploy/observability/test-rules.sh` (promtool, en la imagen de Prometheus): los casos
+están en `prometheus-rules.test.yaml`, entre ellos la caída de OHIP tal como fue.
+
+### Quién se entera
+
+Todas las reglas de arriba llevan la etiqueta `notify: ec-demo1`. **Alertmanager** (en
+`kube-prometheus-stack.yaml`) manda solo esas a **communication-service**, a su webhook interno
+`POST /alerts/alertmanager` —el gateway no lo publica—; las reglas propias del chart (el Watchdog, los
+componentes que un clúster gestionado no expone) no van a nadie.
+
+- Una alerta que salta es una notificación de tipo **`PLATFORM_ALERT`** (warning) o
+  **`PLATFORM_ALERT_CRITICAL`** (critical), con el resumen, la descripción y el enlace de la regla.
+- La tabla de destinatarios decide quién la recibe y por dónde, como con el resto de notificaciones: de
+  serie, los administradores (rol `ai-admin`) en la bandeja y en el navegador (Web Push). Para dejar el
+  Web Push solo a las críticas, marca en ese destinatario los tipos que quieras (*Notifications →
+  Recipients*).
+- Cuando la alerta se resuelve, la notificación se cierra en todas las bandejas.
+- La misma alerta enviada otra vez (cada 4 h si sigue activa, o tras reiniciarse Alertmanager) no se
+  duplica: se identifica por su huella y su inicio. Si vuelve a saltar después de resolverse, es una
+  nueva.
+- Una alerta crítica silencia las de aviso del mismo servicio.
+
+Alertmanager guarda su estado en un `emptyDir`: un reinicio olvida los silencios.
 
 ## Dónde mirar
 

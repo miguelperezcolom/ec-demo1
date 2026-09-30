@@ -49,7 +49,7 @@
     },
     "NotificationType" : {
       "type" : "string",
-      "enum" : [ "CAUSE_OPENED", "PROPOSAL_READY", "RETRYING_TOO_LONG", "PMS_REJECTED", "INTEGRATION_NEEDS_ATTENTION", "CHECK_IN_INCOMPLETE" ]
+      "enum" : [ "CAUSE_OPENED", "PROPOSAL_READY", "RETRYING_TOO_LONG", "PMS_REJECTED", "INTEGRATION_NEEDS_ATTENTION", "CHECK_IN_INCOMPLETE", "PLATFORM_ALERT", "PLATFORM_ALERT_CRITICAL" ]
     },
     "NotificationType-nullable" : {
       "anyOf" : [ {
