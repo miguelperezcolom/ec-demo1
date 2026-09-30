@@ -211,8 +211,9 @@ public class Invoices {
     }
     var difference = frontOffice.subtract(pms.amount());
     return List.of("Los totales NO coinciden (diferencia " + difference.toPlainString() + "). Causas habituales: el alojamiento,",
-        "que Opera factura con su tarifa y sus noches (en una salida anticipada, solo las pasadas); un cargo que Opera",
-        "rechazó o que llegó después del check-out; o cargos del front office anteriores a subirlos a Opera.");
+        "que Opera factura con su tarifa y sus noches (en una salida anticipada, solo las pasadas) y con el paquete del",
+        "régimen aparte (el desayuno BRKFST, que el front office no tiene en su folio); un cargo que Opera rechazó o que",
+        "llegó después del check-out; o cargos del front office anteriores a subirlos a Opera.");
   }
 
   static String amount(BigDecimal amount, String currency) {
