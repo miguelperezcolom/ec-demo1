@@ -96,7 +96,7 @@ Las llamadas a OHIP (`OperaFrontDesk`):
 | No show | Un comentario en la reserva (`PUT /rsv/v1/hotels/{h}/reservations/{id}`, solo `comments`) |
 | Estado de las habitaciones de un tipo, o de una (solo lectura) | `GET /fof/v1/hotels/{h}/rooms?roomType=` · `?fromRoomNumber=&toRoomNumber=` |
 | Cargo de recepción en el folio (y su anulación, en negativo) | `POST /csh/v1/hotels/{h}/reservations/{id}/charges` (`transactionCode`, `price`, `postingReference` `FO:<línea>`, con el cajero) |
-| Posteos del folio (solo lectura) | `GET /csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Postings` |
+| Posteos del folio (solo lectura) | `GET /csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Postings&summaryOnly=false` (sin `summaryOnly=false`, XMAR no da los posteos; la referencia vuelve con un blanco al final) |
 
 Los **códigos de transacción** de los cargos de recepción (`ohip.charges` en pms-integration), de los
 que XMAR deja postear a mano (`GET /csh/v1/hotels/XMAR/transactionCodes?manualPostAllowed=true`):
