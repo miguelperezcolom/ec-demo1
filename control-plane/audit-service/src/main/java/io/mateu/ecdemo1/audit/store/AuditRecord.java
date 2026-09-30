@@ -19,7 +19,9 @@ import java.time.Instant;
 @Table(name = "audit_record", indexes = {
         @Index(name = "audit_record_at", columnList = "at"),
         @Index(name = "audit_record_hotel", columnList = "hotelCode"),
-        @Index(name = "audit_record_actor", columnList = "actor")})
+        @Index(name = "audit_record_actor", columnList = "actor"),
+        @Index(name = "audit_record_stay", columnList = "stayId"),
+        @Index(name = "audit_record_locator", columnList = "locator")})
 public class AuditRecord {
 
     @Id
@@ -36,6 +38,15 @@ public class AuditRecord {
     @Column(columnDefinition = "text")
     public String response;
     public Instant receivedAt;
+    /**
+     * The stay and the CRS locator the action was on, when its parameters say — the front office's and
+     * the CRS's actions do: what a reservation's history is looked up by. Read from the parameters as the
+     * action arrives; null for an action on no reservation.
+     */
+    public String stayId;
+    public String locator;
+
+    static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
     public static AuditRecord of(AuditedAction a, Instant receivedAt) {
         var r = new AuditRecord();
@@ -49,6 +60,21 @@ public class AuditRecord {
         r.succeeded = a.succeeded();
         r.response = a.response();
         r.receivedAt = receivedAt;
+        r.stayId = parameter(a.parameters(), "stayId");
+        r.locator = parameter(a.parameters(), "locator");
         return r;
+    }
+
+    /** A top-level text parameter of the action's JSON parameters; null if there is none or they are not JSON. */
+    static String parameter(String parameters, String name) {
+        if (parameters == null || parameters.isBlank()) {
+            return null;
+        }
+        try {
+            var node = JSON.readTree(parameters).get(name);
+            return node == null || node.isNull() || !node.isValueNode() ? null : node.asText();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

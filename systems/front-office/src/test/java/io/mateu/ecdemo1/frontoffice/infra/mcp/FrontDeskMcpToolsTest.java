@@ -377,11 +377,15 @@ class FrontDeskMcpToolsTest {
     return folios.findByStayId(stayId).orElseThrow().lateCheckOutContracted();
   }
 
+  /**
+   * What the agent did on the stay, as audited: the fixtures' own check-ins and signatures — done by the
+   * desk, and audited as such — left out.
+   */
   List<String> audited(String stayId) {
     // The parameters travel as a JSON string inside the action: {\"stayId\":\"MCP-1\",…}
     var needle = "\\\"stayId\\\":\\\"" + stayId + "\\\"";
     return jdbc.queryForList("select payload from outbox_message where binding = 'audit' order by seq", String.class).stream()
-        .filter(p -> p.contains(needle)).toList();
+        .filter(p -> p.contains(needle)).filter(p -> p.contains("\"by\":\"reception-agent")).toList();
   }
 
   String arrival(int pax) {

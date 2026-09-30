@@ -106,6 +106,39 @@ los de la agencia que la vendió — del hotel o de la cadena.
 Todo reconocimiento y todo rechazo va al topic `audit` (`Read check-in notices`, `Check-in refused:
 unread notices`, `Read check-out warnings`, `Check-out refused: unread warnings`).
 
+## Quién hizo qué con la reserva
+
+Toda operación de recepción con consecuencias sobre una estancia se audita **en el servicio de
+aplicación que la hace** (`StayAudit`), no en la pantalla ni en la herramienta del agente: cuenta igual
+la haga una persona en el mostrador o el agente de recepción por ella.
+
+| Operación | Acción auditada | Servicio |
+|---|---|---|
+| Check-in (y forzado) | `Check-in` (+ `Forced check-in` con el motivo y lo que faltaba) | `CheckInService` |
+| Check-out | `Check-out` | `CheckOutService` |
+| Cambio de habitación | `Room change` (de, a) | `RoomChangeService` |
+| Cargo al folio / anulación | `Charge posted` / `Charge voided` (código, concepto, importe) | `FolioService` |
+| Late check-out | `Late check-out` | `FolioService` |
+| Cobro / preautorización | `Payment taken` (método e importe; nunca datos de tarjeta) | `CheckInService` |
+| Llave, wifi, firma | `Key encoded`, `Wifi created`, `Registration signed` | `CheckInService` |
+| Ancillaries | `Add-on added` / `Add-on removed`, `Ancillaries chosen`, `Ancillaries closed` | `CheckInService` |
+| Kárdex | `Kardex edit` (qué campos, no sus valores), `Contact updated`, `Document scanned` | `KardexService` |
+| No-show de un pax | `No show` | `NoShowService` |
+| Walk-in | `Walk-in` (con lo que contestó el CRS) | `WalkInService` |
+| Incidencias | `Incident reported`, `Incident resolved` | `IncidentService` |
+
+- **Quién.** El usuario del token de la petición (`DeskUser`). Cuando actúa el agente, las
+  operaciones confirmadas se ejecutan como `reception-agent (persona)`, y `PendingConfirmations` solo
+  audita por su cuenta lo que el servicio no auditó: **un registro por operación**.
+- **Qué lleva.** La estancia, el localizador del CRS, el hotel, los parámetros (tarjetas, secretos y
+  tokens enmascarados), si se hizo y lo que contestó o por qué no.
+- **Fallos.** Se auditan también, aparte de la transacción que se deshace. Un rechazo que ya audita
+  quien lo decide (avisos sin leer, check-in incompleto) no se audita dos veces.
+- **Historial.** La ficha de la reserva tiene una sección **Historial**: quién hizo qué y cuándo, lo más
+  reciente primero — la recepción, el agente y lo que el CRS hizo con su reserva —, leído de
+  `audit-service` (`GET /audit`, dentro del clúster; `AUDIT_URL`). Si no contesta, lo dice y la página
+  sigue.
+
 ## Por qué un sistema propio y no una fachada de Opera
 
 El front office tiene datos y decisiones que no son de Opera:

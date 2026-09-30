@@ -155,6 +155,14 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @Colspan(2)
     Callable<Component> otherSystems = this::otherSystems;
 
+    /** Who did what with the booking, and when: here, through the console's agent, and at the front office. */
+    @Section("History")
+    @HiddenInCreate
+    @HiddenInEditor
+    @Label("")
+    @Colspan(2)
+    Callable<Component> history = this::history;
+
     final CreateBookingUseCase createBookingUseCase;
     final UpdateBookingUseCase updateBookingUseCase;
     final ConfirmBookingUseCase confirmBookingUseCase;
@@ -162,6 +170,7 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     final RegisterPaymentUseCase registerPaymentUseCase;
     final BookingQueryService queryService;
     final CustomerLinks customerLinks;
+    final io.mateu.ecdemo1.booking.infra.out.audit.BookingHistory bookingHistory;
 
     public String create(HttpRequest httpRequest) {
         return createBookingUseCase.handle(new CreateBookingCommand(hotelCode, request(), null,
@@ -238,6 +247,30 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
         return BookingRequests.of(channelCode, partnerCode, externalReference, arrival, departure,
                 new Holder(holderFirstName, holderLastName, holderEmail, holderPhone, holderNationality),
                 rooms, guests, comments);
+    }
+
+    Component history() {
+        var entries = bookingHistory.of(id);
+        if (entries.isEmpty()) {
+            return io.mateu.uidl.data.Text.builder().text("The history is not available now.").build();
+        }
+        if (entries.get().isEmpty()) {
+            return io.mateu.uidl.data.Text.builder().text("Nobody has done anything with this booking yet.").build();
+        }
+        var zone = java.time.ZoneId.of("Europe/Madrid");
+        var when = java.time.format.DateTimeFormatter.ofPattern("d MMM HH:mm");
+        return io.mateu.uidl.data.StatusList.builder().compact(true).frameless(true).style("width: 100%;")
+                .items(entries.get().stream().map(e -> io.mateu.uidl.data.StatusItem.builder()
+                        .id("hist-" + (e.at() == null ? "" : e.at().toEpochMilli()) + "-" + Math.abs((e.action() + e.by()).hashCode()))
+                        .title(e.action() + ("front-office".equals(e.service()) ? " · front office" : ""))
+                        .description((e.at() == null ? "" : when.format(e.at().atZone(zone)) + " · ")
+                                + (e.by() == null ? "—" : e.by())
+                                + (e.response() == null || e.response().isBlank() || "OK".equals(e.response()) ? ""
+                                : " — " + e.response()))
+                        .status(e.succeeded() ? "Done" : "Not done")
+                        .statusColor(e.succeeded() ? "success" : "danger")
+                        .build()).toList())
+                .build();
     }
 
     Component otherSystems() {

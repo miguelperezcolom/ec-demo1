@@ -30,23 +30,29 @@ public class NoShowService {
   final CheckInOpsRepository checkInOps;
   final ReceptionReports reception;
   final TransactionTemplate transaction;
+  final StayAudit audit;
 
   public NoShowService(StayRepository stays, CheckInOpsRepository checkInOps, ReceptionReports reception,
-                       PlatformTransactionManager transactions) {
+                       PlatformTransactionManager transactions, StayAudit audit) {
     this.stays = stays;
     this.checkInOps = checkInOps;
     this.reception = reception;
     this.transaction = new TransactionTemplate(transactions);
+    this.audit = audit;
   }
 
   public Outcome paxToggled(String stayId, int pax) {
-    return transaction.execute(status -> {
-      var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
-      var ops = checkInOps.save(stayId, checkInOps.of(stayId).toggleNoShow(pax));
-      var nobodyArrived = stay.status() == StayStatus.ARRIVING && CheckInChecklist.nobodyArrived(stay, ops);
-      // The report leaves with the mark: both saved, or neither.
-      return new Outcome(ops.isNoShow(pax), nobodyArrived,
-          nobodyArrived ? reception.noShow(stayId, stay.pax(), "front office") : null);
-    });
+    return transaction.execute(status -> audit.run("No show", stayId, null, StayAudit.params("pax", pax),
+        () -> toggle(stayId, pax), o -> (o.noShow() ? "Pax " + pax + " marcado como no-show" : "Pax " + pax + " ya no es no-show")
+            + (o.nobodyArrived() ? " — la reserva entera es no-show" + (o.crsNotice() == null ? "" : ": " + o.crsNotice()) : "")));
+  }
+
+  Outcome toggle(String stayId, int pax) {
+    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+    var ops = checkInOps.save(stayId, checkInOps.of(stayId).toggleNoShow(pax));
+    var nobodyArrived = stay.status() == StayStatus.ARRIVING && CheckInChecklist.nobodyArrived(stay, ops);
+    // The report leaves with the mark (and its audit): all saved, or none.
+    return new Outcome(ops.isNoShow(pax), nobodyArrived,
+        nobodyArrived ? reception.noShow(stayId, stay.pax(), "front office") : null);
   }
 }

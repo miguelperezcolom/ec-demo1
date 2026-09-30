@@ -59,6 +59,9 @@ spec:
               value: "http://crs-integration-service:8121"
             - name: MDM_URL
               value: "http://customer-mdm-service:8127"
+            # A reservation's «Historial»: who did what on it, as the audit service keeps it (GET /audit).
+            - name: AUDIT_URL
+              value: "http://audit-service:8129"
             # The PMS's connector, for the one query the check-in's room step needs now: the rooms of
             # the stay's type as Opera's housekeeping has them.
             - name: PMS_INTEGRATION_URL

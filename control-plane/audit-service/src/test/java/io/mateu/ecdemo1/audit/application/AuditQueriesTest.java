@@ -99,6 +99,20 @@ class AuditQueriesTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void aReservationsHistoryIsNewestFirstAndAskingForNoneReadsNothing() {
+        var captor = ArgumentCaptor.forClass(Pageable.class);
+        when(records.findAll(any(Specification.class), captor.capture())).thenReturn(Page.empty());
+
+        assertThat(queries.ofReservation(null, " ", 50)).isEmpty();
+        verify(records, never()).findAll(any(Specification.class), any(Pageable.class));
+
+        queries.ofReservation("FO-1", "97R5DW", 5000);
+        assertThat(captor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "at"));
+        assertThat(captor.getValue().getPageSize()).isEqualTo(500);
+    }
+
+    @Test
     void nothingAskedIsNoCondition() {
         var cb = where(new AuditQuery(" ", "", null, null, null, null, null, null));
         verify(cb, never()).like(any(), any(String.class));

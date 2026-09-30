@@ -126,6 +126,11 @@ partners:
 customer-mdm:
   url: ${CUSTOMER_MDM_URL:}
 
+# The audit service: a booking's history — who did what with it, here and at the front office — for
+# its screen (GET /audit, inside the cluster). Blank: the screen shows no history.
+audit:
+  url: ${AUDIT_URL:}
+
 # The OpenAPI document at /v3/api-docs describes this service's REST API and nothing else: without
 # this it also lists the endpoints Mateu serves its screens from, which no agent should be offered.
 springdoc:

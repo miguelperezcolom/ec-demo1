@@ -62,7 +62,7 @@ class CreateBookingTracingTest {
     final BookingTermsFactory terms = new BookingTermsFactory(catalog, new RoomPricing());
     final WalkInBookingTest.Store store = new WalkInBookingTest.Store();
     final CreateBookingUseCase create = new CreateBookingUseCase(store, terms, catalog, new LocatorValueGenerator(),
-            Clock.systemUTC(), traces);
+            Clock.systemUTC(), traces, RecordingTrail.audit());
     final QuoteBookingUseCase quote = new QuoteBookingUseCase(catalog, terms);
 
     Traces traces() {
@@ -116,7 +116,7 @@ class CreateBookingTracingTest {
     @Test
     void untracedItBooksAsBefore() {
         var untraced = new CreateBookingUseCase(store, terms, catalog, new LocatorValueGenerator(), Clock.systemUTC(),
-                Traces.untraced());
+                Traces.untraced(), RecordingTrail.audit());
         var total = quote.handle("MRU01", WalkInBookingTest.walkIn(null, null, 2)).total();
 
         assertThat(untraced.handle(new CreateBookingCommand("MRU01",

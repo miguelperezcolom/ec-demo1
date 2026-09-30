@@ -122,7 +122,7 @@ class DemoBookingGeneratorTest {
     @Test
     void oneRefusedBookingDoesNotStopTheRest() {
         var created = new ArrayList<CreateBookingCommand>();
-        var create = new CreateBookingUseCase(null, null, null, null, null, null) {
+        var create = new CreateBookingUseCase(null, null, null, null, null, null, null) {
             @Override
             public String handle(CreateBookingCommand command) {
                 created.add(command);
@@ -148,7 +148,7 @@ class DemoBookingGeneratorTest {
 
     @Test
     void unreadablePartnersLeaveTheBookingsDirect() {
-        var create = new CreateBookingUseCase(null, null, null, null, null, null) {
+        var create = new CreateBookingUseCase(null, null, null, null, null, null, null) {
             @Override
             public String handle(CreateBookingCommand command) {
                 assertThat(command.booking().partnerCode()).isNull();

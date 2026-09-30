@@ -62,8 +62,11 @@ class GuestNoticesTest {
 
     notices.acknowledgeCheckIn(a.stayId(), "ana", null);
     assertThat(checkIn.checkIn(complete(a), null, List.of(), "ana").status()).isEqualTo(StayStatus.IN_HOUSE);
-    assertThat(audited(a.stayId())).hasSize(2).last().asString()
-        .contains("Read check-in notices").contains("\"succeeded\":true").contains("He leído el aviso");
+    // the notice read, and then the check-in itself — each audited, with who
+    assertThat(audited(a.stayId())).hasSize(3);
+    assertThat(audited(a.stayId()).get(1)).contains("Read check-in notices").contains("\"succeeded\":true")
+        .contains("He leído el aviso");
+    assertThat(audited(a.stayId()).get(2)).contains("\"action\":\"Check-in\"").contains("\"by\":\"ana\"");
   }
 
   @Test

@@ -28,6 +28,22 @@ public class AuditOutbox {
   }
 
   public void append(AuditedAction action) {
+    write(action);
+    APPENDED.get()[0]++;
+  }
+
+  /** Into the outbox, in the caller's transaction. */
+  protected void write(AuditedAction action) {
     outbox.append(TOPIC, action.actionId(), "AuditedAction", JSON.writeValueAsString(action), null);
+  }
+
+  static final ThreadLocal<long[]> APPENDED = ThreadLocal.withInitial(() -> new long[1]);
+
+  /**
+   * How many actions this thread has audited so far: compared before and after a piece of work, it says
+   * whether the work audited itself — so whoever runs it for someone else audits it only if it did not.
+   */
+  public static long appendedOnThisThread() {
+    return APPENDED.get()[0];
   }
 }

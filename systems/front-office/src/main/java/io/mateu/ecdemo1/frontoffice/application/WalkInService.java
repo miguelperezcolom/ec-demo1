@@ -16,9 +16,11 @@ import org.springframework.stereotype.Service;
 public class WalkInService {
 
   final WalkInDesk desk;
+  final StayAudit audit;
 
-  public WalkInService(WalkInDesk desk) {
+  public WalkInService(WalkInDesk desk, StayAudit audit) {
     this.desk = desk;
+    this.audit = audit;
   }
 
   public WalkInDesk.Offer offer() {
@@ -43,12 +45,26 @@ public class WalkInService {
    * whatever the CRS answers: one that does not answer is asked again; a refusal is the desk's to see.
    */
   public WalkIn confirm(WalkInDesk.Request request, BigDecimal quotedTotal) {
+    // audited once the stay exists — its id is the walk-in's — with what the CRS answered to the send
+    var params = StayAudit.params("arrival", request.arrival(), "departure", request.departure(),
+        "roomType", request.roomTypeCode(), "ratePlan", request.ratePlanCode(), "board", request.boardCode(),
+        "adults", request.adults(), "total", quotedTotal);
     var missing = missing(request.holder());
     if (!missing.isEmpty()) {
-      throw new IllegalArgumentException("Falta del titular: " + String.join(", ", missing) + ".");
+      var why = "Falta del titular: " + String.join(", ", missing) + ".";
+      audit.failed("Walk-in", null, null, params, why);
+      throw new IllegalArgumentException(why);
     }
-    var opened = desk.open(request, new WalkInDesk.Quote(null, 0, quotedTotal));
-    return desk.send(opened);
+    WalkIn opened;
+    try {
+      opened = desk.open(request, new WalkInDesk.Quote(null, 0, quotedTotal));
+    } catch (RuntimeException e) {
+      audit.failed("Walk-in", null, null, params, e.getMessage());
+      throw e;
+    }
+    var sent = desk.send(opened);
+    audit.done("Walk-in", sent.stayId(), null, params, sent.label());
+    return sent;
   }
 
   static boolean blank(String s) {

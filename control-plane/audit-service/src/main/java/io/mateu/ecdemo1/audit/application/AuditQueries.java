@@ -40,6 +40,32 @@ public class AuditQueries {
         this.zone = ZoneId.of(zone);
     }
 
+    /**
+     * A reservation's history: what was done on the stay, or on the CRS's booking of that locator, newest
+     * first — by its columns, or, for an action audited before they were read, by its parameters.
+     */
+    public List<AuditRecord> ofReservation(String stayId, String locator, int limit) {
+        if (blank(stayId) && blank(locator)) {
+            return List.of();
+        }
+        Specification<AuditRecord> spec = (root, query, cb) -> {
+            var any = new ArrayList<Predicate>();
+            for (var pair : List.of(new String[]{"stayId", stayId}, new String[]{"locator", locator})) {
+                if (!blank(pair[1])) {
+                    any.add(cb.equal(root.get(pair[0]), pair[1]));
+                    any.add(cb.and(cb.isNull(root.get(pair[0])),
+                            cb.like(root.get("parameters"), "%\"" + pair[0] + "\":\"" + pair[1] + "\"%")));
+                }
+            }
+            return cb.or(any.toArray(Predicate[]::new));
+        };
+        return records.findAll(spec, PageRequest.of(0, Math.max(1, Math.min(limit, 500)), NEWEST_FIRST)).getContent();
+    }
+
+    static boolean blank(String s) {
+        return s == null || s.isBlank();
+    }
+
     public Page<AuditRecord> find(AuditQuery query, Pageable pageable) {
         return records.findAll(matching(query == null ? AuditQuery.everything() : query, zone), ordered(pageable));
     }

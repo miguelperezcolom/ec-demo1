@@ -37,10 +37,11 @@ public class CheckInService {
   final GuestNotices notices;
   final ReceptionReports reception;
   final IncompleteCheckIns incomplete;
+  final StayAudit audit;
 
   public CheckInService(StayRepository stays, RoomRepository rooms, FolioRepository folios,
                         AddOnCatalogRepository addOnCatalog, CheckInOpsRepository checkInOps, GuestNotices notices,
-                        ReceptionReports reception, IncompleteCheckIns incomplete) {
+                        ReceptionReports reception, IncompleteCheckIns incomplete, StayAudit audit) {
     this.stays = stays;
     this.rooms = rooms;
     this.folios = folios;
@@ -49,6 +50,7 @@ public class CheckInService {
     this.notices = notices;
     this.reception = reception;
     this.incomplete = incomplete;
+    this.audit = audit;
   }
 
   /**
@@ -67,17 +69,23 @@ public class CheckInService {
     return checkIn(stayId, roomNumber, addOnIds, null);
   }
 
-  /** As {@link #checkIn(String, String, Collection)}, saying who asks (for the audit of a refusal). */
+  /** As {@link #checkIn(String, String, Collection)}, saying who asks — audited, done or refused. */
   @Transactional
   public Stay checkIn(String stayId, String roomNumber, Collection<String> addOnIds, String by) {
-    var stay = find(stayId);
-    if (stay.status() == StayStatus.ARRIVING) {
-      notices.requireCheckIn(stay, by);
-      incomplete.requireCompleteCheckIn(stay, by);
-      stay = checkInNow(stay, roomNumber, addOnIds, by);
-    }
-    update(stayId, ops -> ops.withExtras(true));
-    return stay;
+    return audit.run("Check-in", stayId, by, StayAudit.params("room", roomNumber, "addOns", addOnIds), () -> {
+      var stay = find(stayId);
+      if (stay.status() == StayStatus.ARRIVING) {
+        notices.requireCheckIn(stay, by);
+        incomplete.requireCompleteCheckIn(stay, by);
+        stay = checkInNow(stay, roomNumber, addOnIds, by);
+      }
+      update(stayId, ops -> ops.withExtras(true));
+      return stay;
+    }, CheckInService::checkedInOutcome);
+  }
+
+  static String checkedInOutcome(Stay stay) {
+    return stay.status() == StayStatus.IN_HOUSE ? "En casa · habitación " + stay.roomNumber() : "Estancia " + stay.status();
   }
 
   /**
@@ -92,17 +100,20 @@ public class CheckInService {
     if (reason == null || reason.isBlank()) {
       throw new IllegalArgumentException("Forzar el check-in necesita un motivo");
     }
-    var stay = find(stayId);
-    if (stay.status() == StayStatus.ARRIVING) {
-      notices.requireCheckIn(stay, by);
-      var missing = incomplete.missing(stay);
-      stay = checkInNow(stay, roomNumber, addOnIds, by);
-      if (!missing.isEmpty()) {
-        incomplete.recordForced(stay, reason, missing, by);
-      }
-    }
-    update(stayId, ops -> ops.withExtras(true));
-    return stay;
+    return audit.run("Check-in", stayId, by,
+        StayAudit.params("room", roomNumber, "addOns", addOnIds, "forced", true, "reason", reason), () -> {
+          var stay = find(stayId);
+          if (stay.status() == StayStatus.ARRIVING) {
+            notices.requireCheckIn(stay, by);
+            var missing = incomplete.missing(stay);
+            stay = checkInNow(stay, roomNumber, addOnIds, by);
+            if (!missing.isEmpty()) {
+              incomplete.recordForced(stay, reason, missing, by);
+            }
+          }
+          update(stayId, ops -> ops.withExtras(true));
+          return stay;
+        }, CheckInService::checkedInOutcome);
   }
 
   /** Checks the arriving stay in: room, add-ons, in house, the room occupied, the folio opened; up to the PMS. */
@@ -133,12 +144,12 @@ public class CheckInService {
 
   @Transactional
   public CheckInOps wifiCreated(String stayId) {
-    return update(stayId, ops -> ops.withWifi(true));
+    return audit.run("Wifi created", stayId, null, null, () -> update(stayId, ops -> ops.withWifi(true)), null);
   }
 
   @Transactional
   public CheckInOps keyEncoded(String stayId) {
-    return update(stayId, ops -> ops.withLlave(true));
+    return audit.run("Key encoded", stayId, null, null, () -> update(stayId, ops -> ops.withLlave(true)), null);
   }
 
   @Transactional
@@ -149,27 +160,41 @@ public class CheckInService {
   /** The registration signed — which may be the last step a forced check-in owed. */
   @Transactional
   public CheckInOps registrationSigned(String stayId, String by) {
-    var ops = update(stayId, o -> o.withFirma(true));
-    incomplete.settle(stayId, by);
-    return ops;
+    return audit.run("Registration signed", stayId, by, null, () -> {
+      var ops = update(stayId, o -> o.withFirma(true));
+      incomplete.settle(stayId, by);
+      return ops;
+    }, null);
   }
 
   @Transactional
   public CheckInOps paymentTaken(String stayId) {
-    return update(stayId, ops -> ops.withCobro(true));
+    return paymentTaken(stayId, null, null);
+  }
+
+  /**
+   * The payment or pre-authorisation taken: {@code method} is how (card, cash, points) and {@code amount}
+   * how much, as the desk said — for the audit trail; no card data is ever passed here.
+   */
+  @Transactional
+  public CheckInOps paymentTaken(String stayId, String method, java.math.BigDecimal amount) {
+    return audit.run("Payment taken", stayId, null, StayAudit.params("method", method, "amount", amount),
+        () -> update(stayId, ops -> ops.withCobro(true)), null);
   }
 
   /** The ancillaries selection closed as it is. */
   @Transactional
   public CheckInOps extrasClosed(String stayId) {
-    return update(stayId, ops -> ops.withExtras(true));
+    return audit.run("Ancillaries closed", stayId, null, null, () -> update(stayId, ops -> ops.withExtras(true)), null);
   }
 
   /** One add-on contracted or given up, the selection still open. */
   @Transactional
   public Stay addOnToggled(String stayId, String addOnId, boolean added) {
-    var stay = find(stayId);
-    return stays.save(added ? stay.addAddOn(addOnId) : stay.removeAddOn(addOnId));
+    return audit.run(added ? "Add-on added" : "Add-on removed", stayId, null, StayAudit.params("addOn", addOnId), () -> {
+      var stay = find(stayId);
+      return stays.save(added ? stay.addAddOn(addOnId) : stay.removeAddOn(addOnId));
+    }, null);
   }
 
   /**
@@ -178,6 +203,11 @@ public class CheckInService {
    */
   @Transactional
   public Stay extrasChosen(String stayId, Map<String, Boolean> chosen) {
+    return audit.run("Ancillaries chosen", stayId, null, StayAudit.params("chosen", chosen), () -> choose(stayId, chosen),
+        null);
+  }
+
+  Stay choose(String stayId, Map<String, Boolean> chosen) {
     var stay = find(stayId);
     for (var entry : chosen.entrySet()) {
       var has = stay.addOns().stream().anyMatch(a -> a.addOnId().equals(entry.getKey()));

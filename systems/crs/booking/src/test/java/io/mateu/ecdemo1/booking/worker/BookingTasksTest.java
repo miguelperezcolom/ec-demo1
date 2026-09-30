@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BookingTasksTest {
 
     final List<String> noShows = new ArrayList<>();
-    final RegisterNoShowUseCase useCase = new RegisterNoShowUseCase(null, null, null) {
+    final RegisterNoShowUseCase useCase = new RegisterNoShowUseCase(null, null, null, null) {
         @Override
         public void handle(String bookingId) {
             if ("GONE".equals(bookingId)) {

@@ -90,6 +90,12 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- Who did what to a booking, on the audit topic: the same AuditedAction as every service. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-audit</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu.workflow</groupId>
             <artifactId>shared</artifactId>

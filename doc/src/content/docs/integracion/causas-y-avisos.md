@@ -83,7 +83,27 @@ mostrador solo le llegue lo que alguien decida que es suyo.
 
 ## Auditoría
 
-`audit-service` (HLA F016) materializa, inmutables, las acciones declaradas `@Audited` en integraciones
-y mapeado —hechas o rechazadas, por consola, REST o agente— con quién, cuándo, parámetros y respuesta.
-Llegan por el outbox de cada servicio al topic `audit`. La pantalla, en *Audit* (`/_audit`), busca por
+`audit-service` (HLA F016) materializa, inmutables, las acciones con consecuencias —hechas o
+rechazadas, por consola, REST o agente— con quién, cuándo, parámetros y respuesta. Llegan por el outbox
+de cada servicio al topic `audit` (`AuditedAction`). La pantalla, en *Audit* (`/_audit`), busca por
 texto libre y filtra por fecha, hotel, usuario, acción, servicio y resultado. Solo lectura.
+
+Quién audita qué:
+
+| Servicio | Qué | Dónde se audita | Quién |
+|---|---|---|---|
+| `integrations-service`, `mapping-service` | las acciones `@Audited` (activar, pausar, aprobar un mapeado…) | en el servicio (`AuditScope`, `AuditAspect`) | el usuario de la consola, o el agente por él |
+| `front-office` | toda operación de recepción sobre una estancia (tabla en [Un sistema propio](/front-office/sistema-propio/#quién-hizo-qué-con-la-reserva)) | en el servicio de aplicación que la hace (`StayAudit`) | el usuario del token (`DeskUser`), o `reception-agent (persona)` |
+| `booking` (el CRS) | crear, modificar, confirmar, cancelar, no-show, cobro y borrado de una reserva | en el caso de uso (`BookingAudit`) | el usuario del token (o `X-User-Name`), `console-agent (persona)` por las herramientas MCP, `motor` para el no-show del motor, `api` si nadie se identifica |
+
+Cada acción sobre una reserva lleva en sus parámetros la estancia (`stayId`) y el localizador del CRS
+(`locator`); `audit-service` los guarda como columnas indexadas. Con eso sirve, **solo dentro del
+clúster**, el historial de una reserva: `GET /audit?stayId=…&locator=…&limit=…`, lo más reciente
+primero (el gateway no enruta `/audit`; la pantalla `/_audit` sigue tras `ai-admin`). Lo leen el
+front office («Historial» de la reserva, variable `AUDIT_URL`) y la ficha de la reserva en el CRS
+(«History», `AUDIT_URL`).
+
+Una operación hecha se audita **en su misma transacción** (o las dos, o ninguna); una rechazada o
+fallida, **aparte**, porque la suya se deshace. Auditar nunca rompe la operación: si no se puede
+escribir, se registra en el log. En los parámetros, lo que parece una tarjeta, un secreto o un token se
+enmascara, y del kárdex se dice qué campos cambiaron, no sus valores.

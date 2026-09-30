@@ -23,11 +23,14 @@ public class FolioService {
   final FolioRepository folios;
   final ChargeCatalogRepository chargeCatalog;
   final ReceptionReports reception;
+  final StayAudit audit;
 
-  public FolioService(FolioRepository folios, ChargeCatalogRepository chargeCatalog, ReceptionReports reception) {
+  public FolioService(FolioRepository folios, ChargeCatalogRepository chargeCatalog, ReceptionReports reception,
+                      StayAudit audit) {
     this.folios = folios;
     this.chargeCatalog = chargeCatalog;
     this.reception = reception;
+    this.audit = audit;
   }
 
   /**
@@ -44,13 +47,15 @@ public class FolioService {
   /** As {@link #contractLateCheckOut(String)}, saying who charges it. */
   @Transactional
   public boolean contractLateCheckOut(String stayId, String by) {
-    var folio = folioOf(stayId);
-    if (folio.lateCheckOutContracted()) {
-      return false;
-    }
-    var saved = folios.save(folio.contractLateCheckOut());
-    reception.chargePosted(stayId, saved.lines().getLast(), by);
-    return true;
+    return audit.run("Late check-out", stayId, by, StayAudit.params("fee", Folio.LATE_CHECK_OUT_FEE), () -> {
+      var folio = folioOf(stayId);
+      if (folio.lateCheckOutContracted()) {
+        return false;
+      }
+      var saved = folios.save(folio.contractLateCheckOut());
+      reception.chargePosted(stayId, saved.lines().getLast(), by);
+      return true;
+    }, contracted -> contracted ? "Contratado: salida a las 15:00" : "Ya estaba contratado");
   }
 
   /** Posts a catalog charge; empty if the catalog has no such code. */
@@ -63,11 +68,17 @@ public class FolioService {
   @Transactional
   public Optional<ChargeCatalogItem> postCharge(String stayId, String code, String by) {
     var item = chargeCatalog.findByCode(code);
-    item.ifPresent(i -> {
-      var saved = folios.save(folioOf(stayId).post(FolioLine.charged(ChargeKind.CONSUMPTION, i.code(), i.name(), i.price())));
-      reception.chargePosted(stayId, saved.lines().getLast(), by);
-    });
-    return item;
+    if (item.isEmpty()) {
+      audit.failed("Charge posted", stayId, by, StayAudit.params("code", code), "No hay ningún cargo " + code + " en el catálogo");
+      return item;
+    }
+    return audit.run("Charge posted", stayId, by, StayAudit.params("code", code, "concept", item.get().name(),
+        "amount", item.get().price()), () -> {
+          var i = item.get();
+          var saved = folios.save(folioOf(stayId).post(FolioLine.charged(ChargeKind.CONSUMPTION, i.code(), i.name(), i.price())));
+          reception.chargePosted(stayId, saved.lines().getLast(), by);
+          return item;
+        }, posted -> "Cargado al folio y enviado a Opera");
   }
 
   /**
@@ -80,15 +91,20 @@ public class FolioService {
     var folio = folios.findByStayId(stayId).orElse(null);
     var line = folio == null ? null : folio.line(lineId).orElse(null);
     if (line == null || line.kind() == null || !line.kind().toThePms()) {
+      audit.failed("Charge voided", stayId, by, StayAudit.params("line", lineId),
+          "El folio no tiene ese cargo de recepción");
       return Optional.empty();
     }
     if (line.voided()) {
       return Optional.of(line);
     }
-    folios.save(folio.voidLine(lineId));
-    var voided = line.asVoided();
-    reception.chargeVoided(stayId, voided, by);
-    return Optional.of(voided);
+    return audit.run("Charge voided", stayId, by, StayAudit.params("line", lineId, "concept", line.concept(),
+        "amount", line.amount()), () -> {
+          folios.save(folio.voidLine(lineId));
+          var voided = line.asVoided();
+          reception.chargeVoided(stayId, voided, by);
+          return Optional.of(voided);
+        }, v -> "Anulado en el folio y revertido en Opera");
   }
 
   Folio folioOf(String stayId) {

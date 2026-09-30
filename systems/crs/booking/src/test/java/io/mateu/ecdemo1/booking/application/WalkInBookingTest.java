@@ -41,7 +41,7 @@ class WalkInBookingTest {
     final BookingTermsFactory terms = new BookingTermsFactory(catalog, new RoomPricing());
     final Store store = new Store();
     final CreateBookingUseCase create = new CreateBookingUseCase(store, terms, catalog,
-            new LocatorValueGenerator(), Clock.systemUTC(), io.mateu.ecdemo1.booking.tracing.Traces.untraced());
+            new LocatorValueGenerator(), Clock.systemUTC(), io.mateu.ecdemo1.booking.tracing.Traces.untraced(), RecordingTrail.audit());
     final QuoteBookingUseCase quote = new QuoteBookingUseCase(catalog, terms);
 
     static BookingRequest walkIn(String reference, Holder holder, int adults) {
