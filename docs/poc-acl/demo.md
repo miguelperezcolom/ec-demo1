@@ -496,6 +496,18 @@ El agente de recepción lo sabe: `getStay` trae `checkIn` (completo o no, qué f
 qué, cuándo vencen los documentos y si han vencido); `prepareCheckIn` rechaza con lo que falta;
 **`prepareForcedCheckIn`** pide el motivo; `prepareCheckOut` rechaza un check-in incompleto.
 
+Probado en ec1 el 2026-09-30 (front office 0.44.x, Redwood, usuario demo) con **6XN5ZF** (Opera 39485843,
+2 pax): en el asistente, solo el titular escaneado y la firma; *Confirmar* dice «Falta: Documento de
+Huésped 2 (pax 2)»; motivo «El acompañante trae el pasaporte mañana» → **Forzar check-in** →
+`registrar-checkin` COMPLETED, Opera *InHouse* en la 5228; en *Reservas → Check-in incompleto*, la
+estancia con su badge; en la ficha, el aviso ámbar con «Completar». *Check-out* → al asistente, solo
+*Identidad* y *Confirmar*. Con `FORCED_CHECKIN_DOCUMENT_DEADLINE=PT2M` puesto un momento: a los 2 min el
+aviso en **rojo** («PARTE DE VIAJEROS VENCIDO»), el badge «parte vencido» y el aviso `CHECK_IN_INCOMPLETE`
+en la bandeja (*Inbox*) — una vez —. «Completar» → escanear el documento del huésped 2 → completado
+(auditado) y el aviso de la bandeja cerrado; *Check-out* → cobro → Opera *CheckedOut*. Recepción recibe
+estos avisos con el destinatario **«Recepción (front office)»** (rol `user`, bandeja y navegador de
+recepción, tipo `CHECK_IN_INCOMPLETE`, MRU01), además de los administradores (todos los tipos).
+
 ## 10 ter. Walk-in: el front office vende, el CRS reserva
 
 El CRS es el dueño de todas las reservas; el front office es un canal más (`WALKIN`).
@@ -771,6 +783,21 @@ comentarios de la reserva y se reutiliza. Para los flujos 6–8, `opera-outage.s
 modify, cancel, show, rate-plan, ask-agent, proposal); `opera.py` lee Opera (solo GET: también
 `business-date`, `rooms XMAR SJMB`, `reservation XMAR <id>` —estado, habitación y si Opera haría el
 check-in ahora— y `folios XMAR <id>`, la factura).
+
+### Procesos que dejó parados la carrera del candado (antes de 2.23.4)
+
+Un proceso que se creó pero nunca arrancó (PENDING, con `start` hecho y el `LOCK` sin despachar) no lo
+recogen *Retry* ni *Restart* (solo aceptan ERROR o CANCELLED). Lo que sí lo mueve es **Pause** y después
+**Resume** (en el detalle del proceso, en Workflow; o las herramientas MCP `pauseProcess` /
+`resumeProcess` del orquestador, esperando a que esté PAUSED antes de reanudar). Se buscan en la base del
+motor: `process_entity` en PENDING de hace más de 1 h sin pasos en marcha.
+
+El 2026-09-30 había tres: `registrar-checkin` de **V9Q7HH** (hab. 5144) → Pause/Resume → Opera *InHouse*
+en la 5144; eso resolvió solo la causa NOT_IN_HOUSE del `registrar-cargo` de su transfer, que se posteó
+(547653361, 1851, 45 MUR, `FO:L-73907216`, sin duplicado); y el `registrar-cargo` del transfer de
+**V75Y5M** → Pause/Resume → Opera lo rechaza (CHECKED_OUT: la estancia ya había salido, su folio está
+cerrado). Esa causa queda abierta para decidir a mano (reabrir en Opera o descartarla en *Mapping →
+Causas*). Las esperas por MISSING_PARTNER / NOT_YET_PROJECTED no son de la carrera: son de negocio.
 
 ### El cupo diario de la API de Salesforce
 
