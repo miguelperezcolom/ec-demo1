@@ -22,8 +22,11 @@ class JdbcStayReadModel implements StayReadModel {
   @Override
   public List<StayRow> rows() {
     return jdbc.query(
-        "select s.id, s.status, s.check_in, s.check_out, s.room_number, s.room_type, g.name, g.tier"
-            + " from stay s join guest g on g.id = s.guest_id",
+        "select s.id, s.status, s.check_in, s.check_out, s.room_number, s.room_type, g.name, g.tier,"
+            + " coalesce(r.field_value, n.nationality) as nationality"
+            + " from stay s join guest g on g.id = s.guest_id"
+            + " left join pax_registration_data r on r.stay_id = s.id and r.pax = 1 and r.field = 'NATIONALITY'"
+            + " left join customer_nationality n on n.customer_id = g.id",
         (rs, n) -> new StayRow(
             rs.getString("id"),
             StayStatus.valueOf(rs.getString("status")),
@@ -32,7 +35,8 @@ class JdbcStayReadModel implements StayReadModel {
             rs.getString("room_number"),
             rs.getString("room_type"),
             rs.getString("name"),
-            rs.getString("tier")));
+            rs.getString("tier"),
+            rs.getString("nationality")));
   }
 
   @Override

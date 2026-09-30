@@ -59,9 +59,13 @@ public class WalkInDesk {
   volatile Offer offer;
   volatile Instant offerReadAt;
 
+  final io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNationalities nationalities;
+
   public WalkInDesk(WalkIns walkIns, StayRepository stays, GuestRepository guests, PlatformTransactionManager transactions,
+                    io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNationalities nationalities,
                     @Value("${frontoffice.crs-integration-url:}") String crsIntegrationUrl,
                     @Value("${frontoffice.hotel:MRU01}") String hotel) {
+    this.nationalities = nationalities;
     this.walkIns = walkIns;
     this.stays = stays;
     this.guests = guests;
@@ -173,6 +177,8 @@ public class WalkInDesk {
     var guestId = "wi-" + reference;
     guests.save(Guest.fromReservation(guestId, holder.fullName().trim(), holder.documentNumber(), holder.email(),
         holder.phone()));
+    // the flag next to the holder's name: the nationality the desk took down
+    nationalities.put(guestId, holder.nationality(), "WALK_IN");
     stays.save(Stay.fromReservation(reference, guestId, offer.name(offer.roomTypes(), request.roomTypeCode()),
         offer.name(offer.boards(), request.boardCode()), request.arrival(), request.departure(), request.pax(),
         "Walk-in · Recepción", quote.total(), List.of()));

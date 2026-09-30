@@ -31,7 +31,7 @@ public final class GuestHeaders {
     badges.add(Tiers.chip(guest.tier()));
     walkIn(stay).ifPresent(badges::add);
     return EntityHeader.builder()
-        .title(guest.name())
+        .title(FrontOffice.withFlag(stayId, 1, guest.id(), guest.name()))
         .badges(badges)
         .subtitle(staySubtitle(stay))
         .facts(
@@ -52,7 +52,7 @@ public final class GuestHeaders {
     var guest = view.guest();
     // no folio facts here — the check-out screen shows the breakdown and the preauth below
     return EntityHeader.builder()
-        .title(guest.name())
+        .title(FrontOffice.withFlag(stayId, 1, guest.id(), guest.name()))
         .badges(List.of(Tiers.chip(guest.tier())))
         .subtitle(
             stay.roomLabel() + " · " + stay.roomType() + " · " + stay.board() + " · "
@@ -77,7 +77,7 @@ public final class GuestHeaders {
     }
     walkIn(stay).ifPresent(badges::add);
     return EntityHeader.builder()
-        .title(guest.name())
+        .title(FrontOffice.withFlag(stayId, 1, guest.id(), guest.name()))
         .badges(badges)
         .subtitle(
             stay.roomType() + " · " + stay.roomLabel() + " · Sal. "

@@ -10,7 +10,10 @@ import java.util.List;
  */
 public interface StayReadModel {
 
-  /** A stay as a listing shows it: its own columns and its guest's name and tier. */
+  /**
+   * A stay as a listing shows it: its own columns, its guest's name and tier, and the holder's
+   * nationality (what the desk scanned for pax 1, else the customer's) — null when nobody has said.
+   */
   record StayRow(
       String id,
       StayStatus status,
@@ -19,7 +22,14 @@ public interface StayReadModel {
       String roomNumber,
       String roomType,
       String guestName,
-      String guestTier) {}
+      String guestTier,
+      String guestNationality) {
+
+    public StayRow(String id, StayStatus status, LocalDate checkIn, LocalDate checkOut, String roomNumber,
+                   String roomType, String guestName, String guestTier) {
+      this(id, status, checkIn, checkOut, roomNumber, roomType, guestName, guestTier, null);
+    }
+  }
 
   /** The day at a glance: arrivals due (today or overdue), guests in house, departures today. */
   record Today(long arrivals, long inHouse, long departures) {}
