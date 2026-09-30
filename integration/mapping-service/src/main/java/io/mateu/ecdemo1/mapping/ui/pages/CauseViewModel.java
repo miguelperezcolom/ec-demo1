@@ -74,11 +74,6 @@ public class CauseViewModel implements Identifiable, VisibilitySupplier {
         return discardForm.dialogFor(key, null, route(httpRequest));
     }
 
-    /** The Descartar of a waiting process's row: the same dialog, with that process picked. */
-    public Object discardWaiter(HttpRequest httpRequest) {
-        return discardForm.dialogFor(key, clickedProcess(httpRequest), route(httpRequest));
-    }
-
     @Override
     public boolean isHidden(String memberName, HttpRequest httpRequest) {
         if ("discard".equals(memberName)) {
@@ -118,6 +113,11 @@ public class CauseViewModel implements Identifiable, VisibilitySupplier {
     }
 
     public CauseViewModel load(CauseRecord cause) {
+        return load(cause, true);
+    }
+
+    /** @param rowActions whether each waiting process's row carries its «Descartar» (see {@link CausesPage#redwood}) */
+    public CauseViewModel load(CauseRecord cause, boolean rowActions) {
         status = cause.status == CauseStatus.OPEN ? new Status(StatusType.WARNING, "Open")
                 : new Status(StatusType.SUCCESS, "Resolved");
         key = cause.causeKey;
@@ -129,7 +129,8 @@ public class CauseViewModel implements Identifiable, VisibilitySupplier {
         waiting = queries.processesPendingOn(cause.causeKey).stream()
                 .map(w -> new WaitingRow(w.processKey, w.definitionId, w.subject, String.valueOf(w.createdAt),
                         w.status.name(), w.engineProcessId == null ? "unknown" : w.engineProcessId,
-                        new ColumnActionGroup(new ColumnAction[] {new ColumnAction("discardWaiter", "Descartar")})))
+                        rowActions ? new ColumnActionGroup(new ColumnAction[] {new ColumnAction("discardWaiter", "Descartar")})
+                                : null))
                 .toList();
         return this;
     }
