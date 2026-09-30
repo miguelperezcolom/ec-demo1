@@ -4,15 +4,18 @@ The whole CRS → Opera path on one machine, against the **real EventConductor o
 **Opera double** (`opera-mock`). Nothing reaches a real Opera tenant.
 
 ```sh
-# build: the contracts first (installed), then the ten services — with clean: a Boot jar
+# build: the shared libraries first (installed), then the eleven services — with clean: a Boot jar
 # repackaged without it keeps the contracts it copied last time
 (cd contracts && mvn -q install)
-for m in booking partners crs-integration-service mapping-service pms-integration-service opera-mock \
-         communication-service integrations-service customer-mdm-service front-office; do
+(cd supporting/messaging && mvn -q install) && (cd supporting/ui-commons && mvn -q install)
+for m in systems/pms/opera-mock systems/crs/booking systems/erp \
+         integration/crs-integration-service integration/mapping-service integration/pms-integration-service \
+         integration/customer-mdm-service control-plane/integrations-service control-plane/audit-service \
+         control-plane/communication-service systems/front-office; do
   (cd $m && mvn -q clean package -DskipTests); done
 
 ./e2e/poc-acl-local/infra.sh     # Postgres (a database per service), Redpanda, mailpit, the orchestrator
-./e2e/poc-acl-local/apps.sh      # the ten services, logs in e2e/poc-acl-local/logs/
+./e2e/poc-acl-local/apps.sh      # the eleven services, logs in e2e/poc-acl-local/logs/
 python3 e2e/poc-acl-local/scenario.py
 python3 e2e/poc-acl-local/salesforce.py   # optional: the customer MDM's round trip through Salesforce
 ```
@@ -22,6 +25,12 @@ The customer MDM (`customer-mdm-service`) cleans in a real Salesforce org when
 — `SF_DOMAIN`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET` — and only that service gets them. Without the file
 it still resolves identities for the connector; nothing is sent to Salesforce. The org's side is
 deployed with `integration/customer-mdm-service/salesforce/deploy.py`.
+
+**The org is shared with ec1**, and its API allowance (15,000 calls per rolling 24 h) with it. Stop
+the local stack when you are done: on 2026-09-28 a local MDM left running for days — polling every
+20 s at the time — spent the whole allowance. `apps.sh` now leaves the merge poll at its default
+(15 min), and the MDM warns at startup if it is set under 5 minutes. The allowance left, ours and
+everyone else's, shows on the consoles' home pages and in Grafana (*External APIs*).
 
 `infra.sh` imports the definitions from a local clone of `ec-definitions` next to this repository
 (`EC_DEFINITIONS` to point elsewhere), branch `EC_DEFINITIONS_BRANCH` (default `master`).

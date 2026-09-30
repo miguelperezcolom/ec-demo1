@@ -7,8 +7,10 @@
 # resuming from persisted replay ids; its queries under them are a daily net. Screens at /_mdm on the control
 # console, and its business face — Clientes — at /_customers on the data plane. Without the ec-salesforce Secret it still resolves identities; cleaning just waits.
 # What it decides about a customer — a changed golden record, a merge — it publishes on the
-# `customers` topic and calls no one: pms-integration takes it to the front office's kardex and
-# crs-integration projects the customer's reservations again for Opera.
+# `customers` topic and calls no one: the front office reads its kardex from it directly (since H14)
+# and crs-integration projects the customer's reservations again for Opera. A customer's reception
+# notices (Salesforce's) go out on `customer-notices`, which the notices service takes and republishes
+# on `notices` with the reservation's and the agency's.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

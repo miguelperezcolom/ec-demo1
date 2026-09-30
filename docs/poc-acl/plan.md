@@ -22,7 +22,8 @@ esfuerzo se registra desde el primer día en [`cost-log.md`](cost-log.md), y el 
 | #9 (F009) | **Mapeado de códigos**: diccionario cadena + propiedad, versionado, con aprobación humana y **propuesta por un agente** |
 | F012 (parcial) | Suspensión por **causa** y reanudación en bloque al resolverla |
 | Transversal | **MCP** en cada servicio con operativa, **notificaciones** a las personas |
-| F016 | **Auditoría** (`audit-service`): las acciones declaradas `@Audited` en integraciones y mapeado —hechas o rechazadas, por consola, REST o agente— emiten `AuditedAction` por outbox; el servicio las materializa, inmutables, y la consola las lista con búsqueda libre y filtros por fecha, hotel, usuario, acción, servicio y resultado |
+| F016 | **Auditoría** (`audit-service`): las acciones declaradas `@Audited` en integraciones y mapeado —hechas o rechazadas, por consola, REST o agente— emiten `AuditedAction` por outbox; el servicio las materializa, inmutables, y la consola las lista con búsqueda libre y filtros por fecha, hotel, usuario, acción, servicio y resultado. Desde el PR #147 también las operaciones de recepción sobre una estancia (check-in, check-out, cambio de habitación, cargos, cobros, llave, wifi, firma, kárdex, walk-in, no-show…) y las del CRS sobre una reserva, con quién las hizo —la persona del token o el agente por ella—; la ficha de la reserva enseña su «Historial» |
+| Recepción | **El front office del hotel** (H13, H14 y siguientes): estancias alimentadas por lo que Opera tiene; check-in, check-out y no-show que registra el PMS; cargos al folio de Opera; walk-in que reserva el CRS; kárdex con el MDM; **avisos de recepción** de un cliente (maestro Salesforce), de una reserva o de una agencia (servicio `notices`, PR #145) |
 | HLA CRM-MDM F001–F005 (H11) | **Maestro de clientes**: resolver la identidad de cada pasajero al proyectar, provisional si no hay certeza, limpieza y fusión en **Salesforce**, supervivencia en el MDM y propagación del código al perfil de Opera |
 
 **Fuera:** todo lo que sube del PMS al CRS (OOO, no-show, salida anticipada, cupo, streaming),
@@ -342,7 +343,7 @@ Una rama y un PR por hito.
 | H2 ✅ | `integration-model`, `partners`, `crs-integration-service` con inbox, relectura y router | Un cambio en `booking` arranca un proceso con la reserva canónica |
 | H3 ✅ | `mapping-service` con el diccionario, `Preparar`, causas y reanudación; UI y MCP | Una reserva con un código sin mapear se suspende y se reanuda al aprobarlo |
 | H4 ✅ | `opera-mock`, `pms-integration-service` contra él; definiciones #1 y #2 | Punta a punta en local, con la guarda de secuencia |
-| H5 | Tenant real de Opera: **aplazado**, no se escriben datos en Opera | Queda como paso posterior; se documenta qué faltaría validar |
+| H5 | Tenant real de Opera: aplazado el 2026-09-22 y **cubierto por H12** (el conector escribe en XMAR desde el 2026-09-23) | — |
 | H6 ✅ | Proceso #3 contra el doble | Una reserva que referencia un interlocutor nuevo espera y se proyecta tras sincronizarlo |
 | H7 ✅ | `communication-service` y avisos | Cada tipo de aviso llega por email |
 | H8 ✅ | Propuesta de mapeado por agente | Desde la UI o el chat, el agente registra una propuesta que se aprueba y reanuda procesos |
@@ -350,18 +351,45 @@ Una rama y un PR por hito.
 | H13 ✅ | El front office del hotel (`front-office`, traído de la demo de Mateu): cada reserva de MRU01 que se graba en Opera se graba también allí como estancia por llegar, y su cancelación la cancela; UI en `front.ec1.mateu.io` tras Keycloak | Una reserva de `ec1` está en XMAR y en el front office en 20 s |
 | H14 ✅ | La integración **pms-fo** (cadena CRS → PMS → front office): el front office se alimenta de lo que Opera tiene, no de lo que se le mandó; su propia integración en `integrations-service` (puertas, avisos, backfill, activación, sondeo de cambios); fuera los pasos `write-front-office` y `cancel-front-office` de las proyecciones | Una reserva de `ec1` llega a XMAR y de XMAR al front office con los nombres de Opera; un cambio en Opera llega por el sondeo |
 | H12 ✅ | El conector contra el tenant real (OHIP UAT, propiedad XMAR): diferencias con las specs corregidas en el conector y en el doble; interlocutores importados de Opera al ERP en vez de proyectados; en `ec1`, MRU01 integrado con XMAR | Una reserva de `ec1` llega a XMAR (13 s); falta en el tenant: cajero para depósitos e interfaces para referencias en perfiles |
-| H11 | `customer-mdm-service` con Salesforce (HLA CRM-MDM): identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación. En local contra la org real ✅; desplegado en `ec1` (0.17.x) ✅ | Una fusión hecha en Salesforce llega al perfil de Opera de las reservas del cliente absorbido |
+| H11 ✅ | `customer-mdm-service` con Salesforce (HLA CRM-MDM): identidad al proyectar, limpieza y fusión en Salesforce, supervivencia y propagación. En local contra la org real; desplegado en `ec1` (hoy 0.37.x, con marcado por calidad del dato y eventos por Pub/Sub con redes diarias, PR #133) | Una fusión hecha en Salesforce llega al perfil de Opera de las reservas del cliente absorbido |
 | H10 ✅ | `integrations-service`: la integración de cada hotel (conexión con Opera, secreto cifrado) y su alta por puertas como proceso `alta-integracion`; el tráfico de un hotel sin integración activa espera | El alta de un hotel lleva sus reservas a Opera por backfill y la activación libera lo retenido |
+
+### Después de H14 (sin número de hito)
+
+Lo que se ha ido añadiendo tras los hitos, cada cosa en su PR y desplegada en `ec1` salvo que se diga:
+
+| Qué | PR |
+| :-- | :- |
+| Motor EventConductor 2.23.1 sin parches; contratos por contexto con esquemas por topic y comprobación de tareas (`check-contracts.sh`) | #97, #100 |
+| Recepción hasta el PMS: check-in, check-out (con la factura de Opera) y no-show por el motor, con lo que XMAR pide de cada uno | #128, #132 |
+| Avisos de recepción de un cliente: Salesforce → MDM → front office; se leen antes del check-in y del check-out | #126, #131 |
+| Los cargos de recepción al folio de Opera y sus anulaciones; el total incluye los paquetes que Opera carga aparte | #135–#138, #141, #142 |
+| Habitación lista: Opera dice si la asignada está libre e inspeccionada; «Comprobar» en su tarjeta, aviso solo si no lo está | #135, #140 |
+| Check-in forzado: incompleto hasta completarlo, check-out bloqueado, aviso a recepción a las 24 h | #143, #144, #146, #148 |
+| MDM: contactos marcados por calidad del dato, limpieza solo de nombre, eventos de Salesforce por Pub/Sub con redes diarias | #133, #134 |
+| Agente de mapeado: propone todos los códigos pendientes; «Ask the agent» sin filtro pide para cada hotel con pendientes | #121, #129 |
+| IA: agentes que llaman a otros por A2A, guardarraíles de entrada y salida por ruta, chat del control plane con su propio agente | #111, #122 |
+| Consumo de las APIs de Salesforce y Opera: KPIs en las homes, dashboard *External APIs* y alertas en Grafana | #112, #116 |
+| Documentación del proyecto en `doc.ec1.mateu.io` (Starlight, en español, con usuario y contraseña) | #118 |
+| **Avisos de reserva y de agencia**: servicio `notices` en el plano de datos; el front office los aplica junto a los del cliente | #145 (desplegándose) |
+| **Auditoría de recepción y del CRS**, con el «Historial» de la reserva | #147 (desplegándose) |
+| Mateu 3.0-alpha.373 → 376 (Redwood: markdown del chat, acciones de página, confirmaciones, formularios en diálogo) | #110, #119, #139 |
+
+**Previsto, sin hacer:** un solo despliegue de `ia-agent` para todos los canales. Hoy hay tres
+(`ia-agent`, `ia-agent-front-office`, `ia-agent-control-plane`) que solo difieren en el agente por
+defecto; el plan es que el gateway ponga en cada petición el canal y el agente por defecto según el
+host, y que las reglas de ruta del catálogo decidan con ellos.
 
 ## Pendiente de recibir
 
-1. **Tenant de Opera.** Recibidos el gateway (UAT, `mtce13ua`, eu-frankfurt-1), `x-app-key`,
-   client id / secret y enterprise **RIUE**. El 2026-09-22 se comprobó que el token OAuth
-   (`client_credentials`) funciona; es de cadena **RIUC** (`scope C:RIUC`). **Falta el código de
-   hotel**: las Property APIs exigen `x-hotelid` y con `RIUC` / `RIUE` responden 403. También falta
-   saber qué APIs tiene activadas la app `Riu_Hotel_Cliente_OHIP`. Solo hace falta para la
-   validación posterior contra el tenant real: la PoC se completa contra `opera-mock`. Las credenciales no van en el repo: van a `deploy/.secrets/` y de ahí a un
-   Secret. **Rotar el client secret al cerrar la PoC.**
+1. **Tenant de Opera.** Recibido y en uso desde H12: gateway UAT (`mtce13ua`, eu-frankfurt-1),
+   enterprise **RIUE**, cadena **RIUC**, propiedades **XMAR** (la de la PoC) y XMU. El usuario de
+   integración no tiene cajero propio (FOF00094): se creó por OHIP un cajero para la PoC en XMAR,
+   `69721441` «EC-DEMO1 Integración» (PR #125), que el conector pasa en check-outs y folios
+   (`OPERA_CASHIER_ID`); los depósitos siguen apagados (`OPERA_POST_DEPOSITS=false`). Siguen sin
+   configurar las interfaces para las referencias externas en perfiles (`OPERA_PROFILE_REFERENCES=false`). Las credenciales no
+   van en el repo: van a `deploy/.secrets/` y de ahí a un Secret. **Rotar el client secret al cerrar
+   la PoC.**
 2. **Configuración del hotel de pruebas:**
    - Qué catálogos tiene y si se pueden leer por API.
    - Si hay **UDF libres** en la reserva para la guarda de secuencia.

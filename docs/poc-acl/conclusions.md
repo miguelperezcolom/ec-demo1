@@ -4,9 +4,15 @@ Bajada de reservas (alta, modificación, cancelación) de un CRS simulado a Oper
 Property APIs de OHIP, sobre EventConductor, siguiendo el HLA *CRS-PMS Integration*. Fecha de
 cierre: 2026-09-22.
 
-**No se ha escrito nada en el tenant de Opera.** Todo el camino se ha ejecutado contra
-`opera-mock`, un doble de OHIP construido a partir de las specs públicas. Contra el tenant real solo
-se pidió un token OAuth.
+> **Actualización 2026-09-30.** Este documento se cerró el 2026-09-22 y se conserva como estaba; lo
+> que ha cambiado desde entonces está en [Después del cierre](#después-del-cierre-2026-09-23--30), al
+> final. Lo más importante: desde H12 (2026-09-23) el conector **escribe en el tenant real** (OHIP UAT,
+> propiedad XMAR), y la PoC ha crecido hasta el front office del hotel y el maestro de clientes con
+> Salesforce.
+
+**No se ha escrito nada en el tenant de Opera** *(a 2026-09-22; ver la actualización)*. Todo el
+camino se ha ejecutado contra `opera-mock`, un doble de OHIP construido a partir de las specs
+públicas. Contra el tenant real solo se pidió un token OAuth.
 
 ## Qué se ha construido
 
@@ -124,4 +130,80 @@ De diseño, para el DT:
    hotel de pruebas y con autorización expresa** para escribir (H5).
 2. Llevar al motor las dos correcciones (`LOCK`, validación de la longitud de la descripción).
 3. Desplegar en el clúster y probar el agente de mapeado con el LLM real.
+4. Rotar el client secret de OHIP compartido durante la PoC.
+
+## Después del cierre (2026-09-23 → 30)
+
+### Qué se ha añadido
+
+- **Tenant real (H12).** El conector escribe reservas y perfiles de huésped en XMAR. Las diferencias
+  con las specs se corrigieron en el conector y se reprodujeron en `opera-mock`, que desde el
+  2026-09-24 solo se usa en la batería local. Los interlocutores se importan de Opera al ERP en vez
+  de crearse en Opera.
+- **Maestro de clientes con Salesforce (H11)**: identidad al proyectar, limpieza y fusión en
+  Salesforce, propagación al perfil de Opera; después, marcado por calidad del dato y eventos por
+  Pub/Sub con redes diarias.
+- **Front office del hotel (H13, H14 y siguientes)**, alimentado por lo que Opera tiene: check-in,
+  check-out y no-show que registra el PMS; cargos al folio de Opera; walk-in que reserva el CRS;
+  habitación lista según Opera; check-in forzado; avisos de recepción de cliente, reserva y agencia
+  (servicio `notices`, desplegándose); auditoría de quién hizo qué sobre una reserva, en recepción y
+  en el CRS (desplegándose).
+- **IA**: agente de mapeado que propone todo lo pendiente, agentes que se llaman entre sí por A2A,
+  guardarraíles por ruta, chat del control plane con su propio agente.
+- **Operación**: consumo de las APIs de Salesforce y Opera en las homes y en Grafana (dashboard
+  *External APIs* y alertas), documentación en `doc.ec1.mateu.io`.
+
+El detalle, con sus PRs, está en el [plan](plan.md#después-de-h14-sin-número-de-hito).
+
+### El coste, visto al final
+
+A cómo lo describe quien dirigió la PoC:
+
+- **Una primera versión de cada conector —Opera y Salesforce— en torno a una hora**, a partir del HLA
+  y una instrucción («conecta Opera», «haz la conexión con Salesforce»): la IA entendió las APIs de
+  OHIP y de Salesforce y su funcionamiento sin más indicaciones.
+- **Toda la integración en torno a una semana** (22–28 de septiembre): los dos conectores, el
+  mapeado, el MDM con Salesforce, el front office, las pantallas y Grafana.
+- **Como referencia, en Viajes Urbis un conector costaba en torno a un mes de un desarrollador.**
+
+Las horas por sesión no se llegaron a apuntar en [`cost-log.md`](cost-log.md); la comparación de
+arriba es la estimación de quien dirigió el trabajo, no una medida.
+
+### Lo que el tenant real ha cerrado, y lo que no
+
+- **Se escribe y se relee en XMAR**: reserva con la versión del CRS en un UDF numérico, perfil de
+  huésped, modificación, cancelación, check-in, check-out con su factura, no-show y cargos al folio.
+- **Sigue sin configurar** en el tenant: las interfaces de las referencias externas en perfiles
+  (OPERAWS-GEN01187). El usuario de integración no tiene cajero: se creó uno para la PoC
+  (`69721441`), que el conector pasa en check-outs y folios; los depósitos siguen apagados.
+- **Opera rechaza algunas reservas por falta de habitaciones** del tipo pedido (RSV00138): llegan como
+  causa con nombre, como estaba previsto.
+
+### Problemas nuevos
+
+- **El motor**: el `LOCK` en PostgreSQL y la descripción larga que se saltaba al importar están
+  corregidos en EventConductor 2.23.0/2.23.1; las definiciones ya no los rodean.
+- **Una caída de Oracle (2026-09-29).** La API de reservas de OHIP UAT respondió 502 y después 500
+  «Request failed while connecting to the downstream system» durante horas, desde ~01:35 (hora de
+  Madrid). El token y otros módulos (configuración, perfiles) respondían bien: era el servicio de
+  reservas de Oracle, no el cupo ni nada nuestro (sin ningún 429; nuestro ritmo, ~60 llamadas/hora).
+  Los procesos reintentaron y avisaron en la bandeja sin perder ni duplicar nada.
+- **El cupo de Salesforce se agotó (2026-09-28)**, y no por ec1: un `customer-mdm-service` local de
+  días antes (`e2e/poc-acl-local`, poll cada 20 s, atascado en un cliente de prueba) compartía la org
+  de 15.000 llamadas/24 h. Desde entonces el consumo de Salesforce y de Opera se ve en las homes de las
+  consolas y en Grafana, con alertas al 80 %/95 %, por ritmo proyectado y por gasto de «otros».
+- **Campos obligatorios del huésped por nacionalidad, edad u hotel.** OPERA Cloud no tiene una
+  configuración estándar para ello: Page Composer permite un *Required* condicional en las pantallas
+  de OPERA Cloud, pero es de la interfaz y no aplica a lo que entra por OHIP (check-in online, app,
+  integraciones). Responde al «PDTE» de *Configuración de campos de Kardex* del AF PMS-CRM: esa
+  configuración pertenece al Riu Front Office, que es quien captura los datos en todos los canales.
+  Pendiente de confirmación por Oracle.
+
+### Siguientes pasos (a 2026-09-30)
+
+1. Terminar el despliegue de los avisos de reserva y agencia y de la auditoría de recepción.
+2. Un solo despliegue de `ia-agent`: el canal y el agente por defecto viajando en cada petición
+   (previsto, sin hacer).
+3. Configurar en XMAR las interfaces de referencias externas en perfiles; decidir si se activan los
+   depósitos.
 4. Rotar el client secret de OHIP compartido durante la PoC.

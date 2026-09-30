@@ -353,6 +353,13 @@ allí o desde *Clientes*, y el front office los enseña al entrar y al salir.
    *pendiente* avisa de que «la factura saldrá con el dato anterior».
 4. El **agente de recepción** dice el aviso bloqueante antes de pedir confirmación del check-in, y el
    kárdex rechazado antes del check-out.
+5. **Avisos de una reserva o de una agencia** (servicio `notices`, PR #145). **Consola de datos →
+   Avisos**: *Reserva* (el localizador del CRS) o *Agencia* (su código del ERP), hotel (vacío = toda la
+   cadena), tipo, fechas y en qué momento se enseña —*antes de la llegada*, *check-in*, *estancia*,
+   *check-out*—. Los del cliente salen ahí también, solo de lectura: su maestro sigue siendo Salesforce.
+   En el front office, la llegada los enseña bajo «Avisos de la reserva y de su agencia», cada uno con
+   su origen («Cliente», «Reserva …», «Agencia …»), y un bloqueante frena el check-in igual que el del
+   cliente. El agente de la consola también los lista y los crea.
 
 ## 10 bis. No show: el hotel lo dice, el PMS lo anota y el CRS lo cobra
 
@@ -636,6 +643,12 @@ noviembre, solo alojamiento) esperando a las 17:55:41; propuesta del agente en 1
 - *Audit*: cada acción que decide algo sobre un hotel — alta, aprobar o retirar un mapeado, activar,
   pausar, backfill, resolver una causa — hecha o rechazada, por consola, API o agente, con quién,
   cuándo, parámetros y respuesta. Solo lectura.
+- **Quién hizo qué con una reserva** (PR #147): en recepción, check-in (también el forzado), check-out,
+  cambio de habitación, cargos y anulaciones, cobros, llave, wifi, firma, extras, kárdex, walk-in,
+  no-show e incidencias; en el CRS, alta, modificación, confirmación, cancelación y no-show. Cada una
+  con la persona del token, o «reception-agent (persona)» / «console-agent (persona)» si lo hizo el
+  agente por ella; también las rechazadas. Se ven en *Audit* y en el **«Historial»** de la reserva, en
+  el front office, y en su **«History»**, en el CRS.
 - *Inbox* (desde el aviso de la barra superior): los avisos que son para mí — por nombre o por uno de
   mis roles — y las **tareas del motor de formularios** (una tarea es un aviso más, en la bandeja de los
   roles que pide su formulario). Al pulsar una fila se ve el detalle entero; *Open* lleva
@@ -800,6 +813,12 @@ cerrado). Esa causa queda abierta para decidir a mano (reabrir en Opera o descar
 Causas*). Las esperas por MISSING_PARTNER / NOT_YET_PROJECTED no son de la carrera: son de negocio.
 
 ### El cupo diario de la API de Salesforce
+
+Lo que queda del cupo se ve sin gastar llamadas en la **home de las consolas** (tarjeta *Salesforce —
+llamadas libres*, con las nuestras de la última hora y las de «otros»), en *APIs externas* y en el
+dashboard de Grafana *External APIs*, con alertas al 80 % y al 95 %. El 2026-09-28 se agotó por un
+`customer-mdm-service` **local** olvidado (`e2e/poc-acl-local`, que comparte la org): antes de una demo,
+comprobar que no hay pila local corriendo con Salesforce.
 
 La org es una Base Edition: **15.000 llamadas en 24 h móviles** (`DailyApiRequests`), contando toda
 llamada REST o SOAP de cualquiera — el MDM, los scripts, las pruebas, un `curl`. Pasado el cupo,

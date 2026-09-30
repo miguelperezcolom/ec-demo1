@@ -45,7 +45,9 @@ seguridad; **el gateway valida el token de Keycloak antes de que ningún backend
   `/_customers`, `/_journey`, `/_inbox`, `/_api-usage` y **`/ai/**`** — cada prompt que llega al agente
   se factura, así que el chat no puede ser un endpoint abierto.
 - **Rol `ai-admin`**, solo en los hosts de control: `/_ia-cp`, `/_users`, `/_workflow-admin`,
-  `/_forms-admin`, `/_integrations`, `/_mapping`, `/_communication`, `/_mdm` y `/_audit`.
+  `/_forms-admin`, `/_integrations`, `/_mapping`, `/_communication`, `/_mdm`, `/_audit` y también
+  **`/ai/**`**: el agente del control plane llega a aprobaciones de mapeado, decisiones de integración y
+  datos personales del MDM.
 - **Públicos, y por qué**: los webhooks de git del motor (`/workflow/webhooks/**`, `/forms/webhooks/**`,
   verificados por HMAC), el de GitOps del catálogo de IA (`/cp-webhooks/**`, también HMAC), los scripts
   de Web Push de la bandeja, los recursos estáticos del motor y la salud.
