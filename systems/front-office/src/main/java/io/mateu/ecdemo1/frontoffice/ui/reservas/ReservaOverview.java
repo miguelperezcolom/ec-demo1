@@ -93,7 +93,8 @@ import reactor.core.publisher.Flux;
 @Service
 @Scope("prototype")
 public class ReservaOverview
-    implements PostHydrationHandler, ToolbarSupplier, ActionHandler, ActionSupplier, PageWidthSupplier {
+    implements PostHydrationHandler, ToolbarSupplier, ActionHandler, ActionSupplier, PageWidthSupplier,
+    io.mateu.uidl.interfaces.VisibilitySupplier {
 
   @Getter(AccessLevel.NONE) final StayQueries queries;
   @Getter(AccessLevel.NONE) final CheckInService checkIn;
@@ -197,6 +198,26 @@ public class ReservaOverview
   @Label("")
   Callable<Component> historial = () -> io.mateu.ecdemo1.frontoffice.ui.common.ReservationHistory.of(stayId);
 
+  /**
+   * En la llegada, «En otros sistemas» e «Historial» son paneles plegados del foldout (ver
+   * {@link #cuerpo}): el foldout ocupa la página y lo que va detrás de él no se pinta. Como secciones
+   * de página solo van en la estancia y la salida — nunca las dos cosas a la vez.
+   */
+  @Override
+  public boolean isHidden(String memberName, HttpRequest httpRequest) {
+    if (!"otrosSistemas".equals(memberName) && !"historial".equals(memberName)) {
+      return false;
+    }
+    return llegadaEnFoldout();
+  }
+
+  /** La llegada (fuera de los modos que la sustituyen) se pinta como foldout. */
+  boolean llegadaEnFoldout() {
+    return stayId != null && queries.find(stayId)
+        .filter(s -> s.status() == StayStatus.ARRIVING && !modoCheckout)
+        .isPresent();
+  }
+
   // ── los paneles ──────────────────────────────────────────────────────────────
 
   HuespedesPanel huespedes() {
@@ -272,6 +293,22 @@ public class ReservaOverview
                 // info accesoria: estrecha
                 .width("14rem")
                 .content(huespedes().perfilCliente())
+                .build(),
+            // la estancia en los otros sistemas y quién hizo qué: plegados, para no cargar la
+            // operativa del check-in; en la estancia y la salida van como secciones de página
+            FoldoutPanel.builder()
+                .id("otros-sistemas")
+                .title("En otros sistemas")
+                .open(false)
+                .width("26rem")
+                .content(OtherSystems.of(stayId))
+                .build(),
+            FoldoutPanel.builder()
+                .id("historial")
+                .title("Historial")
+                .open(false)
+                .width("24rem")
+                .content(io.mateu.ecdemo1.frontoffice.ui.common.ReservationHistory.of(stayId))
                 .build()))
         .build();
   }
