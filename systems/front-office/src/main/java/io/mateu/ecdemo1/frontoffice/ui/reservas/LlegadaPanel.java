@@ -155,6 +155,17 @@ final class LlegadaPanel {
         .build();
   }
 
+  /**
+   * Los avisos de la reserva y de su agencia para preparar la llegada y para el check-in (los de cada
+   * huésped van bajo su fila, en la sección de huéspedes). Nada, si no hay ninguno.
+   */
+  Component avisosDeLaReserva(Stay stay) {
+    var avisos = r.notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.PRE_ARRIVAL,
+        io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.CHECK_IN).stream()
+        .filter(p -> !p.onPax()).toList();
+    return io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.block("Avisos de la reserva y de su agencia", avisos);
+  }
+
   /** Texto de la operación de extras hecha, con lo contratado. */
   static String extrasHecha(Stay stay) {
     var n = stay.addOns().size();
@@ -205,7 +216,7 @@ final class LlegadaPanel {
                 .toList())
             .build();
     return VerticalLayout.builder()
-        .content(List.of(habitacionLista(stay), checklist))
+        .content(List.of(avisosDeLaReserva(stay), habitacionLista(stay), checklist))
         .style("width: 100%; gap: .5rem;")
         .build();
   }

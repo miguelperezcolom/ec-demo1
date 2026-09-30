@@ -32,7 +32,7 @@ proyecta las pantallas para cada audiencia.
 | Reservas y estancias | Opera | `front-office-commands` (`write-stay`), ordenadas por la versión de Opera |
 | Catálogo (tipos, tarifas, paquetes, habitaciones) | Opera | `front-office-commands` (`replace-catalogue`) |
 | El cliente (kárdex) | El MDM, que lo tiene de Salesforce | Topic `customers` |
-| Avisos de recepción del cliente | Salesforce (su maestro), por el MDM | Topic `customer-notices` |
+| Avisos de recepción (de cliente, de reserva, de agencia) | El servicio de avisos; los de cliente, de Salesforce (su maestro) por el MDM | Topic `notices` |
 | Precio y alta de un walk-in | El CRS | HTTP a `crs-integration-service`: la recepción necesita el localizador ya |
 | Cómo tomó el PMS lo que hizo recepción, y la factura del check-out | Opera | `front-office-commands` (`record-reception`) |
 | Habitaciones que ofrecer en el check-in, con su estado | Opera (catálogo y housekeeping) | Catálogo por `replace-catalogue`; el estado, HTTP a `pms-integration-service` (`GET /front-office/rooms`): la pantalla lo necesita ya |
@@ -82,9 +82,13 @@ enlace a Opera, con un enlace firmado que caduca (una pestaña nueva no lleva el
 
 ## Avisos de recepción, al entrar y al salir
 
-Los avisos de cada cliente (ver [Clientes](/integracion/clientes/#avisos-de-recepción)) se guardan por su
-código: del titular y de los acompañantes que son clientes de la cadena.
+Los avisos (ver [Avisos de recepción](/integracion/avisos/)) llegan por el topic `notices` y se guardan
+por su asunto: los del titular y de los acompañantes que son clientes de la cadena, los de la reserva y
+los de la agencia que la vendió — del hotel o de la cadena.
 
+- **Preparando la llegada.** La reserva enseña arriba los de la reserva y su agencia para antes de la
+  llegada y para el check-in; los de cada huésped van bajo su fila.
+- **Durante la estancia.** El panel de la estancia enseña arriba los avisos para la estancia.
 - **Check-in.** El asistente empieza por un paso *Avisos* si hay alguno para el check-in (activo, vigente
   en las fechas de la estancia), y el carril de huéspedes de la reserva los lleva bajo cada pax. Uno
   **Bloqueante** pide marcar **«He leído el aviso»**; sin eso, `CheckInService` rechaza el check-in —

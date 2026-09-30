@@ -8,7 +8,7 @@
   "x-owner" : "customer-mdm-service",
   "x-key" : "customerId",
   "x-producers" : [ "customer-mdm-service" ],
-  "x-consumers" : [ "front-office" ],
+  "x-consumers" : [ "notices" ],
   "x-java-type" : "io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged",
   "$ref" : "#/$defs/CustomerNoticeChanged",
   "$defs" : {

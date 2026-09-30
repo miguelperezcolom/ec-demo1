@@ -346,7 +346,7 @@ public class CheckInWizard extends Wizard {
     return switch (stepFieldName) {
       // los avisos de recepción de los huéspedes, si tienen alguno para el check-in (Salesforce, vía el MDM)
       case "avisos" -> !notices.forStay(queries.view(stayId).stay(),
-          io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice.Moment.CHECK_IN).isEmpty();
+          io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.CHECK_IN).isEmpty();
       case "identidad" -> queries.pendingPax(queries.view(stayId).stay()) > 0;
       case "habitacion" -> !queries.view(stayId).stay().hasRoom();
       case "extras" -> !queries.ops(stayId).extras();

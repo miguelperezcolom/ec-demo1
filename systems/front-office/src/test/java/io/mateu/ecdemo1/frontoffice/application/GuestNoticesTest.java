@@ -11,9 +11,9 @@ import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus;
-import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged;
-import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeMoment;
-import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeType;
+import io.mateu.ecdemo1.integration.model.notice.NoticeChanged;
+import io.mateu.ecdemo1.integration.model.notice.NoticeChanged.NoticeMoment;
+import io.mateu.ecdemo1.integration.model.notice.NoticeChanged.NoticeType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -26,9 +26,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * The reception notices at the desk, through the application layer on the real adapters (H2): a
- * blocking check-in notice of the holder or of a companion who is a chain customer stops the check-in
- * until it is read; a kárdex change Salesforce rejected or has not decided stops the check-out until
- * «Entendido». Refusals and acknowledgements are audited.
+ * blocking check-in notice of the holder, of a companion who is a chain customer, of the reservation or
+ * of the agency that sold it stops the check-in until it is read; a kárdex change Salesforce rejected
+ * or has not decided, or a check-out notice, stops the check-out until «Entendido». Refusals and
+ * acknowledgements are audited.
  */
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:guest-notices;DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE")
 class GuestNoticesTest {
@@ -94,12 +95,12 @@ class GuestNoticesTest {
     notices.take(notice(a.guestId(), NoticeType.BLOCKING, List.of(NoticeMoment.CHECK_OUT), true, 1));
     notices.take(notice(a.guestId(), NoticeType.BLOCKING, List.of(NoticeMoment.CHECK_IN), false, 1));
     var future = notice(a.guestId(), NoticeType.BLOCKING, List.of(NoticeMoment.CHECK_IN), true, 1);
-    notices.take(new CustomerNoticeChanged(future.eventId(), future.occurredAt(), future.noticeId(), 1, a.guestId(),
+    notices.take(customer(future.eventId(), future.occurredAt(), future.noticeId(), 1, a.guestId(),
         "Desde el mes que viene", NoticeType.BLOCKING, LocalDate.now().plusDays(30), null,
         List.of(NoticeMoment.CHECK_IN), true, null));
 
     var stay = stays.findById(a.stayId()).orElseThrow();
-    assertThat(notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice.Moment.CHECK_IN))
+    assertThat(notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.CHECK_IN))
         .singleElement().satisfies(p -> assertThat(p.notice().typeLabel()).isEqualTo("Importante"));
     assertThat(checkIn.checkIn(complete(a), null, List.of()).status()).isEqualTo(StayStatus.IN_HOUSE);
   }
@@ -125,9 +126,9 @@ class GuestNoticesTest {
   void theMdmsVersionsKeepTheNewestAndAnEventIsTakenOnce() {
     var a = Fixtures.arrival(guests, stays, rooms, 1);
     var id = "AV-" + SEQ.incrementAndGet();
-    var v2 = new CustomerNoticeChanged("E-" + id + "-2", Instant.now(), id, 2, a.guestId(), "v2", NoticeType.BLOCKING,
+    var v2 = customer("E-" + id + "-2", Instant.now(), id, 2, a.guestId(), "v2", NoticeType.BLOCKING,
         null, null, List.of(NoticeMoment.CHECK_IN), false, null);
-    var v1 = new CustomerNoticeChanged("E-" + id + "-1", Instant.now(), id, 1, a.guestId(), "v1", NoticeType.BLOCKING,
+    var v1 = customer("E-" + id + "-1", Instant.now(), id, 1, a.guestId(), "v1", NoticeType.BLOCKING,
         null, null, List.of(NoticeMoment.CHECK_IN), true, null);
 
     assertThat(notices.take(v2)).isTrue();
@@ -193,10 +194,119 @@ class GuestNoticesTest {
     assertThat(checkOut.checkOut(a.stayId()).status()).isEqualTo(StayStatus.DEPARTED);
   }
 
-  static CustomerNoticeChanged notice(String customerId, NoticeType type, List<NoticeMoment> showAt, boolean active,
+  @Test
+  void aBlockingNoticeOfTheReservationStopsTheCheckInUntilRead() {
+    var a = Fixtures.arrival(guests, stays, rooms, 1);
+    notices.take(of(NoticeChanged.SubjectType.RESERVATION, a.stayId(), null, null, NoticeType.BLOCKING,
+        List.of(NoticeMoment.CHECK_IN)));
+    var stay = stays.findById(a.stayId()).orElseThrow();
+
+    assertThat(notices.blockingAtCheckIn(stay)).singleElement().satisfies(p -> {
+      assertThat(p.pax()).isZero();
+      assertThat(p.guestName()).isEqualTo("Reserva " + a.stayId());
+      assertThat(p.notice().subjectLabel()).isEqualTo("Reserva");
+    });
+    assertThatThrownBy(() -> checkIn.checkIn(complete(a), null, List.of(), "ana"))
+        .isInstanceOf(GuestNotices.NotAcknowledged.class);
+    notices.acknowledgeCheckIn(a.stayId(), "ana", null);
+    assertThat(checkIn.checkIn(complete(a), null, List.of(), "ana").status()).isEqualTo(StayStatus.IN_HOUSE);
+  }
+
+  @Test
+  void theAgencysNoticesAreTheStaysByTheNameThePmsGivesIt() {
+    var a = Fixtures.arrival(guests, stays, rooms, 1);
+    var stay = stays.findById(a.stayId()).orElseThrow();
+    stays.save(Stay.fromReservation(stay.id(), stay.guestId(), stay.roomType(), stay.board(), stay.checkIn(),
+        stay.checkOut(), 1, "Nordic Travel Group AB", stay.total(), List.of()).assignRoom(stay.roomNumber(),
+        stay.roomType()));
+    var code = "NORD" + SEQ.incrementAndGet();
+    notices.take(of(NoticeChanged.SubjectType.PARTNER, code, "Nordic Travel Group AB", null, NoticeType.BLOCKING,
+        List.of(NoticeMoment.CHECK_IN)));
+    notices.take(of(NoticeChanged.SubjectType.PARTNER, code + "X", "Otra Agencia S.L.", null, NoticeType.BLOCKING,
+        List.of(NoticeMoment.CHECK_IN)));
+
+    var blocking = notices.blockingAtCheckIn(stays.findById(a.stayId()).orElseThrow());
+
+    assertThat(blocking).singleElement().satisfies(p -> {
+      assertThat(p.guestName()).isEqualTo("Agencia Nordic Travel Group AB");
+      assertThat(p.notice().subjectLabel()).isEqualTo("Agencia");
+    });
+    assertThatThrownBy(() -> checkIn.checkIn(complete(a), null, List.of()))
+        .isInstanceOf(GuestNotices.NotAcknowledged.class);
+  }
+
+  @Test
+  void anotherHotelsNoticeOrAnotherMomentsDoesNotApplyHereAndStayIsInHouse() {
+    var a = Fixtures.arrival(guests, stays, rooms, 1);
+    notices.take(of(NoticeChanged.SubjectType.RESERVATION, a.stayId(), null, "PMI01", NoticeType.BLOCKING,
+        List.of(NoticeMoment.CHECK_IN)));
+    var here = of(NoticeChanged.SubjectType.RESERVATION, a.stayId(), null, "MRU01", NoticeType.IMPORTANT,
+        List.of(NoticeMoment.PRE_ARRIVAL));
+    notices.take(here);
+    notices.take(of(NoticeChanged.SubjectType.RESERVATION, a.stayId(), null, null, NoticeType.INFORMATIVE,
+        List.of(NoticeMoment.IN_HOUSE)));
+    var stay = stays.findById(a.stayId()).orElseThrow();
+
+    assertThat(notices.blockingAtCheckIn(stay)).isEmpty();
+    assertThat(notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.PRE_ARRIVAL))
+        .singleElement().satisfies(p -> assertThat(p.notice().noticeId()).isEqualTo(here.noticeId()));
+    assertThat(notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.IN_HOUSE)).hasSize(1);
+    assertThat(checkIn.checkIn(complete(a), null, List.of()).status()).isEqualTo(StayStatus.IN_HOUSE);
+  }
+
+  @Test
+  void aReservationsCheckOutNoticeMustBeUnderstoodBeforeTheCheckOut() {
+    var a = Fixtures.arrival(guests, stays, rooms, 1);
+    checkIn.checkIn(complete(a), null, List.of());
+    notices.take(of(NoticeChanged.SubjectType.RESERVATION, a.stayId(), null, null, NoticeType.IMPORTANT,
+        List.of(NoticeMoment.CHECK_OUT)));
+
+    var warnings = notices.checkOutWarnings(stays.findById(a.stayId()).orElseThrow());
+    assertThat(warnings.notices()).singleElement().satisfies(p -> assertThat(p.pax()).isZero());
+    assertThatThrownBy(() -> checkOut.checkOut(a.stayId(), "ana")).isInstanceOf(GuestNotices.NotAcknowledged.class);
+    notices.acknowledgeCheckOut(a.stayId(), "ana", null);
+    assertThat(checkOut.checkOut(a.stayId(), "ana").status()).isEqualTo(StayStatus.DEPARTED);
+  }
+
+  @Test
+  void aCustomersNoticeKeptBeforeWithStayIsReadAsInHouse() {
+    var a = Fixtures.arrival(guests, stays, rooms, 1);
+    var id = "AV-OLD" + SEQ.incrementAndGet();
+    // as the listener on customer-notices kept it, before the notices service
+    jdbc.update("insert into customer_notice (notice_id, customer_id, version, text, type, show_at, active) "
+        + "values (?, ?, 1, 'Viene con perro', 'IMPORTANT', 'CHECK_IN,STAY', true)", id, a.guestId());
+
+    var stay = stays.findById(a.stayId()).orElseThrow();
+    assertThat(notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.IN_HOUSE))
+        .singleElement().satisfies(p -> {
+          assertThat(p.pax()).isEqualTo(1);
+          assertThat(p.notice().subjectLabel()).isEqualTo("Cliente");
+        });
+    // the same notice, sent again by the notices service with the same version, keeps what there was
+    assertThat(notices.take(customer("E-" + id, Instant.now(), id, 1, a.guestId(), "Viene con perro",
+        NoticeType.IMPORTANT, null, null, List.of(NoticeMoment.CHECK_IN, NoticeMoment.IN_HOUSE), true, null)))
+        .isFalse();
+  }
+
+  static NoticeChanged of(NoticeChanged.SubjectType subject, String subjectId, String subjectName, String hotel,
+                          NoticeType type, List<NoticeMoment> moments) {
+    var id = "AV-" + SEQ.incrementAndGet();
+    return new NoticeChanged(UUID.randomUUID().toString(), Instant.now(), id, 1, subject, subjectId, subjectName,
+        hotel, "Aviso " + id, type, null, null, moments, true, "NOTICES", null);
+  }
+
+  /** A customer's notice, as the notices service sends it on from Salesforce. */
+  static NoticeChanged customer(String eventId, Instant at, String noticeId, long version, String customerId,
+                                String text, NoticeType type, LocalDate from, LocalDate to, List<NoticeMoment> moments,
+                                boolean active, String salesforceId) {
+    return new NoticeChanged(eventId, at, noticeId, version, NoticeChanged.SubjectType.CUSTOMER, customerId, null,
+        null, text, type, from, to, moments, active, "SALESFORCE", salesforceId);
+  }
+
+  static NoticeChanged notice(String customerId, NoticeType type, List<NoticeMoment> showAt, boolean active,
                                       long version) {
     var id = "AV-" + SEQ.incrementAndGet();
-    return new CustomerNoticeChanged(UUID.randomUUID().toString(), Instant.now(), id, version, customerId,
+    return customer(UUID.randomUUID().toString(), Instant.now(), id, version, customerId,
         "Aviso " + id, type, LocalDate.now().minusDays(1), null, showAt, active, "500" + id);
   }
 
