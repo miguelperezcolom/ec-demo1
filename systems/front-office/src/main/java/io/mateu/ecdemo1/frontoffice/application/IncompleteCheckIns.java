@@ -161,6 +161,11 @@ public class IncompleteCheckIns {
     return documentDeadline;
   }
 
+  /** The deadline as a person reads it: «24 h», or «2 min» when it is set short (to try it). */
+  public String documentDeadlineLabel() {
+    return documentDeadline.toMinutes() < 60 ? documentDeadline.toMinutes() + " min" : documentDeadline.toHours() + " h";
+  }
+
   // ── writes ───────────────────────────────────────────────────────────────────
 
   /**
@@ -290,14 +295,13 @@ public class IncompleteCheckIns {
     }
     var guest = guests.findById(stay.guestId()).map(g -> g.name()).orElse(stay.guestId());
     var room = stay.hasRoom() ? "hab. " + stay.roomNumber() : "sin habitación";
-    var body = ("El check-in de %s (%s, %s) se forzó el %s por %s — «%s» — y pasadas %d h de la llegada sigue "
+    var body = ("El check-in de %s (%s, %s) se forzó el %s por %s — «%s» — y pasadas %s de la llegada sigue "
         + "faltando: %s. El parte de viajeros no puede esperar más: complétalo en la estancia («Completar»). "
         + "La estancia no puede hacer el check-out hasta entonces.").formatted(stay.id(), guest, room,
         WHEN.format(forced.forcedAt().atZone(ZoneId.of("Europe/Madrid"))), forced.forcedBy(), forced.reason(),
-        documentDeadline.toHours(), String.join("; ", documents.stream().map(PendingStep::label).toList()));
+        documentDeadlineLabel(), String.join("; ", documents.stream().map(PendingStep::label).toList()));
     var notice = new NotificationRequested(UUID.randomUUID().toString(), NotificationType.CHECK_IN_INCOMPLETE, hotel,
-        subject(stayId), "Check-in incompleto: " + stayId + " sin documentación pasadas " + documentDeadline.toHours()
-        + " h", body, consoleUrl.isBlank() ? null : consoleUrl + "/reservas/" + stayId,
+        subject(stayId), "Check-in incompleto: " + stayId + " sin documentación pasadas " + documentDeadlineLabel(), body, consoleUrl.isBlank() ? null : consoleUrl + "/reservas/" + stayId,
         "forced-check-in-overdue:" + stayId, now);
     outbox.append(NOTIFICATIONS, notice.dedupKey(), "NotificationRequested", JSON.writeValueAsString(notice), null);
     forcedCheckIns.save(forced.overdueNotified(now));

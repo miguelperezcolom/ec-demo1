@@ -67,9 +67,9 @@ public class FrontOffice {
     return instance.incompleteCheckIns.status(stayId);
   }
 
-  /** The hours a forced check-in's documents are due after the arrival (24). */
-  public static long forcedDeadlineHours() {
-    return instance.incompleteCheckIns.documentDeadline().toHours();
+  /** How long after the arrival a forced check-in's documents are due: «24 h». */
+  public static String forcedDeadlineLabel() {
+    return instance.incompleteCheckIns.documentDeadlineLabel();
   }
 
   /** Where the stay stands in the PMS — «Opera: en casa», «Opera: rechazado — …» —, if it was ever told. */
