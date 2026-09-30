@@ -68,6 +68,23 @@ public class FrontOfficeSuite implements HomeRouteSupplier, WidgetSupplier {
   RouteLink reservas =
       new RouteLink("/reservas", "Reservas").withIcon("vaadin:calendar-user");
 
+  // Atajos a las tres vistas del día de recepción: el mismo listado de reservas con su vista
+  // (ReservasListing.Vista) ya elegida, como hacen las tarjetas de la bienvenida.
+  @Audience("Staff")
+  @Menu
+  RouteLink llegadas =
+      new RouteLink("/reservas?vista=LLEGADAS_HOY", "Llegadas").withIcon("vaadin:sign-in");
+
+  @Audience("Staff")
+  @Menu
+  RouteLink inHouse =
+      new RouteLink("/reservas?vista=IN_HOUSE", "In house").withIcon("vaadin:home");
+
+  @Audience("Staff")
+  @Menu
+  RouteLink salidas =
+      new RouteLink("/reservas?vista=SALIDAS_HOY", "Salidas").withIcon("vaadin:sign-out");
+
   @Audience("Staff")
   @Menu
   RouteLink automatizaciones =
