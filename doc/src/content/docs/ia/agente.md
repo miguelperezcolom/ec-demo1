@@ -8,16 +8,25 @@ una herramienta o una negativa. No tiene pantallas, ni base de datos, ni configu
 cosas de sí mismo: dónde está el plano de control (`IA_CONTROL_PLANE_URL`) y qué agente es por defecto
 (`AGENT_ID`).
 
-La misma imagen corre en dos despliegues:
+La misma imagen corre en tres despliegues:
 
 | Despliegue | Agente | Dónde |
 | :--------- | :----- | :---- |
-| `ia-agent` | `console-agent` | `/ai/**` de las consolas |
+| `ia-agent` | `console-agent` | `/ai/**` de las consolas del plano de datos (`ec1`, `rw.ec1`) |
 | `ia-agent-front-office` | `reception-agent` (solo el MCP del front office) | `/ai/**` de `front.ec1` |
+| `ia-agent-control-plane` | `control-plane-agent` | `/ai/**` de las consolas de control (`console.ec1`, `rw-console.ec1`), con rol `ai-admin` |
 
-El front office tiene su propio pod porque el plano de control enruta por la ruta de la pantalla, y
-las del front office (`/reservas`, `/bienvenida`…) no comparten un prefijo que una regla pueda usar: su
-host es lo que dice que la pregunta viene de recepción.
+El front office y el control plane tienen su propio pod porque el plano de control enruta por la ruta
+de la pantalla, y la ruta no basta: las del front office (`/reservas`, `/bienvenida`…) no comparten un
+prefijo que una regla pueda usar, y el control plane comparte pantallas con el plano de datos
+(`/mapping`). Lo que dice de dónde viene la pregunta es el host. Las reglas de ruta del catálogo se
+siguen aplicando antes: desde las pantallas de mapeado contesta `mapping-agent`.
+
+:::note[Previsto, sin hacer]
+Un solo despliegue para todos: el gateway pondría en cada petición el canal y el agente por defecto
+según el host, `ia-agent` los pasaría a `/internal/agents/resolve` y las reglas de ruta del catálogo
+decidirían con ellos. `AGENT_ID` dejaría de fijarse en el pod.
+:::
 
 ## Un prompt
 

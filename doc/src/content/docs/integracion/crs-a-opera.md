@@ -127,10 +127,11 @@ hace distinto de las especificaciones públicas, o aún no tiene configurado:
   `OPERA_PROPERTIES` (`XMAR,XMU` en ec1) y lee cada una por su código.
 - **UDF**: solo se guardan los que se llaman `UDFN01`…; con otro nombre, Opera los ignora sin decir nada.
 - **Pago en hotel**: la forma de pago es `CASH` (`OPERA_PAY_AT_HOTEL_METHOD`).
-- **Referencias externas en perfiles** y **depósitos al folio** necesitan configuración de un
-  administrador de OPERA (una interfaz para las referencias de perfil y un cajero para el usuario de
-  integración). Hasta entonces quedan apagados: `OPERA_PROFILE_REFERENCES=false`,
-  `OPERA_POST_DEPOSITS=false`.
+- **Referencias externas en perfiles** necesitan que un administrador de OPERA configure una interfaz
+  para ellas; hasta entonces van apagadas (`OPERA_PROFILE_REFERENCES=false`).
+- **Cajero.** El usuario de integración no tiene cajero propio (FOF00094 «Invalid Cashier»). Se creó por
+  OHIP uno para la PoC en XMAR, `69721441` «EC-DEMO1 Integración», que el conector pasa en check-outs y
+  folios (`OPERA_CASHIER_ID`). Los **depósitos** siguen apagados (`OPERA_POST_DEPOSITS=false`).
 - **Un contexto por ejecución de la demo.** El localizador del CRS va en Opera como referencia externa
   bajo un contexto propio (`OPERA_EXTERNAL_SYSTEM`, `ECDEMO1` o `ECDEMO1-<MMddHHmm>` desde el ConfigMap
   `ec-demo-run`), y todas las reservas llevan la *Custom Reference* `EC-DEMO1`. Opera no se limpia

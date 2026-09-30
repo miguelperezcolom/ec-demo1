@@ -122,9 +122,15 @@ el otro sistema la ha aplicado.
 | ia-agent → servidores MCP, api-mcp → APIs | herramientas | ida y vuelta de UI | Una persona conversa con el agente: cada herramienta es parte de su respuesta. |
 | ia-agent, api-mcp → ia-control-plane | configuración del agente, RAG, catálogo | consulta | |
 | pms-integration → Opera (OHIP) | Property APIs | conector a sistema externo | No es entre servicios nuestros: es el conector. |
+| front-office, booking → audit-service | `GET /audit?stayId=…&locator=…` | consulta de UI | El «Historial» de la reserva: quién hizo qué y cuándo. Solo dentro del clúster; si no contesta, la ficha sale sin historial. |
+| notices → erp | `GET /partners/{code}` | consulta | Al crear un aviso de agencia: que el código exista, y el nombre con que Opera la nombra en la estancia. |
+| integrations → customer-mdm, pms-integration | `GET /usage/salesforce`, `GET /usage/opera` (caché 15 s) | consulta | El consumo de las APIs externas, sumado. No gasta llamadas a Salesforce ni a Opera: cada servicio contesta con sus contadores. |
+| shells (ui-commons) → integrations | `GET /usage/kpis` | consulta de UI | Los KPIs de consumo de la home. Si no contesta, las tarjetas dicen «—». |
+| ia-agent → ia-agent | `POST /a2a/{agentId}` (JSON-RPC `message/send`) | ida y vuelta de UI | Un agente delega en otro que tiene permitido (A2A), o una ruta pasa el texto por sus guardarraíles. Solo dentro del clúster. |
 
-audit-service y communication-service solo consumen Kafka. Las consolas no hacen llamadas de
-servidor a servidor.
+audit-service y communication-service solo consumen Kafka (audit-service, además, contesta la consulta
+del historial). Las consolas solo hacen una llamada de servidor a servidor: los KPIs de consumo de su
+home.
 
 ## Órdenes que aún van por HTTP (pendientes)
 

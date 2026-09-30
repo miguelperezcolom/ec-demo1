@@ -51,6 +51,7 @@ de `deploy/manifests/` (los de esta tabla son los del momento de escribirla). La
 | :--------- | :----- | -----: | :--- | :------------ |
 | `ia-agent` | `ai/ia-agent` | 8095 | `/ai` (consolas) | — |
 | `ia-agent-front-office` | `ai/ia-agent` (misma imagen) | 8095 | `/ai` (`front.ec1`) | — |
+| `ia-agent-control-plane` | `ai/ia-agent` (misma imagen) | 8095 | `/ai` (`console.ec1`, `rw-console.ec1`) | — |
 | `ia-control-plane` | `ai/ia-control-plane` | 8110 | `/_ia-cp`, `/cp-webhooks` | `cp-postgres:5432/controlplane` |
 | `api-mcp` | `ai/api-mcp` | 8113 | — (solo dentro del clúster) | — |
 
