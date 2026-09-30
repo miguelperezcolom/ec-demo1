@@ -134,7 +134,7 @@ public class TaskHandlers {
     static Preparation.WaitContext waitContext(TaskContext task, Subject input, String subject) {
         return new Preparation.WaitContext(required(task, ProcessVariables.PROCESS_KEY, input.processKey()),
                 required(task, ProcessVariables.DEFINITION_ID, input.definitionId()), subject, input.variables(),
-                blankAsNull(input.origin()));
+                blankAsNull(input.origin()), blankAsNull(task.processId()));
     }
 
     static PrepareOutcome outcome(Outcome outcome) {

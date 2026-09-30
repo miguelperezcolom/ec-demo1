@@ -39,9 +39,10 @@ public class Preparation {
     /**
      * @param origin who started the process when it was not a change in the CRS — a backfill —
      *               or null
+     * @param engineProcessId the engine's id of the process, which discarding it cancels it by
      */
     public record WaitContext(String processKey, String definitionId, String subject, List<Variable> variables,
-                              String origin) {
+                              String origin, String engineProcessId) {
 
         /** A backfill projects before the integration is active: that is how the hotel gets ready. */
         boolean heldByActivation() {
@@ -115,7 +116,7 @@ public class Preparation {
         if (missing.isEmpty()) {
             return Outcome.OK;
         }
-        causes.await(wait.processKey(), wait.definitionId(), hotelCode, wait.subject(), wait.variables(), missing);
+        causes.await(wait.processKey(), wait.engineProcessId(), wait.definitionId(), hotelCode, wait.subject(), wait.variables(), missing);
         // An equivalence approved between the check above and the wait being registered would leave
         // this process waiting on a cause nothing will resolve again. Look once more, now that the
         // wait is visible to whoever approves.

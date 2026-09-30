@@ -53,6 +53,19 @@ public class MappingAuditSubjects implements AuditSubjects {
             return "%s %s → %s: %s%s".formatted(e.getType(), e.getSourceCode(), e.getTargetCode(), e.getStatus(),
                     e.getEntryVersion() > 0 ? " (v" + e.getEntryVersion() + ")" : "");
         }
+        if (result instanceof io.mateu.ecdemo1.mapping.causes.Causes.Discarded d) {
+            return discarded(d);
+        }
+        if (result instanceof java.util.List<?> list && !list.isEmpty()
+                && list.stream().allMatch(io.mateu.ecdemo1.mapping.causes.Causes.Discarded.class::isInstance)) {
+            return list.stream().map(d -> discarded((io.mateu.ecdemo1.mapping.causes.Causes.Discarded) d))
+                    .collect(java.util.stream.Collectors.joining("; "));
+        }
         return "Done";
+    }
+
+    static String discarded(io.mateu.ecdemo1.mapping.causes.Causes.Discarded d) {
+        return d.processKey() + " discarded; " + (d.engineCancelRequested() ? "engine cancellation requested"
+                : "to be cancelled by hand in Admin → Processes");
     }
 }

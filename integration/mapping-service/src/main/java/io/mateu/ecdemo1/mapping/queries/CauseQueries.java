@@ -38,4 +38,9 @@ public class CauseQueries {
     public List<Waiter> processesWaitingOn(String causeKey) {
         return waiters.waitingOn(causeKey);
     }
+
+    /** Waiting on it, or released by it and not answering: what can still be discarded from the cause. */
+    public List<Waiter> processesPendingOn(String causeKey) {
+        return waiters.pendingOn(causeKey);
+    }
 }

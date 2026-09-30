@@ -16,6 +16,9 @@ import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
+import io.mateu.uidl.interfaces.VisibilitySupplier;
+import io.mateu.uidl.data.ColumnAction;
+import io.mateu.uidl.data.ColumnActionGroup;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
@@ -30,7 +33,7 @@ import java.util.List;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class CauseViewModel implements Identifiable {
+public class CauseViewModel implements Identifiable, VisibilitySupplier {
 
     @ReadOnly
     Status status = new Status(StatusType.NONE, "");
@@ -57,6 +60,54 @@ public class CauseViewModel implements Identifiable {
 
     final Causes causes;
     final CauseQueries queries;
+    final DiscardForm discardForm;
+
+    /**
+     * Gives up on a waiting process — the row's, or one picked in the dialog, or all of them — after
+     * saying what that means and asking why (F012). Offered while any process waits on the cause or
+     * was released by it and has not answered.
+     */
+    @Toolbar
+    @Action
+    @io.mateu.uidl.annotations.Label("Descartar…")
+    public Object discard(HttpRequest httpRequest) {
+        return discardForm.dialogFor(key, null, route(httpRequest));
+    }
+
+    /** The Descartar of a waiting process's row: the same dialog, with that process picked. */
+    public Object discardWaiter(HttpRequest httpRequest) {
+        return discardForm.dialogFor(key, clickedProcess(httpRequest), route(httpRequest));
+    }
+
+    @Override
+    public boolean isHidden(String memberName, HttpRequest httpRequest) {
+        if ("discard".equals(memberName)) {
+            return waiting == null || waiting.isEmpty();
+        }
+        if ("resolve".equals(memberName)) {
+            return "Resolved".equals(status == null ? null : status.message());
+        }
+        return false;
+    }
+
+    /** The row's process in both renderers' contracts: the whole row as {@code _clickedRow}, or its fields directly. */
+    static String clickedProcess(HttpRequest httpRequest) {
+        var parameters = httpRequest.runActionRq().parameters();
+        if (parameters == null) {
+            return null;
+        }
+        if (parameters.get("_clickedRow") instanceof java.util.Map<?, ?> row && row.get("process") != null) {
+            return String.valueOf(row.get("process"));
+        }
+        var direct = parameters.get("process");
+        return direct == null ? null : String.valueOf(direct);
+    }
+
+    /** Where the dialog takes the operator back to: this cause, re-read. */
+    static String route(HttpRequest httpRequest) {
+        var route = httpRequest.runActionRq().route();
+        return route == null || route.isBlank() ? "/mapping/causes" : route;
+    }
 
     @Toolbar
     @Action(confirmationRequired = true, confirmationTitle = "Resolve this cause?",
@@ -75,8 +126,10 @@ public class CauseViewModel implements Identifiable {
         hotel = cause.hotelCode;
         openedAt = String.valueOf(cause.openedAt);
         resolved = cause.resolvedAt == null ? "" : cause.resolvedAt + " by " + cause.resolvedBy;
-        waiting = queries.processesWaitingOn(cause.causeKey).stream()
-                .map(w -> new WaitingRow(w.processKey, w.definitionId, w.subject, String.valueOf(w.createdAt)))
+        waiting = queries.processesPendingOn(cause.causeKey).stream()
+                .map(w -> new WaitingRow(w.processKey, w.definitionId, w.subject, String.valueOf(w.createdAt),
+                        w.status.name(), w.engineProcessId == null ? "unknown" : w.engineProcessId,
+                        new ColumnActionGroup(new ColumnAction[] {new ColumnAction("discardWaiter", "Descartar")})))
                 .toList();
         return this;
     }

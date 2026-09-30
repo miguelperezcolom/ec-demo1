@@ -16,8 +16,29 @@ public interface WaiterRepository extends JpaRepository<Waiter, String> {
             """)
     List<Waiter> waitingOn(@Param("cause") String causeKey);
 
-    @Query("select w from Waiter w where w.status = 'RELEASED' and w.lastSignalAt < :before")
-    List<Waiter> releasedAndSilentSince(@Param("before") Instant before);
+    /**
+     * The processes a person can still discard from this cause: those waiting on it, and those it
+     * released that have not answered — oldest first.
+     */
+    @Query("""
+            select w from Waiter w
+            where w.status in ('WAITING', 'RELEASED')
+              and exists (select 1 from WaiterCause l where l.processKey = w.processKey and l.causeKey = :cause)
+            order by w.createdAt
+            """)
+    List<Waiter> pendingOn(@Param("cause") String causeKey);
+
+    /**
+     * Released, not answered since {@code before}, and released after {@code releasedAfter}. Only
+     * RELEASED ones: a DISCARDED process is never signalled again. And past {@code releasedAfter} not
+     * either: a process that has not answered in all that time is not going to — the engine cancelled
+     * or finished it — and it is left for a person to discard.
+     */
+    @Query("""
+            select w from Waiter w
+            where w.status = 'RELEASED' and w.lastSignalAt < :before and w.releasedAt > :releasedAfter
+            """)
+    List<Waiter> releasedAndSilentSince(@Param("before") Instant before, @Param("releasedAfter") Instant releasedAfter);
 
     @Query("""
             select count(w) from Waiter w
