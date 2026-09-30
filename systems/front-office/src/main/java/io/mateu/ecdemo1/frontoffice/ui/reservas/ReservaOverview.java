@@ -301,7 +301,7 @@ public class ReservaOverview
                 .title("En otros sistemas")
                 .open(false)
                 .width("26rem")
-                .content(OtherSystems.of(stayId))
+                .content(OtherSystems.asList(stayId))
                 .build(),
             FoldoutPanel.builder()
                 .id("historial")
