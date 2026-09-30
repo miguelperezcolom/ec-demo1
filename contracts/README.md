@@ -21,6 +21,7 @@ each service depends on the contexts it speaks and nothing else. The packages
 | `contracts-communication` | Notifications asked for and resolved | notifications, notification-resolutions | pms-integration, customer-mdm, mapping, integrations, communication |
 | `contracts-audit` | `AuditedAction` | audit | mapping, integrations, front-office, booking, audit |
 | `contracts-notices` | `NoticeChanged`: a reception notice of a customer, a reservation or a partner, when the desk sees it | notices | notices, front-office |
+| `contracts-registration` | `RegistrationRuleChanged`: which of a guest's data a destination requires at registration (by country or hotel, nationality, age, role); `RegistrationRequirements`, how a rule reads — shared so the control plane's «Probar» and the front office say the same | registration-rules | registration-rules, front-office |
 | `contracts-process` | The processes' vocabulary shared with ec-definitions: definition ids, gate messages, variable names, outcomes | — | crs-integration, pms-integration, mapping, integrations |
 
 `IntegrationEvent` (the `integration-events` topic) is crs-integration-service's own: it is the only
@@ -49,6 +50,7 @@ producer writes it.
 | customers | contracts-schemas (customer-mdm's language) | customer-mdm | crs-integration, front-office |
 | customer-notices | contracts-schemas | customer-mdm | notices |
 | notices | contracts-schemas (the notices service's language) | notices | front-office |
+| registration-rules | contracts-schemas (the registration-rules service's language) | registration-rules | front-office |
 | customer-commands | contracts-schemas | front-office | customer-mdm |
 | projection-requests | contracts-schemas | integrations | crs-integration |
 | no-show-reports | contracts-schemas | — (the front office's no-show goes to the PMS: front-office-events) | crs-integration |

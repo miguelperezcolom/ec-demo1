@@ -3,6 +3,10 @@ package io.mateu.ecdemo1.frontoffice.ui.checkin;
 import io.mateu.core.infra.declarative.orchestrators.editableview.EditableView;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
 import io.mateu.ecdemo1.frontoffice.application.KardexService;
+import io.mateu.ecdemo1.frontoffice.application.RegistrationRequirementsService;
+import io.mateu.ecdemo1.integration.model.registration.RegistrationRequirements;
+import io.mateu.ecdemo1.integration.model.registration.RegistrationRuleChanged.Field;
+import io.mateu.ecdemo1.integration.model.registration.RegistrationRuleChanged.Moment;
 import io.mateu.ecdemo1.frontoffice.application.StayQueries;
 import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.Label;
@@ -59,11 +63,13 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
 
   @Getter(AccessLevel.NONE) final StayQueries queries;
   @Getter(AccessLevel.NONE) final KardexService kardex;
+  @Getter(AccessLevel.NONE) final RegistrationRequirementsService registration;
 
   /** A prototype bean: Mateu takes the island from Spring; the Identidad step asks Mateu for one too. */
-  public DocumentoView(StayQueries queries, KardexService kardex) {
+  public DocumentoView(StayQueries queries, KardexService kardex, RegistrationRequirementsService registration) {
     this.queries = queries;
     this.kardex = kardex;
+    this.registration = registration;
   }
 
   @Hidden String stayId;
@@ -109,14 +115,25 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
 
     @Label("Teléfono")
     String telefono;
+
+    /** What the destination's registration rules ask of this pax, and what of it the kárdex has. */
+    @Label("Registro de viajeros")
+    String registro;
   }
 
-  /** Editor: contact data editable; identity fields stay read-only. */
+  /**
+   * Editor: identity, contact and the registration data the destination's rules ask for — the fields
+   * they require are marked required for this pax's nationality and age ({@link #isRequired}), and the
+   * legal basis is said above them.
+   */
   @Getter
   @Setter
   @Title("Documento")
   @SubscribeTo(event = "pax-seleccionado", action = "cambiarPax")
-  public static class DocumentoEditor {
+  public static class DocumentoEditor implements io.mateu.uidl.interfaces.RequiredSupplier {
+    @io.mateu.uidl.annotations.Notice(theme = "info")
+    String baseLegal;
+
     @Label("Documento")
     String documento;
 
@@ -128,7 +145,63 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
 
     @Label("Teléfono")
     String telefono;
+
+    @Section("Registro de viajeros")
+    @Label("Tipo de documento")
+    String tipoDocumento;
+
+    @Label("País de expedición")
+    String paisExpedicion;
+
+    @Label("Caducidad del documento")
+    java.time.LocalDate caducidad;
+
+    @Label("Nacionalidad")
+    String nacionalidad;
+
+    @Label("Fecha de nacimiento")
+    java.time.LocalDate fechaNacimiento;
+
+    @Label("Lugar de nacimiento")
+    String lugarNacimiento;
+
+    @Label("Sexo")
+    String sexo;
+
+    @Label("Dirección")
+    String direccion;
+
+    @Label("Ciudad")
+    String ciudad;
+
+    @Label("Código postal")
+    String codigoPostal;
+
+    @Label("País de residencia")
+    String paisResidencia;
+
+    @Label("Adulto responsable y parentesco")
+    String tutor;
+
+    /** The rules' required fields for this pax, comma separated (RegistrationRuleChanged.Field names). */
+    @Hidden String requeridos;
+
+    @Override
+    public boolean isRequired(String fieldName, HttpRequest httpRequest) {
+      var field = FIELDS.get(fieldName);
+      return field != null && requeridos != null && java.util.Arrays.asList(requeridos.split(",")).contains(field.name());
+    }
   }
+
+  /** Each editor field, and the registration field it is. */
+  static final java.util.Map<String, Field> FIELDS = java.util.Map.ofEntries(
+      java.util.Map.entry("documento", Field.DOCUMENT_NUMBER), java.util.Map.entry("tipoDocumento", Field.DOCUMENT_TYPE),
+      java.util.Map.entry("paisExpedicion", Field.DOCUMENT_ISSUING_COUNTRY), java.util.Map.entry("caducidad", Field.DOCUMENT_EXPIRY),
+      java.util.Map.entry("nacionalidad", Field.NATIONALITY), java.util.Map.entry("fechaNacimiento", Field.BIRTH_DATE),
+      java.util.Map.entry("lugarNacimiento", Field.BIRTH_PLACE), java.util.Map.entry("sexo", Field.SEX),
+      java.util.Map.entry("direccion", Field.ADDRESS), java.util.Map.entry("ciudad", Field.CITY),
+      java.util.Map.entry("codigoPostal", Field.POSTAL_CODE), java.util.Map.entry("paisResidencia", Field.COUNTRY_OF_RESIDENCE),
+      java.util.Map.entry("tutor", Field.GUARDIAN));
 
   // ── state selection ──────────────────────────────────────────────────────────
 
@@ -148,7 +221,25 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     datos.setNombre(pax.name());
     datos.setEmail(pax.email());
     datos.setTelefono(pax.phone());
+    datos.setRegistro(registro());
     return datos;
+  }
+
+  /** «Exige: nacionalidad ✓, fecha de nacimiento ✓, dirección — falta · RD 933/2021», or null with no rule. */
+  String registro() {
+    if (stayId == null || stayId.isBlank()) {
+      return null;
+    }
+    var stay = queries.view(stayId).stay();
+    var result = registration.required(stay, paxIndex(), Moment.CHECK_IN);
+    if (result.fields().isEmpty()) {
+      return "Este destino no exige más datos a este huésped";
+    }
+    var values = registration.values(stay, paxIndex());
+    var parts = result.fields().stream().filter(f -> f != Field.SIGNATURE)
+        .map(f -> RegistrationRequirements.label(f) + (blank(values.get(f)) ? " — falta" : " ✓")).toList();
+    return "Exige: " + String.join(", ", parts)
+        + (result.legalBases().isEmpty() ? "" : " · " + String.join("; ", result.legalBases()));
   }
 
   @Override
@@ -164,7 +255,62 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
       // rellenado manual: solo el nombre provisional del hueco como punto de partida
       editor.setNombre(pax.name());
     }
+    if (stayId != null && !stayId.isBlank()) {
+      var stay = queries.view(stayId).stay();
+      var values = registration.values(stay, paxIndex());
+      editor.setTipoDocumento(values.get(Field.DOCUMENT_TYPE));
+      editor.setPaisExpedicion(values.get(Field.DOCUMENT_ISSUING_COUNTRY));
+      editor.setCaducidad(date(values.get(Field.DOCUMENT_EXPIRY)));
+      editor.setNacionalidad(values.get(Field.NATIONALITY));
+      editor.setFechaNacimiento(date(values.get(Field.BIRTH_DATE)));
+      editor.setLugarNacimiento(values.get(Field.BIRTH_PLACE));
+      editor.setSexo(values.get(Field.SEX));
+      editor.setDireccion(values.get(Field.ADDRESS));
+      editor.setCiudad(values.get(Field.CITY));
+      editor.setCodigoPostal(values.get(Field.POSTAL_CODE));
+      editor.setPaisResidencia(values.get(Field.COUNTRY_OF_RESIDENCE));
+      editor.setTutor(values.get(Field.GUARDIAN));
+      var result = registration.required(stay, paxIndex(), Moment.CHECK_IN);
+      editor.setRequeridos(String.join(",", result.fields().stream().map(Enum::name).toList()));
+      editor.setBaseLegal(result.fields().isEmpty() ? null
+          : "Datos obligatorios para el registro de este huésped"
+              + (result.legalBases().isEmpty() ? "" : " — " + String.join("; ", result.legalBases())));
+    }
     return editor;
+  }
+
+  /** The registration data an edit carries, by field. */
+  static java.util.Map<Field, String> registrationData(DocumentoEditor e) {
+    var values = new java.util.EnumMap<Field, String>(Field.class);
+    values.put(Field.DOCUMENT_TYPE, e.getTipoDocumento());
+    values.put(Field.DOCUMENT_ISSUING_COUNTRY, upper(e.getPaisExpedicion()));
+    values.put(Field.DOCUMENT_EXPIRY, e.getCaducidad() == null ? null : e.getCaducidad().toString());
+    values.put(Field.NATIONALITY, upper(e.getNacionalidad()));
+    values.put(Field.BIRTH_DATE, e.getFechaNacimiento() == null ? null : e.getFechaNacimiento().toString());
+    values.put(Field.BIRTH_PLACE, e.getLugarNacimiento());
+    values.put(Field.SEX, e.getSexo());
+    values.put(Field.ADDRESS, e.getDireccion());
+    values.put(Field.CITY, e.getCiudad());
+    values.put(Field.POSTAL_CODE, e.getCodigoPostal());
+    values.put(Field.COUNTRY_OF_RESIDENCE, upper(e.getPaisResidencia()));
+    values.put(Field.GUARDIAN, e.getTutor());
+    return values;
+  }
+
+  static String upper(String s) {
+    return s == null ? null : s.trim().toUpperCase(java.util.Locale.ROOT);
+  }
+
+  static java.time.LocalDate date(String s) {
+    try {
+      return s == null || s.isBlank() ? null : java.time.LocalDate.parse(s.trim());
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  static boolean blank(String s) {
+    return s == null || s.isBlank();
   }
 
   @Override
@@ -182,6 +328,7 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
       kardex.registered(stayId, paxIndex(), edited.getDocumento(), edited.getNombre(), edited.getEmail(),
           edited.getTelefono());
     }
+    kardex.registrationData(stayId, paxIndex(), registrationData(edited));
   }
 
   /** No Edit button while there is no data — the empty state only offers the scan. */

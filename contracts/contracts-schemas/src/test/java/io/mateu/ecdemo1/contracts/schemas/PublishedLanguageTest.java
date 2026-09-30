@@ -20,6 +20,7 @@ import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationResolved;
 import io.mateu.ecdemo1.integration.model.notification.NotificationType;
 import io.mateu.ecdemo1.integration.model.pms.PmsReservationChanged;
+import io.mateu.ecdemo1.integration.model.registration.RegistrationRuleChanged;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
@@ -90,6 +91,34 @@ class PublishedLanguageTest {
                                         NoticeChanged.NoticeType.IMPORTANT, null, null,
                                         List.of(NoticeChanged.NoticeMoment.CHECK_IN, NoticeChanged.NoticeMoment.IN_HOUSE),
                                         false, "SALESFORCE", "500d1000009XyZBAA0")),
+                TopicSpec.topic("registration-rules")
+                        .describedAs("Which of a guest's data a destination's law requires when the hotel registers "
+                                + "them, by the hotel's country or the hotel, the guest's nationality, age and role — "
+                                + "kept in the control plane by compliance; the whole rule each time, the highest "
+                                + "version wins.")
+                        .ownedBy("registration-rules").keyedBy("scope:scopeCode")
+                        .producedBy("registration-rules").consumedBy("front-office")
+                        .messages(RegistrationRuleChanged.class)
+                        .example(new RegistrationRuleChanged("E-9", AT, "RR-ES-1", 2, "España · registro de viajeros",
+                                        RegistrationRuleChanged.Scope.COUNTRY, "ES",
+                                        RegistrationRuleChanged.NationalityMatch.ANY, List.of(), 14, null,
+                                        RegistrationRuleChanged.Role.ANY,
+                                        List.of(RegistrationRuleChanged.Field.DOCUMENT_TYPE,
+                                                RegistrationRuleChanged.Field.DOCUMENT_NUMBER,
+                                                RegistrationRuleChanged.Field.NATIONALITY,
+                                                RegistrationRuleChanged.Field.BIRTH_DATE,
+                                                RegistrationRuleChanged.Field.ADDRESS),
+                                        List.of(), List.of(RegistrationRuleChanged.Moment.CHECK_IN,
+                                                RegistrationRuleChanged.Moment.ONLINE_CHECK_IN),
+                                        "RD 933/2021 · SES.Hospedajes", LocalDate.of(2026, 1, 1), null, true),
+                                new RegistrationRuleChanged("E-10", AT, "RR-MRU01-1", 1, "Fuera de la UE: el documento",
+                                        RegistrationRuleChanged.Scope.HOTEL, "MRU01",
+                                        RegistrationRuleChanged.NationalityMatch.NOT_IN, List.of("EU", "MU"), null, null,
+                                        RegistrationRuleChanged.Role.HOLDER,
+                                        List.of(RegistrationRuleChanged.Field.DOCUMENT_EXPIRY,
+                                                RegistrationRuleChanged.Field.DOCUMENT_ISSUING_COUNTRY),
+                                        List.of(RegistrationRuleChanged.Field.ADDRESS),
+                                        List.of(RegistrationRuleChanged.Moment.CHECK_IN), "Ejemplo", null, null, false)),
                 TopicSpec.topic("customer-commands")
                         .describedAs("What the MDM is asked without waiting: a change to a customer proposed, an "
                                 + "identity scanned at check-in recorded.")
@@ -198,7 +227,7 @@ class PublishedLanguageTest {
                 TopicSpec.topic("audit")
                         .describedAs("An action someone (or an agent) took through a service's API or console.")
                         .ownedBy("audit-service").keyedBy("actionId")
-                        .producedBy("integrations-service", "mapping-service", "front-office", "booking").consumedBy("audit-service")
+                        .producedBy("integrations-service", "mapping-service", "front-office", "booking", "registration-rules").consumedBy("audit-service")
                         .messages(AuditedAction.class)
                         .example(new AuditedAction("A-1", AT, "mapping-service", "approve-proposal", "MRU01", "ana",
                                 "{\"proposal\":\"P-3\"}", true, "approved")));

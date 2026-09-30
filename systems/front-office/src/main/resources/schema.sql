@@ -297,3 +297,27 @@ create table if not exists forced_check_in (
     completed_at        timestamp,
     overdue_notified_at timestamp
 );
+
+-- ── Registration rules (reglas de registro del kárdex) ──────────────────────────
+-- Which of a guest's data the destination's law requires, as the control plane publishes them
+-- (registration-rules): one row per rule, its last version, the whole rule as JSON — kept here, not
+-- asked for, so the desk still applies them when the network does not answer (F017).
+create table if not exists registration_rule (
+    rule_id    varchar(64)   primary key,
+    version    bigint        not null,
+    scope_key  varchar(40)   not null,
+    active     boolean       not null,
+    payload    varchar(4000) not null,
+    updated_at timestamp
+);
+
+-- The registration data of each pax the kárdex keeps apart from the guest's identity: nationality,
+-- birth date, address… as the scanner read them or the desk wrote them, one row per field.
+create table if not exists pax_registration_data (
+    stay_id    varchar(64)  not null,
+    pax        int          not null,
+    field      varchar(40)  not null,
+    field_value varchar(300),
+    updated_at timestamp,
+    primary key (stay_id, pax, field)
+);

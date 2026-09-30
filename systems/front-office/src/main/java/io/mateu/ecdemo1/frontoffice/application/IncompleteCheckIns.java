@@ -132,9 +132,25 @@ public class IncompleteCheckIns {
 
   // ── reads ────────────────────────────────────────────────────────────────────
 
-  /** What the stay's check-in still lacks: the pax's documents (no-shows aside) and the signature. */
+  /** The destination's registration rules; none (in a test that does not wire them), nothing more is asked. */
+  RegistrationRequirementsService registration;
+
+  @Autowired(required = false)
+  public void setRegistration(RegistrationRequirementsService registration) {
+    this.registration = registration;
+  }
+
+  /**
+   * What the stay's check-in still lacks: the pax's documents (no-shows aside), the signature, and what
+   * the destination's registration rules require of each pax that the kárdex does not have yet.
+   */
   public List<PendingStep> missing(Stay stay) {
-    return CheckInChecklist.missing(stay, guests.findById(stay.guestId()).orElse(null), checkInOps.of(stay.id()));
+    var missing = new java.util.ArrayList<>(
+        CheckInChecklist.missing(stay, guests.findById(stay.guestId()).orElse(null), checkInOps.of(stay.id())));
+    if (registration != null) {
+      missing.addAll(registration.missing(stay));
+    }
+    return List.copyOf(missing);
   }
 
   public Status status(Stay stay) {

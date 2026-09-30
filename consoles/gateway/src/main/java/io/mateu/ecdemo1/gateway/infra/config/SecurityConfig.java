@@ -188,6 +188,8 @@ public class SecurityConfig {
                                 "/_integrations/**", "/_mapping/**", "/_communication/**",
                                 // The customer MDM: golden records are personal data.
                                 "/_mdm/**",
+                                // The registration rules: what the law requires of every guest.
+                                "/_registration-rules/**",
                                 // The audit trail: who did what is personal data too.
                                 "/_audit/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())

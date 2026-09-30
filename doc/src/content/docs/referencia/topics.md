@@ -26,6 +26,7 @@ Cada uno tiene su esquema versionado en `contracts/schemas/<topic>/v<N>.schema.j
 | `customers` | contracts-schemas | customer-mdm | crs-integration, front-office | `CustomerChanged`, `CustomersMerged` |
 | `customer-notices` | contracts-schemas | customer-mdm | notices | `CustomerNoticeChanged`: un aviso de recepción de un cliente, entero, como lo confirmó Salesforce; gana la versión mayor |
 | `notices` | contracts-schemas | notices | front-office | `NoticeChanged`: un aviso de recepción de un cliente, una reserva o una agencia, entero, con cuándo lo ve recepción; gana la versión mayor |
+| `registration-rules` | contracts-schemas | registration-rules | front-office | `RegistrationRuleChanged`: una regla de registro del kárdex (qué datos exige un destino, por país u hotel, nacionalidad, edad y rol), entera; gana la versión mayor |
 | `customer-commands` | contracts-schemas | front-office | customer-mdm | `propose-change`, `record-scanned-identity` |
 | `no-show-reports` | contracts-schemas | — | crs-integration | `ReportNoShow`. El front office ya no lo manda: su no-show sube al PMS (`front-office-events`) y de él al CRS por el motor |
 | `notifications` | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication | Un aviso |

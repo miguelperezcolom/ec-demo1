@@ -1,0 +1,6 @@
+kind: mcp
+id: registration-rules
+name: Reglas de registro del kárdex
+url: http://registration-rules:8132
+transport: SSE
+description: Qué datos del huésped exige cada destino al registrarlo — consultar las reglas, evaluarlas con un huésped y proponer una en borrador (inactiva; la activa una persona).

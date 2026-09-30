@@ -14,6 +14,7 @@ mcp:
   - communication
   - orchestrator
   - forms
+  - registration-rules
 rag:
   - handbook
 peers:

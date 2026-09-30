@@ -33,6 +33,7 @@ proyecta las pantallas para cada audiencia.
 | Catálogo (tipos, tarifas, paquetes, habitaciones) | Opera | `front-office-commands` (`replace-catalogue`) |
 | El cliente (kárdex) | El MDM, que lo tiene de Salesforce | Topic `customers` |
 | Avisos de recepción (de cliente, de reserva, de agencia) | El servicio de avisos; los de cliente, de Salesforce (su maestro) por el MDM | Topic `notices` |
+| Reglas de registro del kárdex (qué datos exige cada destino) | El plano de control (`registration-rules`); ver [Reglas de registro](/front-office/reglas-de-registro/) | Topic `registration-rules` |
 | Precio y alta de un walk-in | El CRS | HTTP a `crs-integration-service`: la recepción necesita el localizador ya |
 | Cómo tomó el PMS lo que hizo recepción, y la factura del check-out | Opera | `front-office-commands` (`record-reception`) |
 | Habitaciones que ofrecer en el check-in, con su estado | Opera (catálogo y housekeeping) | Catálogo por `replace-catalogue`; el estado, HTTP a `pms-integration-service` (`GET /front-office/rooms`): la pantalla lo necesita ya |
