@@ -18,6 +18,7 @@ import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.DetailFormCustomisation;
+import io.mateu.uidl.annotations.FoldoutDetail;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInEditor;
 import io.mateu.uidl.annotations.Label;
@@ -59,6 +60,10 @@ import java.util.concurrent.Callable;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
+// The booking's page is an overview — where, when, how much and where it is in Opera — with the rest
+// in foldout panels beside it: eleven stacked cards were a long scroll to what matters, and half of
+// them empty. What has no value is left out of the page; the editor keeps every field.
+@FoldoutDetail(overview = {"Booking", "Amounts"}, folded = {"Tracking"})
 public class BookingViewModel implements Identifiable, VisibilitySupplier {
 
     static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
@@ -82,6 +87,11 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     LocalDate arrival;
     @NotNull
     LocalDate departure;
+    /** Opera's reservation: in the overview, where it is looked for. */
+    @ReadOnly
+    @HiddenInCreate
+    @Label("Opera reservation")
+    String pmsReservationId;
 
     @Section("Holder")
     @NotEmpty
@@ -134,9 +144,6 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @ReadOnly
     @HiddenInCreate
     Long version;
-    @ReadOnly
-    @HiddenInCreate
-    String pmsReservationId;
     @ReadOnly
     @HiddenInCreate
     String created;
