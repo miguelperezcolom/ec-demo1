@@ -64,8 +64,8 @@ public final class ForcedCheckInViews {
     }
     var forced = status.forced();
     var text = (status.overdue()
-        ? "Check-in incompleto — PARTE DE VIAJEROS VENCIDO: pasaron " + FrontOffice.forcedDeadlineHours()
-            + " h desde la llegada y falta documentación. Recepción ya está avisada."
+        ? "Check-in incompleto — PARTE DE VIAJEROS VENCIDO: pasaron " + FrontOffice.forcedDeadlineLabel()
+            + " desde la llegada y falta documentación. Recepción ya está avisada."
         : "Check-in incompleto — forzado el " + WHEN.format(forced.forcedAt()) + " por " + forced.forcedBy()
             + ": «" + forced.reason() + "».")
         + (status.documentsMissing() && !status.overdue()

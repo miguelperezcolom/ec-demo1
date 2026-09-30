@@ -462,9 +462,9 @@ public class FrontDeskMcpTools {
     var guest = guests.findById(stay.guestId()).map(Guest::name).orElse(stay.guestId());
     var summary = ("Check-in FORZADO de %s (%s), %d pax, en la habitación %s, con pasos pendientes: %s. Motivo: «%s». "
         + "Sube a Opera como cualquier check-in; la estancia queda «Check-in incompleto» y no podrá hacer el "
-        + "check-out hasta completarlo; si falta un documento pasadas %d h, el parte de viajeros vence y recepción "
+        + "check-out hasta completarlo; si falta un documento pasadas %s, el parte de viajeros vence y recepción "
         + "recibe un aviso. Queda auditado quién, cuándo y por qué.").formatted(stay.id(), guest, stay.pax(), number,
-        falta, reason.trim(), incomplete.documentDeadline().toHours());
+        falta, reason.trim(), incomplete.documentDeadlineLabel());
     var mustRead = !notices.checkInAcknowledged(stay);
     var fingerprint = notices.checkInFingerprint(stay);
     var blocking = notices.blockingAtCheckIn(stay);
