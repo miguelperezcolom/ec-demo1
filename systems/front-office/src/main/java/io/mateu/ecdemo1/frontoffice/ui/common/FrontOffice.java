@@ -154,7 +154,7 @@ public class FrontOffice {
   /** The reception notices of the stay's guests shown at check-in, pax by pax. */
   public static List<io.mateu.ecdemo1.frontoffice.application.GuestNotices.PaxNotice> checkInNotices(String stayId) {
     return instance.queries.find(stayId)
-        .map(s -> instance.notices.forStay(s, io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice.Moment.CHECK_IN))
+        .map(s -> instance.notices.forStay(s, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.CHECK_IN))
         .orElse(List.of());
   }
 

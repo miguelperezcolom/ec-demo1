@@ -143,6 +143,8 @@ o desde la ficha del cliente en *Clientes*.
   evento vuelve con lo pedido pasa a *Confirmado* y se publica: los hoteles ven lo que tiene Salesforce.
   Si el evento se pierde, una consulta al día (y al arrancar), solo por los escritos sin confirmar.
 - Una fusión pasa los avisos del absorbido al superviviente.
+- El **servicio de avisos** toma `customer-notices` y los publica, junto con los de reserva y agencia, en
+  `notices`, que es lo que lee el front office. Ver [Avisos de recepción](/integracion/avisos/).
 
 El front office los guarda por cliente (titular y acompañantes que son clientes de la cadena) y los
 enseña en el check-in y el check-out: ver [Un sistema propio](/front-office/sistema-propio/).

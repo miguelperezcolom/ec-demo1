@@ -116,6 +116,15 @@ public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu customers = new RemoteMenu("/_customers").withLabel("Clientes");
 
+    /**
+     * The reception notices: what the desk must know of a guest, a reservation or an agency, and
+     * when — before the arrival, at check-in, in house, at check-out. A reservation's and an agency's
+     * are made here; a customer's are Salesforce's, shown read-only. Served by the notices service; the
+     * front office keeps its copy of them.
+     */
+    @Menu
+    RemoteMenu avisos = new RemoteMenu("/_notices").withLabel("Avisos");
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

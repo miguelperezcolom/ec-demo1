@@ -74,6 +74,11 @@ final class EstanciaPanel {
         ? Math.max(balance, 1) : folio.preauthorized().doubleValue();
     var pct = (int) Math.round(balance / preauth * 100);
     var content = new ArrayList<Component>();
+    // los avisos para la estancia: de los huéspedes, de la reserva y de su agencia
+    var avisos = r.notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.IN_HOUSE);
+    if (!avisos.isEmpty()) {
+      content.add(io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.block("Avisos para la estancia", avisos));
+    }
     // el KPI del balance, tal cual
     content.add(
         Meter.builder()
@@ -259,7 +264,7 @@ final class EstanciaPanel {
             ? "Avisos de salida leídos" + (ack == null ? "" : " — " + ack.by())
             : "Antes del check-out: " + (warnings.kardex().isEmpty() ? "" : "datos del kárdex que Salesforce "
                 + (rechazado ? "ha rechazado o " : "") + "no ha aprobado — la factura saldrá con el dato anterior. ")
-                + (warnings.notices().isEmpty() ? "" : "Avisos de salida del cliente.")
+                + (warnings.notices().isEmpty() ? "" : "Avisos de salida.")
             )
         .fullWidth(true);
     content.add(notice.build());

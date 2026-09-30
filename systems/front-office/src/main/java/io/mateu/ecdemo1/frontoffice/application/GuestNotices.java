@@ -1,18 +1,20 @@
 package io.mateu.ecdemo1.frontoffice.application;
 
-import io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice;
-import io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotices;
 import io.mateu.ecdemo1.frontoffice.domain.guest.Guest;
 import io.mateu.ecdemo1.frontoffice.domain.guest.GuestRepository;
 import io.mateu.ecdemo1.frontoffice.domain.guest.KardexChange;
 import io.mateu.ecdemo1.frontoffice.domain.guest.KardexChanges;
+import io.mateu.ecdemo1.frontoffice.domain.notice.Notice;
+import io.mateu.ecdemo1.frontoffice.domain.notice.Notices;
 import io.mateu.ecdemo1.frontoffice.domain.stay.NoticeAcknowledgements;
 import io.mateu.ecdemo1.frontoffice.domain.stay.NoticeAcknowledgements.Acknowledgement;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
+import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIn;
+import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns;
 import io.mateu.ecdemo1.frontoffice.infra.audit.AuditOutbox;
 import io.mateu.ecdemo1.integration.model.audit.AuditedAction;
-import io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged;
+import io.mateu.ecdemo1.integration.model.notice.NoticeChanged;
 import io.mateu.ecdemo1.messaging.Inbox;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -34,11 +36,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * What the desk must know of a stay's guests before letting them in or out. At check-in, the active
- * reception notices of the holder and of every companion who is a chain customer; a BLOCKING one must
- * be read — «He leído el aviso» — before the check-in. At check-out, the kárdex changes Salesforce
- * rejected or has not decided (the invoice goes out with the data it has) and the check-out notices:
- * «Entendido» before the check-out. The notices are Salesforce's, sent by the MDM (customer-notices).
+ * What the desk must know of a stay before letting its guests in or out: the reception notices of the
+ * holder and of every companion who is a chain customer (Salesforce's), of the reservation itself and
+ * of the agency that sold it — all sent by the notices service (notices) — of this hotel or the chain's,
+ * in force some day of the stay. At check-in, a BLOCKING one must be read — «He leído el aviso» —
+ * before the check-in. At check-out, the kárdex changes Salesforce rejected or has not decided (the
+ * invoice goes out with the data it has) and the check-out notices: «Entendido» before the check-out.
+ * The desk also sees the ones for preparing the arrival and for the stay, where it works on them.
  *
  * <p>Enforced here, not on the screens: {@link CheckInService} and {@link CheckOutService} refuse
  * while what applies is not acknowledged — by whoever asks, the desk or the reception agent. An
@@ -49,7 +53,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class GuestNotices {
 
   static final Logger log = LoggerFactory.getLogger(GuestNotices.class);
-  public static final String CONSUMER = "customer-notices";
+  public static final String CONSUMER = "notices";
   static final JsonMapper JSON = JsonMapper.builder().build();
 
   /** Refused: something that must be acknowledged is not. The message says what, for the desk. */
@@ -59,8 +63,17 @@ public class GuestNotices {
     }
   }
 
-  /** A notice, on the pax it is about (1 is the holder). */
-  public record PaxNotice(int pax, String guestName, CustomerNotice notice) {}
+  /**
+   * A notice, on what it is about: a pax (1 is the holder) with their name, or — pax 0 — the reservation
+   * or its agency, with how the desk names them («Reserva 12E45», «Agencia Nordic Travel»).
+   */
+  public record PaxNotice(int pax, String guestName, Notice notice) {
+
+    /** On a guest, not on the reservation or its agency. */
+    public boolean onPax() {
+      return pax > 0;
+    }
+  }
 
   /** A pax's kárdex change Salesforce rejected or has not decided, and what it means, line by line. */
   public record KardexWarning(int pax, String guestName, KardexChange.KardexStatus status, String reason,
@@ -81,7 +94,8 @@ public class GuestNotices {
 
   final StayRepository stays;
   final GuestRepository guests;
-  final CustomerNotices notices;
+  final Notices notices;
+  final WalkIns walkIns;
   final KardexChanges kardex;
   final NoticeAcknowledgements acknowledgements;
   final AuditOutbox audit;
@@ -91,18 +105,20 @@ public class GuestNotices {
   final Clock clock;
 
   @Autowired
-  public GuestNotices(StayRepository stays, GuestRepository guests, CustomerNotices notices, KardexChanges kardex,
-                      NoticeAcknowledgements acknowledgements, AuditOutbox audit, Inbox inbox,
+  public GuestNotices(StayRepository stays, GuestRepository guests, Notices notices, WalkIns walkIns,
+                      KardexChanges kardex, NoticeAcknowledgements acknowledgements, AuditOutbox audit, Inbox inbox,
                       PlatformTransactionManager transactions, @Value("${frontoffice.hotel:MRU01}") String hotel) {
-    this(stays, guests, notices, kardex, acknowledgements, audit, inbox, transactions, hotel, Clock.systemUTC());
+    this(stays, guests, notices, walkIns, kardex, acknowledgements, audit, inbox, transactions, hotel,
+        Clock.systemUTC());
   }
 
-  GuestNotices(StayRepository stays, GuestRepository guests, CustomerNotices notices, KardexChanges kardex,
+  GuestNotices(StayRepository stays, GuestRepository guests, Notices notices, WalkIns walkIns, KardexChanges kardex,
                NoticeAcknowledgements acknowledgements, AuditOutbox audit, Inbox inbox,
                PlatformTransactionManager transactions, String hotel, Clock clock) {
     this.stays = stays;
     this.guests = guests;
     this.notices = notices;
+    this.walkIns = walkIns;
     this.kardex = kardex;
     this.acknowledgements = acknowledgements;
     this.audit = audit;
@@ -113,23 +129,30 @@ public class GuestNotices {
     this.clock = clock;
   }
 
-  // ── from the MDM ────────────────────────────────────────────────────────────
+  // ── from the notices service ────────────────────────────────────────────────
 
-  /** A notice as the MDM sends it: kept unless an equal or newer one is. Once per event. */
+  /** A notice as the notices service sends it: kept unless an equal or newer one is. Once per event. */
   @Transactional
-  public boolean take(CustomerNoticeChanged e) {
+  public boolean take(NoticeChanged e) {
     if (e.eventId() != null && !inbox.firstTime(CONSUMER, e.eventId())) {
       return false;
     }
-    var showAt = EnumSet.noneOf(CustomerNotice.Moment.class);
-    if (e.showAt() != null) {
-      e.showAt().forEach(m -> showAt.add(CustomerNotice.Moment.valueOf(m.name())));
+    var moments = EnumSet.noneOf(Notice.Moment.class);
+    if (e.moments() != null) {
+      e.moments().forEach(m -> {
+        var moment = Notice.moment(m.name());
+        if (moment != null) {
+          moments.add(moment);
+        }
+      });
     }
-    var kept = notices.save(new CustomerNotice(e.noticeId(), e.customerId(), e.version(), e.text(),
-        e.type() == null ? CustomerNotice.Type.INFORMATIVE : CustomerNotice.Type.valueOf(e.type().name()),
-        e.from(), e.to(), showAt, e.active(), e.occurredAt()));
+    var kept = notices.save(new Notice(e.noticeId(),
+        e.subjectType() == null ? Notice.Subject.CUSTOMER : Notice.Subject.valueOf(e.subjectType().name()),
+        e.subjectId(), e.subjectName(), e.hotelCode(), e.version(), e.text(),
+        e.type() == null ? Notice.Type.INFORMATIVE : Notice.Type.valueOf(e.type().name()),
+        e.from(), e.to(), moments, e.active(), e.occurredAt()));
     if (kept) {
-      log.info("{}: notice {} v{} ({}, {})", e.customerId(), e.noticeId(), e.version(), e.type(),
+      log.info("{} {}: notice {} v{} ({}, {})", e.subjectType(), e.subjectId(), e.noticeId(), e.version(), e.type(),
           e.active() ? "active" : "inactive");
     }
     return kept;
@@ -137,36 +160,81 @@ public class GuestNotices {
 
   // ── what applies ────────────────────────────────────────────────────────────
 
-  /** The active notices of the stay's guests shown at that moment, pax by pax. */
-  public List<PaxNotice> forStay(Stay stay, CustomerNotice.Moment moment) {
+  /** The active notices of the stay shown at that moment: pax by pax, then the reservation's and its agency's. */
+  public List<PaxNotice> forStay(Stay stay, Notice.Moment moment) {
     return all(stay).stream()
-        .filter(p -> p.notice().appliesTo(moment, stay.checkIn(), stay.checkOut()))
+        .filter(p -> p.notice().appliesTo(hotel, moment, stay.checkIn(), stay.checkOut()))
         .toList();
   }
 
-  /** Every active notice of the stay's guests, whatever the moment: what the agent is told. */
-  public List<PaxNotice> activeForStay(Stay stay) {
-    return all(stay).stream().filter(p -> p.notice().active()
-            && EnumSet.allOf(CustomerNotice.Moment.class).stream()
-            .anyMatch(m -> p.notice().appliesTo(m, stay.checkIn(), stay.checkOut())))
+  /** The active notices of the stay shown at any of these moments, each once. */
+  public List<PaxNotice> forStay(Stay stay, Notice.Moment first, Notice.Moment... others) {
+    var moments = EnumSet.of(first, others);
+    return all(stay).stream()
+        .filter(p -> moments.stream().anyMatch(m -> p.notice().appliesTo(hotel, m, stay.checkIn(), stay.checkOut())))
         .toList();
+  }
+
+  /** Every active notice of the stay, whatever the moment: what the agent is told. */
+  public List<PaxNotice> activeForStay(Stay stay) {
+    return forStay(stay, Notice.Moment.PRE_ARRIVAL, Notice.Moment.values());
   }
 
   List<PaxNotice> all(Stay stay) {
-    var byCustomer = paxByCustomer(stay);
-    if (byCustomer.isEmpty()) {
-      return List.of();
-    }
     var result = new ArrayList<PaxNotice>();
-    for (var n : notices.of(byCustomer.keySet())) {
-      var pax = byCustomer.get(n.customerId());
-      if (pax != null) {
-        result.add(new PaxNotice(pax.number(), pax.name(), n));
+    var byCustomer = paxByCustomer(stay);
+    if (!byCustomer.isEmpty()) {
+      for (var n : notices.of(Notice.Subject.CUSTOMER, byCustomer.keySet())) {
+        var pax = byCustomer.get(n.subjectId());
+        if (pax != null) {
+          result.add(new PaxNotice(pax.number(), pax.name(), n));
+        }
       }
     }
-    result.sort((a, b) -> a.pax() != b.pax() ? Integer.compare(a.pax(), b.pax())
+    var locators = locators(stay);
+    for (var n : notices.of(Notice.Subject.RESERVATION, locators)) {
+      result.add(new PaxNotice(0, "Reserva " + n.subjectId(), n));
+    }
+    for (var n : partnerNotices(stay)) {
+      result.add(new PaxNotice(0, "Agencia " + (n.subjectName() == null ? n.subjectId() : n.subjectName()), n));
+    }
+    result.sort((a, b) -> a.pax() != b.pax() ? Integer.compare(order(a), order(b))
         : Integer.compare(b.notice().type().ordinal(), a.notice().type().ordinal()));
     return result;
+  }
+
+  /** The guests first, in their order; then what is on the reservation and on its agency. */
+  static int order(PaxNotice p) {
+    return p.pax() > 0 ? p.pax() : Integer.MAX_VALUE;
+  }
+
+  /**
+   * How the CRS knows the reservation: the stay's id — the CRS's locator, for one that came down the
+   * chain — and, for a walk-in the desk opened, the locator the CRS gave it once it booked it.
+   */
+  List<String> locators(Stay stay) {
+    var locators = new ArrayList<String>();
+    locators.add(stay.id());
+    walkIns.of(stay.id()).map(WalkIn::locator).filter(l -> l != null && !l.isBlank()).ifPresent(locators::add);
+    return locators.stream().map(l -> l.toUpperCase(java.util.Locale.ROOT)).distinct().toList();
+  }
+
+  /**
+   * The notices of the agency that sold the stay. The PMS gives the agency by name (the travel agent or
+   * company on the reservation), so a partner's notice — which carries the partner's name as the ERP has
+   * it, the name its PMS profile was written with — is matched by name, or by code if that is what the
+   * stay says.
+   */
+  List<Notice> partnerNotices(Stay stay) {
+    var agency = stay.agency();
+    if (agency == null || agency.isBlank()) {
+      return List.of();
+    }
+    var name = agency.trim();
+    return notices.active(Notice.Subject.PARTNER).stream()
+        .filter(n -> name.equalsIgnoreCase(n.subjectId())
+            || (n.subjectName() != null && name.equalsIgnoreCase(n.subjectName().trim())))
+        .toList();
   }
 
   record Pax(int number, String name) {}
@@ -186,7 +254,7 @@ public class GuestNotices {
 
   /** The blocking check-in notices: what must be read before the check-in. */
   public List<PaxNotice> blockingAtCheckIn(Stay stay) {
-    return forStay(stay, CustomerNotice.Moment.CHECK_IN).stream().filter(p -> p.notice().blocking()).toList();
+    return forStay(stay, Notice.Moment.CHECK_IN).stream().filter(p -> p.notice().blocking()).toList();
   }
 
   public String checkInFingerprint(Stay stay) {
@@ -237,7 +305,7 @@ public class GuestNotices {
 
   public CheckOutWarnings checkOutWarnings(Stay stay) {
     var k = kardexWarnings(stay);
-    var n = forStay(stay, CustomerNotice.Moment.CHECK_OUT);
+    var n = forStay(stay, Notice.Moment.CHECK_OUT);
     var parts = new ArrayList<String>();
     n.forEach(p -> parts.add(p.notice().fingerprint()));
     for (var entry : paxByCustomer(stay).keySet()) {

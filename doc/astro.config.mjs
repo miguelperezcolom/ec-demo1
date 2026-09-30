@@ -77,6 +77,7 @@ export default defineConfig({
 						{ label: 'De Opera al front office', slug: 'integracion/pms-a-front-office' },
 						{ label: 'Clientes: MDM y Salesforce', slug: 'integracion/clientes' },
 						{ label: 'Causas, avisos y bandeja', slug: 'integracion/causas-y-avisos' },
+						{ label: 'Avisos de recepción', slug: 'integracion/avisos' },
 						{ label: 'El recorrido de una reserva', slug: 'integracion/recorrido' },
 					],
 				},

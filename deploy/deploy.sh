@@ -270,6 +270,8 @@ kubectl apply -f deploy/manifests/76-customer-mdm.yaml
 kubectl apply -f deploy/manifests/77-front-office.yaml
 kubectl apply -f deploy/manifests/78-audit.yaml
 kubectl apply -f deploy/manifests/80-journey.yaml
+# The reception notices (data plane): a reservation's and a partner's, and the customers' from Salesforce.
+kubectl apply -f deploy/manifests/83-notices.yaml
 # The documentation site (doc/), behind basic auth.
 kubectl apply -f deploy/manifests/81-docs.yaml
 # The control console: its database first, then the service, then its shell.

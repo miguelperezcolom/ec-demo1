@@ -1,0 +1,6 @@
+kind: mcp
+id: notices
+name: Avisos de recepción
+url: http://notices:8131
+transport: SSE
+description: Los avisos de recepción de un cliente, una reserva o una agencia — leerlos, y crear, cambiar o desactivar los de reserva y agencia (los de cliente son de Salesforce).

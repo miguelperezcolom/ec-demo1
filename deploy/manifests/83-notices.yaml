@@ -1,0 +1,105 @@
+# The reception notices (avisos de recepción), a data-plane system: what the desk must know of a
+# customer, a reservation or a partner — before the arrival, at check-in, in house, at check-out.
+# A reservation's and a partner's are kept here, made on the data plane's console (/_notices, "Avisos")
+# or by its agent (MCP); a customer's are Salesforce's, taken from the MDM (customer-notices) and never
+# edited here. Every notice goes out whole on `notices`, where the front office keeps its copy — so the
+# desk still has them when this service does not answer.
+# Its database lives in the engine's Postgres, like the other services' (55-demo-db-init creates it).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notices
+  namespace: ec-demo1
+  labels: { app: notices }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: notices }
+  template:
+    metadata:
+      labels:
+        app: notices
+        app.kubernetes.io/component: notices
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8131"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-redpanda
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for redpanda; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: notices
+          image: miguelperezcolom/ec-demo1-notices:0.1.0
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: notices
+            - name: OTLP_TRACING_ENDPOINT
+              value: http://tempo.observability.svc.cluster.local:4318/v1/traces
+            - name: TRACING_SAMPLING
+              value: "1.0"
+            - name: SERVER_PORT
+              value: "8131"
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/notices
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "4"
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            # A partner notice carries the partner's name, as the ERP has it: how the PMS names the agency.
+            - name: ERP_URL
+              value: "http://erp:8120"
+          ports:
+            - { name: http, containerPort: 8131 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "384Mi", cpu: "50m" }
+            limits:   { memory: "768Mi", cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8131 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8131 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notices
+  namespace: ec-demo1
+  labels: { app: notices }
+spec:
+  selector: { app: notices }
+  ports:
+    - { name: http, port: 8131, targetPort: 8131 }

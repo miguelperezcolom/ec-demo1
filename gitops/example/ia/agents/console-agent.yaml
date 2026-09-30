@@ -5,6 +5,7 @@ name: Console agent
 llm: anthropic
 mcp:
   - orchestrator
+  - notices
 rag:
   - handbook
 # Other agents it may delegate to over A2A. Each is one tool, described by the peer's own

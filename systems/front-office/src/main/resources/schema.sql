@@ -234,8 +234,11 @@ create table if not exists pms_catalogue_sync (
 
 
 -- ── Reception notices (avisos de recepción) ─────────────────────────────────
--- The chain's customers' notices as the MDM sends them (customer-notices; Salesforce is their master),
--- by the customer code a guest or a companion carries. The MDM's version orders them.
+-- The reception notices as the notices service sends them (notices): of a customer — by the customer
+-- code a guest or a companion carries; Salesforce is their master —, of a reservation (its CRS locator)
+-- or of a partner (its code, and the name the PMS gives the agency). The table is the one the
+-- customers' notices lived in before (customer-notices, straight from the MDM): its rows are kept, and
+-- read as the customers' they are. customer_id is the subject's id; the service's version orders them.
 create table if not exists customer_notice (
     notice_id   varchar(64)  primary key,
     customer_id varchar(64)  not null,
@@ -249,6 +252,11 @@ create table if not exists customer_notice (
     updated_at  timestamp
 );
 create index if not exists customer_notice_customer on customer_notice (customer_id);
+-- What a notice is about, since it can be of more than a customer. The default is what every row
+-- before it was; and the show_at of those still says STAY where the notices say IN_HOUSE — both read.
+alter table customer_notice add column if not exists subject_type varchar(20) default 'CUSTOMER' not null;
+alter table customer_notice add column if not exists subject_name varchar(200);
+alter table customer_notice add column if not exists hotel_code varchar(20);
 
 -- What the desk said it read before a check-in (blocking notices) or a check-out (notices, kárdex
 -- pending or rejected by Salesforce): the last acknowledgement of each stay and moment, and what it

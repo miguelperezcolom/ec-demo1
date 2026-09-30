@@ -23,6 +23,7 @@
         <module>systems/crs/booking</module>
         <module>systems/erp</module>
         <module>systems/front-office</module>
+        <module>systems/notices</module>
         <module>systems/pms/opera-mock</module>
         <!-- contracts: the language they speak, one library per context, and its schemas -->
         <module>contracts</module>

@@ -15,6 +15,7 @@ import io.mateu.ecdemo1.integration.model.customer.GoldenRecord;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent;
 import io.mateu.ecdemo1.integration.model.mapping.CodeType;
+import io.mateu.ecdemo1.integration.model.notice.NoticeChanged;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationResolved;
 import io.mateu.ecdemo1.integration.model.notification.NotificationType;
@@ -57,7 +58,7 @@ class PublishedLanguageTest {
                         .describedAs("A customer's reception notices, as Salesforce (their master) has them: created, "
                                 + "changed or deactivated — the whole notice each time; the highest version wins.")
                         .ownedBy("customer-mdm-service").keyedBy("customerId")
-                        .producedBy("customer-mdm-service").consumedBy("front-office")
+                        .producedBy("customer-mdm-service").consumedBy("notices")
                         .messages(CustomerNoticeChanged.class)
                         .example(new CustomerNoticeChanged("E-4", AT, "AV-7F3A2C", 2, "C-00042",
                                         "Pedir el pasaporte original: el del CRS está caducado",
@@ -67,6 +68,28 @@ class PublishedLanguageTest {
                                         "Cliente alérgico a los frutos secos", CustomerNoticeChanged.NoticeType.IMPORTANT,
                                         null, null, List.of(CustomerNoticeChanged.NoticeMoment.CHECK_IN,
                                                 CustomerNoticeChanged.NoticeMoment.STAY), false, "500d1000009XyZBAA0")),
+                TopicSpec.topic("notices")
+                        .describedAs("The reception notices the desk must know of a customer, a reservation or a "
+                                + "partner — the notices service's own and the customers' it takes from Salesforce "
+                                + "(customer-notices) — the whole notice each time; the highest version wins.")
+                        .ownedBy("notices").keyedBy("subjectType:subjectId")
+                        .producedBy("notices").consumedBy("front-office")
+                        .messages(NoticeChanged.class)
+                        .example(new NoticeChanged("E-6", AT, "AV-R-1", 1, NoticeChanged.SubjectType.RESERVATION,
+                                        "12E45", null, "MRU01", "Cuna en la habitación: la pidieron al reservar",
+                                        NoticeChanged.NoticeType.IMPORTANT, LocalDate.of(2026, 11, 1), null,
+                                        List.of(NoticeChanged.NoticeMoment.PRE_ARRIVAL,
+                                                NoticeChanged.NoticeMoment.CHECK_IN), true, "NOTICES", null),
+                                new NoticeChanged("E-7", AT, "AV-P-1", 3, NoticeChanged.SubjectType.PARTNER,
+                                        "NORDTRAVEL", "Nordic Travel Group AB", null,
+                                        "Bono obligatorio: sin bono no se hace el check-in",
+                                        NoticeChanged.NoticeType.BLOCKING, null, null,
+                                        List.of(NoticeChanged.NoticeMoment.CHECK_IN), true, "NOTICES", null),
+                                new NoticeChanged("E-8", AT, "AV-7F3A2C", 2, NoticeChanged.SubjectType.CUSTOMER,
+                                        "C-00042", null, null, "Cliente alérgico a los frutos secos",
+                                        NoticeChanged.NoticeType.IMPORTANT, null, null,
+                                        List.of(NoticeChanged.NoticeMoment.CHECK_IN, NoticeChanged.NoticeMoment.IN_HOUSE),
+                                        false, "SALESFORCE", "500d1000009XyZBAA0")),
                 TopicSpec.topic("customer-commands")
                         .describedAs("What the MDM is asked without waiting: a change to a customer proposed, an "
                                 + "identity scanned at check-in recorded.")

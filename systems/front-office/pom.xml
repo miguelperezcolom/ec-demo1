@@ -108,6 +108,12 @@
             <artifactId>contracts-customer</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <!-- The reception notices (notices), as the notices service publishes them. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-notices</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>contracts-frontoffice</artifactId>

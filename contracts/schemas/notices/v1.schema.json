@@ -1,0 +1,156 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:notices:v1",
+  "title" : "notices v1",
+  "description" : "The reception notices the desk must know of a customer, a reservation or a partner — the notices service's own and the customers' it takes from Salesforce (customer-notices) — the whole notice each time; the highest version wins.",
+  "x-topic" : "notices",
+  "x-version" : 1,
+  "x-owner" : "notices",
+  "x-key" : "subjectType:subjectId",
+  "x-producers" : [ "notices" ],
+  "x-consumers" : [ "front-office" ],
+  "x-java-type" : "io.mateu.ecdemo1.integration.model.notice.NoticeChanged",
+  "$ref" : "#/$defs/NoticeChanged",
+  "$defs" : {
+    "NoticeChanged" : {
+      "type" : "object",
+      "properties" : {
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "occurredAt" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "noticeId" : {
+          "type" : [ "string", "null" ]
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "subjectType" : {
+          "$ref" : "#/$defs/NoticeChanged.SubjectType-nullable"
+        },
+        "subjectId" : {
+          "type" : [ "string", "null" ]
+        },
+        "subjectName" : {
+          "type" : [ "string", "null" ]
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "text" : {
+          "type" : [ "string", "null" ]
+        },
+        "type" : {
+          "$ref" : "#/$defs/NoticeChanged.NoticeType-nullable"
+        },
+        "from" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "to" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "moments" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/NoticeChanged.NoticeMoment"
+          }
+        },
+        "active" : {
+          "type" : "boolean"
+        },
+        "source" : {
+          "type" : [ "string", "null" ]
+        },
+        "sourceRef" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "eventId", "occurredAt", "noticeId", "version", "subjectType", "subjectId", "subjectName", "hotelCode", "text", "type", "from", "to", "moments", "active", "source", "sourceRef" ],
+      "additionalProperties" : false
+    },
+    "NoticeChanged.NoticeMoment" : {
+      "type" : "string",
+      "enum" : [ "PRE_ARRIVAL", "CHECK_IN", "IN_HOUSE", "CHECK_OUT" ]
+    },
+    "NoticeChanged.NoticeType" : {
+      "type" : "string",
+      "enum" : [ "INFORMATIVE", "IMPORTANT", "BLOCKING" ]
+    },
+    "NoticeChanged.NoticeType-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/NoticeChanged.NoticeType"
+      } ]
+    },
+    "NoticeChanged.SubjectType" : {
+      "type" : "string",
+      "enum" : [ "CUSTOMER", "RESERVATION", "PARTNER" ]
+    },
+    "NoticeChanged.SubjectType-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/NoticeChanged.SubjectType"
+      } ]
+    }
+  },
+  "examples" : [ {
+    "eventId" : "E-6",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "noticeId" : "AV-R-1",
+    "version" : 1,
+    "subjectType" : "RESERVATION",
+    "subjectId" : "12E45",
+    "subjectName" : null,
+    "hotelCode" : "MRU01",
+    "text" : "Cuna en la habitación: la pidieron al reservar",
+    "type" : "IMPORTANT",
+    "from" : "2026-11-01",
+    "to" : null,
+    "moments" : [ "PRE_ARRIVAL", "CHECK_IN" ],
+    "active" : true,
+    "source" : "NOTICES",
+    "sourceRef" : null
+  }, {
+    "eventId" : "E-7",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "noticeId" : "AV-P-1",
+    "version" : 3,
+    "subjectType" : "PARTNER",
+    "subjectId" : "NORDTRAVEL",
+    "subjectName" : "Nordic Travel Group AB",
+    "hotelCode" : null,
+    "text" : "Bono obligatorio: sin bono no se hace el check-in",
+    "type" : "BLOCKING",
+    "from" : null,
+    "to" : null,
+    "moments" : [ "CHECK_IN" ],
+    "active" : true,
+    "source" : "NOTICES",
+    "sourceRef" : null
+  }, {
+    "eventId" : "E-8",
+    "occurredAt" : "2026-11-12T09:30:00Z",
+    "noticeId" : "AV-7F3A2C",
+    "version" : 2,
+    "subjectType" : "CUSTOMER",
+    "subjectId" : "C-00042",
+    "subjectName" : null,
+    "hotelCode" : null,
+    "text" : "Cliente alérgico a los frutos secos",
+    "type" : "IMPORTANT",
+    "from" : null,
+    "to" : null,
+    "moments" : [ "CHECK_IN", "IN_HOUSE" ],
+    "active" : false,
+    "source" : "SALESFORCE",
+    "sourceRef" : "500d1000009XyZBAA0"
+  } ]
+}

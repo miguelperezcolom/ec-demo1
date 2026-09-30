@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- The reception notices (notices): of a customer, a reservation or a partner, as the notices
+         service publishes them — the ones it keeps and the customers' it takes from Salesforce. -->
+    <parent>
+        <groupId>io.mateu.ecdemo1</groupId>
+        <artifactId>contracts</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>contracts-notices</artifactId>
+    <name>ec-demo1 contracts-notices</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+    </dependencies>
+</project>

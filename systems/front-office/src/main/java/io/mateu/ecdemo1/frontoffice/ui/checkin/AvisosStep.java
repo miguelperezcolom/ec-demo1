@@ -44,8 +44,8 @@ public class AvisosStep implements WizardStep, VisibilitySupplier {
     content.add(Notice.builder()
         .theme(blocking ? "danger" : "warning")
         .text(blocking
-            ? "Este cliente tiene un aviso BLOQUEANTE: léelo y marca «He leído el aviso» para poder confirmar el check-in"
-            : "Avisos de recepción de los huéspedes")
+            ? "Hay un aviso BLOQUEANTE: léelo y marca «He leído el aviso» para poder confirmar el check-in"
+            : "Avisos de recepción de la estancia: de los huéspedes, de la reserva y de su agencia")
         .fullWidth(true)
         .build());
     content.add(StatusList.builder().items(NoticeItems.items(notices)).compact(true).style("width: 100%;").build());

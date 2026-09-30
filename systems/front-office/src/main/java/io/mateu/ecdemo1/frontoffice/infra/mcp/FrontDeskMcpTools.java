@@ -4,7 +4,7 @@ import io.mateu.ecdemo1.frontoffice.application.CheckInService;
 import io.mateu.ecdemo1.frontoffice.application.CheckOutService;
 import io.mateu.ecdemo1.frontoffice.application.FolioService;
 import io.mateu.ecdemo1.frontoffice.application.GuestNotices;
-import io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice;
+import io.mateu.ecdemo1.frontoffice.domain.notice.Notice;
 import io.mateu.ecdemo1.frontoffice.application.KardexService;
 import io.mateu.ecdemo1.frontoffice.application.NoShowService;
 import io.mateu.ecdemo1.frontoffice.application.RoomChangeService;
@@ -189,7 +189,7 @@ public class FrontDeskMcpTools {
         forced == null ? null : forced.completedBy());
   }
 
-  public record NoticeView(int pax, String guest, String type, String text, List<String> showAt, LocalDate from,
+  public record NoticeView(int pax, String about, String guest, String type, String text, List<String> showAt, LocalDate from,
                            LocalDate to) {}
 
   public record KardexWarningView(int pax, String guest, String status, List<String> detail) {}
@@ -209,8 +209,8 @@ public class FrontDeskMcpTools {
   }
 
   List<NoticeView> noticeViews(List<GuestNotices.PaxNotice> list) {
-    return list.stream().map(p -> new NoticeView(p.pax(), p.guestName(), p.notice().type().name(), p.notice().text(),
-        p.notice().showAt().stream().sorted().map(Enum::name).toList(), p.notice().from(), p.notice().to())).toList();
+    return list.stream().map(p -> new NoticeView(p.pax(), p.notice().subjectLabel(), p.guestName(), p.notice().type().name(), p.notice().text(),
+        p.notice().moments().stream().sorted().map(Enum::name).toList(), p.notice().from(), p.notice().to())).toList();
   }
 
   List<KardexWarningView> kardexViews(Stay stay) {
@@ -390,7 +390,7 @@ public class FrontDeskMcpTools {
             room.housekeeping() == null ? "" : " (" + room.housekeeping() + ")", stay.total(),
             titles.isEmpty() ? "" : " y los extras: " + String.join(", ", titles));
     // Los avisos del check-in, en el resumen; un bloqueante sin leer se declara leído al confirmar.
-    var avisos = notices.forStay(stay, CustomerNotice.Moment.CHECK_IN);
+    var avisos = notices.forStay(stay, Notice.Moment.CHECK_IN);
     var mustRead = !notices.checkInAcknowledged(stay);
     var fingerprint = notices.checkInFingerprint(stay);
     if (!avisos.isEmpty()) {

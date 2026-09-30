@@ -291,10 +291,12 @@ class FrontDeskMcpToolsTest {
     var stayId = arrival(1);
     var guestId = stays.findById(stayId).orElseThrow().guestId();
     confirmNextTurn(token(tools.prepareKardexEdit(stayId, 1, "Y" + SEQ.incrementAndGet(), null, null, null)));
-    notices.take(new io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged("E-N" + stayId, Instant.now(),
-        "AV-" + stayId, 1, guestId, "Pedir el pasaporte original", 
-        io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeType.BLOCKING, null, null,
-        List.of(io.mateu.ecdemo1.integration.model.customer.CustomerNoticeChanged.NoticeMoment.CHECK_IN), true, null));
+    notices.take(new io.mateu.ecdemo1.integration.model.notice.NoticeChanged("E-N" + stayId, Instant.now(),
+        "AV-" + stayId, 1, io.mateu.ecdemo1.integration.model.notice.NoticeChanged.SubjectType.CUSTOMER, guestId,
+        null, null, "Pedir el pasaporte original",
+        io.mateu.ecdemo1.integration.model.notice.NoticeChanged.NoticeType.BLOCKING, null, null,
+        List.of(io.mateu.ecdemo1.integration.model.notice.NoticeChanged.NoticeMoment.CHECK_IN), true, "SALESFORCE",
+        null));
 
     assertThat(tools.getNotices(stayId).notices()).singleElement()
         .satisfies(n -> assertThat(n.type()).isEqualTo("BLOCKING"));

@@ -13,13 +13,14 @@ each service depends on the contexts it speaks and nothing else. The packages
 | Module | What | Topics | Used by |
 |---|---|---|---|
 | `contracts-reservation` | The canonical reservation (`Reservation`, `Room`, `Person`…), a projection asked for, a no-show reported, a reservation changed in the PMS | projection-requests, no-show-reports, pms-reservations | crs-integration, pms-integration, mapping, customer-mdm, integrations, front-office |
-| `contracts-customer` | `CustomerEvent`, `GoldenRecord`, identity resolution, `CustomerCommand`, `CustomerNoticeChanged` (needs `contracts-reservation`: a passenger is a `Person`) | customers, customer-notices, customer-commands | crs-integration, pms-integration, customer-mdm, front-office |
+| `contracts-customer` | `CustomerEvent`, `GoldenRecord`, identity resolution, `CustomerCommand`, `CustomerNoticeChanged` (needs `contracts-reservation`: a passenger is a `Person`) | customers, customer-notices, customer-commands | crs-integration, pms-integration, customer-mdm, front-office, notices |
 | `contracts-partner` | The partner and its PMS profile | — (HTTP) | crs-integration, pms-integration, mapping, integrations |
 | `contracts-mapping` | Code types, translations, causes, `MappingCommand` | mapping-commands | crs-integration, pms-integration, mapping, integrations |
 | `contracts-integration` | An integration's lifecycle: status, connection, connectivity, future reservations and their codes (needs `contracts-mapping`); `ApiUsage`, what an external API (Salesforce, Opera) is spent | — (HTTP) | crs-integration, pms-integration, mapping, integrations, customer-mdm |
 | `contracts-frontoffice` | `FrontOfficeCommand` (stays, catalogues, how the PMS took the reception: `RecordReception`, and a charge: `RecordCharge`), `FrontOfficeEvent` (check-in, check-out, no-show at the desk; a charge of the folio and its void), the catalogue summary | front-office-commands, front-office-events | pms-integration, integrations, front-office |
 | `contracts-communication` | Notifications asked for and resolved | notifications, notification-resolutions | pms-integration, customer-mdm, mapping, integrations, communication |
 | `contracts-audit` | `AuditedAction` | audit | mapping, integrations, front-office, audit |
+| `contracts-notices` | `NoticeChanged`: a reception notice of a customer, a reservation or a partner, when the desk sees it | notices | notices, front-office |
 | `contracts-process` | The processes' vocabulary shared with ec-definitions: definition ids, gate messages, variable names, outcomes | — | crs-integration, pms-integration, mapping, integrations |
 
 `IntegrationEvent` (the `integration-events` topic) is crs-integration-service's own: it is the only
@@ -46,7 +47,8 @@ producer writes it.
 | partner-commands | erp | integrations, crs-integration | erp |
 | integration-events | crs-integration | crs-integration | crs-integration |
 | customers | contracts-schemas (customer-mdm's language) | customer-mdm | crs-integration, front-office |
-| customer-notices | contracts-schemas | customer-mdm | front-office |
+| customer-notices | contracts-schemas | customer-mdm | notices |
+| notices | contracts-schemas (the notices service's language) | notices | front-office |
 | customer-commands | contracts-schemas | front-office | customer-mdm |
 | projection-requests | contracts-schemas | integrations | crs-integration |
 | no-show-reports | contracts-schemas | — (the front office's no-show goes to the PMS: front-office-events) | crs-integration |

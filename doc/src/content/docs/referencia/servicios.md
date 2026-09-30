@@ -24,6 +24,7 @@ de `deploy/manifests/` (los de esta tabla son los del momento de escribirla). La
 | `booking` | `systems/crs/booking` | 8108 | `/_booking` | `booking` |
 | `erp` | `systems/erp` | 8120 | `/_erp` | `partners` |
 | `front-office` | `systems/front-office` | 8128 | `front.ec1.mateu.io` | `front_office` |
+| `notices` | `systems/notices` | 8131 | `/_notices` (datos) | `notices` |
 
 ## Integración (plano de datos)
 

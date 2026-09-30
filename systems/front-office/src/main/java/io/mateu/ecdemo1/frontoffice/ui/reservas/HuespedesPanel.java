@@ -44,7 +44,8 @@ final class HuespedesPanel {
     // (Salesforce) aún no ha aprobado — o ha rechazado. Aprobado, el dato se queda sin marca.
     var kardex = r.kardex.changeOf(guest.id()).filter(KardexChange::marked).orElse(null);
     // los avisos de recepción de cada pax para el check-in (Salesforce, vía el MDM), bajo su fila
-    var avisos = r.notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.guest.CustomerNotice.Moment.CHECK_IN);
+    var avisos = r.notices.forStay(stay, io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.PRE_ARRIVAL,
+        io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.CHECK_IN);
     items.add(conAvisos(conKardex(paxItem(1, guest.name(), docAdulto(guest.document()),
         guest.identityComplete(), ops.isNoShow(1)), ops.isNoShow(1) ? null : kardex, guest),
         io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, 1)));

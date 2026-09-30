@@ -64,6 +64,7 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `systems/crs/booking/` | The CRS (Rumbo's role): bookings with rooms, guests, nightly rates and payments, priced from its own catalog; a CRUD, an API, MCP tools and the worker side of the booking saga |
 | `systems/erp/` | The ERP: the master of trading partners (tour operators, agencies, companies), with its own outbox |
 | `systems/front-office/` | The hotel's front office (MRU01): stays, check-in, the kárdex, no shows and walk-ins |
+| `systems/notices/` | The reception notices (Avisos) of a customer, a reservation or an agency, and when the desk sees them (before the arrival, check-in, in house, check-out). A reservation's and an agency's are made on the data plane's console; a customer's are Salesforce's, taken from the MDM. All of them go out on `notices`, where the front office keeps its copy |
 | `systems/pms/opera-mock/` | An OHIP double for the local end-to-end suite only; ec1 works against the chain's real tenant |
 | **`integration/`** | **The ACL: what flows between the systems (data plane)** |
 | `integration/crs-integration-service/` | The CRS-side adapter: inbox, reread, canonical reservation, event → process router |

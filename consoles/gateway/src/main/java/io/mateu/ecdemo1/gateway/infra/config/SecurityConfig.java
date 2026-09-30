@@ -152,6 +152,9 @@ public class SecurityConfig {
                         // A booking's journey (journey-service): who the guests are and where the
                         // reservation went — personal data again, so signed in like Clientes.
                         .pathMatchers("/_journey/**").authenticated()
+                        // Avisos (the notices service): what the desk must know of a guest, a
+                        // reservation or an agency — signed in, and written as who did it.
+                        .pathMatchers("/_notices/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the
