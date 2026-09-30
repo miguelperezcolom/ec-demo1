@@ -227,7 +227,8 @@ fi
 
 # GitOps for the control plane: the webhook HMAC secret (generated) and the GitHub read token
 # (pasted, may be empty). Always created so the control plane can mount it; it does nothing until
-# GITOPS_ENABLED is turned on. The token is only needed for a private config repo.
+# GITOPS_ENABLED is turned on. The token is needed for a private config repo; for a public one it
+# only lifts GitHub's anonymous rate limit (the source reads the whole repo in one tarball call).
 kubectl create secret generic cp-gitops -n "$NS" \
   --from-literal=webhook-secret="${GITOPS_WEBHOOK_SECRET:-}" \
   --from-literal=github-token="${GITOPS_GITHUB_TOKEN:-}" \
