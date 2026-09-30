@@ -37,6 +37,9 @@ import java.util.List;
 // the prompt here with the session's token; the gateway sends front.ec1's /ai/** to the front office's
 // own ia-agent, whose agent is the reception one — with the front office's MCP tools and nothing else.
 @AI(sse = "/ai/api/agent/stream")
+// Sin migas automáticas: el front office tiene pocas entradas de menú y su Reserva 360 ya dice dónde
+// está el recepcionista; un «ir al padre» añadido en su cabecera sólo le quitaría sitio.
+@io.mateu.uidl.annotations.NoBreadcrumbs
 public class FrontOfficeSuite implements HomeRouteSupplier, WidgetSupplier {
 
   // la home es la welcome page (Bienvenida)
