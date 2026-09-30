@@ -260,7 +260,7 @@ public class CheckInWizard extends Wizard {
       }
       case "preautorizado" -> {
         confirmar.setPreauthEstado("preautorizado");
-        checkIn.paymentTaken(stayId);
+        checkIn.paymentTaken(stayId, "card", confirmar.getTotalEstancia() == null ? null : java.math.BigDecimal.valueOf(confirmar.getTotalEstancia()));
         return List.of(
             this,
             new Message(

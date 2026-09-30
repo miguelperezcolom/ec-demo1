@@ -38,10 +38,11 @@ public class KardexService {
   final String hotel;
   final TransactionTemplate transaction;
   final IncompleteCheckIns incomplete;
+  final StayAudit audit;
 
   public KardexService(StayRepository stays, GuestRepository guests, Kardex kardex, DemoScanner scanner,
                        WalkIns walkIns, CommandOutbox outbox, @Value("${frontoffice.hotel:MRU01}") String hotel,
-                       PlatformTransactionManager transactions, IncompleteCheckIns incomplete) {
+                       PlatformTransactionManager transactions, IncompleteCheckIns incomplete, StayAudit audit) {
     this.stays = stays;
     this.guests = guests;
     this.kardex = kardex;
@@ -51,6 +52,7 @@ public class KardexService {
     this.hotel = hotel;
     this.transaction = new TransactionTemplate(transactions);
     this.incomplete = incomplete;
+    this.audit = audit;
   }
 
   /**
@@ -59,6 +61,11 @@ public class KardexService {
    * and the pax it belongs to. Holder and companions alike.
    */
   public DemoDocuments.Scanned scanned(String stayId, int pax) {
+    return audit.run("Document scanned", stayId, null, StayAudit.params("pax", pax), () -> scan(stayId, pax),
+        d -> "Documento " + d.documentType() + " leído y enviado al maestro de clientes");
+  }
+
+  DemoDocuments.Scanned scan(String stayId, int pax) {
     var stay = stay(stayId);
     var guest = pax <= 1 ? guestOf(stayId) : null;
     var companion = pax <= 1 ? null : stay.companionAt(pax);
@@ -93,6 +100,19 @@ public class KardexService {
 
   /** The pax registered — or corrected — by hand: document, name and contact. */
   public void registered(String stayId, int pax, String document, String name, String email, String phone) {
+    // what was edited, not the values: the audit trail says who changed a guest's data, the kárdex keeps it
+    var fields = new java.util.ArrayList<String>();
+    if (document != null && !document.isBlank()) fields.add("documento");
+    if (name != null && !name.isBlank()) fields.add("nombre");
+    if (email != null && !email.isBlank()) fields.add("email");
+    if (phone != null && !phone.isBlank()) fields.add("teléfono");
+    audit.run("Kardex edit", stayId, null, StayAudit.params("pax", pax, "fields", fields), () -> {
+      register(stayId, pax, document, name, email, phone);
+      return true;
+    }, ok -> "Kárdex del pax " + pax + " guardado; el cambio va al maestro de clientes");
+  }
+
+  void register(String stayId, int pax, String document, String name, String email, String phone) {
     if (pax <= 1) {
       guestEdited(stayId, g -> g.registeredAtDesk(document, name, email, phone));
     } else {
@@ -105,6 +125,13 @@ public class KardexService {
 
   /** The pax's contact, as the desk took it down. */
   public void contactUpdated(String stayId, int pax, String email, String phone) {
+    audit.run("Contact updated", stayId, null, StayAudit.params("pax", pax), () -> {
+      updateContact(stayId, pax, email, phone);
+      return true;
+    }, ok -> "Contacto del pax " + pax + " actualizado");
+  }
+
+  void updateContact(String stayId, int pax, String email, String phone) {
     if (pax <= 1) {
       guestEdited(stayId, g -> g.updateContact(email, phone));
       return;

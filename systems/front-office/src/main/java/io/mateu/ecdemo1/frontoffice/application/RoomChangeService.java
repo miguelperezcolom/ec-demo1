@@ -20,16 +20,18 @@ public class RoomChangeService {
   final io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms;
   final io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks links;
   final io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports reception;
+  final StayAudit audit;
 
   public RoomChangeService(StayRepository stays, RoomRepository rooms,
                            io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms,
                            io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks links,
-                           io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports reception) {
+                           io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports reception, StayAudit audit) {
     this.stays = stays;
     this.rooms = rooms;
     this.pmsRooms = pmsRooms;
     this.links = links;
     this.reception = reception;
+    this.audit = audit;
   }
 
   /** Whether the PMS refused this stay's check-in: the guests are in at the desk, not in Opera yet. */
@@ -40,6 +42,24 @@ public class RoomChangeService {
   /** The room the stay moved to; empty if that room does not exist or is not free. */
   @Transactional
   public Optional<Room> changeRoom(String stayId, String roomNumber) {
+    var from = stays.findById(stayId).map(s -> s.roomNumber()).orElse(null);
+    var params = StayAudit.params("from", from, "to", roomNumber);
+    Optional<Room> moved;
+    try {
+      moved = change(stayId, roomNumber);
+    } catch (RuntimeException e) {
+      audit.failed("Room change", stayId, null, params, e.getMessage());
+      throw e;
+    }
+    if (moved.isEmpty()) {
+      audit.failed("Room change", stayId, null, params, "La habitación " + roomNumber + " no existe o no está libre");
+    } else {
+      audit.done("Room change", stayId, null, params, "Habitación " + moved.get().number());
+    }
+    return moved;
+  }
+
+  Optional<Room> change(String stayId, String roomNumber) {
     var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
     var room = rooms.findByNumber(roomNumber).filter(Room::assignable).orElse(null);
     var refused = stay.inHouse() && checkInRefused(stayId);

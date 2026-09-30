@@ -7,7 +7,7 @@
   "x-version" : 1,
   "x-owner" : "audit-service",
   "x-key" : "actionId",
-  "x-producers" : [ "integrations-service", "mapping-service", "front-office" ],
+  "x-producers" : [ "integrations-service", "mapping-service", "front-office", "booking" ],
   "x-consumers" : [ "audit-service" ],
   "x-java-type" : "io.mateu.ecdemo1.integration.model.audit.AuditedAction",
   "$ref" : "#/$defs/AuditedAction",

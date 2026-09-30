@@ -56,7 +56,7 @@ public class IncompleteCheckIns {
   static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.forLanguageTag("es"));
 
   /** Refused: the stay's check-in is incomplete. The message says what is missing, for the desk. */
-  public static class CheckInIncomplete extends IllegalStateException {
+  public static class CheckInIncomplete extends IllegalStateException implements StayAudit.AuditedRefusal {
     final List<PendingStep> missing;
 
     public CheckInIncomplete(String message, List<PendingStep> missing) {
@@ -336,7 +336,7 @@ public class IncompleteCheckIns {
   }
 
   static String who(String by) {
-    return by == null || by.isBlank() ? "recepción" : by;
+    return StayAudit.actor(by);
   }
 
   Stay stay(String stayId) {

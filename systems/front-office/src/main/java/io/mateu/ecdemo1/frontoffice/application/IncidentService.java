@@ -17,9 +17,11 @@ public class IncidentService {
 
   final StayRepository stays;
   final Clock clock = Clock.systemDefaultZone();
+  final StayAudit audit;
 
-  public IncidentService(StayRepository stays) {
+  public IncidentService(StayRepository stays, StayAudit audit) {
     this.stays = stays;
+    this.audit = audit;
   }
 
   /**
@@ -28,6 +30,11 @@ public class IncidentService {
    */
   @Transactional
   public Incident report(String stayId, IncidentType type, String title, String comment) {
+    return audit.run("Incident reported", stayId, null, StayAudit.params("type", type, "title", title),
+        () -> open(stayId, type, title, comment), i -> "Incidencia: " + i.title());
+  }
+
+  Incident open(String stayId, IncidentType type, String title, String comment) {
     var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
     var now = LocalDateTime.now(clock);
     var incident = new Incident("inc-" + System.currentTimeMillis(), type, type.icon(),
@@ -39,8 +46,10 @@ public class IncidentService {
 
   @Transactional
   public void resolve(String stayId, String code) {
-    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
-    stays.save(stay.resolveIncident(code));
+    audit.run("Incident resolved", stayId, null, StayAudit.params("incident", code), () -> {
+      var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+      return stays.save(stay.resolveIncident(code));
+    }, s -> "Incidencia " + code + " resuelta");
   }
 
   static boolean blank(String s) {

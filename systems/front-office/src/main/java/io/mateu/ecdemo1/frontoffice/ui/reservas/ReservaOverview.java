@@ -192,6 +192,11 @@ public class ReservaOverview
   @Label("")
   Callable<Component> otrosSistemas = () -> OtherSystems.of(stayId);
 
+  // ── quién hizo qué con la reserva, y cuándo: la recepción, el agente y el CRS (el servicio de auditoría) ──
+  @Section("Historial")
+  @Label("")
+  Callable<Component> historial = () -> io.mateu.ecdemo1.frontoffice.ui.common.ReservationHistory.of(stayId);
+
   // ── los paneles ──────────────────────────────────────────────────────────────
 
   HuespedesPanel huespedes() {
@@ -676,7 +681,7 @@ public class ReservaOverview
       case "cash" -> "Preautorización registrada — " + GuestHeaders.euros(stay.total()) + " en efectivo a la llegada";
       default -> "Preautorización completada — " + GuestHeaders.euros(stay.total()) + " en la tarjeta del huésped";
     };
-    checkIn.paymentTaken(stayId);
+    checkIn.paymentTaken(stayId, method, stay.total());
     if (!modoCobro && stay.status() == StayStatus.ARRIVING) {
       // desde el drawer: cerrar + repintar el host (el foldout se actualiza in situ)
       return List.of(this, new Message(texto), UICommand.closeModal());

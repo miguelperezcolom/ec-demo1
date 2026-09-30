@@ -139,4 +139,29 @@ class PendingConfirmationsTest {
 
     assertThat(confirmations.size()).isEqualTo(1);
   }
+
+  @Test
+  void anOperationThatAuditsItselfIsNotAuditedAgainAndNamesTheAgentForThePerson() {
+    var records = new ArrayList<AuditedAction>();
+    var counting = new AuditOutbox(null) {
+      @Override
+      protected void write(AuditedAction action) {
+        records.add(action);
+      }
+    };
+    var stayAudit = new io.mateu.ecdemo1.frontoffice.application.StayAudit(counting, null, "MRU01", null);
+    var agent = new PendingConfirmations(counting, caller, "MRU01", clock);
+    caller.person = "ana";
+    caller.turn = "s1";
+    var token = FrontDeskMcpToolsTest.token(agent.prepare("Room change", "Cambio a la 202", Map.of("stayId", "FO-9"),
+        () -> stayAudit.run("Room change", "FO-9", null, Map.of("to", "202"), () -> "Habitación 202", r -> r)));
+    caller.turn = "s2";
+
+    assertThat(agent.confirm(token)).isEqualTo("Hecho. Habitación 202");
+    assertThat(records).singleElement().satisfies(a -> {
+      assertThat(a.action()).isEqualTo("Room change");
+      assertThat(a.by()).isEqualTo("reception-agent (ana)");
+      assertThat(a.parameters()).contains("FO-9", "202");
+    });
+  }
 }

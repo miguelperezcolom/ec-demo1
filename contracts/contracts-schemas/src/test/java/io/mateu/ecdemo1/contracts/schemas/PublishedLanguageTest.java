@@ -198,7 +198,7 @@ class PublishedLanguageTest {
                 TopicSpec.topic("audit")
                         .describedAs("An action someone (or an agent) took through a service's API or console.")
                         .ownedBy("audit-service").keyedBy("actionId")
-                        .producedBy("integrations-service", "mapping-service", "front-office").consumedBy("audit-service")
+                        .producedBy("integrations-service", "mapping-service", "front-office", "booking").consumedBy("audit-service")
                         .messages(AuditedAction.class)
                         .example(new AuditedAction("A-1", AT, "mapping-service", "approve-proposal", "MRU01", "ana",
                                 "{\"proposal\":\"P-3\"}", true, "approved")));

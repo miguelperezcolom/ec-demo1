@@ -30,7 +30,7 @@ Cada uno tiene su esquema versionado en `contracts/schemas/<topic>/v<N>.schema.j
 | `no-show-reports` | contracts-schemas | — | crs-integration | `ReportNoShow`. El front office ya no lo manda: su no-show sube al PMS (`front-office-events`) y de él al CRS por el motor |
 | `notifications` | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication | Un aviso |
 | `notification-resolutions` | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication | Lo que causó un aviso se resolvió |
-| `audit` | contracts-schemas | integrations, mapping, front-office | audit | `AuditedAction` |
+| `audit` | contracts-schemas | integrations, mapping, front-office, booking | audit | `AuditedAction` |
 | `human-tasks` | communication (de `HumanTaskChanged` del motor) | forms | communication | Las tareas del motor de formularios, para la bandeja |
 
 ## Los del motor

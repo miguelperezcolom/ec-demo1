@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.infra.mcp;
 
+import io.mateu.ecdemo1.frontoffice.application.StayAudit;
 import io.mateu.ecdemo1.frontoffice.infra.audit.AuditOutbox;
 import io.mateu.ecdemo1.integration.model.audit.AuditedAction;
 import java.security.SecureRandom;
@@ -108,13 +109,20 @@ public class PendingConfirmations {
       return "Error: esa operación ya se ha confirmado o cancelado.";
     }
     var by = actor(person != null ? person : prepared.person());
+    // The use case audits itself (StayAudit), as the agent for the person: recorded here only when it
+    // did not — one record per operation, whoever carries it out.
+    var before = AuditOutbox.appendedOnThisThread();
     try {
-      var outcome = prepared.execution().get();
-      record(prepared, by, true, outcome);
+      var outcome = StayAudit.as(by, prepared.execution());
+      if (AuditOutbox.appendedOnThisThread() == before) {
+        record(prepared, by, true, outcome);
+      }
       return "Hecho. " + outcome;
     } catch (RuntimeException e) {
       var why = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-      record(prepared, by, false, why);
+      if (AuditOutbox.appendedOnThisThread() == before) {
+        record(prepared, by, false, why);
+      }
       return "Error: no se ha podido hacer — " + why;
     }
   }

@@ -32,7 +32,7 @@ class NewBookingWizardTest {
     static final LocalDate ARRIVAL = LocalDate.of(2026, 11, 2);
 
     final List<CreateBookingCommand> created = new ArrayList<>();
-    final CreateBookingUseCase create = new CreateBookingUseCase(null, null, null, null, null, null) {
+    final CreateBookingUseCase create = new CreateBookingUseCase(null, null, null, null, null, null, null) {
         @Override
         public String handle(CreateBookingCommand command) {
             created.add(command);
@@ -145,7 +145,7 @@ class NewBookingWizardTest {
     @Test
     void cancellingSkipsWhatIsCancelledAlreadyAndGoesOnAfterARefusal() {
         var asked = new ArrayList<CancelBookingCommand>();
-        var cancel = new CancelBookingUseCase(null, null, null) {
+        var cancel = new CancelBookingUseCase(null, null, null, null) {
             @Override
             public void handle(CancelBookingCommand command) {
                 asked.add(command);

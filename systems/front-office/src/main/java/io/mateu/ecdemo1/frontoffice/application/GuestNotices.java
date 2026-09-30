@@ -57,7 +57,7 @@ public class GuestNotices {
   static final JsonMapper JSON = JsonMapper.builder().build();
 
   /** Refused: something that must be acknowledged is not. The message says what, for the desk. */
-  public static class NotAcknowledged extends IllegalStateException {
+  public static class NotAcknowledged extends IllegalStateException implements StayAudit.AuditedRefusal {
     public NotAcknowledged(String message) {
       super(message);
     }
@@ -411,7 +411,7 @@ public class GuestNotices {
     params.put("stayId", stayId);
     params.put("covers", fingerprint);
     audit.append(new AuditedAction(UUID.randomUUID().toString(), clock.instant(), AuditOutbox.SERVICE, action, hotel,
-        by == null || by.isBlank() ? "recepción" : by, JSON.writeValueAsString(params), succeeded, response));
+        StayAudit.actor(by), JSON.writeValueAsString(params), succeeded, response));
   }
 
   Stay stay(String stayId) {

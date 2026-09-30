@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BookingActionsTest {
 
     static BookingViewModel booking(String id, String state) {
-        var vm = new BookingViewModel(null, null, null, null, null, null, null);
+        var vm = new BookingViewModel(null, null, null, null, null, null, null, null);
         vm.id = id;
         if (state != null) {
             vm.status = new Status(StatusType.NONE, state);

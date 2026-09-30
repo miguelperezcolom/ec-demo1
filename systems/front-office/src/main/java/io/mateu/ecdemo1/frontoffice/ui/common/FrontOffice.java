@@ -38,6 +38,7 @@ public class FrontOffice {
   private final io.mateu.ecdemo1.frontoffice.application.Invoices invoices;
   private final io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings;
   private final io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incompleteCheckIns;
+  private final io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns walkIns;
 
   public FrontOffice(StayQueries queries, StayReadModel stayReads, RoomRepository rooms,
                      AddOnCatalogRepository addOnCatalog, io.mateu.ecdemo1.frontoffice.application.GuestNotices notices,
@@ -45,7 +46,9 @@ public class FrontOffice {
                      io.mateu.ecdemo1.frontoffice.infra.pms.PmsRooms pmsRooms,
                      io.mateu.ecdemo1.frontoffice.application.Invoices invoices,
                      io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings chargePostings,
-                     io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incompleteCheckIns) {
+                     io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incompleteCheckIns,
+                     io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns walkIns) {
+    this.walkIns = walkIns;
     this.chargePostings = chargePostings;
     this.incompleteCheckIns = incompleteCheckIns;
     this.queries = queries;
@@ -57,6 +60,11 @@ public class FrontOffice {
     this.pmsRooms = pmsRooms;
     this.invoices = invoices;
     instance = this;
+  }
+
+  /** The CRS's locator of a stay: its id, or — for a walk-in — the one the CRS gave it (the stay's own until then). */
+  public static String locator(String stayId) {
+    return instance.walkIns.of(stayId).map(w -> w.locator() == null ? stayId : w.locator()).orElse(stayId);
   }
 
   /**

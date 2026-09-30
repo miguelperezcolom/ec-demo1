@@ -18,14 +18,16 @@ public class CheckOutService {
   final GuestNotices notices;
   final ReceptionReports reception;
   final IncompleteCheckIns incomplete;
+  final StayAudit audit;
 
   public CheckOutService(StayRepository stays, RoomRepository rooms, GuestNotices notices, ReceptionReports reception,
-                         IncompleteCheckIns incomplete) {
+                         IncompleteCheckIns incomplete, StayAudit audit) {
     this.stays = stays;
     this.rooms = rooms;
     this.notices = notices;
     this.reception = reception;
     this.incomplete = incomplete;
+    this.audit = audit;
   }
 
   /**
@@ -39,9 +41,14 @@ public class CheckOutService {
     return checkOut(stayId, null);
   }
 
-  /** As {@link #checkOut(String)}, saying who asks (for the audit of a refusal). */
+  /** As {@link #checkOut(String)}, saying who asks — audited, done or refused. */
   @Transactional
   public Stay checkOut(String stayId, String by) {
+    return audit.run("Check-out", stayId, by, null, () -> checkOutNow(stayId, by),
+        s -> s.inHouse() ? "Estancia " + s.status() : "Salida registrada · habitación " + s.roomNumber() + " liberada");
+  }
+
+  Stay checkOutNow(String stayId, String by) {
     var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
     if (!stay.inHouse()) {
       return stay;

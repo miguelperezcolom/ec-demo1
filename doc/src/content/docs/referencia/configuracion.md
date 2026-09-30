@@ -82,8 +82,13 @@ bajo la Pub/Sub API — fusiones, decisiones de Cases, avisos sin confirmar), `P
 
 ### front-office
 
-`FRONT_OFFICE_HOTEL=MRU01`, `FRONT_OFFICE_PMS_HOTEL=XMAR`, `CRS_INTEGRATION_URL`, `MDM_URL`,
+`FRONT_OFFICE_HOTEL=MRU01`, `FRONT_OFFICE_PMS_HOTEL=XMAR`, `CRS_INTEGRATION_URL`, `MDM_URL`, `AUDIT_URL` (el «Historial» de la reserva),
 `CONSOLE_URL=https://ec1.mateu.io`.
+
+### booking (el CRS)
+
+`CUSTOMER_MDM_URL` (los enlaces de la ficha), `AUDIT_URL=http://audit-service:8129` (su «History»:
+quién hizo qué con la reserva).
 
 ### journey-service
 

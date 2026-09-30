@@ -84,6 +84,9 @@ spec:
             # front office, for the booking's page to link to. Read-only, and only for showing.
             - name: CUSTOMER_MDM_URL
               value: "http://customer-mdm-service:8127"
+            # A booking's history, as the audit service keeps it: who did what with it (GET /audit).
+            - name: AUDIT_URL
+              value: "http://audit-service:8129"
           ports:
             - { name: http, containerPort: 8108 }
           securityContext:

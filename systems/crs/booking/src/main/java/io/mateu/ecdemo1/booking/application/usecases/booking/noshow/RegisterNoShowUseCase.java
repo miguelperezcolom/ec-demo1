@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.booking.application.usecases.booking.noshow;
 
+import io.mateu.ecdemo1.booking.application.usecases.booking.BookingAudit;
 import io.mateu.ecdemo1.booking.application.out.repository.BookingRepository;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.NoShowPolicy;
 import io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.BookingId;
@@ -25,13 +26,19 @@ public class RegisterNoShowUseCase {
     final BookingRepository repository;
     final NoShowPolicy policy;
     final Clock clock;
+    final BookingAudit audit;
 
     @Transactional
     public void handle(String bookingId) {
-        var booking = repository.findByIdForUpdate(new BookingId(bookingId))
-                .orElseThrow(() -> new NoSuchElementException("Booking not found: " + bookingId));
-        booking.noShow(policy, clock.instant());
-        repository.save(booking);
+        var hotel = repository.findById(new BookingId(bookingId)).map(b -> b.getHotelCode()).orElse(null);
+        var booking = audit.run("Booking no-show", bookingId, hotel, BookingAudit.params("feePercent", policy.feePercent()),
+                () -> {
+                    var b = repository.findByIdForUpdate(new BookingId(bookingId))
+                            .orElseThrow(() -> new NoSuchElementException("Booking not found: " + bookingId));
+                    b.noShow(policy, clock.instant());
+                    repository.save(b);
+                    return b;
+                }, b -> "No-show · cuesta " + b.totalAmount());
         log.info("Booking {} is a no-show: it now costs {} ({}% of {})", bookingId, booking.totalAmount(),
                 policy.feePercent(), booking.originalAmount());
     }

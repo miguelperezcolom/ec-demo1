@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.booking.application.usecases.booking.create;
 
+import io.mateu.ecdemo1.booking.application.usecases.booking.BookingAudit;
 import io.mateu.core.infra.valuegenerators.LocatorValueGenerator;
 import io.mateu.ecdemo1.booking.application.out.repository.BookingRepository;
 import io.mateu.ecdemo1.booking.application.usecases.booking.BookingTermsFactory;
@@ -27,6 +28,7 @@ public class CreateBookingUseCase {
     final LocatorValueGenerator locatorValueGenerator;
     final Clock clock;
     final Traces traces;
+    final BookingAudit audit;
 
     /**
      * A channel's own reference names one booking: sent again — a front office retrying after a
@@ -38,7 +40,16 @@ public class CreateBookingUseCase {
         // The CRS entry of a booking's trace: whatever reaches the PMS for it continues from here, and
         // it is found in Tempo by these attributes.
         return traces.inSpan("booking.create", () -> {
-            var id = create(command);
+            var params = BookingAudit.params("hotel", command.hotelCode(), "expectedTotal", command.expectedTotal(),
+                    "payments", command.payments() == null ? 0 : command.payments().size());
+            String id;
+            try {
+                id = create(command);
+            } catch (RuntimeException e) {
+                audit.failed("Booking created", null, command.hotelCode(), params, e.getMessage());
+                throw e;
+            }
+            audit.done("Booking created", id, command.hotelCode(), params, "Reserva " + id);
             traces.tag("booking.id", id);
             traces.tag("booking.locator", id);
             traces.tag("hotel.code", command.hotelCode());
