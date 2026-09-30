@@ -66,8 +66,9 @@ public class MappingController {
     public record ResolveResult(List<Translation> translations, List<Cause> missing) {
     }
 
+    /** @param engineProcessId the engine's id of the process, optional: without it, discarding it cannot cancel it */
     public record WaitRequest(String processKey, String definitionId, String hotelCode, String subject,
-                              List<Variable> variables, List<Cause> causes) {
+                              List<Variable> variables, List<Cause> causes, String engineProcessId) {
     }
 
     public record CauseView(String key, String type, String description, String hotelCode, String status,
@@ -111,8 +112,8 @@ public class MappingController {
     @PostMapping("/causes/wait")
     @Operation(summary = "Register that a process waits on causes it ran into")
     public void await(@RequestBody WaitRequest request) {
-        causes.await(request.processKey(), request.definitionId(), request.hotelCode(), request.subject(),
-                request.variables(), request.causes());
+        causes.await(request.processKey(), request.engineProcessId(), request.definitionId(), request.hotelCode(),
+                request.subject(), request.variables(), request.causes());
     }
 
     @GetMapping("/causes")
@@ -126,6 +127,22 @@ public class MappingController {
     @Operation(summary = "Resolve a cause, resuming every process that waits only on it")
     public void resolveCause(@RequestParam String key, @RequestParam(defaultValue = "admin") String by) {
         causes.resolve(key, by);
+    }
+
+    @PostMapping("/causes/waiters/{processKey}/discard")
+    @Operation(summary = "Give up on a waiting process (F012): it is not resumed, the engine is asked to cancel it, "
+            + "and the answer lists the open causes nobody waits on any more, for the caller to offer resolving them")
+    public Causes.Discarded discard(@PathVariable String processKey, @RequestParam String reason,
+                                    @RequestParam(defaultValue = "admin") String by) {
+        return causes.discard(processKey, reason, by);
+    }
+
+    /** The same, for a key a path cannot carry: most have a slash in them ({@code proyectar-reserva:MRU01/8MU24N:…}). */
+    @PostMapping("/causes/waiters/discard")
+    @Operation(summary = "Give up on a waiting process named by a query parameter — for keys with a slash")
+    public Causes.Discarded discardByParameter(@RequestParam String processKey, @RequestParam String reason,
+                                               @RequestParam(defaultValue = "admin") String by) {
+        return causes.discard(processKey, reason, by);
     }
 
     @PostMapping("/causes/resolve-if-open")

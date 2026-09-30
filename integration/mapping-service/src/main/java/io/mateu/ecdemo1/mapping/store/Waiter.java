@@ -44,4 +44,13 @@ public class Waiter {
     public Instant lastSignalAt;
     public Instant finishedAt;
     public String finishedBy;
+    /**
+     * The engine's id of the waiting process — what the engine cancels a process by. Recorded when the
+     * wait is registered from the engine's task; null for waits registered before it was kept, or over
+     * REST without it: those are cancelled by hand, in Admin → Processes.
+     */
+    public String engineProcessId;
+    /** Why a person discarded it (F012): asked in the discard dialog, kept with who and when. */
+    @Column(length = 1000)
+    public String reason;
 }

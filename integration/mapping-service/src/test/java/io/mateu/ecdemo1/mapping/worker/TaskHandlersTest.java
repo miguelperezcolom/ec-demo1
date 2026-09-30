@@ -120,6 +120,8 @@ class TaskHandlersTest {
             assertThat(wait.processKey()).isEqualTo("proyectar-cancelacion:PMI01/12E45:E-1");
             assertThat(wait.subject()).isEqualTo("12E45");
             assertThat(wait.origin()).isNull();
+            // The engine's id of the process: what discarding it cancels it by.
+            assertThat(wait.engineProcessId()).isEqualTo("PROC-1");
             assertThat(wait.variables()).extracting(Variable::name)
                     .containsExactlyInAnyOrder("definitionId", "hotelCode", "locator", "version", "eventId");
         });

@@ -26,6 +26,35 @@ Un fallo **transitorio** (timeout, 5xx) no es una causa: el motor reintenta el p
 Las causas abiertas se ven en *Mapping → Causes* del plano de control, y cada una en la bandeja de
 quien la resuelve.
 
+### Descartar un proceso que espera
+
+Resolver la causa no es la única salida: una persona puede **renunciar** a un proceso que espera
+(F012) cuando lo que iba a hacer ya no importa — una reserva de prueba, una cancelación de una reserva
+que nunca llegó a Opera. En la causa, *Descartar* en la fila del proceso, o *Descartar…* en la barra
+para elegir uno o todos los de la causa. El diálogo dice qué significa antes de hacerlo y pide el
+**motivo**:
+
+- el proceso queda `DISCARDED` con quién, cuándo y por qué, y no se reanuda aunque la causa se resuelva
+  después, ni se le reenvía el mensaje de reanudación;
+- **el motor lo cancela**: `mapping-service` publica por su outbox `ProcessCancellationRequested` (el
+  mismo comando que el *Cancel* de *Workflow → Processes*) con el id del motor del proceso, que guarda
+  cuando el proceso registra la espera. Una espera registrada sin ese id (anteriores a 0.37.0, o por
+  REST sin `engineProcessId`) no se puede cancelar desde aquí: el diálogo lo dice y enlaza a
+  *Workflow → Processes* para cancelarlo a mano;
+- si ya no espera nadie en la causa, ofrece **resolverla**;
+- queda auditado («Discard process», con el motivo), hecho o rechazado — un proceso que ya se reanudó
+  no se puede descartar.
+
+Por REST: `POST /causes/waiters/{processKey}/discard?reason=…&by=…`, o
+`POST /causes/waiters/discard?processKey=…&reason=…&by=…` para las claves con `/`. Devuelve si se pidió
+la cancelación al motor y qué causas abiertas se quedan sin nadie esperando. No hay herramienta MCP: el
+agente de mapeado no descarta procesos.
+
+Un proceso **liberado** que no contesta recibe el mensaje de reanudación otra vez cada
+`mapping.resend-after` (30 s), pero solo durante `mapping.resend-for` (6 h) desde que se liberó: el
+motor no avisa a los servicios de que un proceso se canceló o terminó, así que pasado ese tiempo se da
+por ido. Sigue visible en su causa como `RELEASED`, para descartarlo.
+
 ## El agente de mapeado propone, una persona aprueba
 
 Cuando falta una equivalencia, el diccionario ofrece **«Ask the agent»** (y el alta lo pide sola al

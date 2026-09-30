@@ -167,6 +167,21 @@ Opera como «BRKFST»: esa es su palabra, y el front office la enseña tal cual.
 - Cada causa aparece **en la bandeja** de quien la resuelve — lo dicen los destinatarios (§11); de
   entrada, el rol `ai-admin` —, con el enlace a su pantalla; al resolverla desaparece de todas las
   bandejas.
+- **Descartar** (F012) es la otra salida, cuando lo que espera ya no importa (una reserva de prueba,
+  una cancelada antes de llegar a Opera): en *Mapping → Causes*, en la causa, *Descartar* en la fila del
+  proceso o *Descartar…* en la barra (uno, o todos los de la causa). El diálogo explica la consecuencia
+  —no se reanuda, no se le reenvía nada, **el motor lo cancela**, y lo que iba a hacer no llega a Opera;
+  no se deshace— y pide el **motivo**, que se guarda con quién y cuándo en el proceso y en la
+  auditoría («Discard process»). Si nadie más espera en la causa, ofrece **resolverla** también. Por
+  REST: `POST /causes/waiters/{processKey}/discard?reason=…&by=…` (o `POST /causes/waiters/discard?processKey=…`
+  para las claves con `/`, que son casi todas). Sin herramienta MCP: el agente de mapeado no descarta.
+  - Cancelar en el motor: mapping-service publica `ProcessCancellationRequested` (el mismo comando que
+    el *Cancel* de *Workflow → Processes*) con el id del motor del proceso, que guarda al registrar la
+    espera (desde 0.37.0). Las esperas anteriores no lo tienen: el diálogo lo dice y enlaza a
+    *Workflow → Processes* (`/workflow/processes`) para cancelarlo a mano, buscando por la clave.
+  - Un proceso liberado que no contesta se reintenta `mapping.resend-for` (6 h) desde que se liberó, no
+    para siempre: el motor no avisa a los servicios de que canceló o terminó un proceso. Pasado eso
+    sigue en la causa, como *RELEASED*, para descartarlo.
 
 ## 6. Los mapeados que propone la IA
 
@@ -809,8 +824,8 @@ El 2026-09-30 había tres: `registrar-checkin` de **V9Q7HH** (hab. 5144) → Pau
 en la 5144; eso resolvió solo la causa NOT_IN_HOUSE del `registrar-cargo` de su transfer, que se posteó
 (547653361, 1851, 45 MUR, `FO:L-73907216`, sin duplicado); y el `registrar-cargo` del transfer de
 **V75Y5M** → Pause/Resume → Opera lo rechaza (CHECKED_OUT: la estancia ya había salido, su folio está
-cerrado). Esa causa queda abierta para decidir a mano (reabrir en Opera o descartarla en *Mapping →
-Causas*). Las esperas por MISSING_PARTNER / NOT_YET_PROJECTED no son de la carrera: son de negocio.
+cerrado). Esa causa queda abierta para decidir a mano (reabrir en Opera o descartar su proceso en
+*Mapping → Causes*, que desde 0.37.0 también lo cancela en el motor — ver §5). Las esperas por MISSING_PARTNER / NOT_YET_PROJECTED no son de la carrera: son de negocio.
 
 ### El cupo diario de la API de Salesforce
 

@@ -399,6 +399,58 @@ class MappingTest {
                 .containsEntry("pmsReservationId", "39486034").doesNotContainKey("chargeOutcome"));
     }
 
+    @Test
+    void discardingAWaitingProcessCancelsItInTheEngineAuditsItAndItIsNeverResumed() throws Exception {
+        var key = "proyectar-cancelacion:PMI01/D1/X:E-9";
+        var cause = "NOT_YET_PROJECTED:PMI01:D1";
+        causesService.await(key, "ENGINE-ID-9", "proyectar-cancelacion", "PMI01", "D1",
+                List.of(new Variable("locator", "D1"), new Variable("hotelCode", "PMI01")),
+                List.of(new io.mateu.ecdemo1.integration.model.mapping.Cause(cause,
+                        io.mateu.ecdemo1.integration.model.mapping.CauseType.NOT_YET_PROJECTED, "test")));
+
+        // A key with a slash in it: named by a query parameter, as a path could not carry it.
+        mvc.perform(post("/causes/waiters/discard").param("processKey", key)
+                        .param("reason", "Test booking cancelled before reaching the PMS").param("by", "Ana García"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.engineCancelRequested").value(true))
+                .andExpect(jsonPath("$.causesLeftUnwaited[0]").value(cause));
+
+        var waiter = waiters.findById(key).orElseThrow();
+        assertThat(waiter.getStatus()).isEqualTo(WaiterStatus.DISCARDED);
+        assertThat(waiter.getFinishedBy()).isEqualTo("Ana García");
+        assertThat(waiter.getReason()).isEqualTo("Test booking cancelled before reaching the PMS");
+        var cancellations = consume("upstream", r -> r.value().contains("process-cancellation-requested")
+                && r.value().contains("ENGINE-ID-9"), 1, 15);
+        assertThat(cancellations).singleElement().satisfies(r -> assertThat(r.key()).isEqualTo("ENGINE-ID-9"));
+        var audited = jdbc.queryForList("select payload from outbox_message where binding = 'audit' and payload like ?",
+                String.class, "%" + key + "%");
+        assertThat(audited).singleElement().satisfies(p -> assertThat(p).contains("Discard process").contains("Ana García")
+                .contains("Test booking cancelled"));
+
+        // Resolving the cause afterwards resumes nothing: the discarded process is not sent the message.
+        causesService.resolve(cause, "t");
+        causesService.resendSilent();
+        assertThat(consume("upstream", r -> r.value().contains("causes-resolved") && r.value().contains(key), 1, 4)).isEmpty();
+        assertThat(waiters.findById(key).orElseThrow().getStatus()).isEqualTo(WaiterStatus.DISCARDED);
+    }
+
+    @Test
+    void aReleasedProcessSilentForLongerThanTheResendWindowIsNotSentAnythingAgain() throws Exception {
+        var key = "proyectar-reserva:PMI01/L9:E9";
+        var cause = "MISSING_MAPPING:PMI01:BOARD:GONE";
+        waitOn(key, cause);
+        causesService.resolve(cause, "t");
+        // Released seven hours ago, over the six the resend lasts: the engine cancelled or finished it.
+        jdbc.update("update waiter set released_at = now() - interval '7 hours', last_signal_at = now() - interval '7 hours' where process_key = ?", key);
+        var before = consume("upstream", r -> r.value().contains("causes-resolved") && r.value().contains(key), 100, 3).size();
+
+        Thread.sleep(3000);   // longer than resend-check and resend-after in this test
+
+        assertThat(consume("upstream", r -> r.value().contains("causes-resolved") && r.value().contains(key), 100, 3))
+                .hasSize(before);
+        assertThat(waiters.findById(key).orElseThrow().getStatus()).isEqualTo(WaiterStatus.RELEASED);
+    }
+
     void waitOn(String processKey, String causeKey) {
         causesService.await(processKey, "proyectar-reserva", "PMI01", "L2",
                 List.of(new Variable("locator", "L2"), new Variable("hotelCode", "PMI01")),

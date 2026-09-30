@@ -19,6 +19,7 @@ import io.mateu.ecdemo1.mapping.store.WaiterCauseRepository;
 import io.mateu.ecdemo1.mapping.store.WaiterRepository;
 import io.mateu.ecdemo1.mapping.store.WaiterStatus;
 import io.mateu.workflow.dtos.Variable;
+import io.mateu.workflow.dtos.events.domain.ProcessCancellationRequested;
 import io.mateu.workflow.dtos.events.integration.MessageReceived;
 import io.mateu.workflow.dtos.events.integration.ProcessCreationRequested;
 import io.mateu.workflow.security.AuthorizationContext;
@@ -81,6 +82,16 @@ public class Causes {
     @Transactional
     public void await(String processKey, String definitionId, String hotelCode, String subject,
                       List<Variable> variables, List<Cause> blocking) {
+        await(processKey, null, definitionId, hotelCode, subject, variables, blocking);
+    }
+
+    /**
+     * @param engineProcessId the engine's id of the waiting process — what discarding it cancels it
+     *                        by; null when the caller does not know it
+     */
+    @Transactional
+    public void await(String processKey, String engineProcessId, String definitionId, String hotelCode, String subject,
+                      List<Variable> variables, List<Cause> blocking) {
         for (var cause : blocking) {
             var record = causes.findById(cause.key()).orElseGet(() -> {
                 var fresh = new CauseRecord();
@@ -112,6 +123,10 @@ public class Causes {
             waiter.setVariables(variables.stream().filter(v -> RELAUNCH_VARIABLES.contains(v.name())).toList());
             waiter.setStatus(WaiterStatus.WAITING);
             waiter.setCreatedAt(clock.instant());
+            waiter.setEngineProcessId(engineProcessId);
+            waiters.save(waiter);
+        } else if (waiter.getEngineProcessId() == null && engineProcessId != null) {
+            waiter.setEngineProcessId(engineProcessId);
             waiters.save(waiter);
         }
         log.info("{} waits on {}", processKey, blocking.stream().map(Cause::key).toList());
@@ -177,6 +192,11 @@ public class Causes {
             span.setAttribute("booking.event", "relaunch");
             span.setAttribute("eventconductor.business-key", successorKey);
         }
+        if (waiter.getStatus() == WaiterStatus.DISCARDED) {
+            // Discarded while its resume message was on its way: a person gave it up, so no successor.
+            log.warn("{} resumed after it was discarded by {}: no successor started", processKey, waiter.getFinishedBy());
+            return successorKey;
+        }
         if (waiter.getStatus() != WaiterStatus.RELAUNCHED) {
             var variables = new java.util.ArrayList<>(waiter.getVariables());
             variables.add(new Variable(ProcessVariables.PROCESS_KEY, successorKey));
@@ -190,23 +210,75 @@ public class Causes {
         return successorKey;
     }
 
-    /** The one way out that is not resolving the causes: a person gives up on the process. */
-    @Audited("Discard process")
-    @Transactional
-    public void discard(String processKey, String discardedBy) {
-        var waiter = waiters.findById(processKey).orElseThrow(() -> new NoSuchElementException("No waiting process " + processKey));
-        waiter.setStatus(WaiterStatus.DISCARDED);
-        waiter.setFinishedAt(clock.instant());
-        waiter.setFinishedBy(discardedBy);
-        waiters.save(waiter);
-        log.warn("{} discarded by {}", processKey, discardedBy);
+    /**
+     * What discarding a process did.
+     *
+     * @param engineCancelRequested whether the engine was asked to cancel the process; when not, it
+     *                              did not know its id, and it is cancelled by hand at {@code adminProcessesUrl}
+     * @param causesLeftUnwaited    the open causes this process waited on that no process waits on now —
+     *                              for whoever discarded it to resolve, if they no longer matter
+     */
+    public record Discarded(String processKey, boolean engineCancelRequested, String adminProcessesUrl,
+                            List<String> causesLeftUnwaited) {
     }
 
-    /** Resends the resume message to released processes that have not answered yet. */
+    /**
+     * The one way out that is not resolving the causes (F012): a person gives up on the process. It
+     * is not resumed, not signalled again, not relaunched; and the engine is asked to cancel it, so
+     * it does not stay RUNNING on a wait nothing will end.
+     *
+     * <p>{@code discardedBy} goes last: it is who the audit names.
+     *
+     * @throws IllegalStateException if the process already resumed and started its successor
+     */
+    @Audited("Discard process")
+    @Transactional
+    public Discarded discard(String processKey, String reason, String discardedBy) {
+        var waiter = waiters.findById(processKey).orElseThrow(() -> new NoSuchElementException("No waiting process " + processKey));
+        if (waiter.getStatus() == WaiterStatus.RELAUNCHED) {
+            throw new IllegalStateException(processKey + " already resumed and started its successor: nothing to discard");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Say why the process is discarded");
+        }
+        var cancel = waiter.getEngineProcessId() != null;
+        if (waiter.getStatus() != WaiterStatus.DISCARDED) {
+            waiter.setStatus(WaiterStatus.DISCARDED);
+            waiter.setFinishedAt(clock.instant());
+            waiter.setFinishedBy(discardedBy);
+            waiter.setReason(reason.strip());
+            waiters.save(waiter);
+            if (cancel) {
+                // The engine's own operator cancellation, addressed as its UI addresses it: by id.
+                outbox.appendToEngine(new ProcessCancellationRequested(processKey, waiter.getEngineProcessId()));
+            }
+            log.warn("{} discarded by {} ({}); engine cancellation {}", processKey, discardedBy, reason,
+                    cancel ? "requested" : "left to Admin → Processes");
+        }
+        var unwaited = links.findByProcessKey(processKey).stream().map(l -> l.causeKey)
+                .filter(key -> causes.findById(key).map(c -> c.status == CauseStatus.OPEN).orElse(false))
+                .filter(key -> waiters.countWaitingOn(key) == 0)
+                .toList();
+        return new Discarded(processKey, cancel, properties.adminProcessesUrl(), unwaited);
+    }
+
+    /** Discards every process waiting on this cause — or released by it and not answering — for one reason; see {@link #discard}. */
+    @Audited("Discard processes waiting on a cause")
+    @Transactional
+    public List<Discarded> discardAllWaitingOn(String causeKey, String reason, String discardedBy) {
+        causes.findById(causeKey).orElseThrow(() -> new NoSuchElementException("No cause " + causeKey));
+        return waiters.pendingOn(causeKey).stream().map(w -> discard(w.getProcessKey(), reason, discardedBy)).toList();
+    }
+
+    /**
+     * Resends the resume message to released processes that have not answered yet — for as long as
+     * {@code mapping.resend-for} after their release. Never to a discarded one: it is not RELEASED.
+     */
     @Scheduled(fixedDelayString = "${mapping.resend-check:10s}")
     @Transactional
     public void resendSilent() {
-        for (var waiter : waiters.releasedAndSilentSince(clock.instant().minus(properties.resendAfter()))) {
+        var now = clock.instant();
+        for (var waiter : waiters.releasedAndSilentSince(now.minus(properties.resendAfter()), now.minus(properties.resendFor()))) {
             log.debug("Resending the resume message to {}", waiter.getProcessKey());
             signal(waiter);
         }

@@ -118,6 +118,9 @@ mapping:
   ia-agent-url: ${IA_AGENT_URL:http://localhost:8095}
   console-url: ${CONSOLE_URL:https://console.ec1.mateu.io}
   resend-after: 30s
+  # How long after its release a silent process is sent the resume message again; past that it is
+  # taken as gone (the engine cancelled or finished it) and left, RELEASED, for a person to discard.
+  resend-for: ${RESEND_FOR:6h}
 
 springdoc:
   packages-to-scan: io.mateu.ecdemo1.mapping.rest
