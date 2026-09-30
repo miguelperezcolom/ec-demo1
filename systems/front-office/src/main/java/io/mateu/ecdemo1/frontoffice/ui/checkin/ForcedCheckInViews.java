@@ -1,12 +1,8 @@
 package io.mateu.ecdemo1.frontoffice.ui.checkin;
 
-import io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns;
-import io.mateu.ecdemo1.frontoffice.domain.stay.PendingStep;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus;
 import io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice;
 import io.mateu.uidl.data.Notice;
-import io.mateu.uidl.data.StatusItem;
-import io.mateu.uidl.data.StatusList;
 import io.mateu.uidl.data.VerticalLayout;
 import io.mateu.uidl.fluent.Component;
 import java.time.ZoneId;
@@ -50,12 +46,12 @@ public final class ForcedCheckInViews {
         ? "Faltan pasos del check-in. «Confirmar check-in» no pasa sin ellos: complétalos, o fuerza el check-in "
             + "con un motivo (queda auditado). La estancia quedará «Check-in incompleto» y no podrá hacer el "
             + "check-out hasta completarlos."
-        : "Completar el check-in: falta lo siguiente. Hazlo y pulsa «Confirmar check-in».";
+        : "Completar el check-in: hazlo y pulsa «Confirmar check-in».";
+    // what is missing in the text itself: Redwood draws a notice's buttons, not other content
     return Notice.builder()
         .theme(status.overdue() ? "danger" : "warning")
-        .text(text)
+        .text("Falta: " + status.missingText() + ". " + text)
         .fullWidth(true)
-        .content(List.of(steps(status)))
         .style("margin: 0.75rem 0;")
         .build();
   }
@@ -74,34 +70,16 @@ public final class ForcedCheckInViews {
             + ": «" + forced.reason() + "».")
         + (status.documentsMissing() && !status.overdue()
             ? " La documentación vence el " + WHEN.format(status.documentsDue()) + "." : "")
-        + " No puede hacer el check-out hasta completarlo.";
+        + " Falta: " + status.missingText() + ". No puede hacer el check-out hasta completarlo.";
+    // «Completar» as the notice's content: Redwood draws the buttons of a notice's content inside it,
+    // not its own action (actionLabel), nor a list
     return Notice.builder()
         .id("checkin-incompleto")
         .theme(status.overdue() ? "danger" : "warning")
         .text(text)
         .fullWidth(true)
-        .content(List.of(steps(status)))
-        .actionLabel("Completar")
-        .actionId("completarCheckin")
-        .build();
-  }
-
-  static Component steps(IncompleteCheckIns.Status status) {
-    return StatusList.builder()
-        .compact(true)
-        .frameless(true)
-        .style("width: 100%;")
-        .items(status.missing().stream().map(ForcedCheckInViews::item).toList())
-        .build();
-  }
-
-  static StatusItem item(PendingStep step) {
-    return StatusItem.builder()
-        .id(step.document() ? "falta-doc-" + step.pax() : "falta-firma")
-        .icon(step.document() ? "🪪" : "✍")
-        .title(step.label())
-        .status("Pendiente")
-        .statusColor("warning")
+        .content(List.of(io.mateu.uidl.data.Button.builder().id("completar-checkin").label("Completar")
+            .actionId("completarCheckin").build()))
         .build();
   }
 }

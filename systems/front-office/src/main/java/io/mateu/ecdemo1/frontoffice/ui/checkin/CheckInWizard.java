@@ -57,6 +57,8 @@ import reactor.core.publisher.Mono;
 @SubscribeTo(event = "llave-grabada", action = "llaveGrabada")
 public class CheckInWizard extends Wizard {
 
+  static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CheckInWizard.class);
+
   String stayId;
   boolean populated;
   int selectedPax = 1;
@@ -382,9 +384,10 @@ public class CheckInWizard extends Wizard {
       return List.of(this, new Message("⛔ " + e.getMessage()));
     }
     confirmar.setMotivoForzado(null);
-    return List.of(
-        new Message("⚠️ Check-in forzado — " + confirmar.getHuespedPrincipal() + " · queda pendiente: " + falta),
-        UICommand.navigateTo("/reservas/" + stayId));
+    log.info("{}: check-in forced from the wizard by {}, pending {}", stayId, by, falta);
+    // de vuelta a la Reserva 360, que ya dice «Check-in incompleto» y lo que falta (una URI, como
+    // «Confirmar check-in»: un navigateTo junto a un mensaje no navega desde el asistente)
+    return java.net.URI.create("/reservas/" + stayId);
   }
 
   @WizardCompletionAction
@@ -400,8 +403,7 @@ public class CheckInWizard extends Wizard {
       } catch (io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns.CheckInIncomplete e) {
         return List.of(this, new Message("⛔ " + e.getMessage()));
       }
-      return List.of(new Message("✅ Check-in completado — " + confirmar.getHuespedPrincipal()),
-          UICommand.navigateTo("/reservas/" + stayId));
+      return java.net.URI.create("/reservas/" + stayId);
     }
     try {
       // «He leído el aviso»: lo leído es lo que se le mostró; si ha cambiado, se vuelve a pedir
