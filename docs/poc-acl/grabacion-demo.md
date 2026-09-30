@@ -1,9 +1,29 @@
 # Grabar el vídeo de la demo
 
-Instrucciones para grabar la demo de la PoC de principio a fin: reset, los cinco flujos de la
-presentación, los tres del día a día con la integración activa (6, Opera no responde; 7, modificar y
-cancelar; 8, un código nuevo) y, en cada paso, dónde se ve viajar el dato. Escritas el 2026-09-27 para grabar al día
-siguiente desde el trabajo.
+Instrucciones para grabar la demo de la PoC de principio a fin: el reset, los nueve flujos de la
+presentación (https://claude.ai/artifact/SDNkBJQrfuVaLMxjhbn43v, en su orden) y, en cada paso, dónde se ve
+viajar el dato. La primera versión (2026-09-28, 16:24) se grabó en Vaadin y sin la recepción; esta es la
+del **vídeo 2**: en **Redwood**, con el flujo 9 (la recepción de principio a fin), el CRM marcado, los
+cuatro agentes y las notificaciones Web Push reales.
+
+## Vídeo 2: capítulos y duración estimada
+
+| # | Capítulo | Duración |
+|---|---|---|
+| 0 | Portada | 0:05 |
+| 1 | Alta de un hotel: CRS → PMS y PMS → front office; el agente propone los 45 | 4:30 |
+| 2 | Un cliente que vuelve: el duplicado se resuelve al escanear el documento | 2:00 |
+| 3 | Recepción cambia un dato: el Case en Salesforce; el rechazo | 1:30 |
+| 4 | No show: front office → PMS → CRS | 1:15 |
+| 5 | Walk-in (asistente Guided Process) | 1:30 |
+| 6 | Opera no responde: espera, aviso (y la notificación Web Push real) | 1:45 |
+| 7 | Modificar y cancelar desde el CRS | 1:10 |
+| 8 | Un código nuevo con la integración activa | 1:20 |
+| 9 | Recepción, de principio a fin: avisos, habitación lista, check-in a Opera, forzado, cargos, check-out y factura | 3:30 |
+| — | El CRM (contactos marcados, vistas) y los agentes (recepción; chat del plano de control) | 1:15 |
+| — | Cierre | 0:05 |
+
+Unos **20 minutos**. Si hay que recortar: el 7 y el 8 se pueden quedar en la presentación.
 
 ## Dos modos: API o interfaces
 
@@ -21,11 +41,11 @@ siguiente desde el trabajo.
 
 Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
 
-> Vamos a grabar el vídeo de la demo siguiendo `docs/poc-acl/grabacion-demo.md`. Primero comprueba
-> los requisitos previos. Luego abre el navegador visible con el perfil de grabación, para que yo
-> entre en Salesforce y en Opera Cloud. Cuando te diga que he entrado, pon ec1 a cero y graba los
-> ocho flujos, toma por toma, con los rótulos. Al final monta el mp4, enséñame dónde está y borra
-> el perfil.
+> Vamos a grabar el vídeo 2 de la demo siguiendo `docs/poc-acl/grabacion-demo.md`, en modo API y
+> en Redwood. Primero comprueba los requisitos previos. Pon ec1 a cero y graba los nueve flujos y el
+> tramo del CRM y los agentes, toma por toma, con los rótulos. Para la toma de Web Push avísame antes:
+> daré permiso de grabación de pantalla y no tocaré el Mac. Al final monta el mp4, déjalo en
+> `~/Movies/` y en «Mi unidad/Demo PoC ACL» de Google Drive, y mándame el correo con los enlaces.
 
 ## Requisitos previos (lo comprueba Claude)
 
@@ -36,8 +56,16 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
 - **Versiones:** ec1 con todo desplegado y la batería de pantallas en verde
   (`cd e2e && npx playwright test tests/consoles.spec.ts`; un fallo suelto que pasa al repetir es
   intermitente).
-- **Mateu y motor:** Mateu 3.0-alpha.370 o posterior en los shells y en el front office, y el motor
-  en 2.22.2 o posterior.
+- **Mateu y motor:** Mateu 3.0-alpha.382 o posterior en todas las UIs (las acciones ⋯, los lookups,
+  los diálogos, `?integration=` y el Guided Process funcionan en Redwood), y el motor en 2.23.4 o
+  posterior (el lock sin carreras).
+- **Pendientes de Redwood cerrados antes de grabar:** editar una integración desde la URL y `/_inbox`
+  por URL (la otra sesión los tenía abiertos el 2026-09-30); si no, esas tomas en Vaadin.
+- **Fecha de negocio de XMAR:** 2026-05-13 (parada). Opera solo hace el check-in de llegadas de esa
+  fecha: para el flujo 9, `deploy/demo/demo-prep.sh seed arriving-opera-today` (y una habitación
+  «Inspeccionada»); el check-out siempre será una salida anticipada.
+- **Cupo de Salesforce:** `demo-prep.sh` muestra las llamadas que quedan; con Pub/Sub el MDM gasta
+  unas 15 al día y una demo completa menos de 100.
 - **Reorganización de módulos:** se habrá hecho el merge. `partners` se llama ahora `erp`, así que
   hay que comprobar que `deploy/demo/common.sh` (`$SERVICES`) y `zero.sh` usan los nombres nuevos.
 - **Herramientas:** ffmpeg (`/opt/homebrew/bin/ffmpeg`) y Playwright (`e2e/node_modules`).
@@ -318,9 +346,70 @@ Después de la toma: `opera-outage.sh alert 10m`.
      estancia en el front office.
    - **Rótulo:** «Una persona aprueba y la reserva sigue sola hasta Opera.»
 
+## Web Push: la toma con la pantalla del Mac
+
+Las notificaciones las pinta macOS fuera de la página y el Chromium de Playwright no tiene servicio
+de push, así que esta toma se graba con **el Chrome del usuario y la captura de pantalla de macOS**:
+
+1. El usuario da permiso de **Grabación de pantalla** a la terminal (*Ajustes del Sistema →
+   Privacidad y seguridad → Grabación de pantalla*) y tiene los avisos activados en su Chrome para
+   `rw-console.ec1.mateu.io` (menú del usuario → Avisos → Activar). Durante la toma no usa el Mac.
+2. Claude graba la pantalla: `ffmpeg -f avfoundation -framerate 30 -capture_cursor 1 -i "<pantalla>:none"
+   -t 60 webpush.mp4` (la pantalla, de `ffmpeg -f avfoundation -list_devices true -i ""`).
+3. En el flujo 6, con el aviso rebajado a 2 min (`opera-outage.sh on --alert-after 2m`), la
+   notificación «Reserva esperando a Opera» sale en el escritorio; un clic lleva a la bandeja.
+   - **Rótulo:** «El aviso también llega al navegador, aunque la consola esté cerrada.»
+4. En el montaje, esta toma se recorta a la zona de la notificación y se inserta en el flujo 6.
+
+## Flujo 9: recepción, de principio a fin
+
+Con una llegada en la fecha de negocio de XMAR (`demo-prep.sh seed arriving-opera-today`), de 2 pax.
+
+1. **Aviso del cliente.** En Clientes (data plane), la ficha del titular → *Nuevo aviso*: Bloqueante,
+   check-in, «Cliente VIP: botella de bienvenida». Espera a que Salesforce lo confirme (unos 4 s).
+   - **Rótulo:** «Los avisos del cliente son de Salesforce, su maestro; también se crean aquí.»
+   - **Panel Salesforce (API):** el Case del aviso sobre el contacto.
+2. **Check-in.** Front office → la estancia → *Check-in*: el asistente empieza por el aviso; sin
+   «He leído el aviso» no confirma.
+   - **Rótulo:** «Un aviso bloqueante no deja seguir hasta leerlo.»
+3. **Habitación lista.** El selector: primero las libres e inspeccionadas en Opera; las otras, en gris
+   con el motivo.
+   - **Rótulo:** «Opera dice qué habitación está lista.»
+4. **Forzar.** Escanear solo al titular; en *Confirmar*, lo que falta (el documento del acompañante)
+   → motivo → **Forzar check-in**.
+   - **Se enseña:** el badge «Check-in incompleto» en *Reservas*; «Opera: en casa · hab. …»; el
+     proceso `registrar-checkin`; el panel Opera (API): InHouse.
+   - **Rótulo:** «Entra sin todo, con motivo y auditado; el PMS lo registra igual.»
+5. **Cargos.** *Gestionar folio* → salida tardía y un extra.
+   - **Se enseña:** el panel Opera (API) con los cargos en el folio (código 1200 y el del extra).
+   - **Rótulo:** «Los cargos de recepción van al folio de Opera.»
+6. **Check-out bloqueado y completar.** *Check-out* → bloqueado → *Completar* → escanear el documento
+   que faltaba.
+   - **Rótulo:** «No sale sin completar el check-in: el parte de viajeros va primero.»
+7. **Check-out y factura.** (Antes, fuera de cámara: un cambio del kárdex del titular rechazado en
+   Salesforce por la API, con motivo.) *Check-out*: el aviso del kárdex rechazado → «Entendido» →
+   confirmar.
+   - **Se enseña:** «salida registrada · factura XMAR…»; *Abrir factura*: la proforma con el número y
+     el total de Opera, «Los totales coinciden».
+   - **Rótulo:** «Opera cierra el folio y emite la factura; los totales coinciden.»
+8. **El recorrido.** «Ver recorrido» de la reserva: check-in, cargos y check-out en la línea de tiempo.
+
+## El CRM y los agentes
+
+1. **Contactos marcados.** Panel Salesforce (API): tres contactos con «Calidad del dato» Solo nombre,
+   Con contacto y Verificado (el del flujo 9, tras el escaneo); la vista «Pendientes de identificar».
+   - **Rótulo:** «Cada contacto dice cuánto fiarse de él; los de solo nombre, fuera del marketing.»
+2. **Agente de recepción.** Front office → icono de la cabecera: «¿Qué llegadas hay hoy?» y «¿Algo
+   que deba saber del cliente de la 5226?» (menciona el aviso).
+   - **Rótulo:** «El agente usa los mismos casos de uso que la pantalla; cada operación la confirma una persona.»
+3. **Chat del plano de control.** rw-console → chat: «¿Qué integraciones hay y en qué estado?».
+   - **Rótulo:** «Un solo ia-agent, cuatro agentes; cada consola, el suyo.»
+
 ## Al terminar
 
-- **Entrega:** el mp4 y `guion-con-tiempos.md` en `~/Movies/`.
+- **Entrega:** el mp4 y `guion-con-tiempos.md` en `~/Movies/` y copiados a «Mi unidad/Demo PoC ACL»
+  (la carpeta sincronizada de Google Drive); un correo al usuario con los enlaces de Drive y los
+  capítulos.
 - **Limpieza:**
   - se borra el perfil del navegador;
   - se borran los specs temporales de `e2e/tests/zz-*`;
