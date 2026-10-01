@@ -74,6 +74,9 @@ spec:
               value: "MUR"
             - name: FRONT_OFFICE_HOTEL
               value: "MRU01"
+            # Its name in the suite's Hotel selector.
+            - name: FRONT_OFFICE_HOTEL_NAME
+              value: "Riu Demo Mauricio"
             # The PMS property this front office consumes (pms-fo): its stays and catalogue come from
             # Opera XMAR, by Kafka (front-office-commands).
             - name: FRONT_OFFICE_PMS_HOTEL

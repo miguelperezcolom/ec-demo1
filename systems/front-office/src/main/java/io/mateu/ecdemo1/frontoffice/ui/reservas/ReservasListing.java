@@ -43,10 +43,13 @@ public class ReservasListing
   final StayRepository stays;
   final DemoReservationsService demoReservations;
   final io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIns forcedCheckIns;
+  final io.mateu.ecdemo1.frontoffice.ui.common.Hotels hotels;
 
   public ReservasListing(StayReadModel stayReads, StayRepository stays, DemoReservationsService demoReservations,
-                         io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIns forcedCheckIns) {
+                         io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIns forcedCheckIns,
+                         io.mateu.ecdemo1.frontoffice.ui.common.Hotels hotels) {
     this.forcedCheckIns = forcedCheckIns;
+    this.hotels = hotels;
     this.stayReads = stayReads;
     this.stays = stays;
     this.demoReservations = demoReservations;
@@ -73,9 +76,15 @@ public class ReservasListing
     Vista vista;
   }
 
+  /**
+   * A line of the listing. The guest's flag is an IMAGE (a bundled SVG, {@link
+   * io.mateu.ecdemo1.frontoffice.ui.common.Flags#image}) drawn before the name — a table cell does not
+   * draw the emoji flag everywhere (Windows, the Redwood table's font: «AT Florian Gruber»).
+   */
   public record Reserva(
       String id,
-      @Label("Huésped") String huesped,
+      @Label("Huésped") @io.mateu.uidl.annotations.PrimaryColumn(leading = "bandera") String huesped,
+      @io.mateu.uidl.annotations.HiddenInList String bandera,
       @Label("Habitación") String habitacion,
       @Label("Noches") long noches,
       @Label("Estado") String estado,
@@ -91,6 +100,10 @@ public class ReservasListing
     forcedCheckIns.open().forEach(f -> incompletos.put(f.stayId(), f));
     // Una consulta (estancia + huésped, sin colecciones); el filtro, el orden y la búsqueda sobre la
     // fila ya pintada siguen en memoria, que es lo que permite buscar por "Llega mañana".
+    // Sólo las estancias del hotel elegido en el selector Hotel de la cabecera.
+    if (!hotels.holdsStaysOfSelected(httpRequest)) {
+      return Paging.page(List.<Reserva>of(), request);
+    }
     var rows =
         stayReads.rows().stream()
             .filter(s -> matchesVista(s, filtros == null ? null : filtros.vista, incompletos.keySet()))
@@ -143,7 +156,8 @@ public class ReservasListing
         ? "Sin asignar" : "Hab " + stay.roomNumber();
     return new Reserva(
         stay.id(),
-        io.mateu.ecdemo1.frontoffice.ui.common.Flags.before(stay.guestNationality(), stay.guestName()),
+        stay.guestName(),
+        io.mateu.ecdemo1.frontoffice.ui.common.Flags.image(stay.guestNationality()),
         habitacion + " · " + stay.roomType(),
         java.time.temporal.ChronoUnit.DAYS.between(stay.checkIn(), stay.checkOut()),
         estadoLabel(stay.status(), stay.checkIn(), stay.checkOut()),
@@ -156,7 +170,7 @@ public class ReservasListing
       return true;
     }
     // The locator too: it is what the desk reads off a voucher or a call.
-    var hay = (row.id() + " " + row.huesped() + " " + row.habitacion() + " " + row.estado() + " "
+    var hay = (row.id() + " " + row.huesped() + " " + io.mateu.ecdemo1.frontoffice.ui.common.Flags.codeOf(row.bandera()) + " " + row.habitacion() + " " + row.estado() + " "
         + (row.checkin() == null ? "" : row.checkin().message()) + " " + (row.tier() == null ? "" : row.tier().message()))
         .toLowerCase();
     for (var word : searchText.trim().toLowerCase().split("\\s+")) {
