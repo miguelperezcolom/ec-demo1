@@ -1,0 +1,160 @@
+---
+// Los sistemas en hexágono (puertos y adaptadores): SVG en línea con los colores de Starlight, así sigue al tema claro y al oscuro.
+---
+<figure class="ecd-figure">
+	<div class="ecd-scroll">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-551 -516 1125 1033" role="img" aria-labelledby="ecd-hex-title ecd-hex-desc" class="ecd-hex">
+<title id="ecd-hex-title">Los sistemas de ec-demo1 en hexágono (puertos y adaptadores)</title>
+<desc id="ecd-hex-desc">En el centro, EventConductor, el motor de procesos, rodeado por los servicios del núcleo: mapping (mapeado), integrations (alta de integraciones), journey (recorrido), communication (bandeja y avisos) y audit (auditoría). Alrededor, un adaptador pegado a cada lado del hexágono y, fuera, el sistema externo de ese lado: el CRS con crs-integration; Opera Cloud con pms-integration; el front office con la integración pms-fo, notices y registration-rules; los LLMs con los agentes de IA (ia-agent e ia-control-plane); Salesforce con customer-mdm; y el ERP con crs-integration, que convierte sus interlocutores en eventos. Las flechas solo unen cada adaptador con el motor: eventos por Kafka, y consultas en el caso de los agentes. Ningún sistema externo habla con otro. Las personas entran por el gateway a las dos consolas, shell y control-shell.</desc>
+<style is:inline>
+
+.ecd-hex { font-family: var(--__sl-font); }
+.ecd-hex text { fill: var(--sl-color-white); }
+.ecd-hex .t-sys { font-size: 23px; font-weight: 700; }
+.ecd-hex .t-name { font-size: 18.5px; font-weight: 600; }
+.ecd-hex .t-sub { font-size: 16px; fill: var(--sl-color-gray-2); }
+.ecd-hex .t-mono { font-family: var(--__sl-font-mono); font-size: 16px; fill: var(--sl-color-gray-2); }
+.ecd-hex .t-cap { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; fill: var(--sl-color-gray-3); }
+.ecd-hex .t-verb { font-size: 16px; font-weight: 700; fill: var(--sl-color-accent-high); }
+.ecd-hex .t-eng { font-size: 23px; font-weight: 700; fill: var(--sl-color-black); }
+.ecd-hex .t-eng-sub { font-size: 16px; fill: var(--sl-color-black); }
+.ecd-hex .b-ext { fill: var(--sl-color-gray-6); stroke: var(--sl-color-gray-3); stroke-width: 1.5; }
+.ecd-hex .b-ad { fill: var(--sl-color-black); stroke: var(--sl-color-gray-3); stroke-width: 1.2; }
+.ecd-hex .b-core { fill: var(--sl-color-black); stroke: var(--sl-color-accent); stroke-width: 1.4; }
+.ecd-hex .b-eng { fill: var(--sl-color-accent-high); stroke: none; }
+.ecd-hex .b-note { fill: none; stroke: var(--sl-color-gray-4); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.ecd-hex .a-ev { fill: none; stroke: var(--sl-color-accent-high); stroke-width: 2; }
+.ecd-hex .a-q { fill: none; stroke: var(--sl-color-gray-3); stroke-width: 1.8; stroke-dasharray: 6 5; }
+.ecd-hex .m-ev { fill: var(--sl-color-accent-high); }
+.ecd-hex .m-q { fill: var(--sl-color-gray-3); }
+
+.ecd-hex .h-outer { fill: var(--sl-color-gray-6); stroke: var(--sl-color-gray-4); stroke-width: 1.5; }
+.ecd-hex .h-core { fill: var(--sl-color-accent-low); stroke: var(--sl-color-accent); stroke-width: 1.2; stroke-dasharray: 5 5; opacity: 0.85; }
+.ecd-hex .port { fill: var(--sl-color-gray-3); }
+.ecd-hex .stub { stroke: var(--sl-color-gray-3); stroke-width: 2; }
+.ecd-hex .b-core { fill: var(--sl-color-accent-low); }
+
+</style>
+<defs>
+<marker id="ecd-hex-ev" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="m-ev" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="ecd-hex-q" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="m-q" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<polygon class="h-outer" points="480.0,0.0 240.0,415.7 -240.0,415.7 -480.0,0.0 -240.0,-415.7 240.0,-415.7"/>
+<rect class="b-ext" x="-203.1" y="-502.4" width="406.2" height="64.7" rx="10"/>
+<text class="t-sys" x="-0.0" y="-473.9" text-anchor="middle">CRS</text>
+<text class="t-sub" x="-0.0" y="-450.5" text-anchor="middle">booking · hace de Rumbo, dueño de la reserva</text>
+<rect class="b-ad" x="-86.2" y="-401.7" width="172.4" height="58.9" rx="7"/>
+<text class="t-name" x="-0.0" y="-377.4" text-anchor="middle">Conector CRS</text>
+<text class="t-mono" x="-0.0" y="-355.7" text-anchor="middle">crs-integration</text>
+<line class="stub" x1="-0.0" y1="-401.7" x2="-0.0" y2="-415.7"/>
+<g transform="translate(-0.0,-415.7) rotate(360)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-ev" x1="-0.0" y1="-333.8" x2="-0.0" y2="-109.5" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<rect class="b-ext" x="376.0" y="-309.7" width="172.7" height="85.5" rx="10"/>
+<text class="t-sys" x="462.3" y="-281.2" text-anchor="middle">Opera Cloud</text>
+<text class="t-sub" x="462.3" y="-257.8" text-anchor="middle">el PMS,</text>
+<text class="t-sub" x="462.3" y="-237.0" text-anchor="middle">por OHIP</text>
+<rect class="b-ad" x="184.3" y="-185.6" width="172.4" height="58.9" rx="7"/>
+<text class="t-name" x="270.5" y="-161.3" text-anchor="middle">Conector PMS</text>
+<text class="t-mono" x="270.5" y="-139.6" text-anchor="middle">pms-integration</text>
+<line class="stub" x1="321.4" y1="-185.6" x2="360.0" y2="-207.8"/>
+<g transform="translate(360.0,-207.8) rotate(420)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-ev" x1="211.7" y1="-122.2" x2="94.8" y2="-54.7" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<rect class="b-ext" x="374.3" y="227.1" width="186.1" height="85.5" rx="10"/>
+<text class="t-sys" x="467.3" y="255.6" text-anchor="middle">Front office</text>
+<text class="t-sub" x="467.3" y="278.9" text-anchor="middle">la recepción</text>
+<text class="t-sub" x="467.3" y="299.7" text-anchor="middle">del hotel</text>
+<rect class="b-ad" x="276.6" y="16.0" width="144.0" height="58.9" rx="7"/>
+<text class="t-name" x="348.6" y="40.3" text-anchor="middle">Integración</text>
+<text class="t-mono" x="348.6" y="62.0" text-anchor="middle">pms-fo</text>
+<line class="stub" x1="399.6" y1="74.8" x2="427.5" y2="90.9"/>
+<g transform="translate(427.5,90.9) rotate(120)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-ev" x1="267.6" y1="38.6" x2="111.7" y2="25.5" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<rect class="b-ad" x="222.7" y="122.5" width="122.6" height="82.9" rx="7"/>
+<text class="t-name" x="284.0" y="146.8" text-anchor="middle">Avisos de</text>
+<text class="t-name" x="284.0" y="170.9" text-anchor="middle">recepción</text>
+<text class="t-mono" x="284.0" y="192.6" text-anchor="middle">notices</text>
+<line class="stub" x1="345.2" y1="199.3" x2="360.0" y2="207.8"/>
+<g transform="translate(360.0,207.8) rotate(120)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-ev" x1="214.9" y1="124.1" x2="94.8" y2="54.7" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<rect class="b-ad" x="75.9" y="233.5" width="219.1" height="58.9" rx="7"/>
+<text class="t-name" x="185.5" y="257.8" text-anchor="middle">Reglas de registro</text>
+<text class="t-mono" x="185.5" y="279.6" text-anchor="middle">registration-rules</text>
+<line class="stub" x1="236.4" y1="292.4" x2="292.5" y2="324.8"/>
+<g transform="translate(292.5,324.8) rotate(120)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-ev" x1="154.0" y1="226.7" x2="116.4" y2="183.4" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<rect class="b-ext" x="-112.4" y="437.7" width="224.7" height="64.7" rx="10"/>
+<text class="t-sys" x="0.0" y="466.2" text-anchor="middle">LLMs</text>
+<text class="t-sub" x="0.0" y="489.6" text-anchor="middle">los modelos de lenguaje</text>
+<rect class="b-ad" x="-181.5" y="322.0" width="363.0" height="79.7" rx="7"/>
+<text class="t-name" x="0.0" y="346.4" text-anchor="middle">Agentes de IA</text>
+<text class="t-mono" x="0.0" y="368.1" text-anchor="middle">ia-agent · ia-control-plane</text>
+<text class="t-sub" x="0.0" y="388.9" text-anchor="middle">consola · mapeado · recepción · control</text>
+<line class="stub" x1="0.0" y1="401.7" x2="0.0" y2="415.7"/>
+<g transform="translate(0.0,415.7) rotate(180)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-q" x1="0.0" y1="313.0" x2="0.0" y2="109.5" marker-end="url(#ecd-hex-q)"/>
+<rect class="b-ext" x="-537.0" y="221.3" width="159.4" height="85.5" rx="10"/>
+<text class="t-sys" x="-457.3" y="249.8" text-anchor="middle">Salesforce</text>
+<text class="t-sub" x="-457.3" y="273.2" text-anchor="middle">el maestro</text>
+<text class="t-sub" x="-457.3" y="294.0" text-anchor="middle">del cliente</text>
+<rect class="b-ad" x="-358.5" y="123.6" width="186.9" height="58.9" rx="7"/>
+<text class="t-name" x="-265.0" y="147.9" text-anchor="middle">MDM de clientes</text>
+<text class="t-mono" x="-265.0" y="169.6" text-anchor="middle">customer-mdm</text>
+<line class="stub" x1="-316.0" y1="182.4" x2="-360.0" y2="207.8"/>
+<g transform="translate(-360.0,207.8) rotate(240)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-ev" x1="-206.3" y1="119.1" x2="-94.8" y2="54.7" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<rect class="b-ext" x="-526.2" y="-304.1" width="147.0" height="85.5" rx="10"/>
+<text class="t-sys" x="-452.7" y="-275.6" text-anchor="middle">ERP</text>
+<text class="t-sub" x="-452.7" y="-252.2" text-anchor="middle">el maestro de</text>
+<text class="t-sub" x="-452.7" y="-231.4" text-anchor="middle">interlocutores</text>
+<rect class="b-ad" x="-357.2" y="-184.8" width="176.2" height="58.9" rx="7"/>
+<text class="t-name" x="-269.1" y="-160.4" text-anchor="middle">Interlocutores</text>
+<text class="t-mono" x="-269.1" y="-138.7" text-anchor="middle">crs-integration</text>
+<line class="stub" x1="-320.0" y1="-184.8" x2="-360.0" y2="-207.8"/>
+<g transform="translate(-360.0,-207.8) rotate(300)"><rect class="port" x="-17" y="-5" width="34" height="10" rx="2"/></g>
+<line class="a-ev" x1="-210.3" y1="-121.4" x2="-94.8" y2="-54.7" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<polygon class="b-eng" points="116.0,0.0 58.0,100.5 -58.0,100.5 -116.0,0.0 -58.0,-100.5 58.0,-100.5"/>
+<text class="t-eng" x="0.0" y="-3.8" text-anchor="middle">EventConductor</text>
+<text class="t-eng-sub" x="0.0" y="19.5" text-anchor="middle">motor de procesos</text>
+<rect class="b-core" x="23.7" y="117.8" width="122.6" height="58.9" rx="7"/>
+<text class="t-name" x="85.0" y="142.1" text-anchor="middle">Auditoría</text>
+<text class="t-mono" x="85.0" y="163.8" text-anchor="middle">audit</text>
+<rect class="b-core" x="-146.3" y="117.8" width="122.6" height="58.9" rx="7"/>
+<text class="t-name" x="-85.0" y="142.1" text-anchor="middle">Recorrido</text>
+<text class="t-mono" x="-85.0" y="163.8" text-anchor="middle">journey</text>
+<rect class="b-core" x="-331.7" y="-29.4" width="197.7" height="58.9" rx="7"/>
+<text class="t-name" x="-232.8" y="-5.1" text-anchor="middle">Bandeja y avisos</text>
+<text class="t-mono" x="-232.8" y="16.6" text-anchor="middle">communication</text>
+<rect class="b-core" x="-145.6" y="-194.0" width="101.1" height="58.9" rx="7"/>
+<text class="t-name" x="-95.0" y="-169.7" text-anchor="middle">Mapeado</text>
+<text class="t-mono" x="-95.0" y="-147.9" text-anchor="middle">mapping</text>
+<rect class="b-core" x="12.3" y="-194.0" width="165.5" height="58.9" rx="7"/>
+<text class="t-name" x="95.0" y="-169.7" text-anchor="middle">Integraciones</text>
+<text class="t-mono" x="95.0" y="-147.9" text-anchor="middle">integrations</text>
+<g transform="translate(-545,424)">
+<line class="a-ev" x1="2" y1="10" x2="56" y2="10" marker-start="url(#ecd-hex-ev)" marker-end="url(#ecd-hex-ev)"/>
+<text class="t-sub" x="68" y="15" text-anchor="start">eventos (Kafka)</text>
+<line class="a-q" x1="2" y1="42" x2="56" y2="42" marker-end="url(#ecd-hex-q)"/>
+<text class="t-sub" x="68" y="47" text-anchor="start">consultas</text>
+<rect class="port" x="9" y="68" width="40" height="12" rx="2"/>
+<text class="t-sub" x="68" y="79" text-anchor="start">puerto</text>
+<rect class="b-core" x="199" y="2" width="40" height="18" rx="4"/>
+<text class="t-sub" x="258" y="16" text-anchor="start">núcleo</text>
+<rect class="b-ad" x="199" y="33" width="40" height="18" rx="4"/>
+<text class="t-sub" x="258" y="47" text-anchor="start">adaptador</text>
+<rect class="b-ext" x="199" y="65" width="40" height="18" rx="4"/>
+<text class="t-sub" x="258" y="79" text-anchor="start">sistema externo</text>
+</g>
+<rect class="b-note" x="244.6" y="430.0" width="323.8" height="80.4" rx="10"/>
+<text class="t-sub" x="406.5" y="454.0" text-anchor="middle">Las personas entran por el gateway</text>
+<text class="t-sub" x="406.5" y="474.8" text-anchor="middle">a las dos consolas:</text>
+<text class="t-mono" x="406.5" y="495.6" text-anchor="middle">shell · control-shell</text>
+</svg>
+	</div>
+</figure>
+
+<style>
+	.ecd-figure { margin: 1.5rem 0; }
+	.ecd-scroll { overflow-x: auto; }
+	.ecd-scroll :global(svg) { display: block; width: 100%; height: auto; min-width: 640px; }
+	figcaption { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); margin-top: 0.5rem; }
+</style>

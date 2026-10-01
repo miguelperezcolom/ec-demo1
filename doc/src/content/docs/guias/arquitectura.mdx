@@ -3,6 +3,8 @@ title: Arquitectura
 description: Cómo está organizado el código, la regla del maestro, la capa anticorrupción, el motor y cómo se hablan los servicios.
 ---
 
+import PlanosControlDatos from '../../../components/PlanosControlDatos.astro';
+
 ## El código, por sistema
 
 Cada módulo es su propio proyecto Maven y su propia imagen, con el nombre de su carpeta
@@ -30,6 +32,12 @@ La PoC separa **lo que fluye** de **quién lo gobierna**, y cada plano tiene su 
 - **Plano de control** — `console.ec1.mateu.io`: la configuración y la medida. IA, usuarios,
   integraciones, mapeado, el MDM técnico, las reglas de registro (*Registro*), notificaciones,
   auditoría, las definiciones del motor.
+
+<PlanosControlDatos />
+
+Entre los dos, el plano de control **configura** (integraciones, diccionario, reglas), **aprueba**
+(equivalencias y cambios), **reanuda o descarta** (los procesos que esperan por una causa) y
+**observa** (auditoría, bandeja, recorrido, trazas).
 
 Cada servicio trae sus propias pantallas (un `@UI` de Mateu en su ruta, p. ej. `/_mapping`) y la
 consola las **federa** con un `RemoteMenu`. Ver [Consolas, gateway y seguridad](/guias/consolas-y-seguridad/).
