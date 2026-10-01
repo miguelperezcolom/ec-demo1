@@ -177,27 +177,6 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
     @DetailFormCustomisation(position = FormPosition.modal)
     @Colspan(2)
     List<PaymentViewModel> payments;
-    // The tracking, on the page, under the payments; the editor shows it in its own section.
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Id")
-    String idOnPage;
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Version")
-    Long versionOnPage;
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Created")
-    String createdOnPage;
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Updated")
-    String updatedOnPage;
 
     @Section("Comments")
     @HiddenInView
@@ -210,20 +189,17 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
     @HiddenInCreate
     String cancellation;
 
-    @Section("Tracking")
-    @HiddenInView
+    /** The record's bookkeeping, in its own narrow fold on the page (and its own section in the editor). */
+    @Section(value = "Tracking", panelWidth = PanelWidth.NARROW)
     @ReadOnly
     @HiddenInCreate
     String id;
-    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     Long version;
-    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     String created;
-    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     String updated;
@@ -467,10 +443,6 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
                 : null;
         created = TIMESTAMP.format(booking.created());
         updated = TIMESTAMP.format(booking.updated());
-        idOnPage = id;
-        versionOnPage = version;
-        createdOnPage = created;
-        updatedOnPage = updated;
         return this;
     }
 

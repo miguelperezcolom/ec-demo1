@@ -59,15 +59,15 @@ class BookingPageLayoutTest {
     }
 
     @Test
-    void theCommentsGoWithTheRoomsAndTheTrackingWithThePayments() throws Exception {
+    void theCommentsGoWithTheRoomsTheTrackingHasItsOwnFoldAndThePaymentsAreCards() throws Exception {
         assertThat(sectionOf("commentsOnPage")).isEqualTo("Rooms and guests");
-        for (var name : List.of("idOnPage", "versionOnPage", "createdOnPage", "updatedOnPage")) {
-            assertThat(sectionOf(name)).as(name).isEqualTo("Payments");
-            assertThat(field(name).isAnnotationPresent(HiddenInEditor.class)).as(name).isTrue();
+        assertThat(sectionOf("paymentsOnPage")).isEqualTo("Payments");
+        assertThat(field("payments").isAnnotationPresent(HiddenInView.class)).isTrue();
+        assertThat(field("id").getAnnotation(Section.class).value()).isEqualTo("Tracking");
+        for (var name : List.of("id", "version", "created", "updated")) {
+            assertThat(field(name).isAnnotationPresent(HiddenInView.class)).as(name).isFalse();
         }
-        for (var name : List.of("comments", "id", "version", "created", "updated")) {
-            assertThat(field(name).isAnnotationPresent(HiddenInView.class)).as(name).isTrue();
-        }
+        assertThat(field("comments").isAnnotationPresent(HiddenInView.class)).isTrue();
     }
 
     @Test
