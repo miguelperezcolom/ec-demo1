@@ -22,7 +22,6 @@ import io.mateu.uidl.annotations.FoldoutDetail;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInEditor;
 import io.mateu.uidl.annotations.HiddenInView;
-import io.mateu.uidl.annotations.KPI;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.ReadOnly;
@@ -68,7 +67,7 @@ import java.util.concurrent.Callable;
 // The booking's page is an overview — where, when, how much and where it is in Opera — with the rest
 // in foldout panels beside it: eleven stacked cards were a long scroll to what matters, and half of
 // them empty. What has no value is left out of the page; the editor keeps every field. The amounts
-// are the page header's KPIs, not a panel; the comments go with the rooms and guests they are about,
+// are badges in the page header, not a panel; the comments go with the rooms and guests they are about,
 // and the tracking with the payments: two short panels fewer.
 @FoldoutDetail(overview = {"Booking"})
 @PageWidth(PageWidthStyle.EDGE_TO_EDGE)
@@ -81,6 +80,18 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @ReadOnly
     @HiddenInCreate
     Status status = new Status(StatusType.NONE, "New");
+
+    /**
+     * The amounts, as the header's badges next to the status (a CRUD record page has no subtitle):
+     * what is still to pay — amber while something is, green once it is paid — and the total with
+     * what has been paid. Null in the creation form: a null Status is no badge.
+     */
+    @ReadOnly
+    @HiddenInCreate
+    Status pendingBadge;
+    @ReadOnly
+    @HiddenInCreate
+    Status amountsBadge;
 
     @Section("Booking")
     @NotEmpty
@@ -169,20 +180,6 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @ReadOnly
     @Label("Updated")
     String updatedOnPage;
-
-    /** The booking's amounts, as the KPIs of its page's header. */
-    @KPI
-    @ReadOnly
-    @HiddenInCreate
-    String total;
-    @KPI
-    @ReadOnly
-    @HiddenInCreate
-    String paid;
-    @KPI
-    @ReadOnly
-    @HiddenInCreate
-    String pending;
 
     @Section("Comments")
     @HiddenInView
@@ -414,11 +411,9 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
                 .map(p -> new PaymentViewModel(p.paymentId(), p.type(), p.methodCode(), p.amount(), p.date(),
                         p.reference()))
                 .toList();
-        total = booking.totalAmount().toPlainString() + " " + booking.currency()
-                + " (" + booking.nights() + " nights)";
-        paid = booking.paidAmount().toPlainString() + " " + booking.currency();
-        pending = booking.totalAmount().subtract(booking.paidAmount()).max(java.math.BigDecimal.ZERO)
-                .toPlainString() + " " + booking.currency();
+        pendingBadge = pendingBadgeOf(booking.totalAmount(), booking.paidAmount(), booking.currency());
+        amountsBadge = new Status(StatusType.NONE,
+                amountsOf(booking.totalAmount(), booking.paidAmount(), booking.currency(), booking.nights()));
         comments = booking.comments();
         commentsOnPage = comments;
         cancellation = booking.cancellation() != null
@@ -431,6 +426,32 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
         createdOnPage = created;
         updatedOnPage = updated;
         return this;
+    }
+
+    /** «Pendiente 1.431,12 EUR» in amber while something is left to pay; «Pagado» in green once nothing is. */
+    static Status pendingBadgeOf(java.math.BigDecimal total, java.math.BigDecimal paid, String currency) {
+        var pending = nz(total).subtract(nz(paid)).max(java.math.BigDecimal.ZERO);
+        return pending.signum() > 0
+                ? new Status(StatusType.WARNING, "Pendiente " + money(pending, currency))
+                : new Status(StatusType.SUCCESS, "Pagado");
+    }
+
+    /** «Total 1.431,12 EUR (5 noches) · Pagado 0,00 EUR». */
+    static String amountsOf(java.math.BigDecimal total, java.math.BigDecimal paid, String currency, long nights) {
+        return "Total " + money(total, currency) + " (" + nights + (nights == 1 ? " noche" : " noches") + ")"
+                + " · Pagado " + money(paid, currency);
+    }
+
+    static String money(java.math.BigDecimal amount, String currency) {
+        var format = java.text.NumberFormat.getNumberInstance(java.util.Locale.forLanguageTag("es-ES"));
+        format.setMinimumFractionDigits(2);
+        format.setMaximumFractionDigits(2);
+        format.setGroupingUsed(true);
+        return format.format(nz(amount)) + (currency == null ? "" : " " + currency);
+    }
+
+    private static java.math.BigDecimal nz(java.math.BigDecimal value) {
+        return value == null ? java.math.BigDecimal.ZERO : value;
     }
 
     @Override

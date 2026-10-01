@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.booking.infra.in.ui.pages;
 import io.mateu.uidl.annotations.FoldoutDetail;
 import io.mateu.uidl.annotations.HiddenInEditor;
 import io.mateu.uidl.annotations.HiddenInView;
-import io.mateu.uidl.annotations.KPI;
 import io.mateu.uidl.annotations.PanelWidth;
 import io.mateu.uidl.annotations.Section;
 import org.junit.jupiter.api.Test;
@@ -38,12 +37,25 @@ class BookingPageLayoutTest {
     }
 
     @Test
-    void theAmountsAreTheHeadersKpis() throws Exception {
-        for (var name : List.of("total", "paid", "pending")) {
-            assertThat(field(name).isAnnotationPresent(KPI.class)).as(name).isTrue();
-        }
+    void theAmountsAreBadgesNextToTheStatusNotKpis() throws Exception {
+        assertThat(Arrays.stream(BookingViewModel.class.getDeclaredFields()).map(java.lang.reflect.Field::getName))
+                .doesNotContain("total", "paid", "pending");
+        assertThat(field("pendingBadge").getType()).isEqualTo(io.mateu.uidl.data.Status.class);
+        assertThat(field("amountsBadge").getType()).isEqualTo(io.mateu.uidl.data.Status.class);
         var foldout = BookingViewModel.class.getAnnotation(FoldoutDetail.class);
         assertThat(foldout.overview()).containsExactly("Booking");
+    }
+
+    @Test
+    void whatIsLeftToPayIsAmberAndAPaidBookingGreen() {
+        var pending = BookingViewModel.pendingBadgeOf(new java.math.BigDecimal("1431.12"), java.math.BigDecimal.ZERO, "EUR");
+        assertThat(pending.type()).isEqualTo(io.mateu.uidl.data.StatusType.WARNING);
+        assertThat(pending.message()).isEqualTo("Pendiente 1.431,12 EUR");
+        var paid = BookingViewModel.pendingBadgeOf(new java.math.BigDecimal("100"), new java.math.BigDecimal("100.00"), "EUR");
+        assertThat(paid.type()).isEqualTo(io.mateu.uidl.data.StatusType.SUCCESS);
+        assertThat(paid.message()).isEqualTo("Pagado");
+        assertThat(BookingViewModel.amountsOf(new java.math.BigDecimal("1431.12"), java.math.BigDecimal.ZERO, "EUR", 5))
+                .isEqualTo("Total 1.431,12 EUR (5 noches) · Pagado 0,00 EUR");
     }
 
     @Test
