@@ -3,8 +3,9 @@ title: Compilar
 description: Cómo se compila ec-demo1 — el orden de las librerías compartidas, Maven con -am y por qué clean.
 ---
 
-Java 21. Cada módulo es su propio proyecto Maven (Spring Boot 3.4 la mayoría; las consolas, el gateway,
-el front office y el agente, Spring Boot 4); el `pom.xml` raíz solo los agrega, así que
+Java 21. Cada módulo es su propio proyecto Maven (Spring Boot 3.4 la mayoría, el gateway incluido;
+Spring Boot 4.0 las consolas `shell` y `control-shell`, `ia-control-plane`, `users`, `content`,
+`ui-commons` y `grpc-interface`, y 4.1 el front office y `ia-agent`); el `pom.xml` raíz solo los agrega, así que
 `mvn -DskipTests package` en la raíz lo compila todo.
 
 ## El orden
@@ -36,7 +37,7 @@ mvn -B -ntp -pl integration/pms-integration-service -am test
 
 | Propiedad | Valor | Dónde |
 | :-------- | :---- | :---- |
-| `mateu.version` | `3.0-alpha.376` | En **todos** los módulos con interfaz: una sola versión, porque las consolas pintan las pantallas de los demás pods |
+| `mateu.version` | `3.0-alpha.383` | En **todos** los módulos con interfaz: una sola versión, porque las consolas pintan las pantallas de los demás pods |
 | `eventconductor.version` | `2.23.1` | Los módulos que hablan con el motor (`shared`, `worker-kafka`) |
 | `testcontainers.version` | `1.21.4` | En los módulos Boot 3.4 que usan Testcontainers, por Docker 29 |
 

@@ -18,7 +18,7 @@ echo "test user id = $TEST_ID"
 Helper to open a psql on the users database (local trust inside the pod, no password needed):
 
 ```sh
-psql_users() { kubectl -n "$NS" exec -i deploy/ec-postgres -c postgres -- psql -U workflow -d users -tAc "$1"; }
+psql_users() { kubectl -n "$NS" exec -i deploy/ec-eventconductor-postgres -c postgres -- psql -U workflow -d users -tAc "$1"; }
 ```
 
 Helper to run kcadm inside the Keycloak pod, logged in as the bootstrap admin:
@@ -73,7 +73,8 @@ Troubleshooting).
 
 ## 3. Create a user, watch it propagate
 
-**Trigger:** open the demo console → **Users** (`https://ec1.mateu.io`, sign in as `demo`/`demo`),
+**Trigger:** open the control console → **Usuarios** (`https://console.ec1.mateu.io`, sign in as
+`demo`/`demo`, which holds the `ai-admin` role it requires),
 and create a user whose **id is `$TEST_ID`** (echo it above), with an email you can receive at, and
 Active status.
 
@@ -81,7 +82,7 @@ Now verify, in order:
 
 ```sh
 # a) The outbox took the intent. Immediately after saving you may catch it pending;
-#    within ~5s the relay should mark it delivered (deliveredAt set).
+#    within ~5s the relay should mark it delivered (published_at set).
 psql_users "select event_type, published_at is not null as delivered, attempts, abandoned
             from outbox_message where binding='identity' and message_key='$TEST_ID' order by seq;"
 #   UserCreated | f | 0 | f      (just after save)
@@ -161,7 +162,7 @@ test the **outbox** retry, break the Admin API path (e.g. temporarily set a wron
 `KEYCLOAK_ADMIN_PASSWORD`), create a user, and watch:
 
 ```sh
-watch -n2 "kubectl -n $NS exec -i deploy/ec-postgres -c postgres -- \
+watch -n2 "kubectl -n $NS exec -i deploy/ec-eventconductor-postgres -c postgres -- \
   psql -U workflow -d users -tAc \
   \"select event_type,attempts,published_at is not null,next_attempt_at,abandoned \
     from outbox_message where binding='identity' and message_key like '${TEST_ID}-b%';\""

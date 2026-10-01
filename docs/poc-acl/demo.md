@@ -1,21 +1,21 @@
 # PoC ACL — guión de la demo
 
-Estado a 2026-09-25, tarde. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
+Estado a 2026-10-01. Todo lo que se enseña está desplegado en `ec1.mateu.io` y escribe en el
 **tenant real de Opera** (OHIP UAT, propiedad **XMAR**); ya no hay doble de Opera en el despliegue
-(`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.23.1** y
-las apps, Mateu **3.0-alpha.367**. Lo marcado *(pendiente)* no está construido todavía o espera una
+(`opera-mock` queda solo para la batería local de pruebas). El motor es EventConductor **2.23.4** (el
+orquestador; formularios y reglas, 2.23.1) y las apps, Mateu **3.0-alpha.383**. Lo marcado *(pendiente)* no está construido todavía o espera una
 decisión.
 
-**ec1 está a cero** desde las 08:20Z (`deploy/demo/zero.sh`): sin integraciones, reservas, mapeados,
-clientes ni procesos, y sin contactos en Salesforce, para recorrer el alta paso a paso. Hasta que se
-recorra y se tome una línea base nueva, `reset.sh` y `npm run demo` no se pueden usar (ver
-[Resetear la demo](#resetear-la-demo)).
+**ec1 no tiene línea base**: se puso a cero (`deploy/demo/zero.sh`) para recorrer el alta paso a paso, y
+desde entonces se ha recorrido varias veces (ensayo y grabación, contextos `ECDEMO1-09280207` y
+`ECDEMO1-09280410`), pero no se ha vuelto a tomar una. Hasta que se tome (`snapshot.sh`), `reset.sh` y
+`npm run demo` no se pueden usar (ver [Resetear la demo](#resetear-la-demo)).
 
 La infraestructura, desde hoy: todo ec1 en **hel1**, en los nodos que elige Karpenter (hoy, uno
 cx53 para todo ec1 y el de observabilidad), sin la topología del benchmark; el PostgreSQL del motor en
 un **volumen** (ya no muere con su pod); los pods clave marcados para que Karpenter no los mueva; y el
-DNS de `ec1.mateu.io` apuntando al balanceador de hel1. El motor tiene **solo los seis procesos de la
-PoC** (ec-definitions #23).
+DNS de `ec1.mateu.io` apuntando al balanceador de hel1. El motor tiene **solo los procesos de la
+PoC**: eran seis (ec-definitions #23); hoy, los doce de §2.
 
 ## 1. Arquitectura (diagramas del HLA)
 
@@ -52,6 +52,7 @@ superior de las cuatro, el **aviso de la bandeja** («Inbox (n)», lo que yo aú
 | :--- | :---------- |
 | Call center | El CRS simulado: una reserva con habitaciones, huéspedes, desglose diario, cobros y su referencia en Opera; en *In other systems*, sus enlaces: la estancia en el front office, el titular y los huéspedes en Clientes y en Salesforce, y la reserva y los perfiles de Opera (como referencias: Opera Cloud no tiene enlace estable) |
 | ERP | El maestro de interlocutores; cada uno sabe **qué perfil es en Opera** (*Opera profile*); *Resync* |
+| Avisos | Los avisos de recepción de una reserva o de una agencia (se crean aquí) y los de un cliente (de Salesforce, solo lectura); el front office guarda su copia (§10 · avisos) |
 | Clientes | La cara de negocio del maestro de clientes, solo consulta: *Buscar clientes* por nombre, email, teléfono o documento; la ficha con sus datos vigentes (lo que decidió Salesforce), dónde está (contacto de Salesforce, huésped del front office, perfiles de Opera), sus reservas en el CRS y sus estancias en el front office — cada una con su enlace — y sus solicitudes de cambio; *Solicitudes de cambio*: todas, con su estado. Los cambios se piden en recepción y los decide Salesforce |
 | Admin | Los procesos del motor, con sus pasos |
 
@@ -69,9 +70,10 @@ Salesforce (enlaces), y el perfil de Opera.
 | Integrations | Dos tipos. **CRS → PMS**: una por hotel del CRS, su conexión con Opera, en qué puerta del alta está, *Relaunch backfill*, *Import partners*. **PMS → Front office** (pms-fo): una por propiedad de Opera y su front office — conexión, catálogo, backfill, activación, y el sondeo de cambios de Opera (cursor, último sondeo); *Resync catalogue*, *Poll now*, *Relaunch backfill* |
 | Mapping | Causes; Dictionary: se filtra por **integración** y muestra también lo **sin mapear** (*Unmapped*), *Ask the agent*, y aprobar, rechazar o **retirar** una entrada o las filas seleccionadas; Partners in the PMS |
 | Customers | El maestro de clientes, lo técnico: golden records, su estado de proyección y las consolidaciones que llegan de Salesforce (la cara de negocio está en Clientes, en el plano de datos) |
+| Registro | Las reglas de registro (kárdex): qué datos del huésped se piden, por país u hotel, nacionalidad, edad y rol; el front office las aplica en el check-in (`deploy/demo/registration-rules-seed.sh` siembra unas de ejemplo) |
 | Notifications | Lo que se ha comunicado y a quién; **destinatarios**: quién se entera de qué y por dónde (§11) |
 | Audit | Todas las acciones auditables: quién, cuándo, con qué parámetros y qué respuesta; búsqueda libre y filtros |
-| Workflow / Forms | Las definiciones de proceso: los diez de la PoC (`alta-integracion`, `alta-integracion-fo`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-estancia`, `proyectar-interlocutor`, `registrar-no-show`, y la recepción hacia el PMS: `registrar-checkin`, `registrar-checkout`, `registrar-no-show-pms`); formularios, hoy ninguno |
+| Workflow / Forms | Las definiciones de proceso: los doce de la PoC (`alta-integracion`, `alta-integracion-fo`, `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-estancia`, `proyectar-interlocutor`, `registrar-no-show`, y la recepción hacia el PMS: `registrar-checkin`, `registrar-checkout`, `registrar-no-show-pms`, `registrar-cargo`, `anular-cargo`); formularios, hoy ninguno |
 | IA | El agente de mapeado y los MCP de cada servicio |
 | Usuarios | Quién puede hacer qué |
 
@@ -169,7 +171,7 @@ Opera como «BRKFST»: esa es su palabra, y el front office la enseña tal cual.
   bandejas.
 - **Descartar** (F012) es la otra salida, cuando lo que espera ya no importa (una reserva de prueba,
   una cancelada antes de llegar a Opera): en *Mapping → Causes*, en la causa, *Descartar* en la fila del
-  proceso o *Descartar…* en la barra (uno, o todos los de la causa). El diálogo explica la consecuencia
+  proceso (solo en Vaadin: en Redwood la fila no lo lleva) o *Descartar…* en la barra (uno, o todos los de la causa). El diálogo explica la consecuencia
   —no se reanuda, no se le reenvía nada, **el motor lo cancela**, y lo que iba a hacer no llega a Opera;
   no se deshace— y pide el **motivo**, que se guarda con quién y cuándo en el proceso y en la
   auditoría («Discard process»). Si nadie más espera en la causa, ofrece **resolverla** también. Por
@@ -214,7 +216,7 @@ retenidos.
 ## 8. Una reserva de punta a punta
 
 Una reserva nueva de MRU01 por su *Central de reservas* (canal `CALLCENTER`; o por el chat del agente,
-*«Crea 3 reservas en MRU01…»*, o con *Demo bookings* en la lista de reservas):
+*«Crea 3 reservas en MRU01…»*, o con *+ 10 reservas demo* en la lista de reservas):
 
 - En el motor: **un** `proyectar-reserva` por reserva. El CRS la crea confirmada y con sus cobros en
   un solo cambio (versión 1, un `booking-created`); cada cambio posterior es otro.
@@ -684,6 +686,13 @@ noviembre, solo alojamiento) esperando a las 17:55:41; propuesta del agente en 1
   (Opera rechaza una escritura, un reintento que no acaba). Qué enseñar: crear uno para un hotel — p. ej.
   el rol de recepción de MRU01 solo con sus causas, por push — y ver que un aviso de ese hotel le llega
   y uno de otro, no.
+- **Las alertas de la plataforma** (PR #163) llegan por la misma tabla: Alertmanager manda las reglas de
+  ec1 —Opera o Salesforce que no contestan (`OperaNotAnswering`, `SalesforceNotAnswering`), Opera que
+  falla una de cada cuatro (`OperaErrorRateHigh`), el cupo de Salesforce, un servicio caído
+  (`ServiceDown`) o en bucle de reinicios (`PodCrashLooping`)— a `communication-service`
+  (`/alerts/alertmanager`, interno), y cada una es un aviso **`PLATFORM_ALERT`** (aviso) o
+  **`PLATFORM_ALERT_CRITICAL`** (crítica), tipos que se eligen por destinatario como los demás. De
+  serie, a los administradores en la bandeja y el navegador; al resolverse, el aviso se cierra solo.
 
 ### Avisos en el navegador (Web Push)
 
@@ -703,8 +712,9 @@ recibe lo deciden los destinatarios de arriba.
   en la bandeja (≈5 s).
 - **Qué llega a quién**: *Integration administrators* (rol `ai-admin`, bandeja y push) lleva todos los
   avisos de la integración a los navegadores de las **consolas** de quien tenga ese rol — `demo` lo
-  tiene. A **recepción** (front office) **no llega nada hoy**: ningún destinatario usa *Browser at the
-  front desk*. El navegador del front office es un canal aparte para que la misma persona, con las dos
+  tiene. A **recepción** (front office) no le llega nada **de serie**: ninguno de los destinatarios por
+  defecto usa *Browser at the front desk*; en ec1 está creado a mano «Recepción (front office)», solo
+  para `CHECK_IN_INCOMPLETE` de MRU01 (§10 quater · forzado). El navegador del front office es un canal aparte para que la misma persona, con las dos
   cosas abiertas, no reciba todo dos veces, y para que al mostrador solo le llegue lo que alguien decida
   que es suyo (p. ej. un destinatario *PMS_REJECTED* de MRU01 por *Browser at the front desk*).
 - **Para la demo**: en el Chrome de la demo, entrar en `console.ec1.mateu.io`, *Activar avisos* →
@@ -723,18 +733,20 @@ Dos scripts en `deploy/demo/`, y ninguno toca Opera:
 
 - **`zero.sh` — antes de cualquier integración** (unos 3 minutos). Vacía lo que hace la integración:
   reservas del CRS (y las tarifas abiertas después, flujo 8), integraciones (crs-pms y pms-fo, con su cursor), mapeados, MDM, huéspedes, estancias y catálogo del PMS del front office (las
-  habitaciones quedan libres), avisos, auditoría y los procesos del motor; y en Salesforce borra
+  habitaciones quedan libres), notificaciones, los avisos de recepción (el servicio `notices` y la
+  copia del front office), auditoría y los procesos del motor; y en Salesforce borra
   **todos** los contactos y los Cases del MDM (el org se comparte con el entorno local). Se queda lo
   que está configurado: interlocutores del ERP, habitaciones y catálogos del front office,
-  definiciones, usuarios y Keycloak. El front office ya no se rellena solo con huéspedes de muestra.
+  definiciones, reglas de registro, usuarios y Keycloak. El front office ya no se rellena solo con
+  huéspedes de muestra.
 - **`reset.sh` — a la línea base** (unos 4 minutos), la que guarda `snapshot.sh` en
-  `~/.local/share/ec-demo1/demo-baseline`: restaura las bases de datos de nuestros servicios y el
-  estado del motor, borra en Salesforce los contactos y Cases que creó la demo y devuelve los de la
+  `~/.local/share/ec-demo1/demo-baseline`: restaura las bases de datos de nuestros servicios —también
+  `notices` y `registration_rules`— y el estado del motor, borra en Salesforce los contactos y Cases que creó la demo y devuelve los de la
   línea base a sus datos.
 
 **Hoy no hay línea base**: la anterior (06:58Z, con MRU01 ↔ XMAR activa) se apartó a
 `demo-baseline-pre-zero` al poner ec1 a cero, para que `reset.sh` no la trajera de vuelta; sin línea
-base, se niega a arrancar. Cuando el alta desde cero esté recorrida, se toma otra (`snapshot.sh`, con
+base, se niega a arrancar. El alta desde cero ya se ha recorrido; falta tomar otra (`snapshot.sh`, con
 nada en marcha).
 
 Opera no se toca ni para resetear: ni se cancela ni se borra nada. Por eso la demo se hace para
@@ -899,7 +911,7 @@ desde su cursor. Qué hacer:
       defecto).
 - [ ] Solo el titular viaja al maestro: los acompañantes no llevan código de cliente en el front office.
 - [x] Mateu **3.0-alpha.361** en todas las apps (renovación del token tras un 401, el botón «atrás»):
-      desplegado; las pantallas, 67/67.
+      desplegado; las pantallas, 67/67. Hoy, **3.0-alpha.383** en todas.
 - [x] Menos nodos: de 7 a 3 (ec1 entero en un cx53 de hel1, la observabilidad en el suyo, y uno de
       sistema del clúster); fuera `swapi`, una app vieja y su balanceador.
 - **Datos de prueba que quedan en XMAR, por contexto** (Opera no se limpia; todos los contextos de la
@@ -947,7 +959,8 @@ desde su cursor. Qué hacer:
   `69721441` → 200. Leer el folio (`GET /csh/v1/hotels/XMAR/reservations/{id}/folios`) no lo necesita.
   Asignarlo al usuario de integración por OHIP (`PUT /fof/config/v1/cashiers` con `appUsers`) da 500:
   si se quiere que sea el cajero por defecto (y no pasarlo en cada llamada), un administrador de OPERA
-  debe asociarlo al usuario en OPERA Cloud (gestión de usuarios → Cashier ID). El conector aún no
-  pasa `cashierId` (`OPERA_POST_DEPOSITS` sigue en `false`). Ojo: `GET /csh/v1/cashiers/{id}/locks`
+  debe asociarlo al usuario en OPERA Cloud (gestión de usuarios → Cashier ID). El conector lo
+  pasa (`OPERA_CASHIER_ID`) en check-outs, folios y cargos; los depósitos siguen apagados
+  (`OPERA_POST_DEPOSITS=false`). Ojo: `GET /csh/v1/cashiers/{id}/locks`
   no es de solo lectura — toma un bloqueo del cajero (y lo abre); se suelta con
   `DELETE /csh/v1/cashiersLock/{lockHandle}`.

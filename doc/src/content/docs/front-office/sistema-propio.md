@@ -13,7 +13,8 @@ con Mateu, pintado por Redwood.
 | Pantalla | Qué hace |
 | :------- | :------- |
 | *Bienvenida* | La página de inicio |
-| *Reservas* | Las estancias: llegadas, en casa, salidas; la ficha con huéspedes, estancia y enlaces a los demás sistemas |
+| *Reservas* | Las estancias: llegadas, en casa, salidas; la ficha con huéspedes, estancia y enlaces a los demás sistemas. Junto al nombre de cada huésped, la bandera de su nacionalidad (la que escaneó recepción para ese pax o, si no, la del cliente en el MDM) |
+| *Llegadas*, *In house*, *Salidas* | Atajos a las tres vistas del día: el mismo listado de reservas con su vista ya elegida (`/reservas?vista=LLEGADAS_HOY`, `IN_HOUSE`, `SALIDAS_HOY`), como las tarjetas de la bienvenida. Solo para el personal |
 | Check-in | Asistente: identidad (con el escaneo del documento), habitación, extras, confirmación |
 | Check-out y folios | Cierre de la estancia y sus cargos |
 | *＋ Walk-in* | Asistente para vender en el mostrador: habitación, tarifa y régimen **del CRS**, precio pedido al CRS, titular |
@@ -22,8 +23,8 @@ con Mateu, pintado por Redwood.
 
 La cabecera tiene el **agente de recepción** (`reception-agent`), cuyo único servidor MCP es el del
 front office. Lo atiende el mismo `ia-agent` que las consolas: el gateway manda el `/ai/**` de
-`front.ec1` marcado con el canal `front-office` y `reception-agent` como agente por defecto. Y un selector **Modo** (Staff / Cliente) que
-proyecta las pantallas para cada audiencia.
+`front.ec1` marcado con el canal `front-office` y `reception-agent` como agente por defecto. Y dos
+selectores: **Modo** (Staff / Cliente), que proyecta las pantallas para cada audiencia, y **Hotel**.
 
 ## De dónde toma cada dato
 
@@ -63,7 +64,8 @@ el alojamiento del folio del front office es el total de la estancia que da Oper
 Opera postea aparte** (en XMAR, el desayuno BRKFST, 40 MUR la noche, fuera de la tarifa). Si aun así
 difieren, la proforma dice por qué suele ser: el alojamiento (Opera factura sus noches con su tarifa; en
 una salida anticipada, solo las pasadas), un cargo que Opera rechazó o que llegó tarde, o cargos
-anteriores a subirlos a Opera.
+anteriores a subirlos a Opera. La factura la sirve el front office (`/invoices/{estancia}`), nunca un
+enlace a Opera, con un enlace firmado que caduca (una pestaña nueva no lleva el token).
 
 **Gestionar folio** lista los cargos de recepción con dónde está cada uno en Opera («Opera: en el folio ·
 88731245», «pendiente», «rechazado — motivo») y **«Anular»**: la línea queda en el folio, anulada y sin
@@ -78,8 +80,7 @@ rechaza con FOF00081). Las libres que aún no están listas se ven en gris con e
 Limpia, sin inspeccionar en Opera») y se pueden elegir a propósito (Opera puede rechazarla); las ocupadas
 o fuera de servicio no se pueden elegir. En la estancia que llega, un aviso dice si la habitación asignada
 está **lista en Opera** o por qué no, con **«Comprobar»** para preguntarlo otra vez (lo de Opera se
-guarda 20 s: una pantalla se repinta a cada clic). La sirve el front office (`/invoices/{estancia}`), nunca un
-enlace a Opera, con un enlace firmado que caduca (una pestaña nueva no lleva el token).
+guarda 20 s: una pantalla se repinta a cada clic).
 
 ## Avisos de recepción, al entrar y al salir
 
@@ -123,7 +124,7 @@ la haga una persona en el mostrador o el agente de recepción por ella.
 | Cobro / preautorización | `Payment taken` (método e importe; nunca datos de tarjeta) | `CheckInService` |
 | Llave, wifi, firma | `Key encoded`, `Wifi created`, `Registration signed` | `CheckInService` |
 | Ancillaries | `Add-on added` / `Add-on removed`, `Ancillaries chosen`, `Ancillaries closed` | `CheckInService` |
-| Kárdex | `Kardex edit` (qué campos, no sus valores), `Contact updated`, `Document scanned` | `KardexService` |
+| Kárdex | `Kardex edit` y `Registration data` (los datos de registro de un pax; qué campos, no sus valores), `Contact updated`, `Document scanned` | `KardexService` |
 | No-show de un pax | `No show` | `NoShowService` |
 | Walk-in | `Walk-in` (con lo que contestó el CRS) | `WalkInService` |
 | Incidencias | `Incident reported`, `Incident resolved` | `IncidentService` |
@@ -134,7 +135,8 @@ la haga una persona en el mostrador o el agente de recepción por ella.
 - **Qué lleva.** La estancia, el localizador del CRS, el hotel, los parámetros (tarjetas, secretos y
   tokens enmascarados), si se hizo y lo que contestó o por qué no.
 - **Fallos.** Se auditan también, aparte de la transacción que se deshace. Un rechazo que ya audita
-  quien lo decide (avisos sin leer, check-in incompleto) no se audita dos veces.
+  quien lo decide (avisos sin leer, `Check-in refused: unread notices`; pasos que faltan, como los
+  datos de registro, `Check-in refused: steps missing`) no se audita dos veces.
 - **Historial.** La ficha de la reserva tiene una sección **Historial**: quién hizo qué y cuándo, lo más
   reciente primero — la recepción, el agente y lo que el CRS hizo con su reserva —, leído de
   `audit-service` (`GET /audit`, dentro del clúster; `AUDIT_URL`). Si no contesta, lo dice y la página

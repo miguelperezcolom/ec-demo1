@@ -83,6 +83,12 @@ rechazó y por qué, la habitación en la que Opera tiene a los huéspedes, la f
 **cargos** que recepción pone en el folio (y sus anulaciones) suben igual, con `registrar-cargo` y
 `anular-cargo`, y su posteo en Opera vuelve como `record-charge`.
 
+:::note[El no show, solo en la PoC]
+En producción el no-show lo marca el **Night Audit de Opera** (OHIP no tiene una llamada que lo ponga)
+y el front office solo lo refleja. El flujo «recepción marca no show → Opera lo anota → el CRS cobra»
+existe para enseñarlo en la demo.
+:::
+
 Las llamadas a OHIP (`OperaFrontDesk`):
 
 | Qué | OHIP |
@@ -90,10 +96,14 @@ Las llamadas a OHIP (`OperaFrontDesk`):
 | Asignar habitación | `POST /fof/v1/hotels/{h}/reservations/{id}/roomAssignments` (`criteria.roomId`) |
 | Habitaciones que sugiere Opera (solo lectura) | `GET /fof/v1/hotels/{h}/reservations/{id}/verifyCheckIns` |
 | Check-in | `POST /fof/v1/hotels/{h}/reservations/{id}/checkIns` |
+| Fecha de negocio de la propiedad (solo lectura) | `GET /ent/config/v1/hotels/{h}/operaContext` (`hotelContext.businessDate`) |
+| Salida anticipada, si la salida aún no es hoy para Opera (sin ella, FOF00107) | `PUT /csh/v1/hotels/{h}/reservations/{id}/earlyDeparture` (con el cajero) |
+| Saldo del folio, por ventana (solo lectura) | `GET /csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Windowbalances` |
+| Saldar el folio con lo cobrado en el mostrador (sin saldar, FOF00108) | `POST /csh/v1/hotels/{h}/reservations/{id}/payments` (`action: Settlefolio`, con el cajero) |
 | Check-out | `POST /csh/v1/hotels/{h}/reservations/{id}/checkOuts`, con `cashierId` (`OPERA_CASHIER_ID`; sin él, FOF00094) |
-| Folios del check-out (solo lectura) | `GET /csh/v1/hotels/{h}/folioHistory?checkOut=true` |
+| Folios del check-out (solo lectura) | `GET /csh/v1/hotels/{h}/folioHistory?reservationIdId={id}&reservationIdType=Reservation&checkOut=true` |
 | Documento de la factura | `POST /csh/v1/hotels/{h}/reservations/{id}/folios` (con el cajero) → `storedFolioId` → `GET /csh/v1/hotels/{h}/storedFolios/{id}` → `folioReportURL` |
-| No show | Un comentario en la reserva (`PUT /rsv/v1/hotels/{h}/reservations/{id}`, solo `comments`) |
+| No show | Un comentario en la reserva (`PUT /rsv/v1/hotels/{h}/reservations/{id}`, solo `comments`); el estado «No Show» lo pone el Night Audit |
 | Estado de las habitaciones de un tipo, o de una (solo lectura) | `GET /fof/v1/hotels/{h}/rooms?roomType=` · `?fromRoomNumber=&toRoomNumber=` |
 | Cargo de recepción en el folio (y su anulación, en negativo) | `POST /csh/v1/hotels/{h}/reservations/{id}/charges` (`transactionCode`, `price`, `postingReference` `FO:<línea>`, con el cajero) |
 | Posteos del folio (solo lectura) | `GET /csh/v1/hotels/{h}/reservations/{id}/folios?fetchInstructions=Postings&summaryOnly=false` (sin `summaryOnly=false`, XMAR no da los posteos; la referencia vuelve con un blanco al final) |

@@ -14,7 +14,8 @@ en ec1 falla. Pasó con `cause_type_check` en el mapeado, que no tenía `INTEGRA
 de un hotel sin integración fallaba `prepare` en bucle. Al añadir un valor a un enum persistido, mirar
 las restricciones de la base de datos desplegada
 (`select conname, pg_get_constraintdef(oid) from pg_constraint where contype='c'`) y quitar o
-rehacer la vieja en el mismo cambio (el mapeado lo hace al arrancar, `StaleEnumChecks`). Un campo nuevo
+rehacer la vieja en el mismo cambio (el mapeado y `communication-service` lo hacen al arrancar, con su
+`StaleEnumChecks`). Un campo nuevo
 de tipo enum puede guardarse como texto para evitarlo.
 
 **Un campo primitivo nuevo rompe la tabla** — `add column ... not null` sobre una tabla con filas.

@@ -27,7 +27,20 @@ repositorio**.
 
 `CONSOLE_HOST=ec1.mateu.io`, `CONTROL_HOST=console.ec1.mateu.io` (y `RW_CONSOLE_HOST`,
 `RW_CONTROL_HOST`, `FRONT_OFFICE_HOST`, con sus valores por defecto en `application.yaml`), y la URL de
-cada backend que enruta.
+cada backend que enruta. El manifiesto solo da algunas (`ORCHESTRATOR_URL`, `FORMS_URL`, `SHELL_URL`,
+`BOOKING_URL`, `CONTENT_URL`, `USERS_URL`, `IA_AGENT_URL`, `IA_CONTROL_PLANE_URL`, `CONTROL_SHELL_URL`);
+el resto —`NOTICES_URL`, `REGISTRATION_RULES_URL`, `COMMUNICATION_URL`, `INTEGRATIONS_URL`,
+`MAPPING_URL`, `CUSTOMER_MDM_URL`, `AUDIT_URL`, `JOURNEY_URL`, `ERP_URL`, `FRONT_OFFICE_URL`…— va con
+el valor por defecto de `application.yaml`, `http://<servicio>:<puerto>`.
+
+| Variable | Valor | Para qué |
+| :------- | :---- | :------- |
+| `DATA_PLANE_AGENT` | `console-agent` por defecto | El agente por defecto de la consola de datos (`X-Default-Agent`, con `X-Agent-Channel: data-plane`) |
+| `CONTROL_PLANE_AGENT` | `control-plane-agent` por defecto | El de la consola de control (`X-Agent-Channel: control-plane`) |
+| `FRONT_OFFICE_AGENT` | `reception-agent` por defecto | El del front office (`X-Agent-Channel: front-office`) |
+| `KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI` | `http://keycloak:8080/realms/ec-demo1/…/certs`, `https://auth.ec1.mateu.io/realms/ec-demo1` | Las claves, por la red del clúster, y el emisor tal como viene en el token |
+
+Las cabeceras se sustituyen siempre: lo que mande el navegador con esos nombres no llega al agente.
 
 ### pms-integration-service
 
@@ -38,9 +51,14 @@ cada backend que enruta.
 | `OPERA_PAY_AT_HOTEL_METHOD` | `CASH` | La forma de pago en hotel del tenant |
 | `OPERA_PROFILE_REFERENCES` | `false` | Referencias externas en perfiles (el tenant no tiene la interfaz) |
 | `OPERA_CRM_EXTERNAL_SYSTEM` | vacío | |
-| `OPERA_POST_DEPOSITS` | `false` | Depósitos al folio (el tenant no tiene cajero para la integración) |
+| `OPERA_POST_DEPOSITS` | `false` | Depósitos al folio (apagado en el tenant de la PoC) |
+| `OPERA_CASHIER_ID` | `69721441` | El cajero con el que se hacen los check-outs y los cargos al folio (`registrar-checkout`, `registrar-cargo`): «EC-DEMO1 Integración», un InterfaceCashier creado para la PoC. Sin él Opera usa el del usuario de la integración, que no tiene (FOF00094) |
 | `OPERA_PROPERTIES` | `XMAR,XMU` | Las propiedades que se ofrecen (listar las de la cadena da 403) |
-| `OPERA_EXTERNAL_SYSTEM`, `OPERA_CUSTOM_REFERENCE` | (ConfigMap `ec-demo-run`, opcional) | El contexto de la ejecución de la demo |
+| `OPERA_EXTERNAL_SYSTEM`, `OPERA_CUSTOM_REFERENCE` | (ConfigMap `ec-demo-run`, opcional; `ECDEMO1` y `EC-DEMO1` por defecto) | El contexto de la ejecución de la demo |
+
+En `application.yaml`: `OPERA_CHARGE_DEFAULT_CODE` (`1851`, el código de transacción de un cargo sin
+código propio; los demás, por tipo, en `opera.charges.codes`) y `OPERA_NO_SHOW_CODES` (`NOSHOW`, los
+motivos de cancelación de Opera que son un no-show, para las estancias del front office).
 
 Cómo se llega a cada propiedad no está aquí: es de la integración de cada hotel, en `integrations-service`.
 
@@ -56,6 +74,11 @@ Cómo se llega a cada propiedad no está aquí: es de la integración de cada ho
 | `USAGE_SALESFORCE_URLS` | `http://customer-mdm-service:8127` | De dónde lee el consumo de Salesforce |
 | `CONSOLE_URL` | `https://console.ec1.mateu.io` | Los enlaces de los avisos |
 
+En `application.yaml`: `GATE_CHECK` (`5s`) y `GATE_RECHECK` (`30s`), las puertas del alta;
+`BACKFILL_PER_TICK` (`20`) y `BACKFILL_TICK` (`2s`), el ritmo del backfill; `ACTIVATION_WINDOW_DAYS`
+(`30`); `USAGE_OPERA_URLS` (por defecto `PMS_INTEGRATION_URL`), `USAGE_TIMEOUT` (`2s`) y `USAGE_CACHE`
+(`15s`), el consumo de las API externas.
+
 ### customer-mdm-service
 
 | Variable | Valor | Para qué |
@@ -68,7 +91,11 @@ bajo la Pub/Sub API — fusiones, decisiones de Cases, avisos sin confirmar), `P
 `MARKING_TICK` (`2m`, las marcas de calidad que cambiaron), `CLEANUP_AFTER` (`30d`), `CLEANUP_CRON`
 (`0 30 3 * * *`) y `CLEANUP_ENABLED` (`true`) — la anonimización de los «Solo nombre» —, y
 `USAGE_LIMITS_STALE` (`2h`, cada cuánto se pregunta a `/limits`). `SF_PUBSUB_HOST`/`SF_PUBSUB_PORT`
-(`api.pubsub.salesforce.com:7443`) y `SF_SUBSCRIBE` (`true`).
+(`api.pubsub.salesforce.com:7443`) y `SF_SUBSCRIBE` (`true`). `SF_API_VERSION` (`v67.0`).
+`SALESFORCE_PAUSE` (`5m`) y `SALESFORCE_PAUSE_MAX` (`60m`): la pausa de todas las llamadas cuando
+Salesforce contesta `REQUEST_LIMIT_EXCEEDED`, doblada en cada rechazo hasta el máximo.
+`SF_LIGHTNING_URL` (vacío: se deriva de `SF_DOMAIN`) y `LINKS_TIMEOUT` (`3s`): los enlaces de la ficha
+del cliente a cada sistema.
 
 ### communication-service
 
@@ -80,10 +107,29 @@ bajo la Pub/Sub API — fusiones, decisiones de Cases, avisos sin confirmar), `P
 | `GOOGLE_CHAT_WEBHOOK`, `GOOGLE_CHAT_WEBHOOK_2` | (Secret `ec-googlechat`) | Los dos espacios de Google Chat |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | (Secret `ec-webpush`) | Web Push |
 
+En `application.yaml`: `FRONT_OFFICE_HOST` (`front.ec1.mateu.io`: los navegadores que se suscriben desde
+ese host son los de recepción, `FRONT_DESK_PUSH`), `INBOX_TASKS_LINK` (`/forms/tasks`, a dónde lleva
+una tarea de la bandeja) y `HUMAN_TASKS_TOPIC` (`human-tasks`). Las alertas de Alertmanager entran por
+`POST /alerts/alertmanager`, sin configuración aquí: a quién llegan lo dice la tabla de destinatarios.
+
 ### front-office
 
-`FRONT_OFFICE_HOTEL=MRU01`, `FRONT_OFFICE_PMS_HOTEL=XMAR`, `CRS_INTEGRATION_URL`, `MDM_URL`, `AUDIT_URL` (el «Historial» de la reserva),
-`CONSOLE_URL=https://ec1.mateu.io`.
+| Variable | Valor | Para qué |
+| :------- | :---- | :------- |
+| `FRONT_OFFICE_HOTEL` | `MRU01` | El hotel (código del CRS) |
+| `FRONT_OFFICE_PMS_HOTEL` | `XMAR` | La propiedad del PMS de la que recibe estancias y catálogo |
+| `FRONT_OFFICE_CURRENCY` | `MUR` | La moneda de los cargos que sube al folio del PMS |
+| `FORCED_CHECKIN_DOCUMENT_DEADLINE` | `PT24H` | El plazo de los documentos de un check-in forzado; pasado, el aviso `CHECK_IN_INCOMPLETE` |
+| `FRONT_OFFICE_URL` | `https://front.ec1.mateu.io` | Su propia URL, para el enlace de ese aviso |
+| `CONSOLE_URL` | `https://ec1.mateu.io` | Los enlaces a la reserva del CRS y a los clientes |
+| `CRS_INTEGRATION_URL`, `MDM_URL`, `AUDIT_URL`, `PMS_INTEGRATION_URL` | `http://<servicio>:<puerto>` | Los walk-ins y el escáner; las lecturas del MDM; el «Historial» de la reserva; las habitaciones libres y limpias de Opera |
+| `KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI` | Los mismos que el gateway | Su login |
+
+En `application.properties`: `FRONT_OFFICE_HOTEL_COUNTRY` (`MU`, el país del hotel para las reglas de
+registro por país; tiene que coincidir con `HOTEL_COUNTRIES` de registration-rules),
+`FRONT_OFFICE_PMS_READY_STATUSES` (`Inspected`, qué estado de limpieza de Opera hace una habitación
+lista), `LINK_SECRET` (vacío: una clave propia del proceso; firma los enlaces «Abrir factura», que
+dejan de valer al reiniciar) y `FORCED_CHECKIN_CHECK_INTERVAL` (`PT1M`).
 
 ### booking (el CRS)
 
@@ -93,7 +139,32 @@ quién hizo qué con la reserva).
 ### journey-service
 
 `TEMPO_URL=http://tempo.observability.svc.cluster.local:3200`,
-`GRAFANA_URL=https://grafana.ec1.mateu.io`, y las URL del CRS, el MDM y el mapeado.
+`GRAFANA_URL=https://grafana.ec1.mateu.io`, y las URL del CRS, el MDM y el mapeado. En
+`application.yaml`: `JOURNEY_LOOKBACK` (`P7D`, hasta dónde busca en Tempo), `JOURNEY_ZONE`
+(`Europe/Madrid`) y `JOURNEY_CACHE_FOR` (`PT5S`).
+
+### mapping-service
+
+`CRS_INTEGRATION_URL`, `PMS_INTEGRATION_URL`, `INTEGRATIONS_URL`, `IA_AGENT_URL` (el agente de
+mapeado, para sus propuestas) y `CONSOLE_URL=https://console.ec1.mateu.io` (los enlaces de los avisos).
+En `application.yaml`: `RESEND_FOR` (`6h`), cuánto tiempo tras liberarlo se le vuelve a mandar el
+mensaje de reanudar a un proceso que no contesta; pasado, queda `RELEASED` en su causa para que una
+persona lo descarte.
+
+### audit-service
+
+`AUDIT_ZONE` (`Europe/Madrid` por defecto): la zona horaria en que se muestra y filtra por fecha el
+rastro.
+
+### notices
+
+`ERP_URL=http://erp:8120`: el maestro de interlocutores; un aviso de agencia lleva el nombre de la agencia tal como la nombra el PMS.
+
+### registration-rules
+
+| Variable | Valor | Para qué |
+| :------- | :---- | :------- |
+| `HOTEL_COUNTRIES` | `MRU01=MU,PMI01=ES,CUN01=MX` | El país de cada hotel del CRS, donde aplica una regla de país. Ningún maestro lo tiene aún: se dice aquí y en cada front office (`FRONT_OFFICE_HOTEL_COUNTRY`) |
 
 ### ia-agent
 
@@ -103,6 +174,9 @@ quién hizo qué con la reserva).
 | `IA_CAPTURE_CONTENT` | `full` | Qué de la conversación va a Tempo (`none`, `redacted`, `full`) |
 | `IA_CAPTURE_MAX_CHARS` | 16384 por defecto | Corte de cada valor capturado |
 | `IA_A2A_MAX_DEPTH` | 2 por defecto | Saltos A2A |
+| `IA_A2A_BASE_URL` | `http://ia-agent:8095` por defecto | La dirección A2A que dice su Agent Card; debe coincidir con `A2A_BASE_URL` del plano de control |
+| `IA_A2A_TIMEOUT_SECONDS` | 120 por defecto | Por llamada A2A, el turno entero del otro agente |
+| `IA_A2A_REQUIRE_TOKEN` | `true` por defecto | `message/send` exige el token de quien llama |
 
 ### ia-control-plane
 
@@ -117,6 +191,10 @@ quién hizo qué con la reserva).
 | `GITOPS_ENABLED`, `GITOPS_REPO`, `GITOPS_BRANCH`, `GITOPS_PATH`, `GITOPS_POLL_ENABLED` | `true`, `miguelperezcolom/ec-ia-config`, `master`, `ia`, `false` | GitOps del catálogo |
 | `GITOPS_GITHUB_TOKEN`, `GITOPS_WEBHOOK_SECRET` | (Secret `cp-gitops`) | |
 | `A2A_BASE_URL` | `http://ia-agent:8095` por defecto | La base de las direcciones A2A |
+| `ORCHESTRATOR_URL`, `FORMS_URL`, `BOOKING_URL`, `RAG_STORE_URL` | `http://<servicio>:<puerto>`; `jdbc:postgresql://cp-postgres:5432/controlplane?user=…&password=…` | Solo para sembrar los catálogos en una base de datos vacía (`CatalogueSeeder`): las API y la fuente de RAG (pgvector, en su misma base de datos). Después, los catálogos son del operador |
+
+En `application.yaml`: `USAGE_RETENTION_DAYS` (`90`) y `USAGE_PURGE_CRON` (`0 30 3 * * *`), el registro
+de consumo de tokens; `GITOPS_SYNC_ON_STARTUP` (`true`) y `GITOPS_POLL_MS` (`300000`).
 
 ### api-mcp
 
@@ -124,6 +202,7 @@ quién hizo qué con la reserva).
 
 ### users
 
+`KEYCLOAK_URL=http://keycloak:8080`, `KEYCLOAK_REALM=ec-demo1`, `KEYCLOAK_ADMIN_USERNAME=admin` y
 `KEYCLOAK_ADMIN_PASSWORD` (Secret `keycloak-admin`): la propagación de usuarios a Keycloak.
 
 ### Terceros

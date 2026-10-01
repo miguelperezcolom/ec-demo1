@@ -18,8 +18,8 @@ each service depends on the contexts it speaks and nothing else. The packages
 | `contracts-mapping` | Code types, translations, causes, `MappingCommand` | mapping-commands | crs-integration, pms-integration, mapping, integrations |
 | `contracts-integration` | An integration's lifecycle: status, connection, connectivity, future reservations and their codes (needs `contracts-mapping`); `ApiUsage`, what an external API (Salesforce, Opera) is spent | — (HTTP) | crs-integration, pms-integration, mapping, integrations, customer-mdm |
 | `contracts-frontoffice` | `FrontOfficeCommand` (stays, catalogues, how the PMS took the reception: `RecordReception`, and a charge: `RecordCharge`), `FrontOfficeEvent` (check-in, check-out, no-show at the desk; a charge of the folio and its void), the catalogue summary | front-office-commands, front-office-events | pms-integration, integrations, front-office |
-| `contracts-communication` | Notifications asked for and resolved | notifications, notification-resolutions | pms-integration, customer-mdm, mapping, integrations, communication |
-| `contracts-audit` | `AuditedAction` | audit | mapping, integrations, front-office, booking, audit |
+| `contracts-communication` | Notifications asked for and resolved | notifications, notification-resolutions | pms-integration, customer-mdm, mapping, integrations, communication, front-office |
+| `contracts-audit` | `AuditedAction` | audit | mapping, integrations, front-office, booking, registration-rules, audit |
 | `contracts-notices` | `NoticeChanged`: a reception notice of a customer, a reservation or a partner, when the desk sees it | notices | notices, front-office |
 | `contracts-registration` | `RegistrationRuleChanged`: which of a guest's data a destination requires at registration (by country or hotel, nationality, age, role); `RegistrationRequirements`, how a rule reads — shared so the control plane's «Probar» and the front office say the same | registration-rules | registration-rules, front-office |
 | `contracts-process` | The processes' vocabulary shared with ec-definitions: definition ids, gate messages, variable names, outcomes | — | crs-integration, pms-integration, mapping, integrations |
@@ -58,9 +58,9 @@ producer writes it.
 | front-office-commands | contracts-schemas | pms-integration, integrations | front-office |
 | front-office-events | contracts-schemas (front-office's language) | front-office | integrations |
 | pms-reservations | contracts-schemas | pms-integration | integrations |
-| notifications | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication |
-| notification-resolutions | contracts-schemas | integrations, mapping, customer-mdm, pms-integration | communication |
-| audit | contracts-schemas | integrations, mapping, front-office, booking | audit |
+| notifications | contracts-schemas | integrations, mapping, customer-mdm, pms-integration, front-office | communication |
+| notification-resolutions | contracts-schemas | integrations, mapping, customer-mdm, pms-integration, front-office | communication |
+| audit | contracts-schemas | integrations, mapping, front-office, booking, registration-rules | audit |
 | human-tasks | communication (from EventConductor's `HumanTaskChanged`) | eventconductor-forms | communication |
 
 The engine's own topics (`upstream`, and the task topics `booking`, `crs-integration`,

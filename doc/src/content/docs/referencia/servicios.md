@@ -41,7 +41,7 @@ de `deploy/manifests/` (los de esta tabla son los del momento de escribirla). La
 | Despliegue | Módulo | Puerto | Ruta | Base de datos |
 | :--------- | :----- | -----: | :--- | :------------ |
 | `integrations-service` | `control-plane/integrations-service` | 8126 | `/_integrations`, `/_api-usage` | `integrations` |
-| `communication-service` | `control-plane/communication-service` | 8125 | `/_communication`, `/_inbox` | `communication` |
+| `communication-service` | `control-plane/communication-service` | 8125 | `/_communication`, `/_inbox` (un `GET /_inbox` tecleado en la barra de direcciones redirige a `/inbox/pending`), `/_inbox/push` también en `front.ec1`; `POST /alerts/alertmanager` solo dentro del clúster (las alertas de Alertmanager a la bandeja) | `communication` |
 | `audit-service` | `control-plane/audit-service` | 8129 | `/_audit` | `audit` |
 | `registration-rules` | `control-plane/registration-rules` | 8132 | `/_registration-rules` | `registration_rules` |
 | `users` | `control-plane/users` | 8102, gRPC 9191 | `/_users` | `users` |
@@ -56,17 +56,20 @@ de `deploy/manifests/` (los de esta tabla son los del momento de escribirla). La
 
 ## Soporte y terceros
 
+El puerto es el del Service; si el contenedor escucha en otro, va entre paréntesis.
+
 | Despliegue | Qué es | Puerto |
 | :--------- | :----- | -----: |
 | `content` | `supporting/content`, un CRUD (`/_content`, base de datos `content`) | 8104 |
-| `orchestrator`, `forms` | EventConductor (chart vendorizado): `/_workflow`, `/_forms` y sus `-admin` | 8105, 8106 |
-| `postgres`, `redpanda` | El PostgreSQL y el Kafka del motor (y de todos) | 5432, 19092 |
+| `orchestrator`, `forms` | EventConductor (chart vendorizado; `orchestrator-standalone-app:2.23.4`, `forms-standalone-app:2.23.1`): `/_workflow`, `/_forms` y sus `-admin` | 8105, 8106 (contenedor 8080) |
+| `rules` | El motor de reglas de EventConductor (`rule-standalone-app:2.23.1`), del mismo chart. Importa `definitions/rules` de ec-definitions, que aún no existe: arranca con el catálogo vacío. Sin ruta en el gateway | 8107 (contenedor 8080) |
+| `postgres`, `redpanda` | El PostgreSQL (`postgres:16`) y el Kafka (Redpanda `v24.1.7`) del motor (y de todos) | 5432, 19092 |
 | `cp-postgres` | `pgvector/pgvector:pg16`, la base de datos del plano de control de IA | 5432 |
 | `keycloak` | `quay.io/keycloak/keycloak:26.0`, en `auth.ec1.mateu.io` | 8080 |
 | `postfix` | `boky/postfix`, el relay de correo a Gmail | 25 |
-| `embeddings` | Text Embeddings Inference con `intfloat/multilingual-e5-small` | 3000 |
+| `embeddings` | Text Embeddings Inference con `intfloat/multilingual-e5-small` | 80 (contenedor 3000) |
 | `kafka-console` | Redpanda Console, en `kafka.ec1.mateu.io`, con basic auth | 8080 |
-| `docs` | Esta documentación, en `doc.ec1.mateu.io`, con basic auth | 80 |
+| `docs` | Esta documentación, en `doc.ec1.mateu.io`, con basic auth | 80 (contenedor 8080) |
 
 `opera-mock` (`systems/pms/opera-mock`) no se despliega: solo existe para el
 [entorno local](/desarrollo/entorno-local/).

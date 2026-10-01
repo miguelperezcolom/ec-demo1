@@ -39,8 +39,10 @@ so a process is changed by a pull request rather than by an API call.
  ia-control-plane    users         orchestrator            forms     control-shell
          │                        the same two pods that answer
     cp-postgres                   /_workflow and /_forms above, through
-    its own volume,               a second @UI each
-    unlike everything above
+    its own server                a second @UI each
+
+      also on this host: /_integrations, /_mapping, /_mdm, /_audit, /_communication,
+      /_registration-rules ── see "The control console"
 
   https://rw.ec1.mateu.io       the same demo console, rendered by Redwood
   https://rw-console.ec1.mateu.io  the same control console, rendered by Redwood
@@ -50,6 +52,8 @@ so a process is changed by a pull request rather than by an API call.
   https://auth.ec1.mateu.io     Keycloak (realm ec-demo1, clients demo + control-plane)
   https://grafana.ec1.mateu.io  Grafana ── Prometheus · Loki · Tempo
   https://kafka.ec1.mateu.io    Redpanda Console ── the event stream itself
+  https://front.ec1.mateu.io    the hotel's front office (MRU01) ── same gateway, a host of its own
+  https://doc.ec1.mateu.io      the documentation site ── basic auth, not Keycloak
 ```
 
 ## What is in here
@@ -73,7 +77,7 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `integration/customer-mdm-service/` | The customer hub: identity resolution, cross-references, distribution; Salesforce cleans and decides |
 | `integration/journey-service/` | A booking's journey across the chain, hop by hop, from its traces in Tempo, told in business words ("Ver recorrido" on the data plane). Owns no data |
 | **`contracts/`** | **The language the services speak — [contracts/README.md](contracts/README.md)** |
-| `contracts/contracts-*/` | One published-language library per context (reservation, customer, partner, mapping, integration, frontoffice, communication, audit, process); each service depends on the ones it speaks. No image |
+| `contracts/contracts-*/` | One published-language library per context (reservation, customer, partner, mapping, integration, frontoffice, communication, audit, process, notices, registration); each service depends on the ones it speaks. No image |
 | `contracts/schemas/` | Every Kafka topic's JSON Schema, versioned, generated from the records, with examples; producers validate against them, consumers parse their examples |
 | `contracts/workers/` | The tasks each worker serves, generated from its registrations; `deploy/demo/check-contracts.sh` matches them against ec-definitions |
 | **`control-plane/`** | **Who governs the flow** |
@@ -95,7 +99,7 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `supporting/content/` | Content, labels and content types — a CRUD and nothing else |
 | `supporting/ui-commons/` | What the UIs share, a library with no image: paging (in the database, and in memory for rows that are not in one), the signed-in user widget of the consoles and the front office, the "other systems" link tables, and the base class of the catalogue CRUDs |
 | **the rest** | |
-| `e2e/` | Playwright coverage of all four consoles against the deployed cluster |
+| `e2e/` | Playwright against the deployed cluster: the four consoles (`tests/`), the PoC demo end to end (`demo/`, `npm run demo`); plus `poc-acl-local/`, the PoC on one machine against `opera-mock`, and `poc-acl-demo/`, the demo's booking seed |
 | `deploy/chart/eventconductor/` | The engine's Helm chart, vendored (see `VENDORED.md`) |
 | `deploy/manifests/` | Keycloak, the postfix mail relay, the embeddings pod, the shells, the gateway, every service, Kafka console, ingress, certificate issuers |
 | `deploy/observability/` | Helm values for Prometheus, Grafana, Loki, Tempo and Alloy |
@@ -103,7 +107,7 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `docs/`, `gitops/` | The PoC's documents; an example of the IA catalogue kept in git |
 
 New here? **[ONBOARDING.md](ONBOARDING.md)** — access, what lives in which repository, and the
-four things about this cluster that otherwise cost an afternoon.
+five things about this cluster that otherwise cost an afternoon.
 
 **The documentation site** — the whole project explained, in Spanish — is in [`doc/`](doc/README.md)
 (Astro + Starlight, like EventConductor's and Mateu's) and served at https://doc.ec1.mateu.io, behind
@@ -112,9 +116,13 @@ a username and password (`riu`, password in `deploy/.secrets/credentials.env` as
 ## Deploy
 
 ```sh
-./deploy/build-images.sh      # the eleven images this repo owns → Docker Hub (only when their code changed)
+./deploy/build-images.sh TAG  # the 25 images this repo owns → Docker Hub (only when their code changed)
 ./deploy/deploy.sh            # everything else, idempotent
 ```
+
+`build-images.sh` builds 22 modules — the two shells twice, Vaadin and Redwood — plus the
+documentation site (tagged `DOCS_TAG`): 25 images, all under the one `TAG` you pass, so pass it
+explicitly. A routine change is usually a few modules with a new tag each, not the whole script.
 
 Between the two, the DNS records have to exist, pointing at the address `deploy.sh` prints after
 installing the ingress controller: `ec1` and `*.ec1` under your domain. Two records rather than
@@ -151,7 +159,7 @@ Two places to look while it runs: **Workflow → Processes** on the control cons
 
 ## The services around the engine
 
-Four applications that are not the engine, each one a pod, each one reached through the gateway on
+Five applications that are not the engine, each one a pod, each one reached through the gateway on
 a path of its own. They came from the `demo/` tree of the engine's own repository; what follows is
 what they are here, not what they were there.
 
@@ -172,7 +180,8 @@ renders empty.
 validates its schema against its own migration history at startup; three services running
 `ddl-auto: update` inside it would be three writers with no shared history. `55-demo-db-init.yaml`
 creates `booking`, `content` and `users` in the same PostgreSQL, the same way Keycloak's database
-is created. They inherit that PostgreSQL's `emptyDir`, so treat what they hold as disposable.
+is created. They live on that PostgreSQL's volume (`hcloud-volumes`), so they survive the pod moving;
+deleting the PVC is what loses them.
 
 **Only `booking` touches Kafka.** It consumes the `booking` topic and replies on `upstream` — one
 consumer group of its own, subscribed to one topic, which is the arrangement the engine's own
@@ -210,8 +219,12 @@ Two things follow from it being an LLM:
   if not, the model is catalogued with `credential: missing` and the console is where you fix that.
 
 The seeded model is `claude-sonnet-4-5`, a generation behind what the API offers. Changing it is
-now a field in the console rather than a Deployment variable — which is most of what the control
-plane is for.
+a catalogue entry rather than a Deployment variable — which is most of what the control plane is
+for. On ec1 the catalogues come from git: GitOps is on, from
+[`ec-ia-config`](https://github.com/miguelperezcolom/ec-ia-config) (`71-ia-control-plane.yaml`), so
+the seeder stands down and the model, prompts, MCP servers and documents are changed by a pull
+request there. An edit in the console to a git-managed entry is reverted on the next push; the
+console is for quick fixes and for entries created there (see [Configuring it from git](#configuring-it-from-git-gitops) below).
 
 ### Observing the agents
 
@@ -316,9 +329,10 @@ would make two places that disagree.
 
 **It goes through a transactional outbox, not a direct call.** Saving the user and calling Keycloak
 cannot commit together — one is Postgres, the other an HTTP API — so the use case does not call
-Keycloak at all. It writes the change to an `identity_outbox` table *in the same transaction* as the
-user: either both land or neither does, and there is no window where the user is saved but the
-intent to propagate is lost. A relay (`@Scheduled`, every few seconds) then drains the table,
+Keycloak at all. It writes the change to the shared outbox (`supporting/messaging`: the
+`outbox_message` table, destination `identity`) *in the same transaction* as the user: either both
+land or neither does, and there is no window where the user is saved but the intent to propagate is
+lost. (The old `identity_outbox` table only keeps its history.) The relay, every few seconds, drains it,
 delivers each change, and marks it done; failures are retried with a growing backoff and abandoned
 after ten attempts so a permanently-bad change stops blocking the queue behind it. Delivered rows
 are kept a week as an audit of what was propagated, then purged.
@@ -393,9 +407,9 @@ topic.
 
 ### The CRS → Opera integration PoC
 
-Seven more pods take `booking`'s events down to Opera Cloud through OHIP's Property APIs, as four
-engine definitions (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelacion`,
-`proyectar-interlocutor`, in `ec-definitions`):
+Seven more pods take `booking`'s events down to Opera Cloud through OHIP's Property APIs, as the
+engine definitions listed in [The demo, in one pass](#the-demo-in-one-pass) (twelve, in
+`ec-definitions`):
 
 | | path | what it is |
 |---|---|---|
@@ -408,21 +422,25 @@ engine definitions (`alta-integracion`, `proyectar-reserva`, `proyectar-cancelac
 | `customer-mdm-service` | `/_customers` · `/_mdm` | The customer master (golden record, identity resolution; Salesforce cleans and decides). Two `@UI`s: **Clientes** on the data plane (`/_customers`: find a customer; its data, where it is known, its reservations in the CRS and the front office, its change requests — read-only, with links to each system) and its technical screens on the control console (`/_mdm`: golden records, consolidations) |
 | `integrations-service` | `/_integrations` | One integration per hotel: its Opera connection (secret sealed) and its onboarding, gate by gate, to activation. Until then the hotel's reservations wait |
 
-**Nothing writes to a real Opera tenant.** Real OHIP credentials, when there are any, go to
-`deploy/.secrets/` and a Secret, never to a values file. The plan, the cost log and the conclusions
+**ec1 writes to the chain's OHIP UAT tenant** (property XMAR): reservations and guest profiles, and
+the desk's check-ins, check-outs and charges; partners are read there, never written. The OHIP
+credentials go to `deploy/.secrets/` and a Secret, never to a values file. The plan, the cost log and the conclusions
 are in [`docs/poc-acl/`](docs/poc-acl/); the path runs end to end on one machine with
 [`e2e/poc-acl-local/`](e2e/poc-acl-local/README.md).
 
 ## The control console
 
 A second console, on a host of its own: **`https://console.ec1.mateu.io`**, behind the `ai-admin`
-realm role. Three applications answer on it:
+realm role. These answer on it:
 
 | section | pod | what it is |
 |---|---|---|
 | **IA** | `ia-control-plane` | The four catalogues the chat agent is configured from — below |
 | **Usuarios** | `users` | Users, groups, roles and permissions. Moved here from the demo console: administering access is not part of using the product |
 | **Workflow** · **Forms** | `orchestrator`, `forms` | Workflow definitions and analytics, and the form definitions with their editor. The same two pods that serve the demo console, each through a second `@UI` |
+| **Integrations** · **Mapping** · **Notifications** | `integrations-service`, `mapping-service`, `communication-service` | The PoC's control plane: each hotel's integration and its onboarding; the dictionary, causes and proposals; recipients and the inbox (`/_integrations`, `/_mapping`, `/_communication`) |
+| **Customers** · **Audit** | `customer-mdm-service`, `audit-service` | The customer master's technical screens (`/_mdm`) and who did what (`/_audit`) |
+| **Registro** | `registration-rules` | The kárdex's registration rules (`/_registration-rules`) |
 
 The last row is the one worth reading twice. `orchestrator` and `forms` are not deployed a second
 time; each declares two `@UI`s — `/_workflow` and `/_workflow-admin`, `/_forms` and `/_forms-admin`
@@ -501,17 +519,15 @@ browser is not a convenience anyone needs on the client that reaches the credent
 
 ### Why it has a database of its own
 
-`postgres.localDisk: true` in `deploy/values/eventconductor.yaml` puts the engine's PostgreSQL on
-an `emptyDir`. That is what makes it local NVMe rather than a network volume, which is what decides
-how fast a WAL commit can fsync, which is the number this whole deployment exists to measure. The
-price is that the data dies with the pod, and for an engine schema and three demo services' rows
-that is the right trade.
+History, mostly. When the control plane was built, `postgres.localDisk: true` in
+`deploy/values/eventconductor.yaml` put the engine's PostgreSQL on an `emptyDir` — local NVMe, for
+the benchmark this deployment was first built for — and its data died with the pod. That was the
+wrong trade for the only copy of this deployment's LLM credentials, so the control plane got a
+second, small PostgreSQL of its own: `cp-postgres`, 10Gi on `hcloud-volumes`, the same storage class
+Redpanda already uses.
 
-It is the wrong trade for the only copy of this deployment's LLM credentials. A control plane whose
-catalogue is gone after a pod restart is worse than the YAML file it replaces, because the point of
-moving configuration into a UI is that it stays put. Flipping `localDisk` to false would have fixed
-it in one line and slowed the measured path for everything, so instead there is a second, small
-PostgreSQL — `cp-postgres`, 10Gi on `hcloud-volumes`, the same storage class Redpanda already uses.
+Since 2026-09-25 the engine's PostgreSQL is on a volume too (`localDisk: false`, `hcloud-volumes`),
+so both survive a pod move; `cp-postgres` stays separate.
 
 ### The credentials
 
@@ -762,6 +778,14 @@ read by walking shadow roots by hand rather than with a selector, because the tw
 their components differently and a selector tuned to one returns nothing on the other, which would
 make a renderer gap look like a passing test.
 
+**The demo's storyline** is a second suite, `npm run demo` (`e2e/demo/`, `demo.config.ts`): the
+script of `docs/poc-acl/demo.md` on ec1, checked where the demo shows it — Opera, the front office
+(`front.ec1.mateu.io`), Salesforce and the consoles. It changes only what it creates, a new MRU01
+reservation and the change on its holder. Two more directories are not Playwright:
+`e2e/poc-acl-local/` runs the PoC on one machine against `opera-mock`
+([README](e2e/poc-acl-local/README.md)), and `e2e/poc-acl-demo/seed.py` seeds a hotel's bookings in
+the CRS for the demo.
+
 ## The node topology
 
 One pool, in hel1, and Karpenter chooses the machines. Every workload is pinned only to the region
@@ -822,12 +846,12 @@ load generator and the throughput it measured — is in the git history before t
   Mateu bakes `@KeycloakSecured` into the generated bootstrap page, so the hostname, realm and
   client id cannot be environment variables yet. Changing any of them means rebuilding
   `control-shell`.
-- **One replica of everything.** The Karpenter pool is capped at 8 CPU. The engine scales
+- **One replica of everything.** The fleet is capped at 40 CPU. The engine scales
   horizontally by design — raising `replicas` in `deploy/values/eventconductor.yaml` is the only
   change needed, since orchestrator instances coordinate through PostgreSQL advisory locks and
   the outbox rather than through a leader.
-- **The rule engine is deployed at zero replicas.** None of these three workflows has a `RULE`
-  step. Its Deployment and Service exist, so turning it on is a one-line change.
+- **The rule engine runs, with nothing to run.** One replica, reading `definitions/rules` from
+  `ec-definitions`, which has none: no process of the PoC has a `RULE` step.
 - **Traces work as of engine 2.5.0** — `eventconductor.step-over`, `eventconductor.dispatch-step`,
   `outbox relay` and the rest arrive in Tempo. It took three releases, and the last one is worth
   knowing about: the endpoint was configured under `management.otlp.tracing.endpoint`, which Boot 4
@@ -836,16 +860,10 @@ load generator and the throughput it measured — is in the git history before t
   looking for the exporter bean said it was configured, including one done here. `OTEL_SERVICE_NAME`
   is set per engine as well, without which every span arrives as `unknown_service` and the three
   are indistinguishable.
-- **Git webhooks are wired but return 500, and it is not this deployment's fault.** A push to
-  master should reload the definitions instead of waiting for the next restart, and everything on
-  this side is in place: the secret exists, the gateway routes `/workflow/webhooks/**` and
-  `/forms/webhooks/**` publicly, and the engines are configured to verify the HMAC. The engine
-  cannot serve them: all three webhook controllers declare `@PathVariable String provider` with no
-  explicit name, and the published jars carry no `MethodParameters` attribute at all — the build
-  configures `maven-compiler-plugin` itself, without a Spring Boot parent to add `-parameters`, so
-  Spring cannot resolve the argument and every call dies with `IllegalArgumentException` before the
-  signature is even checked. One line in the engine's root pom fixes it for all three:
-  `<parameters>true</parameters>`. Until then, definitions reload on pod restart.
+- **Git webhooks reload the definitions.** A push to `master` of `ec-definitions` calls
+  `/workflow/webhooks/**` and `/forms/webhooks/**` (routed publicly; the engines verify the HMAC)
+  and both engines re-import within seconds. They returned 500 until engine 2.2.1, whose jars carry
+  the `MethodParameters` the webhook controllers need.
 - **The Kafka console is behind HTTP basic auth**, because Redpanda Console's open-source build
   has no access control of its own and anyone who reaches it can produce and delete messages, not
   just read them. Its password is generated alongside the others.

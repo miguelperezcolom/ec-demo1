@@ -32,8 +32,9 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
     (`console.ec1.mateu.io`) es quién lo gobierna. Cada una, pintada por Vaadin y por Redwood.
   </Card>
   <Card title="Agentes que solo llaman herramientas" icon="rocket">
-    El agente de la consola, el de recepción y el de mapeado responden llamando a herramientas MCP;
-    se configuran desde un catálogo, se llaman entre sí por A2A y pueden llevar guardarraíles.
+    El agente de la consola, el del plano de control, el de recepción y el de mapeado responden
+    llamando a herramientas MCP; los sirve un solo `ia-agent` para todas las consolas, se configuran
+    desde un catálogo, se llaman entre sí por A2A y pueden llevar guardarraíles.
   </Card>
 </CardGrid>
 

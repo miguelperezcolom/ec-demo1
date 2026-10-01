@@ -6,9 +6,9 @@ description: Por qué un proceso espera en vez de fallar, quién se entera, por 
 ## Causas en vez de errores
 
 Cuando un proceso no puede seguir por algo que no se arregla reintentando, registra una **causa** en
-`mapping-service` y espera. Una causa tiene clave `hotel/tipo/código` y sabe cuántos procesos esperan
-detrás y desde cuándo; **se comparte entre procesos**: seis reservas que esperan el mismo código
-esperan la misma causa y se liberan juntas al resolverla.
+`mapping-service` y espera. Una causa tiene clave `TIPO:hotel:…` (sin barras, para que viaje entera
+en una ruta) y sabe cuántos procesos esperan detrás y desde cuándo; **se comparte entre procesos**:
+seis reservas que esperan el mismo código esperan la misma causa y se liberan juntas al resolverla.
 
 Los tipos (`CauseType`, `contracts-mapping`):
 
@@ -31,16 +31,17 @@ quien la resuelve.
 Resolver la causa no es la única salida: una persona puede **renunciar** a un proceso que espera
 (F012) cuando lo que iba a hacer ya no importa — una reserva de prueba, una cancelación de una reserva
 que nunca llegó a Opera. En la causa, *Descartar* en la fila del proceso, o *Descartar…* en la barra
-para elegir uno o todos los de la causa. El diálogo dice qué significa antes de hacerlo y pide el
+para elegir uno o todos los de la causa. En la consola Redwood las filas no llevan acción: se descarta
+desde *Descartar…* de la barra. El diálogo dice qué significa antes de hacerlo y pide el
 **motivo**:
 
 - el proceso queda `DISCARDED` con quién, cuándo y por qué, y no se reanuda aunque la causa se resuelva
   después, ni se le reenvía el mensaje de reanudación;
 - **el motor lo cancela**: `mapping-service` publica por su outbox `ProcessCancellationRequested` (el
-  mismo comando que el *Cancel* de *Workflow → Processes*) con el id del motor del proceso, que guarda
+  mismo comando que el *Cancel* de *Admin → Workflow → Processes* de la consola de datos) con el id del motor del proceso, que guarda
   cuando el proceso registra la espera. Una espera registrada sin ese id (anteriores a 0.37.0, o por
   REST sin `engineProcessId`) no se puede cancelar desde aquí: el diálogo lo dice y enlaza a
-  *Workflow → Processes* para cancelarlo a mano;
+  *Admin → Workflow → Processes*, en la consola de datos, para cancelarlo a mano;
 - si ya no espera nadie en la causa, ofrece **resolverla**;
 - queda auditado («Discard process», con el motivo), hecho o rechazado — un proceso que ya se reanudó
   no se puede descartar.
@@ -80,9 +81,15 @@ Los tipos (`NotificationType`):
 | `PMS_REJECTED` | Opera rechaza una escritura |
 | `INTEGRATION_NEEDS_ATTENTION` | Una puerta del alta necesita a alguien |
 | `CHECK_IN_INCOMPLETE` | Un check-in forzado sigue sin el documento de un huésped pasadas 24 h de la llegada (parte de viajeros); lo manda el front office a recepción |
+| `PLATFORM_ALERT` | Salta una alerta de Prometheus de la plataforma (una API externa degradada, un servicio caído) |
+| `PLATFORM_ALERT_CRITICAL` | Lo mismo, con severidad crítica: Opera o Salesforce sin responder, un pod caído |
 
-Los avisos llegan por Kafka (`notifications`) y se cierran por Kafka (`notification-resolutions`): un
-aviso se va de todas las bandejas cuando lo que lo causó se resuelve.
+Los avisos de la integración llegan por Kafka (`notifications`) y se cierran por Kafka
+(`notification-resolutions`): un aviso se va de todas las bandejas cuando lo que lo causó se resuelve.
+Las alertas de la plataforma no pasan por Kafka: Alertmanager las manda al webhook
+`POST /alerts/alertmanager` de `communication-service` (solo dentro del clúster) y, cuando la alerta
+se resuelve, la cierra igual en todas las bandejas. Cuáles hay y a quién llegan, en
+[Observabilidad](/operacion/observabilidad/).
 
 ### Quién se entera, y por dónde
 
@@ -100,9 +107,11 @@ Chat, y los urgentes por email (rechazos de Opera y reintentos que no acaban, a 
 
 ### La bandeja
 
-«Inbox (n)» en la cabecera de las cuatro consolas es la única entrada a la bandeja. Tiene los avisos
-que son para mí —por nombre o por uno de mis roles— y las **tareas del motor de formularios** (una
-tarea es un aviso más, en la bandeja de los roles que pide su formulario). *Open* lleva a la pantalla
+«Inbox (n)» en la cabecera de las cuatro consolas es la entrada a la bandeja; con algo urgente dice
+«Inbox (n, m urgent)» y la campana se pone en rojo. `/_inbox` escrito en la barra de direcciones de
+cualquiera de las cuatro consolas también lleva a ella (el gateway lo redirige a `/inbox/pending`).
+Tiene los avisos que son para mí —por nombre o por uno de mis roles— y las **tareas del motor de
+formularios** (una tarea es un aviso más, en la bandeja de los roles que pide su formulario). *Open* lleva a la pantalla
 que lo resuelve y lo marca como **visto**; visto es de cada persona y no resuelve nada: la fila sigue
 hasta que se resuelve, y entonces se va sola.
 
