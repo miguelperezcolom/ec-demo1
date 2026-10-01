@@ -79,4 +79,19 @@ class BookingPageLayoutTest {
                 .map(f -> f.getAnnotation(Section.class).value()))
                 .doesNotContain("Amounts");
     }
+
+    @org.junit.jupiter.api.Test
+    void eachPaymentIsACardTitledByTypeAndMethod() {
+        var p = new PaymentViewModel("p1", io.mateu.ecdemo1.booking.domain.aggregates.booking.vo.PaymentType.Deposit,
+                "VISA", new java.math.BigDecimal("100.00"), java.time.LocalDate.of(2026, 10, 1), "ref-1");
+        assertThat(BookingViewModel.paymentTitleOf(p)).isEqualTo("Deposit · VISA");
+        var vm = new BookingViewModel(null, null, null, null, null, null, null, null);
+        vm.payments = java.util.List.of(p);
+        var cards = (io.mateu.uidl.data.StatusList) vm.paymentCards();
+        assertThat(cards.items()).hasSize(1);
+        assertThat(cards.items().get(0).status()).isEqualTo("100.00");
+        assertThat(cards.items().get(0).lines()).containsExactly("01/10/2026", "ref-1");
+        vm.payments = java.util.List.of();
+        assertThat(vm.paymentCards()).isInstanceOf(io.mateu.uidl.data.Text.class);
+    }
 }

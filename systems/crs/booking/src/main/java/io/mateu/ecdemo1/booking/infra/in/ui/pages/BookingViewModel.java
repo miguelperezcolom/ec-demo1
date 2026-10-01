@@ -161,7 +161,19 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
     @Colspan(2)
     List<GuestViewModel> guests;
 
+    /**
+     * On the booking's page, each payment as a card — like each room above: type and method, the
+     * amount as a badge, the date and the reference under it. No table: a grid in a fold read as
+     * a form. The editor keeps the list below.
+     */
     @Section("Payments")
+    @HiddenInCreate
+    @HiddenInEditor
+    @Label("")
+    @Colspan(2)
+    Callable<Component> paymentsOnPage = this::paymentCards;
+
+    @HiddenInView
     @DetailFormCustomisation(position = FormPosition.modal)
     @Colspan(2)
     List<PaymentViewModel> payments;
@@ -373,6 +385,35 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
                             .build();
                 }).toList())
                 .build();
+    }
+
+    /** Each payment as a card: «Deposit · VISA», the amount as its badge, date and reference below. */
+    Component paymentCards() {
+        var list = payments == null ? List.<PaymentViewModel>of() : payments;
+        if (list.isEmpty()) {
+            return io.mateu.uidl.data.Text.builder().text("Sin pagos").build();
+        }
+        var day = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        var index = new java.util.concurrent.atomic.AtomicInteger();
+        return io.mateu.uidl.data.StatusList.builder().compact(true).frameless(true).style("width: 100%;")
+                .items(list.stream().map(p -> {
+                    var lines = new java.util.ArrayList<String>();
+                    if (p.date() != null) lines.add(day.format(p.date()));
+                    if (p.reference() != null && !p.reference().isBlank()) lines.add(p.reference());
+                    return io.mateu.uidl.data.StatusItem.builder()
+                            .id("payment-" + (p.paymentId() != null ? p.paymentId() : index.incrementAndGet()))
+                            .title(paymentTitleOf(p))
+                            .status(p.amount() == null ? "" : p.amount().toPlainString())
+                            .statusColor("neutral")
+                            .lines(lines)
+                            .build();
+                }).toList())
+                .build();
+    }
+
+    static String paymentTitleOf(PaymentViewModel p) {
+        var type = p.type() == null ? "Payment" : p.type().name();
+        return p.methodCode() == null || p.methodCode().isBlank() ? type : type + " · " + p.methodCode();
     }
 
     Component otherSystems() {
