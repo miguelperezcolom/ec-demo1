@@ -118,6 +118,15 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Diseño técnico',
+					items: [
+						{ label: 'Estructura del proyecto', slug: 'diseno/estructura' },
+						{ label: 'Patrones', slug: 'diseno/patrones' },
+						{ label: 'El código, de punta a punta', slug: 'diseno/recorrido-por-el-codigo' },
+						{ label: 'Cómo extenderlo', slug: 'diseno/extender' },
+					],
+				},
+				{
 					label: 'Desarrollo',
 					items: [
 						{ label: 'Compilar', slug: 'desarrollo/compilar' },
