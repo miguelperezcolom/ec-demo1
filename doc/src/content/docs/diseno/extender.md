@@ -254,22 +254,22 @@ bajo `invoke_agent`.
 | El país del hotel para las reglas de registro | `HOTEL_COUNTRIES` de `registration-rules` y `FRONT_OFFICE_HOTEL_COUNTRY` de su front office | No |
 | Códigos de transacción de los cargos y cajero | `opera.charges` y `OPERA_CASHIER_ID`: **uno para todo el conector**, no por propiedad | Sí, si otra propiedad usa otros |
 
-**El front office es uno por hotel**: `FRONT_OFFICE_HOTEL`, `FRONT_OFFICE_PMS_HOTEL` y
-`FRONT_OFFICE_CURRENCY` en `77-front-office.yaml`, con su base de datos `front_office`. Un segundo hotel
-con front office propio es otro despliegue con otro nombre, otra base de datos, otro host (ingress,
-ruta `front-office` del gateway con `FRONT_OFFICE_HOST`, redirect URI en el cliente `demo` de
-Keycloak) y su `frontOfficeUrl` en la integración. Antes hay que cambiar una cosa en el código: los
-grupos de consumidor del front office son fijos (`ec-demo1-front-office-commands`…), y dos front
-offices en el mismo grupo se repartirían las particiones; cada uno descarta lo que no es de su
-propiedad (`PmsStays`), así que perderían la mitad. El grupo tiene que llevar el hotel.
+**El front office es uno solo, multitenant**: un despliegue y una base de datos para todos los hoteles
+de la cadena, y el recepcionista elige el suyo en el selector **Hotel** (`@AppContext` de
+`FrontOfficeSuite`). Un hotel nuevo no es otro despliegue. Hoy, sin embargo, el servicio sigue atado a
+una propiedad por configuración —`FRONT_OFFICE_HOTEL`, `FRONT_OFFICE_PMS_HOTEL` y
+`FRONT_OFFICE_CURRENCY` en `77-front-office.yaml`—, y `PmsStays` descarta como `OTHER_HOTEL` lo que
+llega de otra. Dar servicio al segundo hotel es, por tanto, llevar esos tres valores al hotel de cada
+estancia (desde su `FrontOfficeIntegration`) y que el selector filtre por él; los grupos de consumidor
+se quedan como están, porque sigue habiendo un solo consumidor.
 
 **Cómo probarlo.** En local, `scenario.py` da de alta PMI01 puerta a puerta contra `opera-mock`. En ec1,
 el alta en la consola de control: cada puerta que se para deja un aviso en la bandeja.
 
-### Otro PMS: la frontera es `pms-integration-service`
+### Otro PMS: un adaptador nuevo en `pms-integration-service`
 
-No hay un «puerto de PMS» dentro del conector: **el adaptador es el servicio entero**. Lo que no sabe de
-Opera, y no cambia:
+`pms-integration-service` es el conector con los PMS, y un PMS nuevo es un adaptador más dentro de él,
+junto al de Opera. No es un servicio nuevo. Lo que no sabe de Opera, y no cambia:
 
 - los procesos de ec-definitions y los contratos `.ectask` del topic `pms-integration`
   (`upsert-reservation`, `ensure-guest-profile`, `check-in-reservation`, `post-charge`…): hablan de
@@ -283,7 +283,8 @@ Lo que sí es de Opera: el paquete `ohip/` (`OhipClient`, `OperaReservations`, `
 en `contracts-integration`, que es la conexión que guarda cada integración; y las lecturas síncronas del
 alta (`/connections/verify`, `/catalog`), que `integrations-service` hace a este servicio.
 
-Un segundo PMS es, por tanto:
+Hoy Opera es el único adaptador y los handlers de `worker/` llaman a sus clases sin un puerto por
+medio: el primer PMS nuevo empieza por sacar ese puerto. Un segundo PMS es, por tanto:
 
 1. Un tipo de conexión en `contracts-integration` y en la integración, que diga qué PMS es.
 2. En `pms-integration-service`, un puerto por operación (reservas, perfiles, recepción, catálogo) con
@@ -292,8 +293,8 @@ Un segundo PMS es, por tanto:
 3. Un doble del PMS nuevo como `systems/pms/opera-mock`, para `e2e/poc-acl-local`: contra un tenant
    real no se pueden provocar los fallos.
 
-Un worker aparte en otro topic también serviría, pero cada `ACTION` nombra su topic: obligaría a
-duplicar los procesos o a elegir el topic con un `CHOICE`.
+Por eso no es un worker aparte en otro topic: cada `ACTION` nombra su topic, y obligaría a duplicar
+los procesos o a elegir el topic con un `CHOICE`.
 
 **Cómo probarlo.** Los tests de los handlers (`ChargeHandlersTest`, `ReceptionHandlersTest`) contra el
 puerto, y `scenario.py` entero contra el doble nuevo.
