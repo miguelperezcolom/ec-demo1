@@ -71,7 +71,7 @@ import java.util.concurrent.Callable;
 // and the tracking with the payments: two short panels fewer.
 @FoldoutDetail(overview = {"Booking"})
 @PageWidth(PageWidthStyle.EDGE_TO_EDGE)
-public class BookingViewModel implements Identifiable, VisibilitySupplier {
+public class BookingViewModel implements Identifiable, VisibilitySupplier, io.mateu.uidl.interfaces.SubtitleSupplier {
 
     static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
             .withZone(ZoneId.systemDefault());
@@ -82,16 +82,22 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     Status status = new Status(StatusType.NONE, "New");
 
     /**
-     * The amounts, as the header's badges next to the status (a CRUD record page has no subtitle):
-     * what is still to pay — amber while something is, green once it is paid — and the total with
-     * what has been paid. Null in the creation form: a null Status is no badge.
+     * What is still to pay, as a header badge next to the status: amber while something is, green
+     * once it is paid. Null in the creation form: a null Status is no badge. The total and what has
+     * been paid are the page's subtitle ({@link #subtitle()}).
      */
     @ReadOnly
     @HiddenInCreate
     Status pendingBadge;
-    @ReadOnly
-    @HiddenInCreate
-    Status amountsBadge;
+
+    /** «Total 1.431,12 EUR (5 noches) · Pagado 0,00 EUR» — the page's subtitle; null in creation. */
+    @io.mateu.uidl.annotations.Hidden
+    String amounts;
+
+    @Override
+    public String subtitle() {
+        return amounts;
+    }
 
     @Section("Booking")
     @NotEmpty
@@ -412,8 +418,7 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
                         p.reference()))
                 .toList();
         pendingBadge = pendingBadgeOf(booking.totalAmount(), booking.paidAmount(), booking.currency());
-        amountsBadge = new Status(StatusType.NONE,
-                amountsOf(booking.totalAmount(), booking.paidAmount(), booking.currency(), booking.nights()));
+        amounts = amountsOf(booking.totalAmount(), booking.paidAmount(), booking.currency(), booking.nights());
         comments = booking.comments();
         commentsOnPage = comments;
         cancellation = booking.cancellation() != null

@@ -41,7 +41,7 @@ class BookingPageLayoutTest {
         assertThat(Arrays.stream(BookingViewModel.class.getDeclaredFields()).map(java.lang.reflect.Field::getName))
                 .doesNotContain("total", "paid", "pending");
         assertThat(field("pendingBadge").getType()).isEqualTo(io.mateu.uidl.data.Status.class);
-        assertThat(field("amountsBadge").getType()).isEqualTo(io.mateu.uidl.data.Status.class);
+        assertThat(io.mateu.uidl.interfaces.SubtitleSupplier.class).isAssignableFrom(BookingViewModel.class);
         var foldout = BookingViewModel.class.getAnnotation(FoldoutDetail.class);
         assertThat(foldout.overview()).containsExactly("Booking");
     }
