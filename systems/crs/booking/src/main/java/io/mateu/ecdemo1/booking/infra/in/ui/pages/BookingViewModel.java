@@ -22,11 +22,13 @@ import io.mateu.uidl.annotations.FoldoutDetail;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInEditor;
 import io.mateu.uidl.annotations.HiddenInView;
+import io.mateu.uidl.annotations.KPI;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.PageWidth;
 import io.mateu.uidl.annotations.PageWidthStyle;
+import io.mateu.uidl.annotations.PanelWidth;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.annotations.Toolbar;
@@ -65,8 +67,10 @@ import java.util.concurrent.Callable;
 @RequiredArgsConstructor
 // The booking's page is an overview — where, when, how much and where it is in Opera — with the rest
 // in foldout panels beside it: eleven stacked cards were a long scroll to what matters, and half of
-// them empty. What has no value is left out of the page; the editor keeps every field.
-@FoldoutDetail(overview = {"Booking", "Amounts"}, folded = {"Tracking"})
+// them empty. What has no value is left out of the page; the editor keeps every field. The amounts
+// are the page header's KPIs, not a panel; the comments go with the rooms and guests they are about,
+// and the tracking with the payments: two short panels fewer.
+@FoldoutDetail(overview = {"Booking"})
 @PageWidth(PageWidthStyle.EDGE_TO_EDGE)
 public class BookingViewModel implements Identifiable, VisibilitySupplier {
 
@@ -97,7 +101,8 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @Label("Opera reservation")
     String pmsReservationId;
 
-    @Section("Holder")
+    /** Wide enough for an email address on one line. */
+    @Section(value = "Holder", panelWidth = PanelWidth.MEDIUM)
     @NotEmpty
     String holderFirstName;
     @NotEmpty
@@ -110,12 +115,19 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
      * On the booking's page, each room with its people, together: two lists side by side made the
      * reader match guests to rooms by line number. The editor keeps the two lists below.
      */
-    @Section("Rooms and guests")
+    @Section(value = "Rooms and guests", panelWidth = PanelWidth.MEDIUM)
     @HiddenInCreate
     @HiddenInEditor
     @Label("")
     @Colspan(2)
     Callable<Component> roomsAndGuests = this::roomsAndGuests;
+    /** The comments, on the page, under the rooms and guests; the editor edits them in their own section. */
+    @HiddenInCreate
+    @HiddenInEditor
+    @ReadOnly
+    @Label("Comments")
+    @Colspan(2)
+    String commentsOnPage;
 
     // The lists show a few columns each and open a row in a modal, where all of its fields fit: a
     // row edited beside the list had too many fields for the space left to it. Only in the editor:
@@ -136,16 +148,44 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @DetailFormCustomisation(position = FormPosition.modal)
     @Colspan(2)
     List<PaymentViewModel> payments;
+    // The tracking, on the page, under the payments; the editor shows it in its own section.
+    @HiddenInCreate
+    @HiddenInEditor
+    @ReadOnly
+    @Label("Id")
+    String idOnPage;
+    @HiddenInCreate
+    @HiddenInEditor
+    @ReadOnly
+    @Label("Version")
+    Long versionOnPage;
+    @HiddenInCreate
+    @HiddenInEditor
+    @ReadOnly
+    @Label("Created")
+    String createdOnPage;
+    @HiddenInCreate
+    @HiddenInEditor
+    @ReadOnly
+    @Label("Updated")
+    String updatedOnPage;
 
-    @Section("Amounts")
+    /** The booking's amounts, as the KPIs of its page's header. */
+    @KPI
     @ReadOnly
     @HiddenInCreate
     String total;
+    @KPI
     @ReadOnly
     @HiddenInCreate
     String paid;
+    @KPI
+    @ReadOnly
+    @HiddenInCreate
+    String pending;
 
     @Section("Comments")
+    @HiddenInView
     @Stereotype(FieldStereotype.textarea)
     @Colspan(2)
     String comments;
@@ -156,15 +196,19 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     String cancellation;
 
     @Section("Tracking")
+    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     String id;
+    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     Long version;
+    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     String created;
+    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     String updated;
@@ -173,7 +217,7 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
      * Where the booking and its people are in the chain's other systems — Opera, the front office,
      * Clientes, Salesforce — as links. Only on the booking's page: nothing to link before it exists.
      */
-    @Section("In other systems")
+    @Section(value = "In other systems", panelWidth = PanelWidth.WIDE)
     @HiddenInCreate
     @HiddenInEditor
     @Label("")
@@ -373,12 +417,19 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
         total = booking.totalAmount().toPlainString() + " " + booking.currency()
                 + " (" + booking.nights() + " nights)";
         paid = booking.paidAmount().toPlainString() + " " + booking.currency();
+        pending = booking.totalAmount().subtract(booking.paidAmount()).max(java.math.BigDecimal.ZERO)
+                .toPlainString() + " " + booking.currency();
         comments = booking.comments();
+        commentsOnPage = comments;
         cancellation = booking.cancellation() != null
                 ? booking.cancellation().reasonCode() + " at " + TIMESTAMP.format(booking.cancellation().cancelledAt())
                 : null;
         created = TIMESTAMP.format(booking.created());
         updated = TIMESTAMP.format(booking.updated());
+        idOnPage = id;
+        versionOnPage = version;
+        createdOnPage = created;
+        updatedOnPage = updated;
         return this;
     }
 
