@@ -1,0 +1,160 @@
+---
+// Plano de control y plano de datos: SVG en línea con los colores de Starlight, así sigue al tema claro y al oscuro.
+---
+<figure class="ecd-figure">
+	<div class="ecd-scroll">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 1104 735" role="img" aria-labelledby="ecd-planes-title ecd-planes-desc" class="ecd-planes">
+<title id="ecd-planes-title">Plano de control y plano de datos</title>
+<desc id="ecd-planes-desc">Dos planos apilados. Arriba, el plano de control, quién gobierna (console.ec1 y rw-console.ec1): alta de integraciones (integrations-service, procesos alta-integracion y alta-integracion-fo), diccionario de mapeado con aprobación humana y agente de mapeado, causas y reanudación, reglas de registro, bandeja y avisos (communication-service), auditoría (audit-service), catálogo de IA (ia-control-plane) y las definiciones de procesos en Git (ec-definitions). Abajo, el plano de datos, lo que fluye (ec1 y rw.ec1): las reservas van del CRS al conector CRS, al motor (proyectar-reserva), al conector PMS, a Opera Cloud y al front office; la recepción sube al PMS; el motor resuelve la identidad del cliente en el MDM, que se sincroniza con Salesforce; y el recorrido de la reserva lo muestra todo. Entre los dos planos, lo que hace el de control sobre el de datos: configura (integraciones, diccionario, reglas), aprueba (equivalencias y cambios), reanuda o descarta (los procesos que esperan por una causa) y observa (auditoría, bandeja, recorrido y trazas).</desc>
+<style is:inline>
+
+.ecd-planes { font-family: var(--__sl-font); }
+.ecd-planes text { fill: var(--sl-color-white); }
+.ecd-planes .t-sys { font-size: 23px; font-weight: 700; }
+.ecd-planes .t-name { font-size: 18.5px; font-weight: 600; }
+.ecd-planes .t-sub { font-size: 16px; fill: var(--sl-color-gray-2); }
+.ecd-planes .t-mono { font-family: var(--__sl-font-mono); font-size: 16px; fill: var(--sl-color-gray-2); }
+.ecd-planes .t-cap { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; fill: var(--sl-color-gray-3); }
+.ecd-planes .t-verb { font-size: 16px; font-weight: 700; fill: var(--sl-color-accent-high); }
+.ecd-planes .t-eng { font-size: 23px; font-weight: 700; fill: var(--sl-color-black); }
+.ecd-planes .t-eng-sub { font-size: 16px; fill: var(--sl-color-black); }
+.ecd-planes .b-ext { fill: var(--sl-color-gray-6); stroke: var(--sl-color-gray-3); stroke-width: 1.5; }
+.ecd-planes .b-ad { fill: var(--sl-color-black); stroke: var(--sl-color-gray-3); stroke-width: 1.2; }
+.ecd-planes .b-core { fill: var(--sl-color-black); stroke: var(--sl-color-accent); stroke-width: 1.4; }
+.ecd-planes .b-eng { fill: var(--sl-color-accent-high); stroke: none; }
+.ecd-planes .b-note { fill: none; stroke: var(--sl-color-gray-4); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.ecd-planes .a-ev { fill: none; stroke: var(--sl-color-accent-high); stroke-width: 2; }
+.ecd-planes .a-q { fill: none; stroke: var(--sl-color-gray-3); stroke-width: 1.8; stroke-dasharray: 6 5; }
+.ecd-planes .m-ev { fill: var(--sl-color-accent-high); }
+.ecd-planes .m-q { fill: var(--sl-color-gray-3); }
+
+.ecd-planes .band-cp { fill: var(--sl-color-accent-low); stroke: var(--sl-color-accent); stroke-width: 1.2; }
+.ecd-planes .band-dp { fill: var(--sl-color-gray-6); stroke: var(--sl-color-gray-4); stroke-width: 1.2; }
+.ecd-planes .b-cp { fill: var(--sl-color-black); stroke: var(--sl-color-accent); stroke-width: 1.2; }
+.ecd-planes .b-eng { fill: var(--sl-color-accent-high); }
+.ecd-planes .t-plane { font-size: 24px; font-weight: 800; }
+.ecd-planes .t-plane-sub { font-size: 17px; font-weight: 400; fill: var(--sl-color-gray-2); }
+.ecd-planes .t-eng { font-size: 20px; }
+.ecd-planes .t-eng-mono { font-family: var(--__sl-font-mono); font-size: 16px; fill: var(--sl-color-black); }
+.ecd-planes .t-verb { font-size: 20px; }
+.ecd-planes .t-flow { font-size: 15px; font-style: italic; fill: var(--sl-color-gray-2); }
+.ecd-planes .a-flow { fill: none; stroke: var(--sl-color-gray-2); stroke-width: 2; }
+.ecd-planes .a-plane { fill: none; stroke: var(--sl-color-accent); stroke-width: 7; }
+.ecd-planes .m-flow { fill: var(--sl-color-gray-2); }
+.ecd-planes .m-plane { fill: var(--sl-color-accent); }
+
+</style>
+<defs>
+<marker id="ecd-planes-flow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="m-flow" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="ecd-planes-plane" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse"><path class="m-plane" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="band-cp" x="0" y="0" width="1100" height="302.9" rx="16"/>
+<text class="t-plane" x="24" y="38" text-anchor="start">Plano de control<tspan class="t-plane-sub" dx="14">quién lo gobierna</tspan></text>
+<text class="t-mono" x="1076" y="37" text-anchor="end">console.ec1 · rw-console.ec1</text>
+<rect class="band-dp" x="0" y="420.9" width="1100" height="309.65" rx="16"/>
+<text class="t-plane" x="24" y="458.9" text-anchor="start">Plano de datos<tspan class="t-plane-sub" dx="14">lo que fluye</tspan></text>
+<text class="t-mono" x="1076" y="457.9" text-anchor="end">ec1 · rw.ec1</text>
+<rect class="b-cp" x="24.0" y="64.0" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="150.2" y="88.3" text-anchor="middle">Alta de integraciones</text>
+<text class="t-mono" x="150.2" y="110.0" text-anchor="middle">integrations-service</text>
+<text class="t-sub" x="150.2" y="130.8" text-anchor="middle">procesos alta-integracion</text>
+<text class="t-sub" x="150.2" y="151.6" text-anchor="middle">y alta-integracion-fo</text>
+<rect class="b-cp" x="290.5" y="64.0" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="416.8" y="88.3" text-anchor="middle">Diccionario de mapeado</text>
+<text class="t-mono" x="416.8" y="110.0" text-anchor="middle">mapping-service</text>
+<text class="t-sub" x="416.8" y="130.8" text-anchor="middle">aprobación humana</text>
+<text class="t-sub" x="416.8" y="151.6" text-anchor="middle">y agente de mapeado</text>
+<rect class="b-cp" x="557.0" y="64.0" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="683.2" y="88.3" text-anchor="middle">Causas y reanudación</text>
+<text class="t-mono" x="683.2" y="110.0" text-anchor="middle">mapping-service</text>
+<text class="t-sub" x="683.2" y="130.8" text-anchor="middle">lo que espera, con nombre:</text>
+<text class="t-sub" x="683.2" y="151.6" text-anchor="middle">se reanuda o se descarta</text>
+<rect class="b-cp" x="823.5" y="64.0" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="949.8" y="88.3" text-anchor="middle">Reglas de registro</text>
+<text class="t-mono" x="949.8" y="110.0" text-anchor="middle">registration-rules</text>
+<text class="t-sub" x="949.8" y="130.8" text-anchor="middle">qué datos del huésped</text>
+<text class="t-sub" x="949.8" y="151.6" text-anchor="middle">exige cada destino</text>
+<rect class="b-cp" x="24.0" y="178.5" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="150.2" y="202.8" text-anchor="middle">Bandeja y avisos</text>
+<text class="t-mono" x="150.2" y="224.5" text-anchor="middle">communication-service</text>
+<text class="t-sub" x="150.2" y="245.3" text-anchor="middle">lo que espera a cada</text>
+<text class="t-sub" x="150.2" y="266.1" text-anchor="middle">persona, y las alertas</text>
+<rect class="b-cp" x="290.5" y="178.5" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="416.8" y="202.8" text-anchor="middle">Auditoría</text>
+<text class="t-mono" x="416.8" y="224.5" text-anchor="middle">audit-service</text>
+<text class="t-sub" x="416.8" y="245.3" text-anchor="middle">quién hizo qué</text>
+<text class="t-sub" x="416.8" y="266.1" text-anchor="middle">y cuándo</text>
+<rect class="b-cp" x="557.0" y="178.5" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="683.2" y="202.8" text-anchor="middle">Catálogo de IA</text>
+<text class="t-mono" x="683.2" y="224.5" text-anchor="middle">ia-control-plane</text>
+<text class="t-sub" x="683.2" y="245.3" text-anchor="middle">LLM, MCP y agentes,</text>
+<text class="t-sub" x="683.2" y="266.1" text-anchor="middle">rutas y presupuestos</text>
+<rect class="b-cp" x="823.5" y="178.5" width="252.5" height="100.5" rx="8"/>
+<text class="t-name" x="949.8" y="202.8" text-anchor="middle">Procesos del motor</text>
+<text class="t-mono" x="949.8" y="224.5" text-anchor="middle">ec-definitions</text>
+<text class="t-sub" x="949.8" y="245.3" text-anchor="middle">definiciones en Git,</text>
+<text class="t-sub" x="949.8" y="266.1" text-anchor="middle">se cambian por PR</text>
+<line class="a-plane" x1="50.0" y1="314.9" x2="50.0" y2="410.9" marker-end="url(#ecd-planes-plane)"/>
+<text class="t-verb" x="72.0" y="346.9" text-anchor="start">configura</text>
+<text class="t-sub" x="72.0" y="370.9" text-anchor="start">integraciones, diccionario</text>
+<text class="t-sub" x="72.0" y="390.9" text-anchor="start">y reglas de registro</text>
+<line class="a-plane" x1="313.0" y1="314.9" x2="313.0" y2="410.9" marker-end="url(#ecd-planes-plane)"/>
+<text class="t-verb" x="335.0" y="346.9" text-anchor="start">aprueba</text>
+<text class="t-sub" x="335.0" y="370.9" text-anchor="start">equivalencias y cambios</text>
+<text class="t-sub" x="335.0" y="390.9" text-anchor="start">que propone el agente</text>
+<line class="a-plane" x1="576.0" y1="314.9" x2="576.0" y2="410.9" marker-end="url(#ecd-planes-plane)"/>
+<text class="t-verb" x="598.0" y="346.9" text-anchor="start">reanuda / descarta</text>
+<text class="t-sub" x="598.0" y="370.9" text-anchor="start">los procesos que esperan</text>
+<text class="t-sub" x="598.0" y="390.9" text-anchor="start">por una causa</text>
+<line class="a-plane" x1="839.0" y1="412.9" x2="839.0" y2="316.9" marker-end="url(#ecd-planes-plane)"/>
+<text class="t-verb" x="861.0" y="346.9" text-anchor="start">observa</text>
+<text class="t-sub" x="861.0" y="370.9" text-anchor="start">auditoría, bandeja,</text>
+<text class="t-sub" x="861.0" y="390.9" text-anchor="start">recorrido y trazas</text>
+<rect class="b-ext" x="24.0" y="490.9" width="88.3" height="60.8" rx="8"/>
+<text class="t-name" x="68.2" y="516.2" text-anchor="middle">CRS</text>
+<text class="t-mono" x="68.2" y="537.9" text-anchor="middle">booking</text>
+<rect class="b-ad" x="144.0" y="490.9" width="166.4" height="60.8" rx="8"/>
+<text class="t-name" x="227.2" y="516.2" text-anchor="middle">Conector CRS</text>
+<text class="t-mono" x="227.2" y="537.9" text-anchor="middle">crs-integration</text>
+<rect class="b-eng" x="342.0" y="490.9" width="185.9" height="60.8" rx="8"/>
+<text class="t-eng" x="434.9" y="516.6" text-anchor="middle">EventConductor</text>
+<text class="t-eng-mono" x="434.9" y="538.9" text-anchor="middle">proyectar-reserva</text>
+<rect class="b-ad" x="559.5" y="490.9" width="166.4" height="60.8" rx="8"/>
+<text class="t-name" x="642.7" y="516.2" text-anchor="middle">Conector PMS</text>
+<text class="t-mono" x="642.7" y="537.9" text-anchor="middle">pms-integration</text>
+<rect class="b-ext" x="757.6" y="490.9" width="138.0" height="60.8" rx="8"/>
+<text class="t-name" x="826.6" y="516.2" text-anchor="middle">Opera Cloud</text>
+<text class="t-mono" x="826.6" y="537.9" text-anchor="middle">OHIP</text>
+<rect class="b-ext" x="927.2" y="490.9" width="148.8" height="60.8" rx="8"/>
+<text class="t-name" x="1001.6" y="516.2" text-anchor="middle">Front office</text>
+<text class="t-sub" x="1001.6" y="537.9" text-anchor="middle">recepción</text>
+<line class="a-flow" x1="116.3" y1="521.3" x2="138.0" y2="521.3" marker-end="url(#ecd-planes-flow)"/>
+<line class="a-flow" x1="314.4" y1="521.3" x2="336.0" y2="521.3" marker-end="url(#ecd-planes-flow)"/>
+<line class="a-flow" x1="531.9" y1="521.3" x2="553.5" y2="521.3" marker-end="url(#ecd-planes-flow)"/>
+<line class="a-flow" x1="729.9" y1="521.3" x2="751.6" y2="521.3" marker-end="url(#ecd-planes-flow)"/>
+<line class="a-flow" x1="899.6" y1="521.3" x2="921.2" y2="521.3" marker-end="url(#ecd-planes-flow)"/>
+<path class="a-flow" d="M991.6,555.7 C991.6,603.7 836.6,603.7 836.6,559.7" marker-end="url(#ecd-planes-flow)"/>
+<text class="t-flow" x="914.1" y="619.7" text-anchor="middle">la recepción sube al PMS</text>
+<rect class="b-ad" x="341.5" y="647.7" width="186.9" height="58.9" rx="8"/>
+<text class="t-name" x="434.9" y="672.0" text-anchor="middle">MDM de clientes</text>
+<text class="t-mono" x="434.9" y="693.7" text-anchor="middle">customer-mdm</text>
+<line class="a-flow" x1="434.9" y1="555.7" x2="434.9" y2="641.7" marker-start="url(#ecd-planes-flow)" marker-end="url(#ecd-planes-flow)"/>
+<text class="t-flow" x="444.9" y="604.7" text-anchor="start">identidad del cliente</text>
+<rect class="b-ext" x="24.0" y="647.7" width="190.2" height="58.9" rx="8"/>
+<text class="t-name" x="119.1" y="672.0" text-anchor="middle">Salesforce</text>
+<text class="t-sub" x="119.1" y="693.7" text-anchor="middle">maestro del cliente</text>
+<line class="a-flow" x1="218.2" y1="677.1" x2="335.5" y2="677.1" marker-start="url(#ecd-planes-flow)" marker-end="url(#ecd-planes-flow)"/>
+<text class="t-flow" x="277.8" y="667.1" text-anchor="middle">clientes</text>
+<rect class="b-ad" x="787.7" y="647.7" width="272.8" height="58.9" rx="8"/>
+<text class="t-name" x="924.1" y="672.0" text-anchor="middle">Recorrido de la reserva</text>
+<text class="t-mono" x="924.1" y="693.7" text-anchor="middle">journey-service</text>
+</svg>
+	</div>
+</figure>
+
+<style>
+	.ecd-figure { margin: 1.5rem 0; }
+	.ecd-scroll { overflow-x: auto; }
+	.ecd-scroll :global(svg) { display: block; width: 100%; height: auto; min-width: 640px; }
+	figcaption { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); margin-top: 0.5rem; }
+</style>

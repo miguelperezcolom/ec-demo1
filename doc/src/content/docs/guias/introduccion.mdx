@@ -3,6 +3,8 @@ title: Introducción
 description: Qué es ec-demo1, qué sistemas tiene, en qué repositorios vive y dónde verlo funcionando.
 ---
 
+import HexagonoSistemas from '../../../components/HexagonoSistemas.astro';
+
 **ec-demo1** es la prueba de concepto de la **capa anticorrupción (ACL)** de Riu entre su CRS y
 Opera Cloud, construida sobre dos piezas propias: **EventConductor**, el motor de procesos, y
 **Mateu**, el framework de interfaces. Empezó como un despliegue de EventConductor en Kubernetes y
@@ -19,21 +21,10 @@ hoy es la PoC completa:
 
 ## Los sistemas
 
-```mermaid
-flowchart LR
-  CRS["CRS<br/>(booking)"] --> ACLCRS["Conector CRS<br/>crs-integration"]
-  ACLCRS --> MOTOR["Motor<br/>EventConductor"]
-  MOTOR --> MAP["Mapeado<br/>mapping-service"]
-  MOTOR --> MDM["MDM clientes<br/>customer-mdm"]
-  MOTOR --> PMS["Conector PMS<br/>pms-integration"]
-  PMS --> OPERA[("Opera Cloud<br/>OHIP")]
-  PMS -- "proyectar-estancia" --> FO["Front office"]
-  MDM <--> SF[("Salesforce")]
-  ERP["ERP<br/>interlocutores"] --> ACLCRS
-  MOTOR --> INBOX["Bandeja y avisos<br/>communication"]
-  NOTICES["Avisos de recepción<br/>notices"] --> FO
-  RULES["Reglas de registro<br/>registration-rules"] --> FO
-```
+<HexagonoSistemas />
+
+Cada sistema externo se enchufa por **un puerto** a **su adaptador**, y los adaptadores solo hablan
+con **el núcleo**: el motor y sus servicios. Ningún sistema externo habla con otro.
 
 | Sistema | Papel en la PoC |
 | :------ | :-------------- |
