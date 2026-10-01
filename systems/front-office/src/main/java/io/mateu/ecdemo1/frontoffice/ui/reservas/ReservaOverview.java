@@ -199,9 +199,8 @@ public class ReservaOverview
   Callable<Component> historial = () -> io.mateu.ecdemo1.frontoffice.ui.common.ReservationHistory.of(stayId);
 
   /**
-   * En la llegada, «En otros sistemas» e «Historial» son paneles plegados del foldout (ver
-   * {@link #cuerpo}): el foldout ocupa la página y lo que va detrás de él no se pinta. Como secciones
-   * de página solo van en la estancia y la salida — nunca las dos cosas a la vez.
+   * «En otros sistemas» e «Historial» no van en la llegada: en el check-in no interesan. Como
+   * secciones de página solo van en la estancia y la salida.
    */
   @Override
   public boolean isHidden(String memberName, HttpRequest httpRequest) {
@@ -293,22 +292,6 @@ public class ReservaOverview
                 // info accesoria: estrecha
                 .width("14rem")
                 .content(huespedes().perfilCliente())
-                .build(),
-            // la estancia en los otros sistemas y quién hizo qué: plegados, para no cargar la
-            // operativa del check-in; en la estancia y la salida van como secciones de página
-            FoldoutPanel.builder()
-                .id("otros-sistemas")
-                .title("En otros sistemas")
-                .open(false)
-                .width("26rem")
-                .content(OtherSystems.asList(stayId))
-                .build(),
-            FoldoutPanel.builder()
-                .id("historial")
-                .title("Historial")
-                .open(false)
-                .width("24rem")
-                .content(io.mateu.ecdemo1.frontoffice.ui.common.ReservationHistory.of(stayId))
                 .build()))
         .build();
   }
