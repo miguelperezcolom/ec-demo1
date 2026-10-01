@@ -184,6 +184,13 @@ const readMenuLabels = (page: Page) => page.evaluate(() => {
                 const text = (el.textContent ?? '').trim()
                 if (text && text.length < 30 && el.children.length === 0) labels.push(text)
             }
+            // A navigation drawer (Redwood's oj-navigation-list on the data plane) wraps each label
+            // in a span inside <a role="treeitem">: the entry is not a leaf, so read it by its role.
+            const role = el.getAttribute('role') ?? ''
+            if (role === 'treeitem' || role === 'menuitem' || role === 'tab') {
+                const text = (el.textContent ?? '').trim()
+                if (text && text.length < 30) labels.push(text)
+            }
             const shadow = (el as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot
             if (shadow) walk(shadow)
         }
