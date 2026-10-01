@@ -84,11 +84,25 @@ public class NoticeCrud extends Crud<NoticeViewModel, NoticeViewModel, NoticeVie
     }
 
     static NoticeRow row(Notice n) {
-        return new NoticeRow(n.id, sobre(n), n.hotelCode == null ? "Cadena" : n.hotelCode, n.text, tipo(n.noticeType()),
+        return new NoticeRow(n.id, sobre(n), n.hotelCode == null ? "Cadena" : n.hotelCode, corto(n.text), tipo(n.noticeType()),
                 n.momentSet().stream().sorted().map(NoticeCrud::momento).collect(Collectors.joining(", ")),
                 vigencia(n),
                 n.active ? new Status(StatusType.SUCCESS, "Activo") : new Status(StatusType.NONE, "Inactivo"),
-                n.salesforce() ? "Salesforce" : "Avisos");
+                n.salesforce() ? "Salesforce" : "Avisos",
+                n.text);
+    }
+
+    /** The notice on one line for the listing: about 60 characters, cut at a word; the whole of it opens under the row. */
+    static String corto(String text) {
+        if (text == null) {
+            return "";
+        }
+        var oneLine = text.replaceAll("\\s+", " ").trim();
+        if (oneLine.length() <= 60) {
+            return oneLine;
+        }
+        var cut = oneLine.lastIndexOf(' ', 60);
+        return oneLine.substring(0, cut > 30 ? cut : 60) + "…";
     }
 
     static String sobre(Notice n) {
