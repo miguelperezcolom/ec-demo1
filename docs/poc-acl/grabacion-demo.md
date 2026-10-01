@@ -66,8 +66,8 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
   «Inspeccionada»); el check-out siempre será una salida anticipada.
 - **Cupo de Salesforce:** `demo-prep.sh` muestra las llamadas que quedan; con Pub/Sub el MDM gasta
   unas 15 al día y una demo completa menos de 100.
-- **Reorganización de módulos:** se habrá hecho el merge. `partners` se llama ahora `erp`, así que
-  hay que comprobar que `deploy/demo/common.sh` (`$SERVICES`) y `zero.sh` usan los nombres nuevos.
+- **Reorganización de módulos:** hecha. `partners` se llama ahora `erp`, y `deploy/demo/common.sh`
+  (`$SERVICES`) ya usa `erp`; la base de datos sigue llamándose `partners` a propósito.
 - **Herramientas:** ffmpeg (`/opt/homebrew/bin/ffmpeg`) y Playwright (`e2e/node_modules`).
 - **Salesforce:** credenciales de API en el secreto `ec-salesforce` (`deploy/demo/common.sh
   salesforce_env`). No se imprimen.
@@ -91,8 +91,9 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
    - **Opera:** solo lectura. Se busca y se enseña, nunca se modifica nada desde su interfaz.
    - **Salesforce:** se navega. **La aprobación del Case del flujo 3 se hace en su interfaz**, lo
      acordamos con el usuario. La fusión del flujo 2 la hace el escaneo en recepción; si no
-     fusiona, se hace en su interfaz (Contacts → duplicados → Merge). Si la interfaz no deja fusionar, el plan B es `python3 dedup.py --execute
-     --include "<nombre>"` fuera de cámara.
+     fusiona, se hace en su interfaz (Contacts → duplicados → Merge). Si la interfaz no deja fusionar, el plan B es
+     `python3 integration/customer-mdm-service/salesforce/dedup.py --execute --include "<clave del grupo>"`
+     (la clave tal como la imprime el plan, no el nombre) fuera de cámara.
 6. Al terminar, se borra el perfil (`rm -rf` del directorio), para que no quede ninguna sesión en
    disco.
 
@@ -121,8 +122,7 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
     el front office. Si algo de Redwood falla en una toma, se graba esa toma en Vaadin
     (`ec1.mateu.io`, `console.ec1.mateu.io`).
   - **Login:** demo/demo en Keycloak.
-- **Duración:** entre 12 y 16 minutos en total (los flujos 6–8, unos 4 más: la espera del flujo 6 se
-  recorta en el montaje).
+- **Duración:** unos 20 minutos en total (ver arriba; la espera del flujo 6 se recorta en el montaje).
 
 ## Reset
 
@@ -357,7 +357,7 @@ de push, así que esta toma se graba con **el Chrome del usuario y la captura de
 2. Claude graba la pantalla: `ffmpeg -f avfoundation -framerate 30 -capture_cursor 1 -i "<pantalla>:none"
    -t 60 webpush.mp4` (la pantalla, de `ffmpeg -f avfoundation -list_devices true -i ""`).
 3. En el flujo 6, con el aviso rebajado a 2 min (`opera-outage.sh on --alert-after 2m`), la
-   notificación «Reserva esperando a Opera» sale en el escritorio; un clic lleva a la bandeja.
+   notificación «Writing <localizador> to the PMS keeps failing» (`RETRYING_TOO_LONG`) sale en el escritorio; un clic lleva a la bandeja.
    - **Rótulo:** «El aviso también llega al navegador, aunque la consola esté cerrada.»
 4. En el montaje, esta toma se recorta a la zona de la notificación y se inserta en el flujo 6.
 

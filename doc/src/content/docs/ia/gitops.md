@@ -12,7 +12,7 @@ estructura; el detalle está en
 ```
 repositorio de configuración              este despliegue
   ia/                                       ia-control-plane
-    llms/anthropic.yaml      ── push ──▶      GitHubCatalogueSource  (lee ia/ por la API, con un token)
+    llms/anthropic.yaml      ── push ──▶      GitHubCatalogueSource  (lee ia/ del tarball de la rama, en una petición)
     mcp/orchestrator.yaml                     ReconcileCatalogueUseCase
     apimcp/booking-api.yaml  ◀─ webhook ──    /cp-webhooks/github    (verificado por HMAC)
     rag/handbook.yaml
@@ -35,7 +35,9 @@ Una entrada por fichero. El campo `kind` (`llm` | `mcp` | `apimcp` | `rag` | `ag
   consola antes del siguiente push.
 - **Los secretos nunca están en el repositorio.** Una entrada `llm` nombra una variable de entorno en
   `credentialEnv` y el plano de control la resuelve de su propio Secret al sincronizar. El token de
-  lectura y el secreto HMAC del webhook son del despliegue (Secret `cp-gitops`). La lectura es todo o
+  lectura (solo hace falta si el repositorio es privado) y el secreto HMAC del webhook son del
+  despliegue (Secret `cp-gitops`). La lectura es una sola petición —el tarball de la rama—, así que no
+  agota el límite de la API de GitHub al arrancar, y es todo o
   nada: una lectura a medias nunca se interpreta como «el repositorio está vacío».
 - **`mcp` y `apimcp` no son lo mismo.** Un `mcp` es un servidor de otro y no lista herramientas; un
   `apimcp` es una oferta compuesta y su lista de herramientas **es** la entrada. Omitir `tools` deja la

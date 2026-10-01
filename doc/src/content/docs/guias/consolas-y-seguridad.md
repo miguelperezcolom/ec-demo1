@@ -42,15 +42,20 @@ seguridad; **el gateway valida el token de Keycloak antes de que ningún backend
 `SecurityConfig.java` es el único sitio donde está escrita la regla:
 
 - **Autenticado** en cualquier host: `/_workflow`, `/_forms`, `/_booking`, `/_content`, `/_erp`,
-  `/_customers`, `/_journey`, `/_inbox`, `/_api-usage` y **`/ai/**`** — cada prompt que llega al agente
-  se factura, así que el chat no puede ser un endpoint abierto.
-- **Rol `ai-admin`**, solo en los hosts de control: `/_ia-cp`, `/_users`, `/_workflow-admin`,
-  `/_forms-admin`, `/_integrations`, `/_mapping`, `/_communication`, `/_mdm`, `/_audit` y también
-  **`/ai/**`**: el agente del control plane llega a aprobaciones de mapeado, decisiones de integración y
-  datos personales del MDM.
+  `/_customers`, `/_journey`, `/_notices`, `/_inbox/**`, `/_api-usage/**` y **`/ai/**`** — cada prompt
+  que llega al agente se factura, así que el chat no puede ser un endpoint abierto.
+- **Rol `ai-admin`**, solo en los hosts de control: `/_ia-cp`, `/_users`, `/mateu/**`,
+  `/_workflow-admin`, `/_forms-admin`, `/_integrations`, `/_mapping`, `/_communication`, `/_mdm`,
+  `/_registration-rules`, `/_audit` y también **`/ai/**`**: el agente del control plane llega a
+  aprobaciones de mapeado, decisiones de integración y datos personales del MDM.
 - **Públicos, y por qué**: los webhooks de git del motor (`/workflow/webhooks/**`, `/forms/webhooks/**`,
-  verificados por HMAC), el de GitOps del catálogo de IA (`/cp-webhooks/**`, también HMAC), los scripts
-  de Web Push de la bandeja, los recursos estáticos del motor y la salud.
+  verificados por HMAC), el de GitOps del catálogo de IA (`/cp-webhooks/**`, también HMAC, y solo en
+  los hosts de control), los scripts de Web Push de la bandeja (`/_inbox/push/push.js` y `sw.js`), los
+  recursos estáticos del motor (`/eventconductor/**`) y la salud. Y dos `GET` que solo redirigen a una
+  pantalla de la consola, que es la que pide el login: `/_inbox` (o `/_inbox/`), tecleado en la barra
+  de direcciones, lleva a la bandeja (`/inbox/pending`), y `/_api-usage/apis`, a las APIs externas
+(`/usage/apis`). Lo
+  demás bajo `/_inbox` y `/_api-usage` sigue autenticado.
 - **Nunca desde fuera** (rutas que devuelven 404 a propósito): `/a2a/**` en todos los hosts, y `/api/**`
   y el MCP del front office en `front.ec1`.
 
@@ -63,7 +68,8 @@ conjunto es la frontera de seguridad, no el ingress. Añadir una quinta consola 
 Lo que **no** tiene ruta y no debe tenerla: el `/internal/**` del plano de control de IA (sirve la
 credencial del LLM en claro al agente), el REST de `integrations-service` (`/integrations/connections`
 entrega al conector el secreto de Opera), `api-mcp` (llama a APIs de terceros con credenciales
-guardadas) y el puerto gRPC 9191 de `users` (no autentica nada). Son alcanzables solo desde dentro
+guardadas), el `POST /alerts/alertmanager` de `communication-service` (por donde entran las alertas de
+la plataforma a la bandeja) y el puerto gRPC 9191 de `users` (no autentica nada). Son alcanzables solo desde dentro
 del namespace.
 
 ## Keycloak

@@ -22,9 +22,10 @@ contexto y cada servicio depende solo de los que habla. Los paquetes
 | `contracts-notices` | `NoticeChanged`: un aviso de recepción de un cliente, una reserva o una agencia | `notices` |
 | `contracts-mapping` | Tipos de código, traducciones, causas, `MappingCommand` | `mapping-commands` |
 | `contracts-integration` | El ciclo de vida de una integración, la conexión, las reservas futuras y sus códigos; `ApiUsage` | — (HTTP) |
-| `contracts-frontoffice` | `FrontOfficeCommand` (estancias, catálogos, `RecordReception`), `FrontOfficeEvent` (check-in, check-out, no show de recepción) | `front-office-commands`, `front-office-events` |
+| `contracts-frontoffice` | `FrontOfficeCommand` (estancias, catálogos, cómo tomó el PMS lo que hizo recepción —`RecordReception`— y un cargo —`RecordCharge`—), `FrontOfficeEvent` (check-in, check-out, no show de recepción; un cargo del folio y su anulación), el resumen del catálogo | `front-office-commands`, `front-office-events` |
 | `contracts-communication` | Avisos pedidos y resueltos | `notifications`, `notification-resolutions` |
 | `contracts-audit` | `AuditedAction` | `audit` |
+| `contracts-registration` | `RegistrationRuleChanged`: qué datos de un huésped exige un destino al registrarlo (por país u hotel, nacionalidad, edad y rol); `RegistrationRequirements`, cómo se lee una regla —compartido para que el «Probar» del plano de control y el front office digan lo mismo— | `registration-rules` |
 | `contracts-process` | El vocabulario de los procesos compartido con ec-definitions: ids de definición, mensajes de espera, nombres de variables, resultados | — |
 
 Las órdenes van con el contexto que las recibe, no en un módulo de «comandos»: un servicio que manda

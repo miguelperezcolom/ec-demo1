@@ -5,13 +5,15 @@ description: Prometheus, Grafana, Loki y Tempo en ec1 — los dashboards propios
 
 La pila está en el namespace `observability`, desplegada por `deploy.sh` desde
 `deploy/observability/`: **kube-prometheus-stack** (Prometheus y Grafana, `grafana.ec1.mateu.io`),
-**Loki** (logs de todos los pods, 7 días), **Tempo** (trazas) y **Alloy** (recolección).
+**Loki** (logs de todos los pods, 7 días), **Tempo** (trazas) y **Alloy** (recolección). Todo salvo
+Alloy y node-exporter va fijado a nodos `ccx23`: ver la excepción en [El clúster](/operacion/cluster/).
 
 - **Métricas**: Prometheus recoge `/actuator/prometheus` de los pods anotados con `prometheus.io/*` y los
   ServiceMonitors de `servicemonitors.yaml`. Retención de 24 h.
 - **Logs**: todos los pods, en Loki.
-- **Trazas**: cada servicio exporta por OTLP a `tempo.observability:4318`, con `OTEL_SERVICE_NAME` y
-  muestreo completo. Tempo tiene `max_attribute_bytes` subido a 65536 para no cortar el contenido de las
+- **Trazas**: los servicios de backend y el motor exportan por OTLP a `tempo.observability:4318`, con
+  `OTEL_SERVICE_NAME` y muestreo completo; las consolas, el gateway, `users`, `content` y `api-mcp` no
+  exportan trazas. Tempo tiene `max_attribute_bytes` subido a 65536 para no cortar el contenido de las
   conversaciones de los agentes.
 
 ## Dashboards

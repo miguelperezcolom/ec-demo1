@@ -4,7 +4,7 @@ description: Cómo se construyen las imágenes, cómo se despliega ec1 desde cer
 ---
 
 ```sh
-./deploy/build-images.sh [TAG]   # las imágenes de este repositorio → Docker Hub
+./deploy/build-images.sh TAG     # las imágenes de este repositorio → Docker Hub
 ./deploy/deploy.sh               # todo lo demás, idempotente
 ```
 
@@ -17,7 +17,12 @@ Instala primero lo que no es una aplicación pero de lo que compilan las demás 
 contratos, `messaging` y `ui-commons`— y después, por cada módulo de la lista `APPS`, hace un
 `clean package` y construye la imagen con `docker buildx build --platform linux/amd64 --push`. Las
 imágenes se llaman `miguelperezcolom/ec-demo1-<carpeta>`; las consolas se construyen dos veces (Vaadin
-y `-Predwood`, `-redwood` en el nombre).
+y `-Predwood`, `-redwood` en el nombre). Al final construye la del sitio de documentación (`doc/`, sin
+paso de Maven) con su propio tag, `DOCS_TAG`.
+
+- **El tag se pasa siempre.** Es uno solo para todas las imágenes de esa ejecución, y sin él el script
+  no construye nada. Como cada manifiesto fija el suyo, una ronda normal no usa este script entero (ver
+  [Desplegar un cambio](#desplegar-un-cambio)).
 
 - **`clean` no es paranoia.** El procesador de anotaciones de Mateu escribe el controlador de la página
   de arranque en `target/generated-sources`, y Maven no lo vuelve a ejecutar si solo cambió
@@ -36,7 +41,7 @@ converge el clúster.
 
 1. Requisitos del clúster: el controlador de ingress y el emisor de certificados.
 2. Namespaces y secretos.
-3. El motor (PostgreSQL, Redpanda, orquestador, formularios), desde el chart vendorizado
+3. El motor (PostgreSQL, Redpanda, orquestador, formularios y reglas), desde el chart vendorizado
    (`deploy/chart/eventconductor`, ver `VENDORED.md`).
 4. Keycloak, consolas, gateway, ingress, servicios, plano de control.
 5. Observabilidad (Prometheus, Grafana, Loki, Tempo, Alloy), dashboards y reglas de alertas.
@@ -59,7 +64,7 @@ conexión con Opera. Regenerarlas deja todo lo guardado sin poder descifrarse.
 Lo habitual no es `deploy.sh` entero sino una ronda de módulos:
 
 1. Compilar y subir **solo los módulos que cambiaron**, con un **tag nuevo** por módulo (cada
-   manifiesto fija su tag, p. ej. `ec-demo1-pms-integration-service:0.36.0`, y `imagePullPolicy:
+   manifiesto fija su tag, p. ej. `ec-demo1-pms-integration-service:0.39.3`, y `imagePullPolicy:
    IfNotPresent`: reutilizar un tag no despliega nada).
 2. Subir los tags en `deploy/manifests/*.yaml`.
 3. `kubectl apply -f` de esos manifiestos y esperar el `rollout status`.

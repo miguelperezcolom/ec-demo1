@@ -1,6 +1,6 @@
 ---
 title: Los procesos del motor
-description: Los siete procesos que ejecuta EventConductor en ec1, paso a paso, y cómo esperan en vez de fallar.
+description: Los doce procesos que ejecuta EventConductor en ec1, paso a paso, y cómo esperan en vez de fallar.
 ---
 
 El motor de ec1 ejecuta **solo los procesos de la PoC**, importados de
@@ -150,6 +150,7 @@ externa, los perfiles de interlocutor por su `CorporateId`, los cobros por su re
 
 :::note[Versión del motor]
 En la 2.18.0 el `LOCK` no funcionaba sobre PostgreSQL (la clave llevaba un separador NUL) y el conector
-serializaba las escrituras en memoria. En ec1 corre la **2.23.1**, y las definiciones usan el `LOCK`
-del motor.
+serializaba las escrituras en memoria. En ec1 el orquestador corre la **2.23.4** (dos procesos que
+toman a la vez una clave de `LOCK` libre ya no mandan el paso del perdedor al topic de mensajes muertos)
+y forms y rules la 2.23.1; las definiciones usan el `LOCK` del motor.
 :::

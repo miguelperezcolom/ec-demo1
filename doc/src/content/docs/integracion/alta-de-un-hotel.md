@@ -10,7 +10,7 @@ con la causa `INTEGRATION_INACTIVE:<hotel>`: no se pierden ni se escriben.
 
 ## Crear la integración
 
-*Integrations → New*. Se eligen dos cosas y las dos se **leen**, no se escriben: el **hotel del CRS**
+*Integrations → CRS → PMS → New*. Se eligen dos cosas y las dos se **leen**, no se escriben: el **hotel del CRS**
 sale del CRS y la **propiedad de Opera**, de Opera (el cliente OHIP no puede listar las de la cadena,
 así que se ofrecen las configuradas, con el nombre que Opera les da). La conexión viene rellena con la
 de la cadena. Al guardarla arranca el proceso `alta-integracion`, que avanza solo por sus puertas.
@@ -29,12 +29,14 @@ de la cadena. Al guardarla arranca el proceso `alta-integracion`, que avanza sol
 Después, `PAUSED` y `DECOMMISSIONED`. Los estados son los de `IntegrationStatus`
 (`contracts-integration`).
 
-- **Cada puerta que necesita a alguien deja un aviso en la bandeja**, con el enlace a la integración, y
-  se cierra sola cuando la integración la pasa.
+- **Cada puerta que necesita a alguien deja un aviso en la bandeja**, con el enlace a la integración
+  (`/integrations/registry/<id>`), y se cierra sola cuando la integración la pasa.
 - **El mapeado** se ve en *Mapping → Dictionary* filtrando por la integración (estado *Unmapped*); cada
   código, al abrirlo, junto a lo que ofrece Opera. Aprobar reanuda todo lo que esperaba.
 - **Los interlocutores**: el que el ERP ya sabe qué perfil es no se toca; si no, se busca en Opera por
-  su `CorporateId` y solo si no está se crea; el ERP anota cuál es.
+  su `CorporateId` y solo si no está se crea; el ERP anota cuál es. *Import partners*, en la
+  integración, hace lo contrario y solo para sembrar la demo: crea o pone al día en el ERP las agencias,
+  empresas y orígenes que la cadena tiene en Opera, sin escribir nada en Opera.
 - **El backfill** no reescribe: lo que Opera ya tiene en esa versión no se escribe (ni la reserva ni el
   perfil). «Ya tiene» es encontrar el localizador del CRS como referencia externa bajo el contexto de la
   ejecución. Las órdenes de proyección van por `projection-requests` y el backfill escribe las de una

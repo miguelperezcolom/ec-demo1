@@ -13,8 +13,10 @@ usuario borrado aquí pero no allí podría seguir entrando. Así que cada alta,
   activa. Los roles y los permisos **no** se mandan: este servicio sigue siendo el único sitio donde se
   deciden.
 - **Por outbox, no con una llamada directa.** Guardar el usuario y llamar a Keycloak no pueden confirmarse
-  juntos, así que el caso de uso no llama a Keycloak: escribe el cambio en `identity_outbox` **en la misma
-  transacción** que el usuario. Un relay la vacía cada pocos segundos, entrega cada cambio y lo marca;
+  juntos, así que el caso de uso no llama a Keycloak: escribe el cambio en el outbox compartido
+  (`outbox_message`, destino `identity`, de `supporting/messaging`) **en la misma transacción** que el
+  usuario. La tabla propia de antes, `identity_outbox`, solo guarda su historial. Un relay vacía el outbox
+  cada pocos segundos, entrega cada cambio y lo marca;
   los fallos se reintentan con un backoff creciente y se abandonan a los diez intentos, para que un
   cambio malo no bloquee la cola. Lo entregado se guarda una semana como registro y se purga.
 - **Al menos una vez, así que idempotente**: en Keycloak es un *upsert* por nombre de usuario (`POST` si

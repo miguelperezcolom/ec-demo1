@@ -25,9 +25,11 @@ se eligen del catálogo (combos y casillas), no se teclean.
 
 ## Las rutas
 
-Una ruta elige qué agente contesta, con cuatro condiciones opcionales —un **rol** requerido, un
-**tenant**, un **locale** y un **prefijo de ruta** de la pantalla desde la que se preguntó—; una
-condición vacía es «me da igual». Se prueban por **prioridad** (menor primero) y gana la primera que
+Una ruta elige qué agente contesta, con cinco condiciones opcionales —un **rol** requerido, un
+**tenant**, un **locale**, un **prefijo de ruta** de la pantalla desde la que se preguntó y el
+**canal**, la consola (`data-plane`, `control-plane` o `front-office`, que marca el gateway por el
+host)—; una condición vacía es «me da igual». Si ninguna encaja, contesta el agente por defecto de la
+consola, también marcado por el gateway (ver [El agente](/ia/agente/)). Se prueban por **prioridad** (menor primero) y gana la primera que
 encaja. El agente de cada petición lo resuelve `ia-agent` preguntando a `/internal/agents/resolve`.
 
 Una ruta puede poner **guardarraíles** de entrada y de salida alrededor del agente que elige. Ver

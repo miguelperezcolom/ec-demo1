@@ -104,9 +104,12 @@ La clasificación de lo que responde OHIP decide qué hace el proceso:
 
 | Respuesta de OHIP | Qué hace el proceso |
 | :---------------- | :------------------ |
-| Timeout, 5xx, límite de caudal | Transitorio: el motor reintenta el paso |
-| 4xx determinista | Causa `PMS_REJECTED` y el proceso espera |
-| Conflicto (la reserva ya existe) | Se lee y se actualiza |
+| Timeout, 5xx, límite de caudal (429), 401 con un token recién pedido | Transitorio: el motor reintenta el paso |
+| Cualquier otro 4xx | Causa `PMS_REJECTED` y el proceso espera |
+
+No hay un caso de «la reserva ya existe»: antes de escribir, el conector busca la reserva por el
+localizador del CRS y, si Opera ya la tiene, la actualiza (o no hace nada si ya tiene esa versión o
+está cancelada).
 
 Pasado `RETRY_ALERT_AFTER` (10 min en el manifiesto) fallando, el conector deja un aviso
 `RETRYING_TOO_LONG` en la bandeja, que se cierra solo cuando el paso pasa.
@@ -120,7 +123,10 @@ esperaba a que la reserva llegase al PMS, como una cancelación que llegó antes
 ## El tenant real
 
 Desde el hito H12 el conector escribe en el **tenant UAT de OHIP**, propiedad **XMAR** (MRU01 en el
-CRS). Solo se escriben **reservas y perfiles de huésped** (con sus cancelaciones). Lo que ese tenant
+CRS). La integración crs-pms escribe **reservas y perfiles de huésped** (con sus cancelaciones) y los
+**perfiles de los interlocutores** que exporta el ERP; la integración pms-fo, lo que hace recepción
+(asignación de habitación, check-in, salida anticipada, pagos y check-out, folios, cargos y el
+comentario del no show; ver [De Opera al front office](/integracion/pms-a-front-office/)). Lo que ese tenant
 hace distinto de las especificaciones públicas, o aún no tiene configurado:
 
 - **Listar las propiedades de la cadena** da 403 a este cliente: el conector ofrece las de

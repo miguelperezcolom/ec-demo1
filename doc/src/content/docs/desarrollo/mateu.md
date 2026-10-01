@@ -5,7 +5,7 @@ description: Cómo se usa Mateu en ec-demo1 — pantallas federadas, dos rendere
 
 [Mateu](https://mateu.io) es el framework de interfaces de todas las pantallas de ec-demo1: cada servicio
 describe sus pantallas en Java (view models con anotaciones) y el renderer las dibuja. La versión es la
-misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.376`).
+misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.383`).
 
 ## Cómo se usa aquí
 
@@ -44,3 +44,11 @@ misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.376`).
 Desde la `3.0-alpha.374` ya no hacen falta los rodeos de antes: un `Listing` carga al abrirse aunque no
 sea `Navigable`, un `@Lookup` en casillas trae sus opciones, las validaciones de los campos ocultos no se
 envían, un `@Section` sobre un campo oculto conserva su encabezado y un `@Notice` a `null` no se pinta.
+
+Y lo que trajeron las últimas:
+
+- **`@FoldoutDetail`** (`3.0-alpha.377`, con arreglos del renderer en la 378 y la 379): una página como
+  resumen más paneles desplegables. Así es la ficha de la reserva del CRS (`BookingViewModel`).
+- **Migas automáticas** (`3.0-alpha.381`): cada página lleva su «ir al padre» sin declararlo. Quien no lo
+  quiere lo quita con `@NoBreadcrumbs`, como el front office, que tiene pocas entradas de menú y cuya
+  ficha de reserva ya dice dónde se está.

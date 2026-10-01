@@ -146,12 +146,15 @@ De diseño, para el DT:
 - **Front office del hotel (H13, H14 y siguientes)**, alimentado por lo que Opera tiene: check-in,
   check-out y no-show que registra el PMS; cargos al folio de Opera; walk-in que reserva el CRS;
   habitación lista según Opera; check-in forzado; avisos de recepción de cliente, reserva y agencia
-  (servicio `notices`, desplegándose); auditoría de quién hizo qué sobre una reserva, en recepción y
-  en el CRS (desplegándose).
+  (servicio `notices`); auditoría de quién hizo qué sobre una reserva, en recepción y en el CRS
+  (desplegados en el PR #150); reglas de registro (kárdex) definidas en el plano de control (#164, #170).
 - **IA**: agente de mapeado que propone todo lo pendiente, agentes que se llaman entre sí por A2A,
-  guardarraíles por ruta, chat del control plane con su propio agente.
+  guardarraíles por ruta, chat del control plane con su propio agente; un solo despliegue de
+  `ia-agent` para todas las consolas (#152, #153).
 - **Operación**: consumo de las APIs de Salesforce y Opera en las homes y en Grafana (dashboard
-  *External APIs* y alertas), documentación en `doc.ec1.mateu.io`.
+  *External APIs* y alertas), documentación en `doc.ec1.mateu.io`; desde la caída de Oracle del
+  2026-09-29, que no levantó ninguna alerta (Alertmanager estaba apagado), las alertas de la plataforma llegan a la bandeja y al
+  navegador de los administradores (Alertmanager → `communication-service`, #163, #170).
 
 El detalle, con sus PRs, está en el [plan](plan.md#después-de-h14-sin-número-de-hito).
 
@@ -182,7 +185,8 @@ arriba es la estimación de quien dirigió el trabajo, no una medida.
 ### Problemas nuevos
 
 - **El motor**: el `LOCK` en PostgreSQL y la descripción larga que se saltaba al importar están
-  corregidos en EventConductor 2.23.0/2.23.1; las definiciones ya no los rodean.
+  corregidos en EventConductor 2.23.0/2.23.1, y la carrera del `LOCK` en el orquestador 2.23.4,
+  desplegado; las definiciones ya no los rodean.
 - **Una caída de Oracle (2026-09-29).** La API de reservas de OHIP UAT respondió 502 y después 500
   «Request failed while connecting to the downstream system» durante horas, desde ~01:35 (hora de
   Madrid). El token y otros módulos (configuración, perfiles) respondían bien: era el servicio de
@@ -197,7 +201,7 @@ arriba es la estimación de quien dirigió el trabajo, no una medida.
   de OPERA Cloud, pero es de la interfaz y no aplica a lo que entra por OHIP (check-in online, app,
   integraciones). Responde al «PDTE» de *Configuración de campos de Kardex* del AF PMS-CRM: esa
   configuración pertenece al Riu Front Office, que es quien captura los datos en todos los canales.
-  Pendiente de confirmación por Oracle. **Hecho en la PoC** (rama `feat/registration-rules`): las
+  Pendiente de confirmación por Oracle. **Hecho en la PoC** (PR #164, desplegado en #170): las
   reglas se definen en el plano de control (`registration-rules`: por país u hotel, nacionalidad,
   edad y rol, auditadas) y cada front office guarda su copia (topic `registration-rules`) y las
   aplica en sus servicios — el check-in se rechaza o se fuerza hasta tener los datos, lo pida el
@@ -205,9 +209,10 @@ arriba es la estimación de quien dirigió el trabajo, no una medida.
 
 ### Siguientes pasos (a 2026-09-30)
 
-1. Terminar el despliegue de los avisos de reserva y agencia y de la auditoría de recepción.
-2. Un solo despliegue de `ia-agent`: el canal y el agente por defecto viajando en cada petición
-   (previsto, sin hacer).
-3. Configurar en XMAR las interfaces de referencias externas en perfiles; decidir si se activan los
+Hechos desde entonces: el despliegue de los avisos de reserva y agencia y de la auditoría de
+recepción (#150), y un solo despliegue de `ia-agent` con el canal y el agente por defecto en cada
+petición (#152, #153).
+
+1. Configurar en XMAR las interfaces de referencias externas en perfiles; decidir si se activan los
    depósitos.
-4. Rotar el client secret de OHIP compartido durante la PoC.
+2. Rotar el client secret de OHIP compartido durante la PoC.

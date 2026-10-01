@@ -13,8 +13,8 @@ hoy es la PoC completa:
 - lo que no se puede resolver solo —un código sin equivalencia, un interlocutor que no está en Opera,
   un rechazo de Opera— se convierte en una **causa** con nombre y el proceso **espera, no falla**;
 - los **clientes** se resuelven en un MDM propio y se limpian y deciden en **Salesforce**;
-- un **plano de control** gobierna las integraciones, el mapeado, los avisos, la auditoría y los
-  **agentes de IA**;
+- un **plano de control** gobierna las integraciones, el mapeado, las **reglas de registro** del
+  kárdex, los avisos, la auditoría y los **agentes de IA**;
 - todo se despliega en el clúster **ec1** con un script, y se observa en Grafana.
 
 ## Los sistemas
@@ -31,6 +31,8 @@ flowchart LR
   MDM <--> SF[("Salesforce")]
   ERP["ERP<br/>interlocutores"] --> ACLCRS
   MOTOR --> INBOX["Bandeja y avisos<br/>communication"]
+  NOTICES["Avisos de recepción<br/>notices"] --> FO
+  RULES["Reglas de registro<br/>registration-rules"] --> FO
 ```
 
 | Sistema | Papel en la PoC |
@@ -39,6 +41,8 @@ flowchart LR
 | **ERP** (`systems/erp`) | El maestro de interlocutores: turoperadores, agencias, empresas |
 | **Opera Cloud** | El PMS real, por OHIP (tenant UAT). No se despliega: se usa |
 | **Front office** (`systems/front-office`) | La recepción del hotel: reservas, check-in, check-out, walk-in, kárdex |
+| **Avisos de recepción** (`systems/notices`) | Los avisos de un cliente, una reserva o una agencia; el front office guarda una copia |
+| **Reglas de registro** (`control-plane/registration-rules`) | Qué datos del huésped exige la ley de cada destino; las define el plano de control y las aplica el front office |
 | **Salesforce** | El maestro del cliente: limpia, deduplica y decide los cambios |
 | **Motor** (EventConductor) | Lleva cada reserva por sus pasos; imágenes publicadas, no se compila aquí |
 

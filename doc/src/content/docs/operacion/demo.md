@@ -24,6 +24,8 @@ deploy/demo/demo-prep.sh health                # solo las comprobaciones: una ta
 deploy/demo/demo-prep.sh contracts             # solo los contratos de tareas
 deploy/demo/demo-prep.sh seed returning-customer [--create]   # flujo 2
 deploy/demo/demo-prep.sh seed arriving-today   # flujo 4: una reserva que llega hoy
+deploy/demo/demo-prep.sh seed arriving-opera-today   # check-in / check-out: una reserva que llega en
+                                               # la fecha de negocio de Opera, y sus habitaciones limpias
 deploy/demo/demo-prep.sh seed walk-in          # flujo 5: los datos a teclear
 ```
 
@@ -44,6 +46,7 @@ los procesos con su paso e intentos, las causas, los avisos, Opera y la estancia
 deploy/demo/opera-outage.sh on [--alert-after 2m] [--auto-off 15m]
 deploy/demo/opera-outage.sh off [--restore-alert]
 deploy/demo/opera-outage.sh status
+deploy/demo/opera-outage.sh alert 10m          # solo el umbral del aviso (reinicia el conector)
 ```
 
 No toca Opera: corta la **red**. Una NetworkPolicy (`demo-opera-outage`) deja a `pms-integration-service`
@@ -51,7 +54,8 @@ hablar solo con los pods del clúster, así que cada llamada a OHIP agota su tim
 el script lo comprueba desde el pod. El proceso **espera, no falla**: el paso que escribe en Opera se
 reintenta, y pasado el umbral llega `RETRYING_TOO_LONG` a la bandeja. `--alert-after` baja el umbral
 para la demo (reinicia el conector: hacerlo **antes** de la reserva). El corte se levanta solo a los
-15 min (`--auto-off`): ec1 lo usan más personas.
+15 min (`--auto-off`): ec1 lo usan más personas. Después, `off --restore-alert` (o `alert 10m`) devuelve
+el umbral a sus 10 min.
 
 ## Volver atrás
 
@@ -59,7 +63,12 @@ para la demo (reinicia el conector: hacerlo **antes** de la reserva). El corte s
 | :----- | :------- |
 | `snapshot.sh` | Guarda la **línea base** de ec1 en `~/.local/share/ec-demo1/demo-baseline`, con nada en marcha (ningún proceso corriendo, nada en un outbox) |
 | `reset.sh` | Vuelve a la línea base (~4 min): restaura las bases de datos de los servicios y el estado del motor; en Salesforce borra los contactos y Cases que creó la demo (solo los de ec1: la org se comparte con el entorno local) y devuelve los de la línea base a sus datos; el MDM retoma los eventos de Salesforce desde ahora; repone el contexto de Opera de la línea base |
-| `zero.sh` | Vuelve a **antes de integrar nada** (~3 min): vacía reservas, integraciones, mapeados, clientes, huéspedes, estancias, avisos, auditoría y procesos; en Salesforce borra todos los contactos y los Cases del MDM. Se queda lo configurado: interlocutores, habitaciones y catálogos del front office, definiciones, usuarios y Keycloak |
+| `zero.sh` | Vuelve a **antes de integrar nada** (~3 min): vacía reservas, integraciones, mapeados, clientes, huéspedes, estancias, notificaciones, avisos de recepción (los de `notices` y la copia del front office), auditoría y procesos; en Salesforce borra todos los contactos y los Cases del MDM. Se queda lo configurado: interlocutores, habitaciones y catálogos del front office, reglas de registro, definiciones, usuarios y Keycloak |
+
+Las bases de datos que entran en la línea base y en `reset.sh` son las de `DATABASES` en
+`deploy/demo/common.sh`: `audit`, `booking`, `communication`, `crs_integration`, `customer_mdm`,
+`front_office`, `integrations`, `mapping`, `notices`, `partners` (la del ERP) y `registration_rules`.
+Las de `users` y `content` no: un reset no toca usuarios ni contenidos.
 
 ### Un contexto de Opera por ejecución
 

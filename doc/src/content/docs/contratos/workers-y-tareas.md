@@ -136,13 +136,21 @@ el hueco se ve al momento. En ec-demo1 lo que lo detecta antes es la comprobaci�
 
 `contracts/workers/<servicio>.tasks` lista lo que sirve cada worker, `<id>@<versión> <topic>`,
 **generado** de sus `TaskRegistration` por su `ServedTasksTest` (con la misma regla
-`-Dcontracts.write=true`):
+`-Dcontracts.write=true`). El de `pms-integration-service`:
 
 ```
+# pms-integration-service: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
+assign-room@1 pms-integration
 cancel-reservation@1 pms-integration
+check-in-reservation@1 pms-integration
+check-out-reservation@1 pms-integration
 ensure-guest-profile@1 pms-integration
 ensure-partner-profile@1 pms-integration
+fetch-invoice@1 pms-integration
+post-charge@1 pms-integration
 project-stay@1 pms-integration
+record-no-show@1 pms-integration
+reverse-charge@1 pms-integration
 upsert-reservation@1 pms-integration
 ```
 

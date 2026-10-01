@@ -10,9 +10,9 @@ Cada módulo es su propio proyecto Maven y su propia imagen, con el nombre de su
 
 | Carpeta | Qué contiene |
 | :------ | :----------- |
-| `systems/` | Los sistemas de la cadena a los que sustituye la PoC, y el front office: `crs/booking` (el CRS), `erp`, `front-office`, `pms/opera-mock` (un doble de OHIP solo para la batería local) |
+| `systems/` | Los sistemas de la cadena a los que sustituye la PoC, y el front office: `crs/booking` (el CRS), `erp`, `front-office`, `notices` (los avisos de recepción), `pms/opera-mock` (un doble de OHIP solo para la batería local) |
 | `integration/` | **El plano de datos**, la ACL: `crs-integration-service`, `pms-integration-service` (el conector de Opera), `mapping-service`, `customer-mdm-service`, `journey-service` |
-| `control-plane/` | **Quién gobierna el flujo**: `integrations-service` (una integración por hotel y su alta), `audit-service`, `communication-service` (avisos, destinatarios, bandeja), `users` y `grpc-interface` |
+| `control-plane/` | **Quién gobierna el flujo**: `integrations-service` (una integración por hotel y su alta), `audit-service`, `communication-service` (avisos, destinatarios, bandeja, y las alertas de la plataforma que le manda Alertmanager), `registration-rules` (las reglas de registro del kárdex), `users` y `grpc-interface` |
 | `consoles/` | Lo que ve la gente: `gateway`, `shell` (plano de datos) y `control-shell` (plano de control) |
 | `ai/` | Los agentes: `ia-agent`, `ia-control-plane` (los catálogos) y `api-mcp` |
 | `contracts/` | El lenguaje que hablan los servicios: librerías por contexto, esquemas de los topics y las tareas de cada worker. Ver [Contratos](/contratos/librerias-y-esquemas/) |
@@ -26,9 +26,10 @@ Cada módulo es su propio proyecto Maven y su propia imagen, con el nombre de su
 La PoC separa **lo que fluye** de **quién lo gobierna**, y cada plano tiene su consola:
 
 - **Plano de datos** — `ec1.mateu.io`: lo que usa el negocio. El CRS (*Call center*), el ERP,
-  *Clientes*, el recorrido de una reserva, los procesos del motor.
+  *Clientes*, los *Avisos* de recepción, el recorrido de una reserva, los procesos del motor.
 - **Plano de control** — `console.ec1.mateu.io`: la configuración y la medida. IA, usuarios,
-  integraciones, mapeado, el MDM técnico, notificaciones, auditoría, las definiciones del motor.
+  integraciones, mapeado, el MDM técnico, las reglas de registro (*Registro*), notificaciones,
+  auditoría, las definiciones del motor.
 
 Cada servicio trae sus propias pantallas (un `@UI` de Mateu en su ruta, p. ej. `/_mapping`) y la
 consola las **federa** con un `RemoteMenu`. Ver [Consolas, gateway y seguridad](/guias/consolas-y-seguridad/).
@@ -61,10 +62,10 @@ tienen operativa propia que enseñar.
 
 ## El motor
 
-EventConductor lleva cada reserva por sus pasos. Los procesos están en ec-definitions y son diez:
+EventConductor lleva cada reserva por sus pasos. Los procesos están en ec-definitions y son doce:
 `proyectar-reserva`, `proyectar-cancelacion`, `proyectar-interlocutor`, `proyectar-estancia`,
 `registrar-no-show`, `registrar-checkin`, `registrar-checkout`, `registrar-no-show-pms`,
-`alta-integracion` y `alta-integracion-fo`. Cada paso `ACTION` es una **tarea**
+`registrar-cargo`, `anular-cargo`, `alta-integracion` y `alta-integracion-fo`. Cada paso `ACTION` es una **tarea**
 que atiende un worker en un topic de Kafka (`mapping`, `pms-integration`, `crs-integration`,
 `integrations`, `booking`). Ver [Los procesos del motor](/guias/procesos/) y
 [Workers y tareas](/contratos/workers-y-tareas/).
