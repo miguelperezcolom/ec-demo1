@@ -166,7 +166,7 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
      * amount as a badge, the date and the reference under it. No table: a grid in a fold read as
      * a form. The editor keeps the list below.
      */
-    @Section("Payments")
+    @Section(value = "Payments", panelWidth = PanelWidth.MEDIUM)
     @HiddenInCreate
     @HiddenInEditor
     @Label("")
@@ -216,7 +216,7 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
     Callable<Component> otherSystems = this::otherSystems;
 
     /** Who did what with the booking, and when: here, through the console's agent, and at the front office. */
-    @Section("History")
+    @Section(value = "History", panelWidth = PanelWidth.MEDIUM)
     @HiddenInCreate
     @HiddenInEditor
     @Label("")
