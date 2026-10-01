@@ -111,6 +111,33 @@ public class Bienvenida extends Welcome {
     };
   }
 
+  /** The hotel chosen in the header's Hotel selector, for this render (see {@link #component}). */
+  transient io.mateu.ecdemo1.frontoffice.ui.common.Hotels.Hotel hotel;
+
+  /**
+   * The figures are the chosen hotel's: a hotel whose stays are not in this front office shows
+   * zeros, not another hotel's day. The subtitle names the hotel.
+   */
+  @Override
+  public io.mateu.uidl.fluent.Component component(io.mateu.uidl.interfaces.HttpRequest httpRequest) {
+    var hotels = io.mateu.ecdemo1.frontoffice.ui.common.Hotels.instance();
+    if (hotels != null) {
+      hotel = hotels.selected(httpRequest);
+      if (!hotels.holdsStays(hotel)) {
+        llegadasHoy = zero(llegadasHoy);
+        enCasa = zero(enCasa);
+        salidasHoy = zero(salidasHoy);
+        ocupacion = null;
+      }
+    }
+    return super.component(httpRequest);
+  }
+
+  private static io.mateu.uidl.data.MetricCard zero(io.mateu.uidl.data.MetricCard c) {
+    return new io.mateu.uidl.data.MetricCard(c.id(), c.title(), "0", c.unit(), c.trend(), c.trendLabel(), c.icon(),
+        c.description(), c.actionId(), c.style(), c.cssClasses());
+  }
+
   @Override
   protected String heroTitle() {
     return "Front-Office Suite";
@@ -118,7 +145,8 @@ public class Bienvenida extends Welcome {
 
   @Override
   protected String heroSubtitle() {
-    return "Recepción y automatización del hotel — llegadas, estancias y salidas en una sola vista";
+    var de = hotel == null ? "del hotel" : "de " + hotel.name();
+    return "Recepción y automatización " + de + " — llegadas, estancias y salidas en una sola vista";
   }
 
   @Action

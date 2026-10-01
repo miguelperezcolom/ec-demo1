@@ -32,4 +32,22 @@ class FlagsTest {
     assertThat(Flags.before("FR", "Anne Martin")).isEqualTo("🇫🇷 Anne Martin");
     assertThat(Flags.before(null, "Anne Martin")).isEqualTo("Anne Martin");
   }
+
+  @Test
+  void theImageIsTheBundledSvgOfTheCountry() {
+    assertThat(Flags.image("AT")).isEqualTo("/flags/at.svg");
+    assertThat(Flags.image("uk")).isEqualTo("/flags/gb.svg");
+    assertThat(Flags.image("ESP")).isNull();
+    assertThat(Flags.image(null)).isNull();
+    assertThat(Flags.codeOf(Flags.image("at"))).isEqualTo("AT");
+    assertThat(Flags.codeOf(null)).isEmpty();
+  }
+
+  @Test
+  void everyCountryHasItsFlagBundled() {
+    for (var country : Flags.COUNTRIES) {
+      var path = "static" + Flags.image(country);
+      assertThat(getClass().getClassLoader().getResource(path)).as(path).isNotNull();
+    }
+  }
 }

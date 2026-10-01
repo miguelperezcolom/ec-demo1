@@ -54,19 +54,15 @@ public class FrontOfficeSuite implements HomeRouteSupplier, WidgetSupplier {
     Cliente
   }
 
-  public enum Hotel {
-    PuntaCana,
-    Bavaro,
-    Aruba
-  }
-
   // persona projection: naming this @AppContext field "audience" makes its value drive the
   // @Audience marks — unset → full view; Staff/Cliente → that audience's projection
   @AppContext(label = "Modo")
   Modo audience;
 
+  // the hotels this front office serves (Hotels: its configured property, MRU01 ↔ Opera XMAR) — the
+  // choice travels in every request (HttpRequest.appContext("hotel")) and scopes the stays shown
   @AppContext(label = "Hotel")
-  Hotel hotel;
+  io.mateu.ecdemo1.frontoffice.ui.common.Hotels hotel;
 
   @Menu
   RouteLink reservas =

@@ -34,6 +34,24 @@ public final class Flags {
     return flag.isEmpty() || name == null ? name : flag + " " + name;
   }
 
+  /**
+   * The flag as an IMAGE: the path of its bundled SVG (static/flags, the 1x1 set of flag-icons, MIT),
+   * or null when it is not a country's code. What a table cell shows — it draws the same everywhere,
+   * where the emoji depends on the font (the Redwood table and Windows show the two letters).
+   */
+  public static String image(String code) {
+    var iso = iso(code);
+    return iso == null ? null : "/flags/" + iso.toLowerCase(Locale.ROOT) + ".svg";
+  }
+
+  /** The country code an {@link #image} path is the flag of ("AT" for /flags/at.svg), or "". */
+  public static String codeOf(String image) {
+    if (image == null || !image.startsWith("/flags/") || !image.endsWith(".svg")) {
+      return "";
+    }
+    return image.substring("/flags/".length(), image.length() - ".svg".length()).toUpperCase(Locale.ROOT);
+  }
+
   /** The two-letter code, normalised, if it is a country's; null otherwise. */
   static String iso(String code) {
     if (code == null) {
