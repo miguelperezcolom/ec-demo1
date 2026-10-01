@@ -56,11 +56,11 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
 - **Versiones:** ec1 con todo desplegado y la batería de pantallas en verde
   (`cd e2e && npx playwright test tests/consoles.spec.ts`; un fallo suelto que pasa al repetir es
   intermitente).
-- **Mateu y motor:** Mateu 3.0-alpha.382 o posterior en todas las UIs (las acciones ⋯, los lookups,
-  los diálogos, `?integration=` y el Guided Process funcionan en Redwood), y el motor en 2.23.4 o
-  posterior (el lock sin carreras).
-- **Pendientes de Redwood cerrados antes de grabar:** editar una integración desde la URL y `/_inbox`
-  por URL (la otra sesión los tenía abiertos el 2026-09-30); si no, esas tomas en Vaadin.
+- **Mateu y motor:** Mateu 3.0-alpha.383 o posterior en todas las UIs (las acciones ⋯, los lookups,
+  los diálogos, `?integration=` y el Guided Process funcionan en Redwood; Editar una integración
+  abierta por su URL y la insignia de estado en el foldout de la reserva, desde 383), y el motor en
+  2.23.4 o posterior (el lock sin carreras). `/_inbox` por URL abre la bandeja desde el gateway
+  0.35.0.
 - **Fecha de negocio de XMAR:** 2026-05-13 (parada). Opera solo hace el check-in de llegadas de esa
   fecha: para el flujo 9, `deploy/demo/demo-prep.sh seed arriving-opera-today` (y una habitación
   «Inspeccionada»); el check-out siempre será una salida anticipada.
