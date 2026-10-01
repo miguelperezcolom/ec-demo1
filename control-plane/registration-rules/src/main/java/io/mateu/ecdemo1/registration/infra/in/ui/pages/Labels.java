@@ -45,6 +45,15 @@ final class Labels {
         };
     }
 
+    /** The moment in a word, for the listing's column: «Antes», «Recepción», «Online». */
+    static String momentShort(Moment m) {
+        return switch (m) {
+            case PRE_ARRIVAL -> "Antes";
+            case CHECK_IN -> "Recepción";
+            case ONLINE_CHECK_IN -> "Online";
+        };
+    }
+
     static String field(Field f) {
         var l = RegistrationRequirements.label(f);
         return Character.toUpperCase(l.charAt(0)) + l.substring(1);

@@ -77,13 +77,28 @@ public class RuleCrud extends Crud<RuleViewModel, RuleViewModel, RuleViewModel, 
     }
 
     static RuleRow row(RegistrationRule r) {
+        var required = r.requiredList().stream().map(Labels::field).toList();
+        var exempt = r.exemptList().stream().map(Labels::field).toList();
+        var detalle = new StringBuilder("Exige: ").append(required.isEmpty() ? "nada" : String.join(", ", required));
+        if (!exempt.isEmpty()) {
+            detalle.append("\nExime: ").append(String.join(", ", exempt));
+        }
+        detalle.append("\nCuándo: ").append(r.momentList().stream().map(Labels::moment).collect(Collectors.joining(", ")));
+        if (r.legalBasis != null && !r.legalBasis.isBlank()) {
+            detalle.append("\nBase legal: ").append(r.legalBasis);
+        }
         return new RuleRow(r.id, r.name, Labels.scope(r.scope()) + " " + r.scopeCode, aQuien(r),
-                r.requiredList().stream().map(Labels::field).collect(Collectors.joining(", "))
-                        + (r.exemptList().isEmpty() ? "" : " · exime: "
-                        + r.exemptList().stream().map(Labels::field).collect(Collectors.joining(", "))),
-                r.momentList().stream().map(Labels::moment).collect(Collectors.joining(", ")),
-                r.legalBasis == null ? "" : r.legalBasis, vigencia(r),
-                r.active ? new Status(StatusType.SUCCESS, "Activa") : new Status(StatusType.NONE, "Inactiva"));
+                exige(required, exempt),
+                r.momentList().stream().map(Labels::momentShort).collect(Collectors.joining(", ")),
+                vigencia(r),
+                r.active ? new Status(StatusType.SUCCESS, "Activa") : new Status(StatusType.NONE, "Inactiva"),
+                detalle.toString());
+    }
+
+    /** «3 datos · exime 1»: the count only; the list itself opens under the row. */
+    static String exige(java.util.List<String> required, java.util.List<String> exempt) {
+        var s = required.size() == 1 ? "1 dato" : required.size() + " datos";
+        return exempt.isEmpty() ? s : s + " · exime " + exempt.size();
     }
 
     /** «El titular · no UE · 14+ años». */
