@@ -726,7 +726,7 @@ public class Integrations {
     }
 
     void notifyAttention(Integration i, String title, String body) {
-        notifyAttention(i, title, body, properties.consoleUrl() + "/integrations/integrations/" + i.id);
+        notifyAttention(i, title, body, properties.consoleUrl() + "/integrations/registry/" + i.id);
     }
 
     void notifyAttention(Integration i, String title, String body, String link) {

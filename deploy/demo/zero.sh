@@ -2,9 +2,9 @@
 # Takes ec1 back to before anything was integrated, to walk the onboarding again step by step:
 #   - the services lose what the integration made: reservations, integrations (crs-pms and pms-fo, with
 #     the pms-fo cursor), mappings, the MDM's customers, the front office's guests, stays and the PMS
-#     catalogue it was given, notifications, audit, the engine's processes;
+#     catalogue it was given, notifications, the reception notices, audit, the engine's processes;
 #   - what is set up, not integrated, stays: the ERP's partners, the front office's rooms and
-#     catalogs, the process definitions, content, users and Keycloak;
+#     catalogs, the registration rules, the process definitions, content, users and Keycloak;
 #   - Salesforce loses every contact and the MDM's change-request Cases.
 # Opera is not touched, and never cleaned: what earlier runs wrote stays there. So each run gets a
 # context of its own for the CRS locator in the reservations' external references — ECDEMO1-<MMddHHmm>,
@@ -39,8 +39,9 @@ wipe integrations integration backfill_run fo_integration fo_backfill_run outbox
 wipe mapping cause mapping_entry partner_profile waiter waiter_cause outbox_message
 wipe communication inbox_item inbox_seen notification resolution
 wipe customer_mdm customer customer_source customer_xref consolidation change_request outbox_message
-wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line pms_catalogue pms_catalogue_sync command_inbox
+wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line pms_catalogue pms_catalogue_sync command_inbox walk_in check_in_ops forced_check_in stay_invoice folio_line_pms pax_registration_data customer_nationality customer_notice stay_notice_ack
 echo "update room set occupancy = 'FREE';" | psql_in front_office
+wipe notices notice outbox_message
 wipe audit audit_record
 wipe $ENGINE_DB $ENGINE_TABLES log_message_entity outbox_message_entity received_task sync_invocation
 

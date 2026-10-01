@@ -18,6 +18,14 @@ salesforce_env
 [ -f "$BASELINE/taken-at" ] || { echo "No baseline in $BASELINE: take one with snapshot.sh"; exit 1; }
 echo "Resetting ec1's demo to the baseline of $(cat "$BASELINE/taken-at")"
 
+# A baseline taken before a database was covered has no dump of it: that one is left as it is, said
+# here — before anything stops — rather than found half-way, with the services down.
+RESTORED=""
+for db in $DATABASES; do
+  if [ -f "$BASELINE/$db.sql" ]; then RESTORED="$RESTORED $db"
+  else echo "  $db: not in this baseline, left as it is (take a new one with snapshot.sh)"; fi
+done
+
 WORK=$(mktemp -d)
 psql_value customer_mdm "select id from customer" > "$WORK/customers-now"
 psql_value customer_mdm "select id from change_request" > "$WORK/requests-now" 2>/dev/null || : > "$WORK/requests-now"
@@ -28,7 +36,7 @@ for d in $SERVICES; do kubectl -n $NS wait --for=delete pod -l app=$d --timeout=
 sleep 5
 
 echo "Restoring the databases"
-for db in $DATABASES; do
+for db in $RESTORED; do
   psql_in $db < "$BASELINE/$db.sql" > /dev/null && echo "  $db"
 done
 { echo "truncate $(echo $ENGINE_TABLES | tr ' ' ',');"; cat "$BASELINE/$ENGINE_DB.sql"; } | psql_in $ENGINE_DB > /dev/null && echo "  $ENGINE_DB (state tables)"

@@ -88,7 +88,8 @@ spec:
             - name: OPERA_PAY_AT_HOTEL_METHOD
               value: "CASH"
             # Not configured in the tenant yet: profile references need the external systems as
-            # interfaces of the property, and posting deposits needs a cashier for the integration user.
+            # interfaces of the property. Deposits stay off too, although the integration user has a
+            # cashier now (OPERA_CASHIER_ID, below): the demo does not take them.
             - name: OPERA_PROFILE_REFERENCES
               value: "false"
             - name: OPERA_CRM_EXTERNAL_SYSTEM
