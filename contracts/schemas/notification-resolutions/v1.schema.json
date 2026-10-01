@@ -7,7 +7,7 @@
   "x-version" : 1,
   "x-owner" : "communication-service",
   "x-key" : "subject (none from pms-integration's retry watch)",
-  "x-producers" : [ "integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service" ],
+  "x-producers" : [ "integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office" ],
   "x-consumers" : [ "communication-service" ],
   "x-java-type" : "io.mateu.ecdemo1.integration.model.notification.NotificationResolved",
   "$ref" : "#/$defs/NotificationResolved",

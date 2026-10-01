@@ -34,8 +34,9 @@ import java.util.List;
 @io.mateu.uidl.annotations.Script(src = "/_inbox/push/push.js")
 // The reception agent's chat. Declaring it is what puts Redwood's conversation button in the global
 // header (next to the user widget) and opens the chat in the drawer on the left. Mateu's client posts
-// the prompt here with the session's token; the gateway sends front.ec1's /ai/** to the front office's
-// own ia-agent, whose agent is the reception one — with the front office's MCP tools and nothing else.
+// the prompt here with the session's token; the gateway sends front.ec1's /ai/** to the one ia-agent,
+// stamping the front-office channel and the reception agent as its default — with the front office's
+// MCP tools and nothing else.
 @AI(sse = "/ai/api/agent/stream")
 // Sin migas automáticas: el front office tiene pocas entradas de menú y su Reserva 360 ya dice dónde
 // está el recepcionista; un «ir al padre» añadido en su cabecera sólo le quitaría sitio.

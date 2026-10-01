@@ -210,7 +210,7 @@ class PublishedLanguageTest {
                         .describedAs("A notification for the people who look after a hotel: a cause opened, a proposal "
                                 + "ready, a write retrying too long… Deduplicated by dedupKey.")
                         .ownedBy("communication-service").keyedBy("dedupKey (none from pms-integration's retry watch)")
-                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service")
+                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office")
                         .consumedBy("communication-service")
                         .messages(NotificationRequested.class)
                         .example(new NotificationRequested("N-1", NotificationType.CAUSE_OPENED, "MRU01",
@@ -220,7 +220,7 @@ class PublishedLanguageTest {
                 TopicSpec.topic("notification-resolutions")
                         .describedAs("What a notification was about is resolved: its subject's notifications close.")
                         .ownedBy("communication-service").keyedBy("subject (none from pms-integration's retry watch)")
-                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service")
+                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office")
                         .consumedBy("communication-service")
                         .messages(NotificationResolved.class)
                         .example(new NotificationResolved("MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING", "ana", AT)),

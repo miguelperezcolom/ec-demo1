@@ -117,6 +117,8 @@ mapping:
   integrations-url: ${INTEGRATIONS_URL:http://localhost:8126}
   ia-agent-url: ${IA_AGENT_URL:http://localhost:8095}
   console-url: ${CONSOLE_URL:https://console.ec1.mateu.io}
+  # The data plane's console, for the processes in flight a discard sends a person to cancel by hand.
+  data-console-url: ${DATA_CONSOLE_URL:https://ec1.mateu.io}
   resend-after: 30s
   # How long after its release a silent process is sent the resume message again; past that it is
   # taken as gone (the engine cancelled or finished it) and left, RELEASED, for a person to discard.

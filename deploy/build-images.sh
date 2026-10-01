@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds and pushes the eleven images this repository owns: the four shells, the gateway, the four
+# Builds and pushes the images this repository owns: the four shells, the gateway, the four
 # demo services, the IA control plane and the pod that serves catalogued APIs as MCP servers — and
 # the documentation site (doc/), last, with no Maven step.
 #
@@ -12,7 +12,7 @@
 # Everything else runs from published images — the engine's orchestrator/forms/rules/worker from
 # Docker Hub, Keycloak from Quay, Postgres and Redpanda from their own registries.
 #
-#   ./deploy/build-images.sh [TAG]        # default: the version in each pom
+#   ./deploy/build-images.sh TAG          # one tag for every image; DOCS_TAG for the site
 #
 # linux/amd64 only, matching the nodeSelector every workload here carries: the Karpenter pool can
 # provision arm64 and a single-arch image on an arm64 node is an unschedulable pod, not an error
@@ -21,7 +21,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REGISTRY="${REGISTRY:-miguelperezcolom}"
-TAG="${1:-0.8.0}"
+TAG="${1:?usage: build-images.sh TAG — one tag for every image (there is no default: a forgotten one tagged everything 0.8.0)}"
 
 # By path: the modules are grouped by system (README, "Layout"). The image is named after the
 # module's folder — systems/erp builds ec-demo1-erp. The shells in this list build twice: see

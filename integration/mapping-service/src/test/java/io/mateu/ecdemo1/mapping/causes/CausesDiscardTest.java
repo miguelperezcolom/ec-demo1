@@ -51,7 +51,7 @@ class CausesDiscardTest {
     final WaiterCauseRepository links = mock(WaiterCauseRepository.class);
     final Outbox outbox = mock(Outbox.class);
     final MappingProperties properties = new MappingProperties(null, null, null, null, "https://console.test",
-            Duration.ofSeconds(30), Duration.ofHours(6));
+            Duration.ofSeconds(30), Duration.ofHours(6), "https://data.test");
     final Causes causes = new Causes(causeRecords, waiters, links, outbox, properties, Clock.fixed(NOW, ZoneOffset.UTC));
 
     Waiter waiter;
@@ -110,7 +110,7 @@ class CausesDiscardTest {
         assertThat(waiter.getStatus()).isEqualTo(WaiterStatus.DISCARDED);
         verify(outbox, never()).appendToEngine(any());
         assertThat(discarded.engineCancelRequested()).isFalse();
-        assertThat(discarded.adminProcessesUrl()).isEqualTo("https://console.test/workflow/processes");
+        assertThat(discarded.adminProcessesUrl()).isEqualTo("https://data.test/workflow/processes");
     }
 
     @Test

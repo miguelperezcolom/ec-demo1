@@ -159,7 +159,7 @@ public class DiscardForm implements TitleSupplier, ButtonsSupplier, VisibilitySu
             parts.add("the engine was asked to cancel " + (notCancelled.isEmpty() ? "it" : "the others"));
         }
         if (!notCancelled.isEmpty()) {
-            parts.add("cancel " + String.join(", ", notCancelled) + " by hand in Admin → Processes ("
+            parts.add("cancel " + String.join(", ", notCancelled) + " by hand in Admin → Workflow → Processes ("
                     + done.get(0).adminProcessesUrl() + "): the engine's id of it is not known here");
         }
         var unwaited = new LinkedHashSet<String>();
