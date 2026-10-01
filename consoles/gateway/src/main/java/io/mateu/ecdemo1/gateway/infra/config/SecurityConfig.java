@@ -129,6 +129,9 @@ public class SecurityConfig {
                         // (the key, the subscriptions) stay behind the rule below.
                         .pathMatchers("/_inbox/push/push.js", "/_inbox/push/sw.js").permitAll()
                         // The inbox, on every host: what it shows depends on the caller's roles.
+                        // Except the service's own path typed in the address bar: a GET with no
+                        // token, which the route inbox-page only redirects to the shell's route.
+                        .pathMatchers(HttpMethod.GET, "/_inbox", "/_inbox/").permitAll()
                         .pathMatchers("/_inbox/**").authenticated()
                         // The external APIs' usage (the page behind the home pages' tiles), on every host
                         // like the inbox: counts, no personal data, but not for anonymous callers.
