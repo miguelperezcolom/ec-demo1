@@ -42,6 +42,16 @@ office, un cambio de datos por Salesforce, un no show, la auditoría, la bandeja
 a la línea base (`E2E_RESET=0` para no hacerlo). Necesita la integración de MRU01 dada de alta y una
 línea base: ver [La demo](/operacion/demo/).
 
+### Pendiente
+
+Lo que las pruebas aún no cubren, anotado para más adelante:
+
+- **`npm test` no recorre los dos menús más nuevos**: *Avisos* (`/_notices`, consola de datos) y
+  *Registro* (`/_registration-rules`, consola de control) no tienen entrada en `e2e/tests/consoles.ts`.
+- **El entorno local no levanta `notices` ni `registration-rules`** (`e2e/poc-acl-local/infra.sh`): no
+  están en el camino CRS → Opera que recorre `scenario.py`, pero sin ellos no hay avisos de recepción ni
+  pasos del kárdex que probar en local.
+
 ## De punta a punta en local
 
 `e2e/poc-acl-local` recorre el camino entero contra el orquestador real y el doble de Opera: ver
