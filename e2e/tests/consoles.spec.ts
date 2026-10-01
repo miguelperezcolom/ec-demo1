@@ -64,6 +64,19 @@ for (const console_ of CONSOLES) {
                 .toBe(true)
         })
 
+        // The service's own path typed in the address bar: a GET with no token, which the gateway
+        // refused with a 401 and both renderers showed as a blank page. It is sent to the shell's
+        // route for the inbox instead.
+        test('the inbox opens by its service path, /_inbox', async ({ page }) => {
+            await signIn(page, console_)
+            await page.goto(`https://${console_.host}/_inbox`, { waitUntil: 'domcontentloaded' })
+            await expect
+                .poll(async () => await page.locator('text=Mark as seen').count() > 0,
+                      { message: '/_inbox did not open the inbox', timeout: 90_000 })
+                .toBe(true)
+            expect(page.url()).toContain('/inbox/pending')
+        })
+
         for (const screen of console_.screens) {
             test(`${screen.menu} → ${screen.entry} renders`, async ({ page }) => {
                 await signIn(page, console_)
