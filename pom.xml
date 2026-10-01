@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   The whole repository in one build: `mvn -DskipTests package` from here builds every module, the
-  libraries (integration-model, grpc-interface, ui-commons) first, since the reactor orders them by dependency.
+  libraries (the contracts, messaging, grpc-interface, ui-commons) first, since the reactor orders them by dependency.
 
   An aggregator and nothing else: no module has this as its parent, and each still builds on its own
   from its folder (deploy/build-images.sh does it module by module). The modules are grouped by
