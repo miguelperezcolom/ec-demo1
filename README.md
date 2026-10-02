@@ -111,7 +111,7 @@ five things about this cluster that otherwise cost an afternoon.
 
 **The documentation site** — the whole project explained, in Spanish — is in [`doc/`](doc/README.md)
 (Astro + Starlight, like EventConductor's and Mateu's) and served at https://doc.ec1.mateu.io, behind
-a username and password (`riu`, password in `deploy/.secrets/credentials.env` as `DOCS_PASSWORD`).
+a username and password (`riu`, and `oracle` for Oracle; passwords in `deploy/.secrets/credentials.env` as `DOCS_PASSWORD` and `DOCS_ORACLE_PASSWORD`).
 
 ## Deploy
 

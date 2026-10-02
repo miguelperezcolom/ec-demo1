@@ -12,7 +12,7 @@ What someone joining needs, in the order they need it.
 | Grafana | https://grafana.ec1.mateu.io | `admin` / *ask* |
 | Kafka console | https://kafka.ec1.mateu.io | `admin` / *ask* |
 | Front office (MRU01) | https://front.ec1.mateu.io | `demo` / `demo` |
-| Documentation | https://doc.ec1.mateu.io | `riu` / *ask* (`DOCS_PASSWORD`) |
+| Documentation | https://doc.ec1.mateu.io | `riu` / *ask* (`DOCS_PASSWORD`); `oracle` for Oracle (`DOCS_ORACLE_PASSWORD`) |
 
 Only the demo user is in version control, because it is in the realm file and is meant to be
 public. It reaches both consoles: it holds the realm roles `user`, `admin` and `ai-admin`, and

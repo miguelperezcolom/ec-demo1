@@ -109,6 +109,7 @@ append_if_missing CP_CRYPTO_KEY "$(openssl rand -base64 32)"
 append_if_missing INTEGRATIONS_CRYPTO_KEY "$(openssl rand -base64 32)"
 # The documentation site's password (doc.ec1.mateu.io, user `riu`), for the docs-basic-auth Secret below.
 append_if_missing DOCS_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+append_if_missing DOCS_ORACLE_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
 
 # shellcheck disable=SC1090
 set -a; . "$SECRETS"; set +a
@@ -133,19 +134,27 @@ kubectl create configmap keycloak-realm -n "$NS" \
 kubectl create secret generic kafka-console-auth -n "$NS" \
   --from-literal=auth="admin:$(openssl passwd -apr1 "$KAFKA_CONSOLE_PASSWORD")" \
   --dry-run=client -o yaml | kubectl apply -f -
-# htpasswd for the documentation site's ingress (81-docs.yaml), user `riu`. Created only if it is
-# not there: a bcrypt line is salted, so re-creating it on every run would change the Secret for
-# nothing. bcrypt with apache2-utils' htpasswd, or from the httpd image when it is not installed;
-# openssl's apr1 (what the Kafka console's uses, which ingress-nginx also takes) as the last resort.
-if ! kubectl get secret docs-basic-auth -n "$NS" >/dev/null 2>&1; then
-  if command -v htpasswd >/dev/null 2>&1; then
-    DOCS_HTPASSWD="$(htpasswd -nbB riu "$DOCS_PASSWORD")"
-  elif command -v docker >/dev/null 2>&1; then
-    DOCS_HTPASSWD="$(docker run --rm httpd:2.4-alpine htpasswd -nbB riu "$DOCS_PASSWORD")"
-  else
-    DOCS_HTPASSWD="riu:$(openssl passwd -apr1 "$DOCS_PASSWORD")"
+# htpasswd for the documentation site's ingress (81-docs.yaml): `riu`, and `oracle` for Oracle's
+# people. Each user's line is added only if it is not there: a bcrypt line is salted, so re-creating
+# it on every run would change the Secret for nothing. bcrypt with apache2-utils' htpasswd, or from
+# the httpd image when it is not installed; openssl's apr1 (what the Kafka console's uses, which
+# ingress-nginx also takes) as the last resort.
+docs_htpasswd() {  # <user> <password>
+  if command -v htpasswd >/dev/null 2>&1; then htpasswd -nbB "$1" "$2"
+  elif command -v docker >/dev/null 2>&1; then docker run --rm httpd:2.4-alpine htpasswd -nbB "$1" "$2"
+  else echo "$1:$(openssl passwd -apr1 "$2")"
+  fi | grep -v '^$'
+}
+DOCS_AUTH="$(kubectl get secret docs-basic-auth -n "$NS" -o jsonpath='{.data.auth}' 2>/dev/null | base64 -d || true)"
+DOCS_AUTH_BEFORE="$DOCS_AUTH"
+for docs_user in "riu:$DOCS_PASSWORD" "oracle:$DOCS_ORACLE_PASSWORD"; do
+  if ! printf '%s\n' "$DOCS_AUTH" | grep -q "^${docs_user%%:*}:"; then
+    DOCS_AUTH="$(printf '%s\n%s' "$DOCS_AUTH" "$(docs_htpasswd "${docs_user%%:*}" "${docs_user#*:}")" | grep -v '^$')"
   fi
-  kubectl create secret generic docs-basic-auth -n "$NS" --from-literal=auth="$DOCS_HTPASSWD"
+done
+if [ "$DOCS_AUTH" != "$DOCS_AUTH_BEFORE" ]; then
+  kubectl create secret generic docs-basic-auth -n "$NS" --from-literal=auth="$DOCS_AUTH" \
+    --dry-run=client -o yaml | kubectl apply -f -
 fi
 # Shared by the orchestrator and the forms engine: each reads its own key and ignores the other.
 # Both apps verify inbound webhooks against it, and a blank value would make them verify nothing.
@@ -347,7 +356,7 @@ Done.
   Keycloak  https://auth.ec1.mateu.io     admin / \$KEYCLOAK_ADMIN_PASSWORD
   Grafana   https://grafana.ec1.mateu.io  admin / \$GRAFANA_ADMIN_PASSWORD
   Kafka     https://kafka.ec1.mateu.io    admin / \$KAFKA_CONSOLE_PASSWORD
-  Docs      https://doc.ec1.mateu.io      riu / \$DOCS_PASSWORD
+  Docs      https://doc.ec1.mateu.io      riu / \$DOCS_PASSWORD, oracle / \$DOCS_ORACLE_PASSWORD
 
 Passwords are in $SECRETS.
 Certificates take a minute: kubectl get certificate -A
