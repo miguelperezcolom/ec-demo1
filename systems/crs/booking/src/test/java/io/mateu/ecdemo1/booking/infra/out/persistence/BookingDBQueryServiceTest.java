@@ -67,6 +67,17 @@ class BookingDBQueryServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void aConcreteSetOfBookingsIsAConditionOnTheId() {
+        Root<BookingEntity> root = mock(Root.class, RETURNS_DEEP_STUBS);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
+        BookingDBQueryService.matching("", new BookingCriteria(null, null, null, null, null, null,
+                        Set.of("4MBZS7")))
+                .toPredicate(root, mock(CriteriaQuery.class), cb);
+        verify(root.get("id")).in(Set.of("4MBZS7"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void nothingAskedIsNoCondition() {
         CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
         BookingDBQueryService.matching(null, null).toPredicate(mock(Root.class, RETURNS_DEEP_STUBS), mock(CriteriaQuery.class), cb);

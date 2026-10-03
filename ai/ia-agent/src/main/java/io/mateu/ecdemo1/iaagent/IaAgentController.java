@@ -29,8 +29,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -39,9 +37,6 @@ public class IaAgentController {
 
     private static final Logger log = LoggerFactory.getLogger(IaAgentController.class);
 
-    /** Matches [NAVIGATE:{...}] blocks emitted by the LLM anywhere in its response. */
-    private static final Pattern NAVIGATE_PATTERN =
-            Pattern.compile("\\[NAVIGATE:(\\{[^]]*})]", Pattern.DOTALL);
 
     private final AgentConfigClient configClient;
     private final ChatClientRegistry chatClients;
@@ -219,6 +214,7 @@ public class IaAgentController {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private String buildSystemPrompt(String basePrompt, String serverContext, String sessionId,
+                                     String screenRoute,
                                      List<org.springframework.ai.tool.ToolCallback> peers) {
         var sb = new StringBuilder(basePrompt);
         if (serverContext != null && !serverContext.isBlank()) {
@@ -228,7 +224,7 @@ public class IaAgentController {
         if (!peerContext.isBlank()) {
             sb.append("\n\n").append(peerContext);
         }
-        String menuPrompt = menuContextStore.buildMenuSystemPrompt(sessionId);
+        String menuPrompt = menuContextStore.buildMenuSystemPrompt(sessionId, screenRoute);
         if (!menuPrompt.isBlank()) {
             sb.append("\n\n").append(menuPrompt);
         }
@@ -265,28 +261,21 @@ public class IaAgentController {
     }
 
     /**
-     * Scans {@code rawText} for [NAVIGATE:{...}] markers, builds an SSE navigation
-     * event for each one, and returns the text with all markers stripped.
+     * Scans {@code rawText} for [NAVIGATE:{...}] markers: the one that is a command becomes the SSE
+     * navigation event, the ones the model wrote as links become markdown links (see
+     * {@link NavigationMarkers}).
      */
-    private record ParsedResponse(String cleanText, List<ServerSentEvent<String>> navEvents) {}
+    record ParsedResponse(String cleanText, List<ServerSentEvent<String>> navEvents) {}
 
-    private ParsedResponse parseNavigation(String rawText) {
+    ParsedResponse parseNavigation(String rawText) {
+        var parsed = NavigationMarkers.parse(rawText, objectMapper);
         var navEvents = new ArrayList<ServerSentEvent<String>>();
-        Matcher m = NAVIGATE_PATTERN.matcher(rawText);
-        while (m.find()) {
-            String json = m.group(1);
-            try {
-                // Validate JSON is parseable before emitting
-                objectMapper.readTree(json);
-                String ssePayload = "{\"event\":\"navigation-requested\",\"detail\":" + json + "}";
-                navEvents.add(ServerSentEvent.<String>builder().data(ssePayload).build());
-                log.debug("Navigation requested: {}", json);
-            } catch (Exception e) {
-                log.warn("Malformed NAVIGATE block, ignoring: {}", json);
-            }
+        for (String json : parsed.navigations()) {
+            String ssePayload = "{\"event\":\"navigation-requested\",\"detail\":" + json + "}";
+            navEvents.add(ServerSentEvent.<String>builder().data(ssePayload).build());
+            log.debug("Navigation requested: {}", json);
         }
-        String cleanText = NAVIGATE_PATTERN.matcher(rawText).replaceAll("").trim();
-        return new ParsedResponse(cleanText, navEvents);
+        return new ParsedResponse(parsed.cleanText(), navEvents);
     }
 
     /**
@@ -353,7 +342,7 @@ public class IaAgentController {
                     return err;
                 }
                 String systemPrompt = buildSystemPrompt(config.systemPrompt(),
-                        tools.getServerSystemContext(), sessionId, peers);
+                        tools.getServerSystemContext(), sessionId, request.screenRoute(), peers);
                 var history = conversationStore.getHistory(sessionId);
 
                 var turn = agentTurn.call(config, systemPrompt, history, message,
@@ -583,7 +572,7 @@ public class IaAgentController {
                 return;
             }
             String systemPrompt = buildSystemPrompt(config.systemPrompt(),
-                    tools.getServerSystemContext(), sessionId, peers);
+                    tools.getServerSystemContext(), sessionId, request.screenRoute(), peers);
             // A route with output guardrails gets no deltas: see checkOutput.
             synchronized (this) {
                 deltas = config.guardrailsOrNone().output().isEmpty();

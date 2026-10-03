@@ -23,8 +23,12 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -53,7 +57,8 @@ public class BookingCrudOrchestrator extends Crud<
 
     @Override
     public ListingData<BookingRow> search(SearchRequest request, HttpRequest httpRequest) {
-        return DbPaging.page(request, p -> queryService.findAll(request.searchText(), criteria(filters(request)),
+        var criteria = criteria(filters(request), ids(httpRequest));
+        return DbPaging.page(request, p -> queryService.findAll(request.searchText(), criteria,
                         PageRequest.of(p.getPageNumber(), p.getPageSize(),
                                 DbPaging.pageable(request.pageable(), SORTABLE).getSort())),
                 booking -> BookingRow.of(booking, this::hotelName));
@@ -70,8 +75,15 @@ public class BookingCrudOrchestrator extends Crud<
     }
 
     static BookingCriteria criteria(BookingFilters filters) {
-        if (filters == null) {
+        return criteria(filters, null);
+    }
+
+    static BookingCriteria criteria(BookingFilters filters, Set<String> ids) {
+        if (filters == null && ids == null) {
             return null;
+        }
+        if (filters == null) {
+            return new BookingCriteria(null, null, null, null, null, null, ids);
         }
         return new BookingCriteria(
                 filters.hotel == null || filters.hotel.isBlank() ? null : filters.hotel,
@@ -79,7 +91,34 @@ public class BookingCrudOrchestrator extends Crud<
                 filters.arrival != null ? filters.arrival.from() : null,
                 filters.arrival != null ? filters.arrival.to() : null,
                 filters.departure != null ? filters.departure.from() : null,
-                filters.departure != null ? filters.departure.to() : null);
+                filters.departure != null ? filters.departure.to() : null,
+                ids);
+    }
+
+    /**
+     * The listing's id-set filter — {@code /booking/bookings?ids=4MBZS7,JXD3G6}, what the assistant
+     * navigates to to show the bookings it found. Reserved by Mateu for every listing (no field in
+     * {@link BookingFilters}); it travels in the component state as a comma-joined string (from the
+     * URL) or a list. Null when absent or blank: no condition.
+     *
+     * <p>Read from the state because the Mateu this module builds with does not type it yet; once
+     * Mateu ships {@code SearchRequest.ids()}, that is the typed way to read it.
+     */
+    static Set<String> ids(HttpRequest httpRequest) {
+        if (httpRequest == null || httpRequest.runActionRq() == null
+                || httpRequest.runActionRq().componentState() == null) {
+            return null;
+        }
+        Object raw = httpRequest.runActionRq().componentState().get("ids");
+        Collection<?> tokens = raw instanceof Collection<?> list ? list
+                : raw == null ? List.of() : Arrays.asList(raw.toString().split(","));
+        var ids = new LinkedHashSet<String>();
+        for (Object token : tokens) {
+            if (token != null && !token.toString().isBlank()) {
+                ids.add(token.toString().trim());
+            }
+        }
+        return ids.isEmpty() ? null : ids;
     }
 
     /** The hotel filter's options: the hotels of the CRS catalog. */
