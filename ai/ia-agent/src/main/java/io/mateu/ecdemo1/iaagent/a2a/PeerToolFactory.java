@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.iaagent.a2a;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mateu.ecdemo1.iaagent.ToolProgressListener;
 import io.mateu.ecdemo1.iaagent.config.AgentConfig;
 import io.mateu.ecdemo1.iaagent.observability.AgentObservability;
 import io.micrometer.observation.ObservationRegistry;
@@ -59,6 +60,12 @@ public class PeerToolFactory {
     }
 
     public List<ToolCallback> toolsFor(AgentConfig config, String authorization, A2aHop hop) {
+        return toolsFor(config, authorization, hop, ToolProgressListener.NONE);
+    }
+
+    /** As {@link #toolsFor(AgentConfig, String, A2aHop)}, with every call reported to {@code progress}. */
+    public List<ToolCallback> toolsFor(AgentConfig config, String authorization, A2aHop hop,
+                                       ToolProgressListener progress) {
         if (hop.noDelegation() || hop.depth() >= maxDepth) {
             return List.of();
         }
@@ -67,7 +74,7 @@ public class PeerToolFactory {
                 .filter(p -> p.id() != null && !p.id().equals(config.agentId()))
                 .filter(p -> !hop.chain().contains(p.id()))
                 .filter(p -> p.a2aUrl() != null && !p.a2aUrl().isBlank())
-                .map(p -> (ToolCallback) new PeerToolCallback(definition(p), p, authorization, next))
+                .map(p -> (ToolCallback) new PeerToolCallback(definition(p), p, authorization, next, progress))
                 .toList();
     }
 
@@ -109,12 +116,15 @@ public class PeerToolFactory {
         private final AgentConfig.Peer peer;
         private final String authorization;
         private final A2aHop hop;
+        private final ToolProgressListener progress;
 
-        PeerToolCallback(ToolDefinition definition, AgentConfig.Peer peer, String authorization, A2aHop hop) {
+        PeerToolCallback(ToolDefinition definition, AgentConfig.Peer peer, String authorization, A2aHop hop,
+                         ToolProgressListener progress) {
             this.definition = definition;
             this.peer = peer;
             this.authorization = authorization;
             this.hop = hop;
+            this.progress = progress;
         }
 
         @Override
@@ -143,15 +153,24 @@ public class PeerToolFactory {
             if (message == null || message.isBlank()) {
                 return "The request to " + peer.name() + " was not sent: no message was given.";
             }
+            var name = definition.name();
+            var peerId = String.valueOf(peer.id());
+            long started = System.nanoTime();
+            ToolProgressListener.started(progress, name, peerId, "a2a");
             try {
                 log.info("A2A call to {} at {} (depth {}, chain {})", peer.id(), peer.a2aUrl(),
                         hop.depth(), hop.chain());
                 var reply = client.send(peer.a2aUrl(), message, authorization, hop, null);
                 log.info("A2A answer from {}: {} chars", peer.id(), reply.text().length());
+                ToolProgressListener.ended(progress, name, peerId, "a2a", started, null);
                 return reply.text();
             } catch (A2aClient.A2aException e) {
                 log.warn("A2A call to {} failed: {}", peer.id(), e.getMessage());
+                ToolProgressListener.ended(progress, name, peerId, "a2a", started, e.getMessage());
                 return "The agent " + peer.name() + " did not answer: " + e.getMessage();
+            } catch (RuntimeException e) {
+                ToolProgressListener.ended(progress, name, peerId, "a2a", started, String.valueOf(e.getMessage()));
+                throw e;
             }
         }
     }

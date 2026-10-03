@@ -17,13 +17,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
+import io.micrometer.observation.contextpropagation.ObservationThreadLocalAccessor;
+import org.springframework.ai.chat.model.ChatResponse;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -127,9 +132,16 @@ public class IaAgentController {
     private List<org.springframework.ai.tool.ToolCallback> allTools(
             AgentConfig config, PerRequestMcpClientFactory.PerRequestTools mcp,
             List<org.springframework.ai.tool.ToolCallback> peers) {
+        return allTools(config, mcp, peers, ToolProgressListener.NONE);
+    }
+
+    /** As above, with the RAG searches reported to {@code progress} (the other two kinds already are). */
+    private List<org.springframework.ai.tool.ToolCallback> allTools(
+            AgentConfig config, PerRequestMcpClientFactory.PerRequestTools mcp,
+            List<org.springframework.ai.tool.ToolCallback> peers, ToolProgressListener progress) {
         var all = new ArrayList<org.springframework.ai.tool.ToolCallback>(
                 List.of(mcp.getCallbacks()));
-        all.addAll(ragTools.toolsFor(config.rags()));
+        all.addAll(ragTools.toolsFor(config.rags(), progress));
         all.addAll(peers);
         return all;
     }
@@ -175,8 +187,8 @@ public class IaAgentController {
     /**
      * The route's output guardrails on the whole answer, before any of it leaves: what the user
      * gets. This is why an answer is never sent in pieces while a route has output guardrails — a
-     * token already on the wire cannot be taken back. (Neither endpoint streams tokens today: /stream
-     * sends placeholders while the agent works and the answer in one event, after this.)
+     * token already on the wire cannot be taken back. So /stream sends no deltas for such a route —
+     * only its status and tool events — and the answer in one event, after this.
      *
      * <p>They read the answer as the user would, without navigation markers; one they allow
      * unchanged keeps its markers, one they rewrite loses them.
@@ -383,26 +395,39 @@ public class IaAgentController {
 
     // ── /stream  (POST, SSE) ─────────────────────────────────────────────────
 
-    /**
-     * SSE endpoint.
-     *
-     * Request body: {@link ChatRequest} (JSON) — includes {@code message}, {@code sessionId}
-     * and optionally {@code menuContext} (only needs to be sent when the menu changes).
-     *
-     * SSE events emitted:
-     * <ul>
-     *   <li>{@code data: {"inputTokens":N,"outputTokens":M,"totalTokens":T}} — token usage
-     *       (placeholder every 2 s while the LLM is running, then the real counts)</li>
-     *   <li>{@code data: {"event":"navigation-requested","detail":{...}}} — navigation command
-     *       (emitted if the LLM included a [NAVIGATE:{...}] marker in its response)</li>
-     *   <li>{@code data: <text>} — the actual response text</li>
-     * </ul>
-     */
+    /** How often an idle stream says it is still alive, as an SSE comment no client renders. */
+    static final Duration KEEP_ALIVE = Duration.ofSeconds(5);
+
     /** As {@link #stream(ChatRequest, String, String, String)}, from no console in particular. */
     public Flux<ServerSentEvent<String>> stream(ChatRequest request, String authorization) {
         return stream(request, authorization, null, null);
     }
 
+    /**
+     * SSE endpoint: the answer as it is written, and what the agent is doing until then.
+     *
+     * Request body: {@link ChatRequest} (JSON) — includes {@code message}, {@code sessionId}
+     * and optionally {@code menuContext} (only needs to be sent when the menu changes).
+     *
+     * <p>SSE events, every one a single {@code data:} payload, in this order:
+     * <ul>
+     *   <li>{@code {"event":"agent-status","detail":{"phase":"resolving|guardrails|connecting|thinking","text":"…",…}}}
+     *       — each phase of the prompt, with a sentence the panel can show as it is;</li>
+     *   <li>{@code {"event":"agent-tool","detail":{"name":"…","server":"…","kind":"mcp|rag|a2a","phase":"start|end","ms":N,"error":"…"}}}
+     *       — each tool call, as it starts and as it ends;</li>
+     *   <li>{@code {"event":"agent-delta","detail":{"text":"…"}}} — a piece of the answer, to append.
+     *       Never sent when the route has output guardrails: a piece already on the wire cannot be
+     *       taken back, so then the answer leaves only once they have read it. Navigation markers
+     *       never appear in one;</li>
+     *   <li>{@code {"inputTokens":N,"outputTokens":M,"totalTokens":T}} — the session's usage so far,
+     *       once, at the end;</li>
+     *   <li>{@code {"event":"navigation-requested","detail":{…}}} — per [NAVIGATE:{…}] marker;</li>
+     *   <li>the answer, cleaned, as plain text — last. A client that showed the deltas replaces
+     *       them with it; one that knows nothing of deltas shows only this, as before.</li>
+     * </ul>
+     * An idle stream sends an SSE comment every {@link #KEEP_ALIVE}. A failure is
+     * {@code {"event":"agent-error","detail":{"message":"…"}}}, last.
+     */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest request,
                                                 @RequestHeader(value = "Authorization", required = false) String authorization,
@@ -422,77 +447,130 @@ public class IaAgentController {
         // it, and without it the prompt's span would start a trace of its own.
         Observation requestObservation = observationRegistry.getCurrentObservation();
 
-        // Blocking LLM call on a dedicated thread; cache() so both subscribers share the result.
-        Mono<LlmResult> resultMono = Mono.fromCallable(() -> {
-                    var observation = startPromptObservation(requestObservation, sessionId, request.message());
-                    try (var scope = observation.openScope()) {
-                        return streamPrompt(observation, request, authorization, console, sessionId, history);
-                    } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
-                        tagResponse(observation, e.getMessage());
-                        outcome(observation, "refused");
-                        throw e;
-                    } catch (Exception e) {
-                        observation.error(e);
-                        throw e;
-                    } finally {
-                        observation.stop();
-                    }
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .cache();
+        // One sink per request, fed from wherever the prompt is at: the setup (blocking — the
+        // control plane, the guardrails, the MCP handshakes) on a worker, the model's chunks on
+        // the model's threads, the tool events on the tools'. FluxSink serialises them.
+        Flux<ServerSentEvent<String>> events = Flux.create(sink -> {
+            var run = new StreamRun(sink, request, authorization, console, sessionId, history, requestObservation);
+            sink.onDispose(run::cancel);
+            Schedulers.boundedElastic().schedule(run::start);
+        });
 
-        // Periodic token-usage placeholders while the LLM is running.
-        // onErrorComplete() so that an LLM error terminates the interval cleanly
-        // without propagating through the concat.
-        Flux<ServerSentEvent<String>> periodicTokens = Flux
-                .interval(Duration.ZERO, Duration.ofSeconds(2))
-                .map(i -> tokenEvent(0, 0, 0))
-                .takeUntilOther(resultMono.onErrorComplete());
-
-        // Final events: real token counts + optional navigation events + content text.
-        // On error, emit a structured agent-error SSE event so the client can display
-        // the actual cause (e.g. missing LLM API key).
-        Flux<ServerSentEvent<String>> finalEvents = resultMono
-                // A misconfiguration is not a stack trace: it is a sentence for whoever can fix
-                // it, and it reaches the panel as the answer rather than as an error event.
-                .onErrorResume(e -> e instanceof NoConfigurationException
-                                || e instanceof ChatClientRegistry.UnsupportedProviderException,
-                        e -> {
-                            log.warn("Stream aborted session={}: {}", sessionId, e.getMessage());
-                            return Mono.just(new LlmResult(e.getMessage(), 0, 0, 0));
-                        })
-                .doOnError(e -> log.error("Stream error session={} — {}: {}",
-                        sessionId, e.getClass().getName(), e.getMessage(), e))
-                .flatMapMany(r -> {
-                    var parsed = parseNavigation(r.content());
-                    var events = new ArrayList<ServerSentEvent<String>>();
-                    events.add(tokenEvent(r.inputTokens(), r.outputTokens(), r.totalTokens()));
-                    events.addAll(parsed.navEvents());
-                    events.add(contentEvent(parsed.cleanText()));
-                    return Flux.fromIterable(events);
-                })
-                .onErrorResume(e -> Flux.just(errorEvent(e)));
-
-        return Flux.concat(periodicTokens, finalEvents);
+        return events.publish(shared -> Flux.merge(shared,
+                Flux.interval(KEEP_ALIVE, KEEP_ALIVE)
+                        .map(i -> ServerSentEvent.<String>builder().comment("keep-alive").build())
+                        .takeUntilOther(shared.then())));
     }
 
-    /** The body of one /stream prompt, inside its observation. */
-    private LlmResult streamPrompt(Observation observation, ChatRequest request, String authorization,
-                                   Console console, String sessionId,
-                                   List<org.springframework.ai.chat.messages.Message> history) {
-        // Same order as /chat: resolve first, because it decides which agent, which
-        // servers to connect to and with which model to answer — and can refuse.
-        AgentConfig config = resolveConfig(authorization, request, console);
-        tagAgent(observation, config);
-        var input = checkInput(observation, config, request.message(), authorization);
-        if (input.blocked()) {
-            return new LlmResult(GuardrailRunner.refusal(GuardrailRunner.Side.INPUT, input), 0, 0, 0);
+    /** {@code event} first, so the payload reads as what it is. */
+    private static java.util.Map<String, Object> eventMap(String event, Object detail) {
+        var map = new java.util.LinkedHashMap<String, Object>();
+        map.put("event", event);
+        map.put("detail", detail);
+        return map;
+    }
+
+    private ServerSentEvent<String> jsonEvent(String event, java.util.Map<String, ?> detail) {
+        try {
+            return ServerSentEvent.<String>builder()
+                    .data(objectMapper.writeValueAsString(eventMap(event, detail)))
+                    .build();
+        } catch (Exception e) {
+            return ServerSentEvent.<String>builder().data("{\"event\":\"" + event + "\",\"detail\":{}}").build();
         }
-        String message = input.text();
-        try (var tools = mcpFactory.createTools(config.mcpUrls(), authorization)) {
-            var peers = peerTools.toolsFor(config, authorization, A2aHop.origin());
-            var toolCallbacks = allTools(config, tools, peers);
+    }
+
+    /**
+     * One /stream prompt, from the first status line to the last event. Also the prompt's
+     * {@link ToolProgressListener}: its tools report here, and it turns that into events.
+     */
+    private final class StreamRun implements ToolProgressListener {
+
+        private final FluxSink<ServerSentEvent<String>> sink;
+        private final ChatRequest request;
+        private final String authorization;
+        private final Console console;
+        private final String sessionId;
+        private final List<org.springframework.ai.chat.messages.Message> history;
+        private final Observation requestObservation;
+
+        /** Set once: the first of finishing, failing and the client going away wins. */
+        private final AtomicBoolean done = new AtomicBoolean();
+        private volatile Observation observation;
+        private volatile PerRequestMcpClientFactory.PerRequestTools tools;
+        private volatile Disposable llm;
+
+        // The answer as it arrives. Guarded by this.
+        private final NavigationMarkerFilter markers = new NavigationMarkerFilter();
+        /** Everything the model wrote, every round of the tool loop. */
+        private final StringBuilder all = new StringBuilder();
+        /** What it wrote since its last tool call: the answer, as /chat's call() returns it. */
+        private final StringBuilder round = new StringBuilder();
+        private boolean toolSinceText;
+        private boolean shownAny;
+        private int[] usage = {0, 0, 0};
+        private boolean deltas;
+
+        StreamRun(FluxSink<ServerSentEvent<String>> sink, ChatRequest request, String authorization,
+                  Console console, String sessionId,
+                  List<org.springframework.ai.chat.messages.Message> history, Observation requestObservation) {
+            this.sink = sink;
+            this.request = request;
+            this.authorization = authorization;
+            this.console = console;
+            this.sessionId = sessionId;
+            this.history = history;
+            this.requestObservation = requestObservation;
+        }
+
+        void start() {
+            var observation = startPromptObservation(requestObservation, sessionId, request.message());
+            this.observation = observation;
+            try (var scope = observation.openScope()) {
+                run(observation);
+            } catch (NoConfigurationException | ChatClientRegistry.UnsupportedProviderException e) {
+                refused(e);
+            } catch (Exception e) {
+                failed(e);
+            }
+        }
+
+        /** Same order as /chat: resolve, check the input, connect, then the model. */
+        private void run(Observation observation) {
+            status("resolving", "Preparando el agente…", java.util.Map.of());
+            AgentConfig config = resolveConfig(authorization, request, console);
+            tagAgent(observation, config);
+            if (!config.guardrailsOrNone().input().isEmpty()) {
+                status("guardrails", "Revisando la petición…", java.util.Map.of());
+            }
+            var input = checkInput(observation, config, request.message(), authorization);
+            if (input.blocked()) {
+                finish(new LlmResult(GuardrailRunner.refusal(GuardrailRunner.Side.INPUT, input), 0, 0, 0));
+                return;
+            }
+            String message = input.text();
+
+            int expected = config.mcpUrls() == null ? 0 : config.mcpUrls().size();
+            if (expected > 0) {
+                status("connecting", "Conectando con " + expected
+                        + (expected == 1 ? " servidor MCP…" : " servidores MCP…"),
+                        java.util.Map.of("expected", expected));
+            }
+            var tools = mcpFactory.createTools(config.mcpUrls(), authorization, this);
+            this.tools = tools;
+            if (done.get()) {
+                // The client left while the handshakes ran.
+                tools.close();
+                return;
+            }
+            var peers = peerTools.toolsFor(config, authorization, A2aHop.origin(), this);
+            var toolCallbacks = allTools(config, tools, peers, this);
             tagTools(observation, tools, toolCallbacks.size());
+            status("connecting", (expected > 0
+                            ? "Conectado a " + tools.connectedServers() + "/" + expected + " servidores MCP · "
+                            : "") + toolCallbacks.size() + (toolCallbacks.size() == 1 ? " herramienta" : " herramientas"),
+                    java.util.Map.of("connected", tools.connectedServers(), "expected", expected,
+                            "tools", toolCallbacks.size()));
             if (tools.hasNoServers() && config.rags().isEmpty() && peers.isEmpty()) {
                 String err = "No hay ningún servidor MCP disponible ("
                         + tools.expectedServers() + " configurados, 0 conectados) ni "
@@ -501,32 +579,221 @@ public class IaAgentController {
                 log.warn("Stream aborted session={}: no tools at all", sessionId);
                 tagResponse(observation, err);
                 outcome(observation, "no_tools");
-                return new LlmResult(err, 0, 0, 0);
+                finish(new LlmResult(err, 0, 0, 0));
+                return;
             }
             String systemPrompt = buildSystemPrompt(config.systemPrompt(),
                     tools.getServerSystemContext(), sessionId, peers);
-            var turn = agentTurn.call(config, systemPrompt, history, message,
-                    toolCallbacks.toArray(new org.springframework.ai.tool.ToolCallback[0]));
-            String content = turn.content();
-            int inputTokens = turn.inputTokens(), outputTokens = turn.outputTokens(),
-                    totalTokens = turn.totalTokens();
+            // A route with output guardrails gets no deltas: see checkOutput.
+            synchronized (this) {
+                deltas = config.guardrailsOrNone().output().isEmpty();
+            }
+            status("thinking", "Pensando…", java.util.Map.of());
 
-            log.info("Stream completed session={}: {} chars, tokens={}/{}/{}",
-                    sessionId, content != null ? content.length() : 0,
-                    inputTokens, outputTokens, totalTokens);
+            llm = agentTurn.stream(config, systemPrompt, history, message,
+                            toolCallbacks.toArray(new org.springframework.ai.tool.ToolCallback[0]))
+                    .doOnNext(this::chunk)
+                    // The end is blocking — output guardrails over A2A — so not on the thread that
+                    // delivered the model's last chunk.
+                    .then(Mono.fromCallable(() -> complete(config, message))
+                            .subscribeOn(Schedulers.boundedElastic()))
+                    .contextWrite(ctx -> ctx.put(ObservationThreadLocalAccessor.KEY, observation))
+                    .subscribe(this::finish, e -> {
+                        if (e instanceof NoConfigurationException
+                                || e instanceof ChatClientRegistry.UnsupportedProviderException) {
+                            refused(e);
+                        } else {
+                            failed(e);
+                        }
+                    });
+            if (done.get()) {
+                llm.dispose();
+            }
+        }
 
-            var checked = checkOutput(config,
-                    (content != null && !content.isBlank()) ? content : "(sin respuesta)", authorization);
-            String raw = checked.text();
-            conversationStore.addExchange(sessionId, message, raw);
-            conversationStore.accumulateTokens(sessionId, inputTokens, outputTokens, totalTokens);
-            usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
-                    inputTokens, outputTokens, totalTokens,
-                    jwtIdentityReader.read(authorization), sessionId);
-            tagResponse(observation, raw);
-            outcome(observation, checked.outcome());
-            int[] cumulative = conversationStore.getTotalTokens(sessionId);
-            return new LlmResult(raw, cumulative[0], cumulative[1], cumulative[2]);
+        private synchronized void chunk(ChatResponse response) {
+            int[] u = AgentTurn.usageOf(response);
+            if (u[0] > 0 || u[2] > 0) {
+                usage = u;
+            }
+            String text = AgentTurn.textOf(response);
+            if (text == null || text.isEmpty()) {
+                return;
+            }
+            boolean newRound = toolSinceText;
+            if (newRound) {
+                round.setLength(0);
+                toolSinceText = false;
+            }
+            all.append(text);
+            round.append(text);
+            if (!deltas) {
+                return;
+            }
+            String safe = markers.feed(text);
+            if (safe.isEmpty()) {
+                return;
+            }
+            if (newRound && shownAny) {
+                // What the model said before calling a tool and what it says after are two
+                // paragraphs, not one run-on sentence.
+                safe = "\n\n" + safe.stripLeading();
+            }
+            if (!safe.isBlank()) {
+                shownAny = true;
+            }
+            sink.next(jsonEvent("agent-delta", java.util.Map.of("text", safe)));
+        }
+
+        /** The answer is complete: check it, record it, and say what it cost. */
+        private LlmResult complete(AgentConfig config, String message) {
+            Observation observation = this.observation;
+            try (var scope = observation.openScope()) {
+                String content;
+                int[] cost;
+                synchronized (this) {
+                    content = round.toString().isBlank() ? all.toString() : round.toString();
+                    cost = usage;
+                }
+                log.info("Stream completed session={}: {} chars, tokens={}/{}/{}",
+                        sessionId, content.length(), cost[0], cost[1], cost[2]);
+                if (!config.guardrailsOrNone().output().isEmpty()) {
+                    status("guardrails", "Revisando la respuesta…", java.util.Map.of());
+                }
+                var checked = checkOutput(config, !content.isBlank() ? content : "(sin respuesta)", authorization);
+                String raw = checked.text();
+                conversationStore.addExchange(sessionId, message, raw);
+                conversationStore.accumulateTokens(sessionId, cost[0], cost[1], cost[2]);
+                usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
+                        cost[0], cost[1], cost[2], jwtIdentityReader.read(authorization), sessionId);
+                tagResponse(observation, raw);
+                outcome(observation, checked.outcome());
+                int[] cumulative = conversationStore.getTotalTokens(sessionId);
+                return new LlmResult(raw, cumulative[0], cumulative[1], cumulative[2]);
+            }
+        }
+
+        // ── ToolProgressListener ─────────────────────────────────────────────
+
+        @Override
+        public void toolStarted(String name, String server, String kind) {
+            synchronized (this) {
+                toolSinceText = true;
+            }
+            sink.next(jsonEvent("agent-tool", toolDetail(name, server, kind, "start", null, null)));
+        }
+
+        @Override
+        public void toolEnded(String name, String server, String kind, long millis, String error) {
+            sink.next(jsonEvent("agent-tool", toolDetail(name, server, kind, "end", millis, error)));
+            status("thinking", "Pensando…", java.util.Map.of());
+        }
+
+        private java.util.Map<String, Object> toolDetail(String name, String server, String kind, String phase,
+                                                         Long millis, String error) {
+            var detail = new java.util.LinkedHashMap<String, Object>();
+            detail.put("name", name);
+            if (server != null) {
+                detail.put("server", server);
+            }
+            if (kind != null) {
+                detail.put("kind", kind);
+            }
+            detail.put("phase", phase);
+            if (millis != null) {
+                detail.put("ms", millis);
+            }
+            if (error != null) {
+                detail.put("error", error);
+            }
+            return detail;
+        }
+
+        private void status(String phase, String text, java.util.Map<String, ?> extra) {
+            var detail = new java.util.LinkedHashMap<String, Object>();
+            detail.put("phase", phase);
+            detail.put("text", text);
+            detail.putAll(extra);
+            sink.next(jsonEvent("agent-status", detail));
+        }
+
+        // ── The end, whichever it is ─────────────────────────────────────────
+
+        /** The last events, as /stream has always ended: usage, navigation, the answer. */
+        private void finish(LlmResult result) {
+            if (!done.compareAndSet(false, true)) {
+                return;
+            }
+            closeTools();
+            var parsed = parseNavigation(result.content() == null ? "" : result.content());
+            sink.next(tokenEvent(result.inputTokens(), result.outputTokens(), result.totalTokens()));
+            parsed.navEvents().forEach(sink::next);
+            sink.next(contentEvent(parsed.cleanText()));
+            sink.complete();
+            stopObservation();
+        }
+
+        /**
+         * A misconfiguration is not a stack trace: it is a sentence for whoever can fix it, and it
+         * reaches the panel as the answer rather than as an error event.
+         */
+        private void refused(Throwable e) {
+            log.warn("Stream aborted session={}: {}", sessionId, e.getMessage());
+            Observation observation = this.observation;
+            if (observation != null) {
+                tagResponse(observation, e.getMessage());
+                outcome(observation, "refused");
+            }
+            finish(new LlmResult(e.getMessage(), 0, 0, 0));
+        }
+
+        private void failed(Throwable e) {
+            log.error("Stream error session={} — {}: {}", sessionId, e.getClass().getName(), e.getMessage(), e);
+            if (!done.compareAndSet(false, true)) {
+                return;
+            }
+            Observation observation = this.observation;
+            if (observation != null) {
+                observation.error(e);
+            }
+            closeTools();
+            sink.next(errorEvent(e));
+            sink.complete();
+            stopObservation();
+        }
+
+        /** The client went away: stop the model, close the connections, end the span. */
+        void cancel() {
+            if (!done.compareAndSet(false, true)) {
+                return;
+            }
+            log.info("Stream cancelled by the client session={}", sessionId);
+            var llm = this.llm;
+            if (llm != null) {
+                llm.dispose();
+            }
+            closeTools();
+            Observation observation = this.observation;
+            if (observation != null) {
+                outcome(observation, "cancelled");
+            }
+            stopObservation();
+        }
+
+        private void closeTools() {
+            var tools = this.tools;
+            this.tools = null;
+            if (tools != null) {
+                tools.close();
+            }
+        }
+
+        private void stopObservation() {
+            var observation = this.observation;
+            this.observation = null;
+            if (observation != null) {
+                observation.stop();
+            }
         }
     }
 }

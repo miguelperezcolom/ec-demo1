@@ -20,9 +20,15 @@ import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -72,6 +78,24 @@ class ChatGuardrailsTest {
                            ToolCallback[] tools) {
             calls.add("agent:" + userMessage);
             return new Result(agentAnswer, 10, 5, 15);
+        }
+
+        @Override
+        public Flux<ChatResponse> stream(AgentConfig config, String systemPrompt, List<Message> history,
+                                         String userMessage, ToolCallback[] tools) {
+            // The answer in pieces of five characters, as a model streams it, a marker split too.
+            return Flux.defer(() -> {
+                calls.add("agent:" + userMessage);
+                var chunks = new ArrayList<ChatResponse>();
+                for (int i = 0; i < agentAnswer.length(); i += 5) {
+                    chunks.add(new ChatResponse(List.of(new Generation(new AssistantMessage(
+                            agentAnswer.substring(i, Math.min(agentAnswer.length(), i + 5)))))));
+                }
+                chunks.add(ChatResponse.builder().generations(List.of())
+                        .metadata(ChatResponseMetadata.builder().usage(new DefaultUsage(10, 5, 15)).build())
+                        .build());
+                return Flux.fromIterable(chunks);
+            });
         }
     };
 
@@ -180,8 +204,10 @@ class ChatGuardrailsTest {
         assertTrue(events.stream().noneMatch(e -> e.contains("ana@example.com")), events.toString());
         assertTrue(events.stream().noneMatch(e -> e.contains("navigation-requested")), events.toString());
         assertEquals("Escribe a [dato omitido].", events.getLast());
-        // Everything before it is a token-count placeholder or the final count.
-        events.subList(0, events.size() - 1).forEach(e -> assertTrue(e.contains("\"totalTokens\""), e));
+        // Everything before it is progress or the final count — no delta, not even a harmless one.
+        events.subList(0, events.size() - 1).forEach(e -> assertTrue(
+                e.contains("\"totalTokens\"") || e.contains("\"agent-status\""), e));
+        assertTrue(events.stream().anyMatch(e -> e.contains("Revisando la respuesta")), events.toString());
     }
 
     @Test
