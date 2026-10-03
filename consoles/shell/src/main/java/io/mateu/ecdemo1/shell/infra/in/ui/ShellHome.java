@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.shell.infra.in.ui;
 import io.mateu.ecdemo1.uicommons.user.UserWidget;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.AI;
+import io.mateu.uidl.annotations.App;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Script;
@@ -72,6 +73,8 @@ import java.util.List;
 // The agent itself knows nothing about these menus: it reaches the orchestrator, the forms engine
 // and the booking service over MCP, and each of those decides what it is willing to expose.
 @AI(sse = "/ai/api/agent/stream")
+// The light/dark switch in the header, next to the chat toggle: the theme otherwise follows the OS only.
+@App(themeToggle = true)
 public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**

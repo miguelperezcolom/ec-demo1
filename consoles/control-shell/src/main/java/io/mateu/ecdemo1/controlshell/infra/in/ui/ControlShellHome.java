@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.controlshell.infra.in.ui;
 import io.mateu.ecdemo1.uicommons.user.UserWidget;
 import io.mateu.uidl.StyleConstants;
 import io.mateu.uidl.annotations.AI;
+import io.mateu.uidl.annotations.App;
 import io.mateu.uidl.annotations.FavIcon;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Script;
@@ -60,6 +61,8 @@ import java.util.List;
 // ai-admin on it like on the rest of this host. That agent reaches the integrations, the mapping, the customer MDM, the notifications
 // and the engines over MCP — what this console governs.
 @AI(sse = "/ai/api/agent/stream")
+// The light/dark switch in the header, next to the chat toggle: the theme otherwise follows the OS only.
+@App(themeToggle = true)
 public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**

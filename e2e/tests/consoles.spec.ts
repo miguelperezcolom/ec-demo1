@@ -48,7 +48,7 @@ for (const console_ of CONSOLES) {
         // still declared, hidden, so a reload on the inbox resolves too — both are checked here.
         test('the inbox badge opens the inbox', async ({ page }) => {
             await signIn(page, console_)
-            const badge = page.locator('a', { hasText: /Inbox/ }).first()
+            const badge = page.locator('[aria-label^="Bandeja"]').first()
             await expect(badge, `${console_.name} shows no inbox badge`).toBeVisible({ timeout: 60_000 })
             await badge.click()
             await expect
