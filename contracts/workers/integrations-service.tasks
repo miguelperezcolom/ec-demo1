@@ -2,13 +2,17 @@
 activate@1 integrations
 await-activation@1 integrations
 backfill-prepass@1 integrations
+check-demo-health@1 integrations
 contrast-catalogues@1 integrations
 fo-activate@1 integrations
 fo-await-activation@1 integrations
 fo-start-backfill@1 integrations
 fo-sync-catalogue@1 integrations
 fo-verify-connectivity@1 integrations
+notify-reset-result@1 integrations
+purge-engine@1 integrations
 request-mapping@1 integrations
+reset@1 integrations
 start-backfill@1 integrations
 sync-partners@1 integrations
 verify-connectivity@1 integrations

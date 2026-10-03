@@ -91,12 +91,13 @@ public class FrontOfficeSuite implements HomeRouteSupplier, WidgetSupplier {
       new RouteLink("/automatizaciones", "Automatizaciones").withIcon("vaadin:tasks");
 
   /**
-   * Who is signed in, and a way out — the same widget as the consoles' shells (ui-commons'
+   * The demo's banner while an Opera outage is simulated («Simulación: Opera no responde»), then
+   * who is signed in, and a way out — the same widget as the consoles' shells (ui-commons'
    * UserWidget): a greeting that opens the email and Logout. Redwood draws it in the global
    * header's profile area.
    */
   @Override
   public List<Component> widgets(HttpRequest httpRequest) {
-    return UserWidget.of(httpRequest);
+    return UserWidget.withDemoBanner(httpRequest);
   }
 }
