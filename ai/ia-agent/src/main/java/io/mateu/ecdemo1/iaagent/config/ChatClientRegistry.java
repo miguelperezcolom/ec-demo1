@@ -175,6 +175,11 @@ public class ChatClientRegistry {
 
     private static OpenAiChatOptions.Builder openAiOptions(AgentConfig.Llm llm) {
         var builder = OpenAiChatOptions.builder();
+        // The usage of a streamed answer arrives in a last chunk only when the request asks for it
+        // (stream_options.include_usage). Spring AI 2.0.1 asks by default when nothing is set;
+        // said here so the token bar does not depend on a default — a gateway that drops it shows
+        // zeros, not an error.
+        builder.streamUsage(true);
         builder.apiKey(llm.apiKey());
         builder.model(llm.model());
         if (!isBlank(llm.baseUrl())) {

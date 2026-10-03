@@ -101,6 +101,15 @@ public class PerRequestMcpClientFactory {
      *                            MCP server so they can enforce their own authorization.
      */
     public PerRequestTools createTools(List<String> serverUrls, String authorizationHeader) {
+        return createTools(serverUrls, authorizationHeader, ToolProgressListener.NONE);
+    }
+
+    /**
+     * As {@link #createTools(List, String)}, and every call to one of the tools is reported to
+     * {@code progress} as it starts and ends — the streaming endpoint's progress lines.
+     */
+    public PerRequestTools createTools(List<String> serverUrls, String authorizationHeader,
+                                       ToolProgressListener progress) {
         // Connect to all MCP servers in parallel so total wait = max(individual timeouts)
         // instead of sum(individual timeouts).
         Observation prompt = observationRegistry.getCurrentObservation();
@@ -137,7 +146,8 @@ public class PerRequestMcpClientFactory {
             }
         }
 
-        ToolCallback[] wrapped = wrapWithExecutor(dropDuplicateNames(rawCallbacks.toArray(ToolCallback[]::new)));
+        ToolCallback[] wrapped = wrapWithExecutor(dropDuplicateNames(rawCallbacks.toArray(ToolCallback[]::new)),
+                progress);
         log.info("Per-request MCP tools ready: {} tools from {}/{} servers",
                 wrapped.length, clients.size(), serverUrls.size());
         return new PerRequestTools(clients, wrapped, serverContexts, serverUrls.size());
@@ -268,10 +278,11 @@ public class PerRequestMcpClientFactory {
         return byName.values().toArray(ToolCallback[]::new);
     }
 
-    private ToolCallback[] wrapWithExecutor(ToolCallback[] callbacks) {
+    private ToolCallback[] wrapWithExecutor(ToolCallback[] callbacks, ToolProgressListener progress) {
         return Arrays.stream(callbacks)
                 .map(cb -> (ToolCallback) new ToolCallback() {
                     private final String serverUrl = cb instanceof ServerToolCallback s ? s.url() : null;
+                    private final String serverName = serverUrl == null ? null : clientNameFor(serverUrl);
 
                     @Override
                     public ToolDefinition getToolDefinition() {
@@ -287,6 +298,7 @@ public class PerRequestMcpClientFactory {
                         log.info("MCP tool call: {} ({})", toolName, serverUrl);
                         log.debug("MCP tool call: {} input={}", toolName, toolInput);
                         long started = System.nanoTime();
+                        ToolProgressListener.started(progress, toolName, serverName, "mcp");
                         // The spring.ai.tool observation Spring AI opened around this call. The
                         // failures below are answered to the model as text rather than thrown, so
                         // this is the only place that can mark the tool's span and metric as the
@@ -309,6 +321,7 @@ public class PerRequestMcpClientFactory {
                             log.info("MCP tool result: {} in {} ms, {} chars", toolName,
                                     (System.nanoTime() - started) / 1_000_000, result == null ? 0 : result.length());
                             log.debug("MCP tool result: {} -> {}", toolName, result);
+                            ToolProgressListener.ended(progress, toolName, serverName, "mcp", started, null);
                             return result;
                         } catch (ExecutionException e) {
                             String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
@@ -316,6 +329,7 @@ public class PerRequestMcpClientFactory {
                             if (toolCall != null) {
                                 toolCall.error(e.getCause() != null ? e.getCause() : e);
                             }
+                            ToolProgressListener.ended(progress, toolName, serverName, "mcp", started, msg);
                             return "{\"error\":true,\"tool\":\"" + toolName + "\","
                                     + "\"message\":\"HERRAMIENTA NO DISPONIBLE: " + toolName
                                     + " falló con el error: " + msg + ". "
@@ -325,6 +339,9 @@ public class PerRequestMcpClientFactory {
                             if (toolCall != null) {
                                 toolCall.error(e);
                             }
+                            ToolProgressListener.ended(progress, toolName, serverName, "mcp", started,
+                                    e instanceof java.util.concurrent.TimeoutException
+                                            ? "no respondió a tiempo" : String.valueOf(e.getMessage()));
                             return "{\"error\":true,\"tool\":\"" + toolName + "\","
                                     + "\"message\":\"HERRAMIENTA NO DISPONIBLE: " + toolName
                                     + " no respondió a tiempo o no está levantada. "
