@@ -1,0 +1,3 @@
+# customer-mdm-service: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
+clean-salesforce@1 customer-mdm
+reset@1 customer-mdm

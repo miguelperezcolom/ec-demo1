@@ -118,6 +118,18 @@
             <artifactId>shared</artifactId>
             <version>${eventconductor.version}</version>
         </dependency>
+        <!-- The demo's reset (process reset-demo): the engine's task reset@1 on the topic communication —
+             the worker runtime (worker-kafka) and the reset every service does to itself (demo-reset). -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>worker-kafka</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
+        </dependency>
 
         <dependency>
             <groupId>io.mateu</groupId>

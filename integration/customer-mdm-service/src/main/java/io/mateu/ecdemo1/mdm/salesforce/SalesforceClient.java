@@ -60,6 +60,8 @@ public class SalesforceClient {
         public static final String NOTICE_WRITE = "notice-write";
         /** The net under a notice's event: asking how the ones written and not confirmed stand. */
         public static final String NOTICE_POLL = "notice-poll";
+        /** The demo's reset (process reset-demo): the org's contacts and change Cases deleted. */
+        public static final String DEMO_RESET = "demo-reset";
         /** An OAuth token: counted, but not a call the org's allowance counts. */
         public static final String TOKEN = "token";
 
@@ -328,6 +330,51 @@ public class SalesforceClient {
             page = call(purpose, s -> rest.get().uri(s.instanceUrl() + next)
                     .header("Authorization", "Bearer " + s.accessToken()).retrieve().body(JsonNode.class));
         }
+    }
+
+    /**
+     * The ids SOQL finds among the live records — not the recycle bin's, unlike {@link #queryAll}. One
+     * call per page, each counted under the purpose.
+     */
+    public List<String> ids(String purpose, String soql) {
+        var ids = new ArrayList<String>();
+        var page = call(purpose, s -> rest.get()
+                .uri(s.instanceUrl() + "/services/data/{v}/query?q={q}", properties.apiVersion(), soql)
+                .header("Authorization", "Bearer " + s.accessToken()).retrieve().body(JsonNode.class));
+        while (true) {
+            page.path("records").forEach(r -> ids.add(r.path("Id").asText()));
+            var next = page.path("nextRecordsUrl").asText(null);
+            if (next == null || page.path("done").asBoolean(true)) {
+                return ids;
+            }
+            page = call(purpose, s -> rest.get().uri(s.instanceUrl() + next)
+                    .header("Authorization", "Bearer " + s.accessToken()).retrieve().body(JsonNode.class));
+        }
+    }
+
+    /**
+     * Deletes these records, {@value #COLLECTION} a call (sObject Collections, not all or none): the
+     * org's daily allowance counts calls, not records. What was already gone is not counted.
+     *
+     * @return how many Salesforce deleted
+     */
+    public int delete(String purpose, List<String> ids) {
+        var deleted = 0;
+        for (var from = 0; from < ids.size(); from += COLLECTION) {
+            var batch = ids.subList(from, Math.min(ids.size(), from + COLLECTION)).stream().map(SalesforceClient::safe).toList();
+            var answer = call(purpose, s -> rest.delete()
+                    .uri(s.instanceUrl() + "/services/data/{v}/composite/sobjects?allOrNone=false&ids={ids}",
+                            properties.apiVersion(), String.join(",", batch))
+                    .header("Authorization", "Bearer " + s.accessToken()).retrieve().body(JsonNode.class));
+            if (answer != null) {
+                for (var result : answer) {
+                    if (result.path("success").asBoolean(false)) {
+                        deleted++;
+                    }
+                }
+            }
+        }
+        return deleted;
     }
 
     /**

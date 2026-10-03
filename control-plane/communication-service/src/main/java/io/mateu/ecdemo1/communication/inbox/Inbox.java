@@ -92,8 +92,9 @@ public class Inbox {
                 + ". Process " + t.processId() + ", step " + t.stepId() + ".";
         item.link = properties.inbox().tasksLink();
         var plan = routing.plan(Recipient.TASK, null);
-        var roles = new java.util.LinkedHashSet<String>(t.requiredRoles() == null || t.requiredRoles().isEmpty()
-                ? List.of(EVERYONE) : t.requiredRoles());
+        var required = t.requiredRoles() == null || t.requiredRoles().isEmpty()
+                ? properties.inbox().rolesOf(t.formId()) : t.requiredRoles();
+        var roles = new java.util.LinkedHashSet<String>(required.isEmpty() ? List.of(EVERYONE) : required);
         roles.addAll(plan.inboxRoles());
         item.roles = Recipient.join(roles);
         item.users = Recipient.join(plan.inboxUsers());

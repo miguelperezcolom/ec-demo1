@@ -19,6 +19,7 @@
         <mateu.version>3.0-alpha.386</mateu.version>
         <spring-ai.version>1.0.0</spring-ai.version>
         <lombok.version>1.18.44</lombok.version>
+        <eventconductor.version>2.23.1</eventconductor.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <!-- The Pub/Sub API client: gRPC, and Avro for the event payloads. -->
         <grpc.version>1.77.0</grpc.version>
@@ -92,6 +93,24 @@
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>contracts-integration</artifactId>
             <version>1.0.0</version>
+        </dependency>
+        <!-- The demo's reset (process reset-demo): the engine's tasks reset@1 and clean-salesforce@1 on the
+             topic customer-mdm — the worker runtime (worker-kafka) and the reset every service does to
+             itself (demo-reset). -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>shared</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>worker-kafka</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
         </dependency>
         <!-- Its messages checked against the topics' schemas (contracts/schemas). -->
         <dependency>

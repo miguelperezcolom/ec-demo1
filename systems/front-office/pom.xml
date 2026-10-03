@@ -89,6 +89,15 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+        <!-- The demo's reset (process reset-demo): its own tables emptied, its listeners paused around it.
+             Installed from ../../supporting/demo-reset first. Served as the engine's task reset@1 by a
+             worker of its own (infra/demo/EngineWorker): no worker-kafka here — that one is Spring Cloud
+             Stream and Boot 3. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <!-- The outbox, its relay and the inbox, shared by the services. Installed from
              ../../supporting/messaging first. -->
         <dependency>
@@ -142,6 +151,13 @@
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>contracts-testing</artifactId>
             <version>1.0.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- The demo's reset against the real schema (schema.sql on PostgreSQL): H2 truncates one table
+             at a time and knows no to_regclass. The core module alone, its container started by hand. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
