@@ -72,7 +72,7 @@ public final class UserWidget {
                     content.add(popover(claims));
                     return List.<Component>of(HorizontalLayout.builder()
                             .content(content)
-                            .style("align-items: flex-end;")
+                            .style("align-items: center;") // the inbox is an icon button: centred with the greeting
                             .build());
                 })
                 .orElse(List.of());
