@@ -63,11 +63,18 @@ import java.util.List;
 // and the engines over MCP — what this console governs.
 @AI(sse = "/ai/api/agent/stream")
 // The light/dark switch in the header, next to the chat toggle: the theme otherwise follows the OS only.
-// The menu on top, declared: since Mateu 385 a shell with remote menus keeps the variant it declares
-// (the client no longer forces MENU_ON_TOP), and AUTO would pick another one for this many entries.
-// RIU's red as the brand accent: a line under the menu band and the console name in it (light theme).
-// Not the primary colour — it never means "clickable".
-@App(value = AppVariant.MENU_ON_TOP, themeToggle = true, accentColor = "#D2232A")
+// Opera Cloud's navigation (HAMBURGER_SECTIONS, Mateu P9): the hamburger holds the sections — one per
+// service, each the RemoteMenu below — and the band under the header the second level of the section
+// on screen (Agents, Llms… for IA), a group of it as a dropdown. Choosing a section goes to its first
+// screen. With eleven services the bar of MENU_ON_TOP no longer fitted, and dropping every service's
+// screens into one bar is not how this console is used: one works inside one service at a time.
+// The section on screen comes from the route, so a deep link or a reload shows it before the service
+// has answered with its menu; a service that is down disables its own section and nothing else.
+// The data plane keeps MENU_ON_TOP.
+// RIU's red as the brand accent: a line under the band and the section's name in it (light theme, the
+// Vaadin build only — Redwood draws its band with its own neutral tokens). Not the primary colour — it
+// never means "clickable".
+@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#D2232A")
 public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**
@@ -79,11 +86,12 @@ public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
         return "/inicio";
     }
 
-    // Both entries name their label. Without one Mateu labels a RemoteMenu from the field name
-    // until the remote pod answers — "Control plane" and "Users" here — and then swaps in the real
-    // one, which is the menu bar changing under the reader a moment after it is drawn. Neither of
-    // these two ever matched, so this console flickered on both. See ShellHome for the same note
-    // and the cost that comes with it.
+    // The sections, one per service, in the hamburger's order. Each names its label: without one
+    // Mateu labels a RemoteMenu from the field name until the remote pod answers — "Control plane"
+    // and "Users" here — and then swaps in the real one, which is the menu changing under the reader
+    // a moment after it is drawn. The shell's label wins (Mateu P9), so it is also what the section
+    // is called whatever the pod answers. See ShellHome for the same note and the cost that comes
+    // with it.
 
     /** The IA catalogues, served by the control-plane pod, which labels the section "IA". */
     @Menu
