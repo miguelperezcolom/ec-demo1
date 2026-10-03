@@ -53,5 +53,6 @@
         <module>supporting/content</module>
         <module>supporting/ui-commons</module>
         <module>supporting/messaging</module>
+        <module>supporting/demo-reset</module>
     </modules>
 </project>

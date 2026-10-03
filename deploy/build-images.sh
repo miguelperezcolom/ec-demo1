@@ -44,6 +44,10 @@ echo "── installing the contracts (the language the services speak) ──"
 echo "── installing messaging (the shared outbox and inbox) ──"
 ( cd supporting/messaging && mvn -B -ntp -DskipTests install )
 
+# demo-reset likewise: the reset@1 task every service serves for the demo's reset (process reset-demo).
+echo "── installing demo-reset (each service's own reset) ──"
+( cd supporting/demo-reset && mvn -B -ntp -DskipTests install )
+
 # ui-commons likewise: the shells, the front office and the control-plane UIs compile against it.
 echo "── installing ui-commons (what the UIs share) ──"
 ( cd supporting/ui-commons && mvn -B -ntp -DskipTests install )

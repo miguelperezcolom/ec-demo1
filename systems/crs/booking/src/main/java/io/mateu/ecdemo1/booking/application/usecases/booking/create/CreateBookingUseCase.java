@@ -30,6 +30,16 @@ public class CreateBookingUseCase {
     final Traces traces;
     final BookingAudit audit;
 
+    /** The demo reset's pause: none in a test that builds the use case by hand. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    io.mateu.ecdemo1.booking.application.usecases.intake.CrsIntake intake;
+
+    void ensureOpen() {
+        if (intake != null) {
+            intake.ensureOpen();
+        }
+    }
+
     /**
      * A channel's own reference names one booking: sent again — a front office retrying after a
      * timeout — it answers with the booking already made, whatever the price or the payments say by
@@ -39,6 +49,7 @@ public class CreateBookingUseCase {
     public String handle(CreateBookingCommand command) {
         // The CRS entry of a booking's trace: whatever reaches the PMS for it continues from here, and
         // it is found in Tempo by these attributes.
+        ensureOpen();
         return traces.inSpan("booking.create", () -> {
             var params = BookingAudit.params("hotel", command.hotelCode(), "expectedTotal", command.expectedTotal(),
                     "payments", command.payments() == null ? 0 : command.payments().size());

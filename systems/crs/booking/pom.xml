@@ -90,6 +90,13 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- The demo's reset (process reset-demo): reset@1, this service emptying its own tables with its
+             consumers paused. Installed from supporting/demo-reset first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <!-- Who did what to a booking, on the audit topic: the same AuditedAction as every service. -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>

@@ -17,7 +17,8 @@ spring:
 
   cloud:
     function:
-      definition: consumeNotifications;consumeResolutions;consumeHumanTasks
+      # consumeWorkerEvent: the engine's tasks (worker-kafka) — the demo's reset, worker.CommunicationTasks.
+      definition: consumeNotifications;consumeResolutions;consumeHumanTasks;consumeWorkerEvent
     stream:
       kafka:
         binder:
@@ -37,6 +38,14 @@ spring:
         consumeHumanTasks-in-0:
           destination: ${HUMAN_TASKS_TOPIC:human-tasks}
           group: ec-demo1-communication
+        # IN: the engine's tasks for this service — the step of reset-demo that names the topic
+        # communication. Never paused by the reset it runs (demo-reset keeps it); the three above are.
+        consumeWorkerEvent-in-0:
+          destination: communication
+          group: ec-demo1-communication-worker
+        # OUT: the replies to the engine.
+        upstream:
+          destination: upstream
 
   # The cluster's send-only relay (deploy/manifests/11-postfix.yaml): plain SMTP inside the
   # namespace, no auth, no TLS; postfix relays onwards.
@@ -71,6 +80,9 @@ communication:
   max-attempts: 5
   inbox:
     tasks-link: ${INBOX_TASKS_LINK:/forms/tasks}
+    # Whose a form's tasks are when the forms engine announces no roles (before EventConductor stores
+    # them with JPA): reset-demo's confirmation is the administrators'.
+    task-roles: ${INBOX_TASK_ROLES:confirmar-reset-demo=ai-admin}
   # The Google Chat spaces a recipient can post to, numbered 1 and 2 in this order (their incoming
   # webhooks, from a Secret; blank ones are left out).
   chat:

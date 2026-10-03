@@ -1,6 +1,9 @@
 package io.mateu.ecdemo1.mapping.worker;
 
 import io.mateu.ecdemo1.mapping.worker.runtime.Reasons;
+import io.mateu.ecdemo1.demoreset.DemoReset;
+import io.mateu.ecdemo1.demoreset.DemoResetPlan;
+import io.mateu.ecdemo1.demoreset.DemoResetTask;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -57,5 +60,16 @@ public class MappingTasks {
     public TaskRegistration<TaskHandlers.Projected, Void> resolveProjectionTask(TaskHandlers handlers) {
         return new TaskRegistration<>(RESOLVE_PROJECTION, 1, TOPIC, TaskHandlers.Projected.class, Void.class,
                 Reasons.asBefore(handlers::resolveProjection));
+    }
+
+    /** What the demo's reset (reset-demo) empties of it — deploy/demo/zero.sh's list: the causes, the dictionary, the partners' profiles, the waiters and the outbox. */
+    @Bean
+    public DemoResetPlan demoResetPlan() {
+        return DemoResetPlan.truncate("mapping", "cause", "mapping_entry", "partner_profile", "waiter", "waiter_cause", "outbox_message");
+    }
+
+    @Bean
+    public TaskRegistration<DemoResetTask.Input, Void> resetTask(DemoReset reset) {
+        return DemoResetTask.registration(TOPIC, reset);
     }
 }

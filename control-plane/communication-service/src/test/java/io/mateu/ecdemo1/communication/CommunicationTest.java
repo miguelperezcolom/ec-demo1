@@ -273,6 +273,13 @@ class CommunicationTest {
         send("human-tasks", "t-10", Map.of("taskId", "t-10", "formId", "note", "status", "PENDING", "at", Instant.now().toString()));
         waitFor(() -> inbox.openFor(Set.of()).stream().anyMatch(i -> "task/t-10".equals(i.id)));
         assertThat(inbox.openFor(Set.of())).anyMatch(i -> "task/t-10".equals(i.id));
+
+        // reset-demo's confirmation, announced with no roles (the forms engine on JPA drops them):
+        // the administrators' all the same (communication.inbox.task-roles), nobody else's.
+        send("human-tasks", "t-11", Map.of("taskId", "t-11", "formId", "confirmar-reset-demo", "status", "PENDING",
+                "at", Instant.now().toString()));
+        waitFor(() -> inbox.openFor(Set.of("ai-admin")).stream().anyMatch(i -> "task/t-11".equals(i.id)));
+        assertThat(inbox.openFor(Set.of("user"))).noneMatch(i -> "task/t-11".equals(i.id));
     }
 
     static String subjectOf(jakarta.mail.Message m) {

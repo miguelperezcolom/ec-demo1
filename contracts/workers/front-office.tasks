@@ -1,0 +1,2 @@
+# front-office: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
+reset@1 front-office

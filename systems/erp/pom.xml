@@ -90,6 +90,21 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- The demo's reset (process reset-demo): reset@1, this service emptying its own tables with its
+             consumers paused. Installed from supporting/demo-reset first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <!-- The engine's worker runtime: it binds the task topic (consumeWorkerEvent), runs each task on
+             the handler registered for it and answers the engine on `upstream` — today the demo's
+             reset@1. -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>worker-kafka</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu.workflow</groupId>
             <artifactId>shared</artifactId>
