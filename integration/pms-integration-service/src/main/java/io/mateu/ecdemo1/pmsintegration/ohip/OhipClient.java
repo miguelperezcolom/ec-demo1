@@ -57,6 +57,8 @@ public class OhipClient {
     final RestClient.Builder builder;
     /** Counts every call to Opera, by what it was for; null counts nothing. */
     final OperaUsage usage;
+    /** The demo's simulated outage: every call fails as a timeout while it is on; null, never. */
+    final OperaOutage outage;
 
     public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock) {
         this(connections, properties, reader, clock, RestClient.builder());
@@ -72,9 +74,16 @@ public class OhipClient {
      * that made it, in the booking's trace. And counted ({@link OperaUsage}): the consoles' header
      * says how much of Opera the platform spends, and on what.
      */
-    @org.springframework.beans.factory.annotation.Autowired
     public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock,
                       RestClient.Builder builder, OperaUsage usage) {
+        this(connections, properties, reader, clock, builder, usage, null);
+    }
+
+    /** And failing as a timeout does while the demo simulates an outage ({@link OperaOutage}). */
+    @org.springframework.beans.factory.annotation.Autowired
+    public OhipClient(Connections connections, OhipProperties properties, TolerantReader reader, Clock clock,
+                      RestClient.Builder builder, OperaUsage usage, OperaOutage outage) {
+        this.outage = outage;
         this.connections = connections;
         this.properties = properties;
         this.reader = reader;
@@ -279,6 +288,10 @@ public class OhipClient {
         factory.setConnectTimeout(properties.timeout());
         factory.setReadTimeout(properties.timeout());
         var clone = builder.clone();
+        // Ahead of the count: a call the simulated outage fails never reached Opera.
+        if (outage != null) {
+            clone = clone.requestInterceptor(outage);
+        }
         if (usage != null) {
             clone = clone.requestInterceptor(usage);
         }

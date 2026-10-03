@@ -30,20 +30,26 @@ import java.math.BigDecimal;
  * linked; how the CRS's multi-room bookings should land there is a question for the DT.
  */
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class ReservationPayload {
 
     final ObjectMapper objectMapper;
     final OhipProperties properties;
     final PackageRules packageRules;
+    /** The run's context in Opera, swapped at runtime by reset-demo. */
+    final io.mateu.ecdemo1.pmsintegration.config.OperaContext context;
+
+    public ReservationPayload(ObjectMapper objectMapper, OhipProperties properties, PackageRules packageRules) {
+        this(objectMapper, properties, packageRules, io.mateu.ecdemo1.pmsintegration.config.OperaContext.of(properties));
+    }
 
     public ObjectNode build(Reservation r, IntegrationClients.Resolved codes, String pmsHotelId, String guestProfileId,
                             Partner partner, String partnerProfileId, String partnerProfileType) {
         var body = objectMapper.createObjectNode();
         var reservation = body.putObject("reservations").putArray("reservation").addObject();
         reservation.put("hotelId", pmsHotelId);
-        if (!properties.customReference().isBlank()) {
-            reservation.put("customReference", properties.customReference());
+        if (!context.customReference().isBlank()) {
+            reservation.put("customReference", context.customReference());
         }
         var channel = codes.translation(CodeType.CHANNEL, r.channelCode());
 
@@ -93,7 +99,7 @@ public class ReservationPayload {
         reservation.putArray("reservationPaymentMethods").addObject().put("paymentMethod", method).put("folioView", 1);
 
         var references = reservation.putArray("externalReferences");
-        references.addObject().put("id", r.locator()).put("idContext", properties.externalSystemCode());
+        references.addObject().put("id", r.locator()).put("idContext", context.externalSystemCode());
         if (partner != null && r.externalReference() != null) {
             references.addObject().put("id", r.externalReference()).put("idContext", partner.code());
         }

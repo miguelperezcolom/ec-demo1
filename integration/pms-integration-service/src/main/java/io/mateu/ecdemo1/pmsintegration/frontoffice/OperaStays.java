@@ -28,7 +28,7 @@ import java.util.Optional;
  * Two hundred to a page, a few pages for a hotel: a poll every minute.
  */
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class OperaStays {
 
     public enum Scope {
@@ -43,6 +43,12 @@ public class OperaStays {
 
     final OhipClient ohip;
     final OhipProperties properties;
+    /** The run's context in Opera, swapped at runtime by reset-demo. */
+    final io.mateu.ecdemo1.pmsintegration.config.OperaContext context;
+
+    public OperaStays(OhipClient ohip, OhipProperties properties) {
+        this(ohip, properties, io.mateu.ecdemo1.pmsintegration.config.OperaContext.of(properties));
+    }
 
     /**
      * The reservation, whole — with its packages, which a plain read leaves out. Empty if Opera does
@@ -68,7 +74,7 @@ public class OperaStays {
             var uri = "/rsv/v1/hotels/{h}/reservations?limit={l}&offset={o}&departureStartDate={f}&arrivalEndDate={t}"
                     + (scope == Scope.CHAIN ? "&customReference={c}" : "");
             var answer = scope == Scope.CHAIN
-                    ? ohip.get(hotelId, uri, hotelId, PAGE, offset, from, to, properties.customReference()).body()
+                    ? ohip.get(hotelId, uri, hotelId, PAGE, offset, from, to, context.customReference()).body()
                     : ohip.get(hotelId, uri, hotelId, PAGE, offset, from, to).body();
             var reservations = answer.path("reservations");
             var infos = reservations.path("reservationInfo");

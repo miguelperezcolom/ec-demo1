@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * the first property this client may see is used.
  */
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class OperaProfiles {
 
     public record Ensured(String profileId, boolean created) {
@@ -28,6 +28,12 @@ public class OperaProfiles {
     final OhipClient ohip;
     final OhipProperties properties;
     final ObjectMapper objectMapper;
+    /** The run's context in Opera, swapped at runtime by reset-demo. */
+    final io.mateu.ecdemo1.pmsintegration.config.OperaContext context;
+
+    public OperaProfiles(OhipClient ohip, OhipProperties properties, ObjectMapper objectMapper) {
+        this(ohip, properties, objectMapper, io.mateu.ecdemo1.pmsintegration.config.OperaContext.of(properties));
+    }
 
     /**
      * The reservation's holder, as the guest profile Opera needs to take a reservation (F001). One
@@ -171,7 +177,7 @@ public class OperaProfiles {
     }
 
     public java.util.Optional<JsonNode> byExternalId(String hotelId, String externalId) {
-        return ohip.find(hotelId, "/crm/v1/externalSystems/{ext}/profiles/{id}", properties.externalSystemCode(), externalId);
+        return ohip.find(hotelId, "/crm/v1/externalSystems/{ext}/profiles/{id}", context.externalSystemCode(), externalId);
     }
 
     /**
@@ -232,7 +238,7 @@ public class OperaProfiles {
     Ensured ensure(String hotelId, String externalId, ObjectNode profile) {
         var references = profile.has("externalReferences") ? (ArrayNode) profile.get("externalReferences")
                 : profile.putArray("externalReferences");
-        references.insertObject(0).put("id", externalId).put("idContext", properties.externalSystemCode());
+        references.insertObject(0).put("id", externalId).put("idContext", context.externalSystemCode());
         var existing = byExternalId(hotelId, externalId);
         if (existing.isPresent()) {
             var id = existing.get().path("profileIdList").path(0).path("id").asText();
