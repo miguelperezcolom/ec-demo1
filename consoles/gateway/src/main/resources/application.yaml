@@ -1,5 +1,31 @@
 server:
   port: 8190
+  # Compress what the consoles download. No backend behind this gateway compresses (none sets
+  # server.compression) and ingress-nginx is not configured to either, so until this every
+  # console shipped its JavaScript as-is: 777 KB for Redwood's app bundle, 885 KB for Vaadin's.
+  # Here rather than in each app because every console's every response passes through here, and
+  # the hop from the backends to this pod stays inside the cluster where size does not matter.
+  # Responses a backend already compressed pass through untouched (Content-Encoding is set).
+  # text/event-stream is deliberately absent: compressing a stream buffers it, and the chat and the
+  # process logs would arrive in lumps.
+  compression:
+    enabled: true
+    min-response-size: 1KB
+    mime-types:
+      - text/html
+      - text/css
+      - text/plain
+      - text/xml
+      - text/javascript
+      - application/javascript
+      - application/x-javascript
+      - application/json
+      - application/xml
+      - image/svg+xml
+      - application/manifest+json
+      - font/ttf
+      - font/otf
+      - application/vnd.ms-fontobject
 
 spring:
   application:
