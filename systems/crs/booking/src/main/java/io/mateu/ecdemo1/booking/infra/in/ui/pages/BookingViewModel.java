@@ -22,7 +22,6 @@ import io.mateu.uidl.annotations.FoldoutDetail;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.HiddenInEditor;
 import io.mateu.uidl.annotations.HiddenInView;
-import io.mateu.uidl.annotations.KPI;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Lookup;
 import io.mateu.uidl.annotations.ReadOnly;
@@ -68,11 +67,11 @@ import java.util.concurrent.Callable;
 // The booking's page is an overview — where, when, how much and where it is in Opera — with the rest
 // in foldout panels beside it: eleven stacked cards were a long scroll to what matters, and half of
 // them empty. What has no value is left out of the page; the editor keeps every field. The amounts
-// are the page header's KPIs, not a panel; the comments go with the rooms and guests they are about,
+// are badges in the page header, not a panel; the comments go with the rooms and guests they are about,
 // and the tracking with the payments: two short panels fewer.
 @FoldoutDetail(overview = {"Booking"})
 @PageWidth(PageWidthStyle.EDGE_TO_EDGE)
-public class BookingViewModel implements Identifiable, VisibilitySupplier {
+public class BookingViewModel implements Identifiable, VisibilitySupplier, io.mateu.uidl.interfaces.SubtitleSupplier {
 
     static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
             .withZone(ZoneId.systemDefault());
@@ -81,6 +80,24 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @ReadOnly
     @HiddenInCreate
     Status status = new Status(StatusType.NONE, "New");
+
+    /**
+     * What is still to pay, as a header badge next to the status: amber while something is, green
+     * once it is paid. Null in the creation form: a null Status is no badge. The total and what has
+     * been paid are the page's subtitle ({@link #subtitle()}).
+     */
+    @ReadOnly
+    @HiddenInCreate
+    Status pendingBadge;
+
+    /** «Total 1.431,12 EUR (5 noches) · Pagado 0,00 EUR» — the page's subtitle; null in creation. */
+    @io.mateu.uidl.annotations.Hidden
+    String amounts;
+
+    @Override
+    public String subtitle() {
+        return amounts;
+    }
 
     @Section("Booking")
     @NotEmpty
@@ -144,45 +161,22 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @Colspan(2)
     List<GuestViewModel> guests;
 
-    @Section("Payments")
+    /**
+     * On the booking's page, each payment as a card — like each room above: type and method, the
+     * amount as a badge, the date and the reference under it. No table: a grid in a fold read as
+     * a form. The editor keeps the list below.
+     */
+    @Section(value = "Payments", panelWidth = PanelWidth.MEDIUM)
+    @HiddenInCreate
+    @HiddenInEditor
+    @Label("")
+    @Colspan(2)
+    Callable<Component> paymentsOnPage = this::paymentCards;
+
+    @HiddenInView
     @DetailFormCustomisation(position = FormPosition.modal)
     @Colspan(2)
     List<PaymentViewModel> payments;
-    // The tracking, on the page, under the payments; the editor shows it in its own section.
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Id")
-    String idOnPage;
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Version")
-    Long versionOnPage;
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Created")
-    String createdOnPage;
-    @HiddenInCreate
-    @HiddenInEditor
-    @ReadOnly
-    @Label("Updated")
-    String updatedOnPage;
-
-    /** The booking's amounts, as the KPIs of its page's header. */
-    @KPI
-    @ReadOnly
-    @HiddenInCreate
-    String total;
-    @KPI
-    @ReadOnly
-    @HiddenInCreate
-    String paid;
-    @KPI
-    @ReadOnly
-    @HiddenInCreate
-    String pending;
 
     @Section("Comments")
     @HiddenInView
@@ -195,20 +189,17 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     @HiddenInCreate
     String cancellation;
 
-    @Section("Tracking")
-    @HiddenInView
+    /** The record's bookkeeping, in its own narrow fold on the page (and its own section in the editor). */
+    @Section(value = "Tracking", panelWidth = PanelWidth.NARROW)
     @ReadOnly
     @HiddenInCreate
     String id;
-    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     Long version;
-    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     String created;
-    @HiddenInView
     @ReadOnly
     @HiddenInCreate
     String updated;
@@ -225,7 +216,7 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
     Callable<Component> otherSystems = this::otherSystems;
 
     /** Who did what with the booking, and when: here, through the console's agent, and at the front office. */
-    @Section("History")
+    @Section(value = "History", panelWidth = PanelWidth.MEDIUM)
     @HiddenInCreate
     @HiddenInEditor
     @Label("")
@@ -372,6 +363,35 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
                 .build();
     }
 
+    /** Each payment as a card: «Deposit · VISA», the amount as its badge, date and reference below. */
+    Component paymentCards() {
+        var list = payments == null ? List.<PaymentViewModel>of() : payments;
+        if (list.isEmpty()) {
+            return io.mateu.uidl.data.Text.builder().text("Sin pagos").build();
+        }
+        var day = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        var index = new java.util.concurrent.atomic.AtomicInteger();
+        return io.mateu.uidl.data.StatusList.builder().compact(true).frameless(true).style("width: 100%;")
+                .items(list.stream().map(p -> {
+                    var lines = new java.util.ArrayList<String>();
+                    if (p.date() != null) lines.add(day.format(p.date()));
+                    if (p.reference() != null && !p.reference().isBlank()) lines.add(p.reference());
+                    return io.mateu.uidl.data.StatusItem.builder()
+                            .id("payment-" + (p.paymentId() != null ? p.paymentId() : index.incrementAndGet()))
+                            .title(paymentTitleOf(p))
+                            .status(p.amount() == null ? "" : p.amount().toPlainString())
+                            .statusColor("neutral")
+                            .lines(lines)
+                            .build();
+                }).toList())
+                .build();
+    }
+
+    static String paymentTitleOf(PaymentViewModel p) {
+        var type = p.type() == null ? "Payment" : p.type().name();
+        return p.methodCode() == null || p.methodCode().isBlank() ? type : type + " · " + p.methodCode();
+    }
+
     Component otherSystems() {
         return OtherSystems.of(id, pmsReservationId, id == null ? null : customerLinks.of(hotelCode, id).orElse(null));
     }
@@ -414,11 +434,8 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
                 .map(p -> new PaymentViewModel(p.paymentId(), p.type(), p.methodCode(), p.amount(), p.date(),
                         p.reference()))
                 .toList();
-        total = booking.totalAmount().toPlainString() + " " + booking.currency()
-                + " (" + booking.nights() + " nights)";
-        paid = booking.paidAmount().toPlainString() + " " + booking.currency();
-        pending = booking.totalAmount().subtract(booking.paidAmount()).max(java.math.BigDecimal.ZERO)
-                .toPlainString() + " " + booking.currency();
+        pendingBadge = pendingBadgeOf(booking.totalAmount(), booking.paidAmount(), booking.currency());
+        amounts = amountsOf(booking.totalAmount(), booking.paidAmount(), booking.currency(), booking.nights());
         comments = booking.comments();
         commentsOnPage = comments;
         cancellation = booking.cancellation() != null
@@ -426,11 +443,33 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier {
                 : null;
         created = TIMESTAMP.format(booking.created());
         updated = TIMESTAMP.format(booking.updated());
-        idOnPage = id;
-        versionOnPage = version;
-        createdOnPage = created;
-        updatedOnPage = updated;
         return this;
+    }
+
+    /** «Pendiente 1.431,12 EUR» in amber while something is left to pay; «Pagado» in green once nothing is. */
+    static Status pendingBadgeOf(java.math.BigDecimal total, java.math.BigDecimal paid, String currency) {
+        var pending = nz(total).subtract(nz(paid)).max(java.math.BigDecimal.ZERO);
+        return pending.signum() > 0
+                ? new Status(StatusType.WARNING, "Pendiente " + money(pending, currency))
+                : new Status(StatusType.SUCCESS, "Pagado");
+    }
+
+    /** «Total 1.431,12 EUR (5 noches) · Pagado 0,00 EUR». */
+    static String amountsOf(java.math.BigDecimal total, java.math.BigDecimal paid, String currency, long nights) {
+        return "Total " + money(total, currency) + " (" + nights + (nights == 1 ? " noche" : " noches") + ")"
+                + " · Pagado " + money(paid, currency);
+    }
+
+    static String money(java.math.BigDecimal amount, String currency) {
+        var format = java.text.NumberFormat.getNumberInstance(java.util.Locale.forLanguageTag("es-ES"));
+        format.setMinimumFractionDigits(2);
+        format.setMaximumFractionDigits(2);
+        format.setGroupingUsed(true);
+        return format.format(nz(amount)) + (currency == null ? "" : " " + currency);
+    }
+
+    private static java.math.BigDecimal nz(java.math.BigDecimal value) {
+        return value == null ? java.math.BigDecimal.ZERO : value;
     }
 
     @Override
