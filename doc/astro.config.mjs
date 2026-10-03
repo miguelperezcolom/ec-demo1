@@ -113,6 +113,7 @@ export default defineConfig({
 						{ label: 'Observabilidad', slug: 'operacion/observabilidad' },
 						{ label: 'Consumo de Salesforce y Opera', slug: 'operacion/consumo-apis-externas' },
 						{ label: 'La demo: preparar y resetear', slug: 'operacion/demo' },
+						{ label: 'La página Demo: reset y caída de Opera', slug: 'operacion/pagina-demo' },
 						{ label: 'Usuarios, Keycloak y correo', slug: 'operacion/usuarios-y-correo' },
 						{ label: 'Problemas conocidos', slug: 'operacion/problemas-conocidos' },
 					],
