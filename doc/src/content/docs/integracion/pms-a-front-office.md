@@ -102,7 +102,7 @@ Las llamadas a OHIP (`OperaFrontDesk`):
 | Saldar el folio con lo cobrado en el mostrador (sin saldar, FOF00108) | `POST /csh/v1/hotels/{h}/reservations/{id}/payments` (`action: Settlefolio`, con el cajero) |
 | Check-out | `POST /csh/v1/hotels/{h}/reservations/{id}/checkOuts`, con `cashierId` (`OPERA_CASHIER_ID`; sin él, FOF00094) |
 | Folios del check-out (solo lectura) | `GET /csh/v1/hotels/{h}/folioHistory?reservationIdId={id}&reservationIdType=Reservation&checkOut=true` |
-| Documento de la factura | `POST /csh/v1/hotels/{h}/reservations/{id}/folios` (con el cajero) → `storedFolioId` → `GET /csh/v1/hotels/{h}/storedFolios/{id}` → `folioReportURL` |
+| Documento de la factura | `POST /csh/v1/hotels/{h}/reservations/{id}/folios` (con el cajero) → `storedFolioId` → `GET /csh/v1/hotels/{h}/storedFolios/{id}` → `folioReportURL`. Solo funciona con el control `PERMANENT_FOLIO_STORAGE` activado, y en XMAR no lo está: el generate no devuelve `storedFolioId` y el front office sirve su proforma. Ver [Front office · Por qué se abre la proforma](/front-office/sistema-propio/) |
 | No show | Un comentario en la reserva (`PUT /rsv/v1/hotels/{h}/reservations/{id}`, solo `comments`); el estado «No Show» lo pone el Night Audit |
 | Estado de las habitaciones de un tipo, o de una (solo lectura) | `GET /fof/v1/hotels/{h}/rooms?roomType=` · `?fromRoomNumber=&toRoomNumber=` |
 | Cargo de recepción en el folio (y su anulación, en negativo) | `POST /csh/v1/hotels/{h}/reservations/{id}/charges` (`transactionCode`, `price`, `postingReference` `FO:<línea>`, con el cajero) |

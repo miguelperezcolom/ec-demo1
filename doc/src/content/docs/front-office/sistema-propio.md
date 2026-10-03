@@ -67,6 +67,37 @@ una salida anticipada, solo las pasadas), un cargo que Opera rechazó o que lleg
 anteriores a subirlos a Opera. La factura la sirve el front office (`/invoices/{estancia}`), nunca un
 enlace a Opera, con un enlace firmado que caduca (una pestaña nueva no lleva el token).
 
+### Por qué en XMAR se abre la proforma y no el PDF de Opera
+
+En XMAR, «Abrir factura» abre siempre la proforma: **Opera no guarda el PDF de sus facturas**. Se
+comprobó el 3 de octubre de 2026 directamente contra OHIP, con una reserva de prueba. Ni antes, ni
+durante, ni después del check-out hay un documento que pedir:
+
+- El PDF solo se puede obtener por un camino. Al generar el folio en el check-out
+  (`POST …/reservations/{id}/folios`), Opera devuelve un `storedFolioId`. Con
+  `GET …/storedFolios/{id}` se obtiene la URL del informe (`folioReportURL`), y de ahí el PDF. En
+  XMAR, el generate **no devuelve ningún `storedFolioId`**, y `storedFolios` responde vacío.
+- No hay otra vía. El generate no tiene ninguna opción para guardar o imprimir, la proforma de Opera
+  (`proformaFolio`) es solo JSON, `folios` no se sirve en PDF y `folioHistory` da solo el número y el
+  importe.
+- Solo se puede generar un folio con el saldo a cero (antes, `FOF00123`), y después del check-out ya
+  no se puede regenerar (`FOF01459`).
+
+La causa es un ajuste de la propiedad, no del API: el control de Cashiering **Permanent Folio Storage**
+(`PERMANENT_FOLIO_STORAGE`) está desactivado. Opera lo describe como «Storage of printed folios to be
+viewed/printed without re-generation». Para tener el PDF de Opera hay que pedir a RIU (o a Oracle) que
+lo activen en la propiedad y que confirmen que el usuario de la integración puede leer los folios
+guardados.
+
+Con el control activado, la integración ya sigue ese camino: `check-out-reservation` guarda el
+`storedFolioId` y `fetch-invoice` lleva el PDF al front office, que lo sirve en lugar de la proforma.
+Solo quedarían tres ajustes:
+
+- pasar a `storedFolios` los parámetros que exige XMAR (`invoiceNo`, `internalFolioWindowID`,
+  `folioDate`, `folioStatus`, `folioTypeName`);
+- reintentar mientras Opera genera el PDF (`reportStatus`);
+- no mandar por Kafka un PDF de más de 1 MB.
+
 **Gestionar folio** lista los cargos de recepción con dónde está cada uno en Opera («Opera: en el folio ·
 88731245», «pendiente», «rechazado — motivo») y **«Anular»**: la línea queda en el folio, anulada y sin
 contar, y Opera anula su posteo.
