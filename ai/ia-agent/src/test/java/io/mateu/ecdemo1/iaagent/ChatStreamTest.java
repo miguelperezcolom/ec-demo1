@@ -176,6 +176,38 @@ class ChatStreamTest {
         assertEquals("Te llevo ahora.  Listo.", data.getLast());
     }
 
+    /**
+     * The answer that showed «Nora Duarte: » with nothing after it: one NAVIGATE marker per booking,
+     * written inline as if they were links. They are links now, and none of them moves the screen.
+     */
+    @Test
+    void markersWrittenAsLinksStayInTheAnswerAsLinksAndNavigateNowhere() {
+        var answer = NavigationMarkersTest.INLINE_LINKS_ANSWER;
+        model = tools -> Flux.just(text(answer.substring(0, 140)), text(answer.substring(140, 300)),
+                text(answer.substring(300)), usage(10, 5));
+
+        var data = stream("¿no admite filtro por ids?");
+
+        assertTrue(events(data, "navigation-requested").isEmpty(), data.toString());
+        assertTrue(data.getLast().contains("- Nora Duarte: [4MBZS7](/booking/bookings/4MBZS7)"), data.getLast());
+        assertTrue(data.getLast().contains("- Giulia Okafor: [JXD3G6](/booking/bookings/JXD3G6)"), data.getLast());
+        assertFalse(deltas(data).contains("NAVIGATE"), deltas(data));
+    }
+
+    /** «¿qué reservas hay canceladas?», answered as the prompt asks: short, and shown in the listing. */
+    @Test
+    void aFilteredListingIsWhereTheAnswerIsShown() {
+        model = tools -> Flux.just(text("Hay 2 reservas canceladas; te las muestro en el listado.\n"),
+                text(NavigationMarkersTest.marker("/booking/bookings?status=Cancelled")), usage(10, 5));
+
+        var data = stream("¿qué reservas hay canceladas?");
+
+        var navigation = events(data, "navigation-requested");
+        assertEquals(1, navigation.size());
+        assertEquals("/booking/bookings?status=Cancelled", navigation.get(0).path("detail").path("route").asText());
+        assertEquals("Hay 2 reservas canceladas; te las muestro en el listado.", data.getLast());
+    }
+
     @Test
     void thePhasesAreSaidBeforeTheAnswer() {
         model = tools -> Flux.just(text("Hola."), usage(1, 1));
