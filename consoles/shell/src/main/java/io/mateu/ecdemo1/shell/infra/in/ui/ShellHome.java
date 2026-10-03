@@ -15,6 +15,7 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.Style;
 import io.mateu.uidl.annotations.UI;
 import io.mateu.uidl.data.RemoteMenu;
+import io.mateu.uidl.fluent.AppVariant;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HomeRouteSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
@@ -63,11 +64,7 @@ import java.util.List;
 @FavIcon("/images/riu.svg")
 // Edge-to-edge: the pages behind these menus are listings and workflow graphs, and capping the
 // content at the default ~900px container squeezes them into cards for lack of horizontal room.
-// …and RIU's red as the brand accent (--mateu-accent): a line under the menu band and the console
-// name in it (light theme). Not the primary colour — it never means "clickable". Set as a style
-// until the Mateu release with @App(accentColor) is in: then it moves to @App(accentColor = "#D2232A").
-// Mateu versions without the accent ignore the variable.
-@Style(StyleConstants.FULL_WIDTH + " --mateu-accent: #D2232A;")
+@Style(StyleConstants.FULL_WIDTH)
 // The home is a page of its own, Inicio (homeRoute below): a welcome — hero and KPI tiles — which
 // both renderers draw. It used to be this class's own page, as a landing template with a welcome
 // banner, but Redwood asks for a home route with no class to build it from, and was answered
@@ -78,7 +75,11 @@ import java.util.List;
 // and the booking service over MCP, and each of those decides what it is willing to expose.
 @AI(sse = "/ai/api/agent/stream")
 // The light/dark switch in the header, next to the chat toggle: the theme otherwise follows the OS only.
-@App(themeToggle = true)
+// The menu on top, declared: since Mateu 385 a shell with remote menus keeps the variant it declares
+// (the client no longer forces MENU_ON_TOP), and AUTO would pick another one for this many entries.
+// RIU's red as the brand accent: a line under the menu band and the console name in it (light theme).
+// Not the primary colour — it never means "clickable".
+@App(value = AppVariant.MENU_ON_TOP, themeToggle = true, accentColor = "#D2232A")
 public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**
