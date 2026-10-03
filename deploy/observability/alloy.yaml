@@ -5,13 +5,24 @@ controller:
   # leave it collecting only its own, and blind to the engine it exists to watch.
   nodeSelector: { kubernetes.io/arch: amd64 }
 alloy:
+  # Logs are read from the node's own files (/var/log/pods), not streamed through the API server:
+  # Cloudfleet support (2026-10-03) flagged that loki.source.kubernetes, with every Alloy pod
+  # discovering every pod, kept a long-lived stream per container open on the API server and pushed
+  # every line to Loki once per Alloy pod (3×). Now each pod only sees the pods on its own node.
+  mounts:
+    varlog: true
   resources:
     requests: { memory: 128Mi, cpu: 50m }
     limits: { memory: 256Mi, cpu: 500m }
   configMap:
     content: |-
+      // Only the pods on this Alloy pod's own node (the chart sets HOSTNAME to the node name).
       discovery.kubernetes "pods" {
         role = "pod"
+        selectors {
+          role  = "pod"
+          field = "spec.nodeName=" + sys.env("HOSTNAME")
+        }
       }
 
       discovery.relabel "pods" {
@@ -32,10 +43,28 @@ alloy:
           source_labels = ["__meta_kubernetes_pod_label_app"]
           target_label  = "app"
         }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+          separator     = "/"
+          target_label  = "__path__"
+          replacement   = "/var/log/pods/*$1/*.log"
+        }
       }
 
-      loki.source.kubernetes "pods" {
-        targets    = discovery.relabel.pods.output
+      local.file_match "pod_logs" {
+        path_targets = discovery.relabel.pods.output
+      }
+
+      // tail_from_end: on the first start, don't re-send what Loki already has.
+      loki.source.file "pods" {
+        targets       = local.file_match.pod_logs.targets
+        forward_to    = [loki.process.cri.receiver]
+        tail_from_end = true
+      }
+
+      // The files carry the container runtime's prefix (timestamp, stream); the API stream removed it.
+      loki.process "cri" {
+        stage.cri {}
         forward_to = [loki.write.default.receiver]
       }
 
