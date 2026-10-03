@@ -122,6 +122,13 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- The demo's reset (process reset-demo): reset@1, this service emptying its own tables with its
+             consumers paused. Installed from supporting/demo-reset first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <dependency>
             <groupId>io.mateu.workflow</groupId>
             <artifactId>shared</artifactId>

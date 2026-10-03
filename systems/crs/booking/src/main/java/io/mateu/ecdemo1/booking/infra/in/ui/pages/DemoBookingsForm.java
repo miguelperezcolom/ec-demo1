@@ -44,6 +44,11 @@ public class DemoBookingsForm {
     }
 
     Outcome create(Long seed) {
+        return create(seed, null);
+    }
+
+    /** {@code tag}: written in every booking's comments (the demo reset's seed finds them by it). */
+    Outcome create(Long seed, String tag) {
         var notes = new ArrayList<String>();
         List<PartnerDirectory.TradingPartner> partners;
         try {
@@ -54,7 +59,7 @@ public class DemoBookingsForm {
         }
         var batch = Long.toString(clock.instant().getEpochSecond(), 36).toUpperCase(Locale.ROOT);
         var generator = new DemoBookingGenerator(catalog, pricing, partners,
-                seed != null ? new Random(seed) : new Random(), LocalDate.now(clock), batch);
+                seed != null ? new Random(seed) : new Random(), LocalDate.now(clock), batch).tagged(tag);
         var created = new ArrayList<String>();
         var failed = new ArrayList<String>();
         var bookings = generator.generate(COUNT);

@@ -20,8 +20,19 @@ public class CancelBookingUseCase {
     final Clock clock;
     final BookingAudit audit;
 
+    /** The demo reset's pause: none in a test that builds the use case by hand. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    io.mateu.ecdemo1.booking.application.usecases.intake.CrsIntake intake;
+
+    void ensureOpen() {
+        if (intake != null) {
+            intake.ensureOpen();
+        }
+    }
+
     @Transactional
     public void handle(CancelBookingCommand command) {
+        ensureOpen();
         var hotel = repository.findById(new BookingId(command.id())).map(b -> b.getHotelCode()).orElse(null);
         audit.run("Booking cancelled", command.id(), hotel, BookingAudit.params("reason", command.reasonCode()), () -> {
             var booking = repository.findByIdForUpdate(new BookingId(command.id()))

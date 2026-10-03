@@ -7,6 +7,7 @@ import io.micrometer.observation.ObservationRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.mateu.ecdemo1.demoreset.ConsumerPause;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 @ConditionalOnExpression("'${frontoffice.kafka-brokers:}' != ''")
-public class NoticeEvents implements DisposableBean {
+public class NoticeEvents implements DisposableBean, ConsumerPause {
 
   static final Logger log = LoggerFactory.getLogger(NoticeEvents.class);
   public static final String GROUP = "ec-demo1-front-office-notices";
@@ -67,5 +68,21 @@ public class NoticeEvents implements DisposableBean {
   @Override
   public void destroy() {
     container.stop();
+  }
+
+  /** Held still while the demo's reset empties the tables (demo-reset): what it had polled, finished. */
+  @Override
+  public void pause() {
+    container.pause();
+  }
+
+  @Override
+  public void resume() {
+    container.resume();
+  }
+
+  @Override
+  public String describe() {
+    return GROUP;
   }
 }

@@ -1,2 +1,6 @@
 # booking: the tasks it serves, <id>@<version> <topic> — generated from its TaskRegistrations (-Dcontracts.write=true)
+pause-intake@1 booking
 register-no-show@1 booking
+reset@1 booking
+resume-intake@1 booking
+seed-demo-bookings@1 booking

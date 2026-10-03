@@ -3,7 +3,6 @@ package io.mateu.ecdemo1.pmsintegration.worker;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
 import io.mateu.ecdemo1.integration.model.notification.NotificationType;
 import io.mateu.ecdemo1.pmsintegration.config.PmsIntegrationProperties;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.stereotype.Component;
@@ -23,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * work. The work is the engine's; this is only the alarm.
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class RetryWatch {
 
@@ -34,12 +32,27 @@ public class RetryWatch {
     final StreamBridge streamBridge;
     final Clock clock;
     final Map<String, Failing> failing = new ConcurrentHashMap<>();
+    /** The threshold, changeable at runtime (the demo page); the configured one by default. */
+    final io.mateu.ecdemo1.pmsintegration.config.RetryAlert alert;
+
+    public RetryWatch(PmsIntegrationProperties properties, StreamBridge streamBridge, Clock clock) {
+        this(properties, streamBridge, clock, new io.mateu.ecdemo1.pmsintegration.config.RetryAlert(properties.alertAfter()));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RetryWatch(PmsIntegrationProperties properties, StreamBridge streamBridge, Clock clock,
+                      io.mateu.ecdemo1.pmsintegration.config.RetryAlert alert) {
+        this.properties = properties;
+        this.streamBridge = streamBridge;
+        this.clock = clock;
+        this.alert = alert;
+    }
 
     public void failed(String processId, String stepId, String hotelCode, String subject, String reason) {
         var key = processId + "/" + stepId;
         var now = clock.instant();
         var state = failing.merge(key, new Failing(now, false, subject), (old, fresh) -> old);
-        if (!state.alerted() && state.since().plus(properties.alertAfter()).isBefore(now)) {
+        if (!state.alerted() && state.since().plus(alert.after()).isBefore(now)) {
             failing.put(key, new Failing(state.since(), true, subject));
             var sent = streamBridge.send("notifications", new NotificationRequested(UUID.randomUUID().toString(),
                     NotificationType.RETRYING_TOO_LONG, hotelCode, subject,

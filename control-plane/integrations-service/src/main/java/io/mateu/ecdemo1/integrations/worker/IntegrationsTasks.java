@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.integrations.worker;
 import io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
 import io.mateu.ecdemo1.integrations.worker.runtime.Reasons;
+import io.mateu.ecdemo1.integrations.demo.DemoTaskHandlers;
 import io.mateu.workflow.worker.api.TaskHandler;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import org.springframework.context.annotation.Bean;
@@ -104,5 +105,39 @@ public class IntegrationsTasks {
     @Bean
     public TaskRegistration<TaskHandlers.Onboarding, Void> foActivateTask(TaskHandlers handlers) {
         return task("fo-activate", handlers.frontOffice(FrontOfficeIntegrations::stepActivate));
+    }
+
+    // ── reset-demo (ec-definitions): this service's own reset, the engine's, the health and the notice ──
+
+    /** What this service empties when the demo goes back to zero (deploy/demo/zero.sh's list). */
+    @Bean
+    public io.mateu.ecdemo1.demoreset.DemoResetPlan demoResetPlan() {
+        return io.mateu.ecdemo1.demoreset.DemoResetPlan.truncate("integrations",
+                "integration", "backfill_run", "fo_integration", "fo_backfill_run", "outbox_message");
+    }
+
+    @Bean
+    public TaskRegistration<io.mateu.ecdemo1.demoreset.DemoResetTask.Input, Void> resetTask(
+            io.mateu.ecdemo1.demoreset.DemoReset reset) {
+        return io.mateu.ecdemo1.demoreset.DemoResetTask.registration(TOPIC, reset);
+    }
+
+    @Bean
+    public TaskRegistration<DemoTaskHandlers.Purge, DemoTaskHandlers.Purged> purgeEngineTask(DemoTaskHandlers handlers) {
+        return new TaskRegistration<>("purge-engine", 1, TOPIC, DemoTaskHandlers.Purge.class, DemoTaskHandlers.Purged.class,
+                Reasons.asBefore(handlers::purgeEngine));
+    }
+
+    @Bean
+    public TaskRegistration<DemoTaskHandlers.HealthInput, DemoTaskHandlers.HealthOutput> checkDemoHealthTask(
+            DemoTaskHandlers handlers) {
+        return new TaskRegistration<>("check-demo-health", 1, TOPIC, DemoTaskHandlers.HealthInput.class,
+                DemoTaskHandlers.HealthOutput.class, Reasons.asBefore(handlers::checkHealth));
+    }
+
+    @Bean
+    public TaskRegistration<DemoTaskHandlers.NoticeInput, Void> notifyResetResultTask(DemoTaskHandlers handlers) {
+        return new TaskRegistration<>("notify-reset-result", 1, TOPIC, DemoTaskHandlers.NoticeInput.class, Void.class,
+                Reasons.asBefore(handlers::notifyResult));
     }
 }

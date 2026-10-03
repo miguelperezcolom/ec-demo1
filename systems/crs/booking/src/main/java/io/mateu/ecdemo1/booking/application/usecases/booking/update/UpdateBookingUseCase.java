@@ -26,9 +26,20 @@ public class UpdateBookingUseCase {
     final Clock clock;
     final BookingAudit audit;
 
+    /** The demo reset's pause: none in a test that builds the use case by hand. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    io.mateu.ecdemo1.booking.application.usecases.intake.CrsIntake intake;
+
+    void ensureOpen() {
+        if (intake != null) {
+            intake.ensureOpen();
+        }
+    }
+
     /** @return whether the booking changed; false when the terms were the same. */
     @Transactional
     public boolean handle(UpdateBookingCommand command) {
+        ensureOpen();
         var booking = repository.findByIdForUpdate(new BookingId(command.id()))
                 .orElseThrow(() -> new NoSuchElementException("Booking not found: " + command.id()));
         var terms = termsFactory.terms(booking.getHotelCode(), command.booking());

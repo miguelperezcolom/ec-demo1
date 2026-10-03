@@ -29,7 +29,8 @@ spring:
   # the broker acknowledged it; keyed by the customer.
   cloud:
     function:
-      definition: consumeCustomerCommands
+      # consumeWorkerEvent: the engine's tasks (worker-kafka) — the demo's reset, worker.MdmTasks.
+      definition: consumeCustomerCommands;consumeWorkerEvent
     stream:
       kafka:
         binder:
@@ -80,6 +81,14 @@ spring:
             max-attempts: 1000
             back-off-initial-interval: 1000
             back-off-max-interval: 60000
+        # IN: the engine's tasks for the MDM — the steps of reset-demo that name the topic customer-mdm.
+        # Never paused by the reset it runs (demo-reset keeps it); consumeCustomerCommands is.
+        consumeWorkerEvent-in-0:
+          destination: customer-mdm
+          group: ec-demo1-customer-mdm-worker
+        # OUT: the replies to the engine.
+        upstream:
+          destination: upstream
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect

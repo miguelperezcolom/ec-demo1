@@ -161,6 +161,11 @@ public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu audit = new RemoteMenu("/_audit").withLabel("Audit");
 
+    // The demo itself (integrations-service): reset it to zero — the engine's reset-demo, confirmed in
+    // the inbox — and simulate an Opera outage. Behind ai-admin, like the rest of this console.
+    @Menu
+    RemoteMenu demo = new RemoteMenu("/_demo").withLabel("Demo");
+
     /**
      * The inbox, hidden from the bar: the badge in the widgets below is the way in, and it says how
      * much is waiting on the way. Still declared, so a deep link or a reload on /inbox/... resolves.

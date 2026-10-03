@@ -19,7 +19,7 @@ public record CommunicationProperties(String from, String defaultEmail, int maxA
     public CommunicationProperties {
         if (from == null) from = "integration@ec1.mateu.io";
         if (maxAttempts <= 0) maxAttempts = 5;
-        if (inbox == null) inbox = new Inbox(null);
+        if (inbox == null) inbox = new Inbox(null, null);
         if (chat == null) chat = new Chat(null);
         if (push == null) push = new Push(null, null, null, null);
     }
@@ -54,8 +54,28 @@ public record CommunicationProperties(String from, String defaultEmail, int maxA
         }
     }
 
-    /** @param tasksLink where a person fills in the forms engine's tasks */
-    public record Inbox(String tasksLink) {
+    /**
+     * @param tasksLink where a person fills in the forms engine's tasks
+     * @param taskRoles the roles a form's tasks go to when the forms engine announces none, by form id
+     *                  ({@code confirmar-reset-demo=ai-admin;other-form=a|b}). The forms engine with JPA
+     *                  persistence drops a form's requiredRoles before EventConductor's fix (forms V7):
+     *                  without this, reset-demo's confirmation would reach everyone's inbox
+     */
+    public record Inbox(String tasksLink, String taskRoles) {
+
+        /** The roles of a form's tasks when the forms engine says none; empty when nothing is set. */
+        public java.util.List<String> rolesOf(String formId) {
+            if (formId == null || taskRoles == null) {
+                return java.util.List.of();
+            }
+            for (var entry : taskRoles.split(";")) {
+                var parts = entry.split("=", 2);
+                if (parts.length == 2 && parts[0].trim().equals(formId)) {
+                    return java.util.Arrays.stream(parts[1].split("\\|")).map(String::trim).filter(r -> !r.isEmpty()).toList();
+                }
+            }
+            return java.util.List.of();
+        }
 
         public Inbox {
             if (tasksLink == null) tasksLink = "/forms/tasks";

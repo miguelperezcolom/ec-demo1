@@ -2,7 +2,7 @@
 # (secret sealed at rest under the key in ec-integrations-crypto) and its life, from onboarding —
 # connectivity, catalogue contrast, mapping, partners, backfill — to activation, pause and
 # decommission; the worker of «alta-integracion», the MCP tools, and the screens at /_integrations
-# on the control console. Its REST API is not routed by the gateway: /integrations/connections hands
+# on the control console — and the demo's administration (/_demo, the steps of reset-demo it serves). Its REST API is not routed by the gateway: /integrations/connections hands
 # the connector the secret.
 apiVersion: apps/v1
 kind: Deployment
@@ -46,7 +46,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: integrations-service
-          image: miguelperezcolom/ec-demo1-integrations-service:0.51.0
+          image: miguelperezcolom/ec-demo1-integrations-service:0.54.0
           env:
             # Traces to Tempo, the one the engine exports to: a booking's trace runs from the CRS through
             # this service and the orchestrator (docs: deploy/observability, "Trazas de una reserva").
@@ -107,6 +107,18 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-integrations-crypto, key: INTEGRATIONS_CRYPTO_KEY } }
             - name: CONSOLE_URL
               value: "https://console.ec1.mateu.io"
+            # The demo's administration (control console → Demo, /_demo): the reset-demo runs are read from
+            # the engine's database, and purge-engine empties it but for the reset that asks; the
+            # health check after a reset asks each of these; the process pages are on the data console.
+            - name: ENGINE_DB_URL
+              value: jdbc:postgresql://postgres:5432/workflow
+            - name: DATA_CONSOLE_URL
+              value: "https://ec1.mateu.io"
+            - name: BOOKING_URL
+              value: "http://booking:8108"
+            - name: DEMO_HEALTH
+              value: >-
+                booking=http://booking:8108/actuator/health/readiness,erp=http://erp:8120/actuator/health/readiness,crs-integration=http://crs-integration-service:8121/actuator/health/readiness,mapping=http://mapping-service:8122/actuator/health/readiness,pms-integration=http://pms-integration-service:8123/actuator/health/readiness,communication=http://communication-service:8125/actuator/health/readiness,customer-mdm=http://customer-mdm-service:8127/actuator/health/readiness,front-office=http://front-office:8128/actuator/health/readiness,audit=http://audit-service:8129/actuator/health/readiness,notices=http://notices:8131/actuator/health/readiness,registration-rules=http://registration-rules:8132/actuator/health/readiness,orchestrator=http://orchestrator:8105/actuator/health,forms=http://forms:8106/actuator/health
           ports:
             - { name: http, containerPort: 8126 }
           securityContext:

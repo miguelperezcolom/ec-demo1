@@ -110,6 +110,16 @@ public class ConsolidationEvents implements SmartLifecycle {
             channel.shutdownNow();
         }
         threads.forEach(Thread::interrupt);
+        for (var thread : threads) {
+            try {
+                // Gone before the caller moves the cursors: a loop still running could save its own after.
+                thread.join(5_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        threads.clear();
     }
 
     @Override

@@ -18,7 +18,7 @@ spring:
   cloud:
     function:
       # What other services ask of the master without waiting: partner-commands.
-      definition: consumePartnerCommands
+      definition: consumeWorkerEvent;consumePartnerCommands
     stream:
       kafka:
         binder:
@@ -35,6 +35,17 @@ spring:
               configuration:
                 key.serializer: org.apache.kafka.common.serialization.StringSerializer
       bindings:
+        # IN: the tasks the engine dispatches for this worker — today reset@1, the demo's reset
+        # (process reset-demo): the ERP empties its own tables, its other consumers paused. A topic
+        # and a group of its own.
+        consumeWorkerEvent-in-0:
+          destination: erp
+          group: ec-demo1-erp-worker
+          consumer:
+            concurrency: 1
+        # OUT, via StreamBridge: the replies back to the engine.
+        upstream:
+          destination: upstream
         # OUT, via the outbox relay: partner-changed, for whoever integrates with this master.
         partnerEvents:
           destination: partners

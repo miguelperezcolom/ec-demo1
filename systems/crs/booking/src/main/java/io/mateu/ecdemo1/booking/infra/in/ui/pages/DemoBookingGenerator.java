@@ -104,6 +104,13 @@ final class DemoBookingGenerator {
     final Random random;
     final LocalDate today;
     final String batch;
+    /** Put in every booking's comments, to find the batch again (the demo reset's seed); none, none. */
+    String tag;
+
+    DemoBookingGenerator tagged(String tag) {
+        this.tag = tag;
+        return this;
+    }
 
     DemoBookingGenerator(CrsCatalog catalog, RoomPricing pricing, List<TradingPartner> partners, Random random,
                          LocalDate today, String batch) {
@@ -195,6 +202,9 @@ final class DemoBookingGenerator {
         // The partner's voucher, or the web's own locator; a call center booking has none.
         var reference = CALL_CENTER.equals(channel.code()) ? null : "%s-%s-%02d".formatted(channel.code(), batch, index + 1);
         var comments = random.nextInt(10) < 3 ? pick(COMMENTS) : null;
+        if (tag != null) {
+            comments = comments == null ? tag : comments + " · " + tag;
+        }
         var request = BookingRequests.of(channel.code(), partner != null ? partner.code() : null, reference,
                 arrival, departure, holder, rooms, guests, comments);
         return new DemoBooking(hotel.code(), request, payments);

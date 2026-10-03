@@ -1,6 +1,9 @@
 package io.mateu.ecdemo1.crsintegration.worker;
 
 import io.mateu.ecdemo1.crsintegration.worker.runtime.Reasons;
+import io.mateu.ecdemo1.demoreset.DemoReset;
+import io.mateu.ecdemo1.demoreset.DemoResetPlan;
+import io.mateu.ecdemo1.demoreset.DemoResetTask;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,5 +39,16 @@ public class CrsTasks {
     public TaskRegistration<TaskHandlers.NoShowToReport, TaskHandlers.NoShowReported> reportNoShowTask(TaskHandlers handlers) {
         return new TaskRegistration<>(REPORT_NO_SHOW, 1, TOPIC, TaskHandlers.NoShowToReport.class,
                 TaskHandlers.NoShowReported.class, Reasons.asBefore(handlers::reportNoShow));
+    }
+
+    /** What the demo's reset (reset-demo) empties of it — deploy/demo/zero.sh's list: its inbox and outbox — it keeps no state of its own. */
+    @Bean
+    public DemoResetPlan demoResetPlan() {
+        return DemoResetPlan.truncate("crs-integration", "inbox_entry", "outbox_message");
+    }
+
+    @Bean
+    public TaskRegistration<DemoResetTask.Input, Void> resetTask(DemoReset reset) {
+        return DemoResetTask.registration(TOPIC, reset);
     }
 }

@@ -28,6 +28,7 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8123"
     spec:
+      serviceAccountName: pms-integration-service
       nodeSelector:
         topology.kubernetes.io/region: hel1
         kubernetes.io/arch: amd64
@@ -44,7 +45,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: pms-integration-service
-          image: miguelperezcolom/ec-demo1-pms-integration-service:0.51.0
+          image: miguelperezcolom/ec-demo1-pms-integration-service:0.54.0
           env:
             # Traces to Tempo, the one the engine exports to: a booking's trace runs from the CRS through
             # the orchestrator to this service's steps, its calls to the MDM and to Opera, and on to the
@@ -71,9 +72,15 @@ spec:
             - name: INTEGRATIONS_URL
               value: "http://integrations-service:8126"
             # How long a write to Opera keeps failing before the inbox hears of it. The demo's Opera
-            # outage (deploy/demo/opera-outage.sh on --alert-after 2m) lowers it for a while.
+            # outage (deploy/demo/opera-outage.sh on --alert-after 2m) lowers it for a while; the
+            # control plane's Demo page changes it at runtime, without a restart (GET/PUT /demo/opera).
             - name: RETRY_ALERT_AFTER
               value: "10m"
+            # reset-demo's new-opera-context: the new context is taken at once and kept in the
+            # ec-demo-run ConfigMap (envFrom below) through the Kubernetes API, with this pod's
+            # service account — the Role below lets it touch that ConfigMap and nothing else.
+            - name: RUN_CONFIG_KUBERNETES
+              value: "true"
             # OHIP UAT: reservations carry the CRS's locator under a context of our own. Not "CRS":
             # the tenant's real CRS writes its references under it, and ours would mix with theirs.
             # The context (OPERA_EXTERNAL_SYSTEM) is not here but in the ec-demo-run ConfigMap (envFrom,
@@ -142,3 +149,43 @@ spec:
   selector: { app: pms-integration-service }
   ports:
     - { name: http, port: 8123, targetPort: 8123 }
+---
+# The connector keeps the demo's Opera context (reset-demo, task new-opera-context) in the ec-demo-run
+# ConfigMap. Its own account, allowed that ConfigMap and nothing else, in this namespace only.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pms-integration-service
+  namespace: ec-demo1
+  labels: { app: pms-integration-service }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pms-integration-run-config
+  namespace: ec-demo1
+  labels: { app: pms-integration-service }
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [ec-demo-run]
+    verbs: [get, patch]
+  # create cannot be limited by name: only when ec-demo-run is not there yet.
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pms-integration-run-config
+  namespace: ec-demo1
+  labels: { app: pms-integration-service }
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pms-integration-run-config
+subjects:
+  - kind: ServiceAccount
+    name: pms-integration-service
+    namespace: ec-demo1
