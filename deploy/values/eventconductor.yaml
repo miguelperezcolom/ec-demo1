@@ -71,7 +71,10 @@ orchestrator:
     karpenter.sh/do-not-disrupt: "true"
   # 2.23.4: two processes taking a free LOCK key at the same instant (a check-in and the charge of its
   # extra) no longer park the loser's step on the dead-letter topic (PostgreSQL 25P02).
-  imageTag: "2.23.4"
+  # 2.23.4-ec1: a LOCAL build (v2.23.4 + engine PR fix/graph-dark-theme), not a release — the
+  # process/definition diagram follows the console's dark theme. Back to a published tag with the
+  # next engine release.
+  imageTag: "2.23.4-ec1"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
