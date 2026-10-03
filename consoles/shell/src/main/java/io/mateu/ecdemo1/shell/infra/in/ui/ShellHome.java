@@ -63,7 +63,11 @@ import java.util.List;
 @FavIcon("/images/riu.svg")
 // Edge-to-edge: the pages behind these menus are listings and workflow graphs, and capping the
 // content at the default ~900px container squeezes them into cards for lack of horizontal room.
-@Style(StyleConstants.FULL_WIDTH)
+// …and RIU's red as the brand accent (--mateu-accent): a line under the menu band and the console
+// name in it (light theme). Not the primary colour — it never means "clickable". Set as a style
+// until the Mateu release with @App(accentColor) is in: then it moves to @App(accentColor = "#D2232A").
+// Mateu versions without the accent ignore the variable.
+@Style(StyleConstants.FULL_WIDTH + " --mateu-accent: #D2232A;")
 // The home is a page of its own, Inicio (homeRoute below): a welcome — hero and KPI tiles — which
 // both renderers draw. It used to be this class's own page, as a landing template with a welcome
 // banner, but Redwood asks for a home route with no class to build it from, and was answered
