@@ -55,13 +55,27 @@ public record CommunicationProperties(String from, String defaultEmail, int maxA
     }
 
     /**
-     * @param tasksLink where a person fills in the forms engine's tasks
+     * @param taskLink  where a person answers one of the forms engine's tasks: a path in the console
+     *                  the inbox is open in, with {@code {taskId}} standing for the task's id. The
+     *                  forms engine's page for one task — claim it, fill its form in, complete it —
+     *                  is {@code /forms/task/{id}}, and it answers on both consoles: the data plane
+     *                  mounts the forms UI at /_forms, the control plane at /_forms-admin, and the
+     *                  same pod serves the route through either. A link without {@code {taskId}}
+     *                  is used as it is, for every task
      * @param taskRoles the roles a form's tasks go to when the forms engine announces none, by form id
      *                  ({@code confirmar-reset-demo=ai-admin;other-form=a|b}). The forms engine with JPA
      *                  persistence drops a form's requiredRoles before EventConductor's fix (forms V7):
      *                  without this, reset-demo's confirmation would reach everyone's inbox
      */
-    public record Inbox(String tasksLink, String taskRoles) {
+    public record Inbox(String taskLink, String taskRoles) {
+
+        /** The forms engine's page for one task, which is where its inbox item leads. */
+        public static final String TASK_PAGE = "/forms/task/{taskId}";
+
+        /** Where this task is answered. */
+        public String linkTo(String taskId) {
+            return taskId == null || taskId.isBlank() ? taskLink : taskLink.replace("{taskId}", taskId);
+        }
 
         /** The roles of a form's tasks when the forms engine says none; empty when nothing is set. */
         public java.util.List<String> rolesOf(String formId) {
@@ -78,7 +92,7 @@ public record CommunicationProperties(String from, String defaultEmail, int maxA
         }
 
         public Inbox {
-            if (tasksLink == null) tasksLink = "/forms/tasks";
+            if (taskLink == null || taskLink.isBlank()) taskLink = TASK_PAGE;
         }
     }
 }

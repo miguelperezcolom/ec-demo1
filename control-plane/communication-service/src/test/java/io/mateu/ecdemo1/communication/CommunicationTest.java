@@ -261,6 +261,9 @@ class CommunicationTest {
                 .satisfies(i -> {
                     assertThat(i.title).isEqualTo("Approve the refund");
                     assertThat(i.kind).isEqualTo("TASK");
+                    // To that task's own page — claim, fill in, complete — not to the list of all of
+                    // them; a path, so it opens in the console the inbox is open in.
+                    assertThat(i.link).isEqualTo("/forms/task/t-9");
                 });
         assertThat(inbox.openFor(Set.of("ai-admin"))).noneMatch(i -> "task/t-9".equals(i.id));
 
