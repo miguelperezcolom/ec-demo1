@@ -3,7 +3,9 @@ package io.mateu.ecdemo1.integrations.ui.pages;
 import io.mateu.ecdemo1.integrations.lifecycle.Integrations;
 import io.mateu.ecdemo1.integrations.rest.IntegrationDto;
 import io.mateu.ecdemo1.integrations.application.IntegrationQueries;
+import io.mateu.ecdemo1.integration.model.integration.IntegrationStatus;
 import io.mateu.ecdemo1.integrations.store.Integration;
+import io.mateu.ecdemo1.integrations.store.IntegrationTransition;
 import io.mateu.ecdemo1.integrations.ui.suppliers.CrsHotelLabel;
 import io.mateu.ecdemo1.integrations.ui.suppliers.CrsHotelOptions;
 import io.mateu.ecdemo1.integrations.ui.suppliers.OperaPropertyLabel;
@@ -40,7 +42,7 @@ import java.util.function.Function;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class IntegrationViewModel implements Identifiable {
+public class IntegrationViewModel implements Identifiable, io.mateu.uidl.interfaces.VisibilitySupplier {
 
     @ReadOnly
     @HiddenInCreate
@@ -258,6 +260,46 @@ public class IntegrationViewModel implements Identifiable {
                 .map(h -> new HistoryRow(String.valueOf(h.at()), h.by(), h.what())).toList();
         id = i.id;
         return this;
+    }
+
+    /**
+     * Each action only where the integration's state lets it do something — the same rules the
+     * lifecycle enforces (IntegrationTransition), so a click is never answered with «Only an active
+     * integration can be paused». A new integration has none: it is registered first.
+     */
+    @Override
+    public boolean isHidden(String memberName, HttpRequest httpRequest) {
+        var current = current();
+        if (current == null) {
+            return java.util.Set.of("verify", "recheck", "importPartners", "approveMapping", "activate", "pause", "resume",
+                    "relaunchBackfill", "decommission").contains(memberName);
+        }
+        return switch (memberName) {
+            case "activate" -> !IntegrationTransition.ACTIVATE.allowedFrom(current);
+            case "pause" -> !IntegrationTransition.PAUSE.allowedFrom(current);
+            case "resume" -> !IntegrationTransition.RESUME.allowedFrom(current);
+            case "decommission" -> !IntegrationTransition.DECOMMISSION.allowedFrom(current);
+            case "approveMapping" -> current != IntegrationStatus.MAPPING_PENDING;
+            case "relaunchBackfill" -> current != IntegrationStatus.ACTIVE && current != IntegrationStatus.PAUSED;
+            // what a recheck looks at again: a gate of the onboarding that waits on something outside
+            case "recheck" -> !java.util.EnumSet.of(IntegrationStatus.CONNECTIVITY_FAILED, IntegrationStatus.PENDING_CONFIGURATION,
+                    IntegrationStatus.MAPPING_PENDING, IntegrationStatus.SYNCING_PARTNERS, IntegrationStatus.BACKFILL_BLOCKED)
+                    .contains(current);
+            case "verify", "importPartners" -> current == IntegrationStatus.DECOMMISSIONED;
+            default -> false;
+        };
+    }
+
+    /** The status shown, as the lifecycle's: null for one not registered yet. */
+    IntegrationStatus current() {
+        if (id == null || status == null || status.message() == null) {
+            return null;
+        }
+        try {
+            return IntegrationStatus.valueOf(status.message());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     static String orNothing(String value) {

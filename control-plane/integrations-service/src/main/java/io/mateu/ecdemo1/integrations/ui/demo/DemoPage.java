@@ -24,7 +24,6 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.data.Message;
 import io.mateu.uidl.data.Notice;
-import io.mateu.uidl.data.State;
 import io.mateu.uidl.data.VerticalLayout;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HttpRequest;
@@ -53,7 +52,7 @@ import org.springframework.stereotype.Service;
 @Scope("prototype")
 @Getter
 @Setter
-public class DemoPage {
+public class DemoPage implements io.mateu.uidl.interfaces.VisibilitySupplier {
 
     static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd/MM HH:mm:ss").withZone(ZoneId.of("Europe/Madrid"));
 
@@ -162,19 +161,64 @@ public class DemoPage {
     @Action(idempotent = true)
     @Label("Actualizar")
     public Object refresh() {
-        return new State(this);
+        return this;
+    }
+
+    /**
+     * Each action only when it can do something: cancelling while a reset is open, retrying when the
+     * last one failed, switching the outage on while it is off and off while it is on. Read anew at
+     * every render — and every action renders the page again ({@link #act}).
+     */
+    @Override
+    public boolean isHidden(String memberName, HttpRequest httpRequest) {
+        return switch (memberName) {
+            case "cancelReset" -> !resetOpen();
+            case "retryReset" -> !resetFailed();
+            case "outageOn" -> outageActive().orElse(false);
+            case "outageOff" -> !outageActive().orElse(true);
+            default -> false;
+        };
+    }
+
+    boolean resetOpen() {
+        try {
+            return runs.available() && runs.open().isPresent();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    boolean resetFailed() {
+        try {
+            return runs.available() && runs.latest().filter(ResetRuns.Run::failed).isPresent();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** Empty when the connector does not answer: then both switches are offered. */
+    java.util.Optional<Boolean> outageActive() {
+        try {
+            return outage.status().map(OperaOutage.Status::active);
+        } catch (RuntimeException e) {
+            return java.util.Optional.empty();
+        }
     }
 
     interface Act {
         String run();
     }
 
+    /**
+     * The action's message and the page drawn again — its panels and its toolbar, not only its fields'
+     * values: a State would leave the outage's and the reset's panels as they were until a reload.
+     */
     Object act(Act action) {
         try {
-            return List.of(new Message(action.run()), new State(this));
+            return List.of(new Message(action.run()), this);
         } catch (RuntimeException e) {
             var why = e.getMessage() == null ? e.toString() : e.getMessage();
-            return List.of(Message.error(why), new State(this));
+            return List.of(Message.error(why), this);
         }
     }
 

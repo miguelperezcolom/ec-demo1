@@ -41,7 +41,7 @@ import java.util.function.Function;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-public class FrontOfficeIntegrationViewModel implements Identifiable {
+public class FrontOfficeIntegrationViewModel implements Identifiable, io.mateu.uidl.interfaces.VisibilitySupplier {
 
     @ReadOnly
     @HiddenInCreate
@@ -237,6 +237,39 @@ public class FrontOfficeIntegrationViewModel implements Identifiable {
                 .map(h -> new HistoryRow(String.valueOf(h.at()), h.by(), h.what())).toList();
         id = i.id;
         return this;
+    }
+
+    /**
+     * Each action only where the integration's state lets it do something, by the lifecycle's own rules
+     * (FoIntegrationTransition). A new integration has none: it is registered first.
+     */
+    @Override
+    public boolean isHidden(String memberName, HttpRequest httpRequest) {
+        var current = current();
+        if (current == null) {
+            return java.util.Set.of("verify", "recheck", "resyncCatalogue", "activate", "pause", "resume", "pollNow",
+                    "relaunchBackfill", "decommission").contains(memberName);
+        }
+        var done = current == io.mateu.ecdemo1.integrations.store.FoIntegrationStatus.DECOMMISSIONED;
+        return switch (memberName) {
+            case "activate" -> !io.mateu.ecdemo1.integrations.store.FoIntegrationTransition.ACTIVATE.allowedFrom(current);
+            case "pause" -> !io.mateu.ecdemo1.integrations.store.FoIntegrationTransition.PAUSE.allowedFrom(current);
+            case "resume" -> !io.mateu.ecdemo1.integrations.store.FoIntegrationTransition.RESUME.allowedFrom(current);
+            case "decommission", "verify", "recheck", "resyncCatalogue", "pollNow", "relaunchBackfill" -> done;
+            default -> false;
+        };
+    }
+
+    /** The status shown, as the lifecycle's: null for one not registered yet. */
+    io.mateu.ecdemo1.integrations.store.FoIntegrationStatus current() {
+        if (id == null || status == null || status.message() == null) {
+            return null;
+        }
+        try {
+            return io.mateu.ecdemo1.integrations.store.FoIntegrationStatus.valueOf(status.message());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     @Override
