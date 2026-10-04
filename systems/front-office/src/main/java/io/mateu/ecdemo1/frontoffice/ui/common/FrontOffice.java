@@ -109,6 +109,11 @@ public class FrontOffice {
     return instance.pmsLinks.stateOf(stayId);
   }
 
+  /** The price the CRS agreed for the stay, when it came from the CRS. */
+  public static java.util.Optional<java.math.BigDecimal> agreedPrice(String stayId) {
+    return instance == null ? java.util.Optional.empty() : instance.pmsLinks.agreedOf(stayId);
+  }
+
   /** The PMS reservation the stay is, if it is linked to one. */
   public static java.util.Optional<String> pmsReservation(String stayId) {
     return instance.pmsLinks.ofStay(stayId).map(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.Link::pmsReservationId)

@@ -31,7 +31,9 @@ public class PrecioWalkIn implements WizardStep {
   @Label("")
   Callable<Component> avisoCrs = () -> errorCrs == null || errorCrs.isBlank()
       ? Notice.builder().theme("info").slim(true).fullWidth(true)
-          .text("Precio del CRS para esta estancia: es el que se le cobra al huésped.").build()
+          .text("Precio del CRS para esta estancia: el acordado con el huésped, que Opera guarda fijo."
+              + " Si Opera cobra aparte algún paquete del régimen (el desayuno de XMAR), la estancia"
+              + " lo dirá junto a este precio.").build()
       : Notice.builder().theme("danger").fullWidth(true)
           .text("El CRS no da precio: " + errorCrs + " Vuelve al paso «Estancia» y cámbiala.").build();
 

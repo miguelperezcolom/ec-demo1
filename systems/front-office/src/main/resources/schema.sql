@@ -202,6 +202,10 @@ create index if not exists stay_pms_reservation on stay (pms_reservation_id);
 -- «Opera: pendiente — check-in enviado», «Opera: en casa», «Opera: rechazado — motivo».
 alter table stay add column if not exists pms_state varchar(500);
 
+-- The price the CRS agreed (the rate Opera keeps fixed), next to the stay's total — what Opera bills,
+-- with the packages it posts apart (XMAR's BRKFST): the desk sees both when they differ.
+alter table stay add column if not exists agreed_total numeric(12,2);
+
 -- The invoice the PMS issued at the check-out (the PMS is the master of the folio): its number and
 -- figures, and its document when the PMS gave one. None: the desk's «Abrir factura» is the front
 -- office's proforma, labelled as such.

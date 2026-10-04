@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.demoreset.DemoReset;
 import io.mateu.ecdemo1.demoreset.DemoResetPlan;
 import io.mateu.ecdemo1.demoreset.DemoResetTask;
 
+import io.mateu.ecdemo1.booking.infra.config.CatalogReset;
 import io.mateu.ecdemo1.booking.worker.runtime.Reasons;
 import io.mateu.workflow.worker.api.TaskRegistration;
 import org.springframework.context.annotation.Bean;
@@ -36,9 +37,21 @@ public class BookingTasks {
         return DemoResetPlan.truncate("booking", "booking_entity", "crs_booking", "catalog_rate_plan", "outbox_message");
     }
 
+    /**
+     * The reset's tables, and then the running catalog: the rate plans opened since it was built were
+     * kept in catalog_rate_plan, now empty, but they are still sold until the catalog forgets them too.
+     */
     @Bean
-    public TaskRegistration<DemoResetTask.Input, Void> resetTask(DemoReset reset) {
-        return DemoResetTask.registration(TOPIC, reset);
+    public TaskRegistration<DemoResetTask.Input, Void> resetTask(DemoReset reset, CatalogReset catalog) {
+        var tables = DemoResetTask.registration(TOPIC, reset);
+        return new TaskRegistration<>(tables.id(), tables.version(), tables.topic(), tables.inputType(),
+                tables.outputType(), (input, context) -> {
+                    var done = tables.handler().handle(input, context);
+                    var forgotten = catalog.forgetAddedRatePlans();
+                    context.progress("CRS catalog: back to its built rate plans"
+                            + (forgotten.isEmpty() ? "" : " (no longer sold: " + String.join(", ", forgotten) + ")"));
+                    return done;
+                });
     }
 
     @Bean

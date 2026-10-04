@@ -22,4 +22,14 @@ public class PmsRejectedException extends RuntimeException {
     public String errorCode() {
         return errorCode;
     }
+
+    /**
+     * Opera's no as a cause keeps it, for the person who resolves it: its words and its error code
+     * («There are not enough rooms available on Room Type level — RSV00138»), and the HTTP status when
+     * Opera gave no words.
+     */
+    public String reason() {
+        var words = getMessage() == null || getMessage().isBlank() ? "Opera answered " + status : getMessage();
+        return errorCode == null || errorCode.isBlank() ? words : words + " — " + errorCode;
+    }
 }

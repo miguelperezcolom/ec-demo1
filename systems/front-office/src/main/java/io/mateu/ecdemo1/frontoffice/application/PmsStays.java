@@ -228,6 +228,7 @@ public class PmsStays {
             companions(w), roomType(w), board(w), w.checkIn(), w.checkOut(), Math.max(1, w.pax()), w.agency(), w.total()),
         true);
     links.link(stayId, w.pmsReservationId(), w.pmsVersion(), ratePlan(w));
+    links.agreed(stayId, w.agreedTotal());
     walkInOf(w).ifPresent(walkIn -> walkIns.save(walkIn.cameBack(w.crsLocator() != null ? w.crsLocator() : walkIn.locator(),
         w.pmsReservationId(), clock.instant())));
     // The reception's, as the PMS holds it now: the stay says so. What the desk did before the stay was

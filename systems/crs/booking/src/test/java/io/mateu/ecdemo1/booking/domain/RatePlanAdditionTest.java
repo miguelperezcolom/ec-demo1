@@ -50,4 +50,19 @@ class RatePlanAdditionTest {
         assertThatThrownBy(() -> RatePlan.valid("STAFF", " ", BigDecimal.ONE)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> RatePlan.valid("STAFF", "x", new BigDecimal("0"))).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void forgettingTheAddedPlansLeavesTheCatalogAsBuilt() {
+        catalog.addRatePlan("MRU01", RatePlan.valid("EMPLEADOS-27", "Empleados 2027", new BigDecimal("0.5")));
+        catalog.addRatePlan("PMI01", RatePlan.valid("SPRING", "Primavera", new BigDecimal("0.9")));
+        var built = ImportedCatalogs.standardCatalog();
+
+        catalog.forgetAddedRatePlans(built);
+
+        assertThat(catalog.codes("MRU01").ratePlans()).isEqualTo(built.codes("MRU01").ratePlans());
+        assertThat(catalog.codes("PMI01").ratePlans()).isEqualTo(built.codes("PMI01").ratePlans());
+        assertThatThrownBy(() -> catalog.ratePlan("MRU01", "EMPLEADOS-27")).isInstanceOf(IllegalArgumentException.class);
+        // and it can be opened again afterwards
+        assertThat(catalog.addRatePlan("MRU01", RatePlan.valid("EMPLEADOS-27", "Empleados 2027", new BigDecimal("0.5")))).isTrue();
+    }
 }

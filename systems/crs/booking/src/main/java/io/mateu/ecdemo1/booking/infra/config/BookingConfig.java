@@ -26,6 +26,11 @@ public class BookingConfig {
 
     @Bean
     CrsCatalog crsCatalog(ObjectMapper objectMapper) {
+        return built(objectMapper);
+    }
+
+    /** The catalog as built, before any rate plan opened while the CRS runs. */
+    static CrsCatalog built(ObjectMapper objectMapper) {
         return CrsCatalog.standard(new ImportedCatalogs(objectMapper)::hotel);
     }
 

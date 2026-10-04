@@ -117,6 +117,11 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
      * Where Open goes. The shell opens an absolute URL in a new tab and navigates a path in this one, so
      * a link into the console the person is in becomes its path — the page they came to resolve opens
      * right here — and a link into the other console stays absolute, in a tab of its own.
+     *
+     * <p>Each console is served twice, by the Vaadin shell and by the Redwood one, under the same paths:
+     * ec1 and rw.ec1 are the data plane, console.ec1 and rw-console.ec1 the control plane. A notice keeps
+     * the link it was written with (the Vaadin host), so a link into either twin of the console the
+     * person is in opens here too — they stay in the shell they chose.
      */
     static String destination(String link, String origin) {
         if (origin == null || origin.isBlank()) {
@@ -125,7 +130,8 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
         try {
             var target = java.net.URI.create(link);
             var here = java.net.URI.create(origin);
-            if (target.getHost() == null || !target.getHost().equalsIgnoreCase(here.getHost())) {
+            if (target.getHost() == null || here.getHost() == null
+                    || !console(target.getHost()).equals(console(here.getHost()))) {
                 return link;
             }
             var path = target.getRawPath() == null || target.getRawPath().isEmpty() ? "/" : target.getRawPath();
@@ -134,6 +140,12 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
         } catch (IllegalArgumentException e) {
             return link;
         }
+    }
+
+    /** A host with its shell's prefix taken off: rw.ec1… and ec1…, rw-console.ec1… and console.ec1… are one console. */
+    static String console(String host) {
+        var h = host.toLowerCase(java.util.Locale.ROOT);
+        return h.startsWith("rw.") || h.startsWith("rw-") ? h.substring(3) : h;
     }
 
     /** The console the request comes from: the browser's Origin, or the host the gateway forwarded. */

@@ -672,7 +672,7 @@ public final class JourneyMapper {
             var retried = error != null && toOpera != null;
             if (error != null && !retried) {
                 outcome = Outcome.FAILED;
-                detail = error;
+                detail = humanError(error);
             } else if (waiting || (!causes.isEmpty() && toOpera == null)) {
                 outcome = Outcome.WAITING;
                 detail = causes.isEmpty() ? "Espera a que se resuelvan sus causas" : "Espera a: " + String.join(" · ", causes);
@@ -684,10 +684,10 @@ public final class JourneyMapper {
             } else if (toOpera != null && processes.values().stream().allMatch(p -> "COMPLETED".equals(p.status()))) {
                 outcome = Outcome.DONE;
                 detail = (toFrontOffice != null ? "En Opera y en el front office" : "En Opera")
-                        + (retried ? ", tras reintentos (" + error + ")" : "");
+                        + (retried ? ", tras reintentos (" + humanError(error) + ")" : "");
             } else if (toOpera != null) {
                 outcome = Outcome.DONE;
-                detail = "En Opera" + (retried ? ", tras reintentos (" + error + ")" : "");
+                detail = "En Opera" + (retried ? ", tras reintentos (" + humanError(error) + ")" : "");
             } else {
                 outcome = Outcome.IN_PROGRESS;
                 detail = nowNanos - end < SETTLING.toNanos() ? "En curso: la traza sigue llegando" : "Sin llegar a Opera en esta traza";
@@ -935,5 +935,32 @@ public final class JourneyMapper {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /**
+     * An error as «Cómo acabó» says it: what happened, in the desk's words — not the technical message
+     * with OHIP's URL (that stays in «Paso a paso» and in the trace).
+     */
+    public static String humanError(String error) {
+        if (error == null || error.isBlank()) {
+            return "";
+        }
+        var e = error.toLowerCase(java.util.Locale.ROOT);
+        if (e.contains("simulación: opera no responde")) {
+            return "Opera no respondía (simulación)";
+        }
+        if (e.contains("i/o error") || e.contains("timed out") || e.contains("timeout") || e.contains("connection refused")
+                || e.contains("connect")) {
+            return "Opera no respondía";
+        }
+        if (e.matches("(?s).*ohip (5\\d\\d|429).*")) {
+            return "Opera respondió con un error temporal";
+        }
+        if (e.contains("ohip 401")) {
+            return "Opera no aceptó las credenciales";
+        }
+        var plain = error.replaceAll("\"?https?://[^\\s\"]+\"?", "").replaceAll("\\([A-Z]+ /[^)]*\\)", "")
+                .replaceAll("\\s+", " ").strip();
+        return plain.length() > 160 ? plain.substring(0, 157) + "…" : plain;
     }
 }

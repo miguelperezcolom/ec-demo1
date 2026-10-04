@@ -288,4 +288,17 @@ class JourneyMapperTest {
                           java.util.Map<String, String> attributes) {
         return new TraceSpan(id, parent, service, name, kind, start, end, attributes, false, null);
     }
+
+    @Test
+    void howItEndedSaysWhatHappenedNotTheTechnicalErrorNorOhipsUrl() {
+        var raw = "Opera: I/O error on GET request for \"https://mtce13ua.hospitality-api.eu-frankfurt-1.ocs.oc-test.com/rsv/v1/hotels/XMAR/reservations\": "
+                + "Simulación: Opera no responde (GET /rsv/v1/hotels/XMAR/reservations)";
+        assertThat(JourneyMapper.humanError(raw)).isEqualTo("Opera no respondía (simulación)");
+        assertThat(JourneyMapper.humanError("Opera: I/O error on POST request for \"https://x.example/rsv\": Read timed out"))
+                .isEqualTo("Opera no respondía");
+        assertThat(JourneyMapper.humanError("Opera: OHIP 503 on GET https://x.example/rsv: busy"))
+                .isEqualTo("Opera respondió con un error temporal");
+        assertThat(JourneyMapper.humanError("Integración CRS: Type definition error at \"https://a.b/c\""))
+                .isEqualTo("Integración CRS: Type definition error at").doesNotContain("https");
+    }
 }

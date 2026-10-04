@@ -305,9 +305,12 @@
         },
         "currency" : {
           "type" : [ "string", "null" ]
+        },
+        "agreedTotal" : {
+          "type" : [ "number", "null" ]
         }
       },
-      "required" : [ "type", "commandId", "pmsHotelCode", "pmsReservationId", "confirmationNumber", "crsLocator", "externalReferences", "pmsVersion", "status", "holder", "companions", "roomTypeCode", "ratePlanCode", "boardCode", "checkIn", "checkOut", "pax", "agency", "total", "currency" ],
+      "required" : [ "type", "commandId", "pmsHotelCode", "pmsReservationId", "confirmationNumber", "crsLocator", "externalReferences", "pmsVersion", "status", "holder", "companions", "roomTypeCode", "ratePlanCode", "boardCode", "checkIn", "checkOut", "pax", "agency", "total", "currency", "agreedTotal" ],
       "additionalProperties" : false
     }
   },
@@ -338,7 +341,8 @@
     "pax" : 2,
     "agency" : null,
     "total" : 312.4,
-    "currency" : "EUR"
+    "currency" : "EUR",
+    "agreedTotal" : null
   }, {
     "type" : "replace-catalogue",
     "commandId" : "CMD-10",

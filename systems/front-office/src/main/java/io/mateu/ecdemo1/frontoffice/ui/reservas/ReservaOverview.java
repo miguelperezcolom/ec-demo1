@@ -406,17 +406,23 @@ public class ReservaOverview
       }
       case "noShowPax" -> {
         var pax = paxDe(httpRequest);
-        var outcome = noShows.paxToggled(stayId, pax);
-        var nombre = nameOf(pax);
-        if (outcome.nobodyArrived()) {
-          // Nadie de la reserva ha llegado: es un no show de la reserva, y lo decide el CRS
-          // (HLA F006) — la cancela con su cargo, y el resultado vuelve aquí y a Opera.
-          yield List.of(this, new Message("No show registrado — " + nombre + ". " + outcome.crsNotice()));
+        if (!io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.ops(stayId).isNoShow(pax)) {
+          // marcarlo se pregunta antes: si nadie más ha llegado, el CRS cancela la reserva con su cargo
+          yield drawers().confirmarNoShow(pax, nameOf(pax));
         }
-        yield List.of(this, new Message(outcome.noShow()
-            ? "No show registrado — " + nombre
-            : "No show revertido — " + nombre));
+        yield noShowPax(pax);
       }
+      case "confirmarNoShowPax" -> {
+        var result = new ArrayList<Object>(List.of(UICommand.closeModal()));
+        var done = noShowPax(paxDe(httpRequest));
+        if (done instanceof List<?> list) {
+          result.addAll(list);
+        } else {
+          result.add(done);
+        }
+        yield result;
+      }
+      case "cancelarNoShowPax" -> UICommand.closeModal();
       case "opWifi" -> {
         checkIn.wifiCreated(stayId);
         yield List.of(this, new Message("Tarjeta wifi creada — red HOTEL_GUEST · clave " + claveWifi()));
@@ -777,6 +783,20 @@ public class ReservaOverview
     }
     var companion = view.stay().companionAt(pax);
     return companion != null ? companion.name() : "Huésped " + pax;
+  }
+
+  /** Marca (o revierte) el no show de un pax, ya confirmado. */
+  private Object noShowPax(int pax) {
+    var outcome = noShows.paxToggled(stayId, pax);
+    var nombre = nameOf(pax);
+    if (outcome.nobodyArrived()) {
+      // Nadie de la reserva ha llegado: es un no show de la reserva, y lo decide el CRS
+      // (HLA F006) — la cancela con su cargo, y el resultado vuelve aquí y a Opera.
+      return List.of(this, new Message("No show registrado — " + nombre + ". " + outcome.crsNotice()));
+    }
+    return List.of(this, new Message(outcome.noShow()
+        ? "No show registrado — " + nombre
+        : "No show revertido — " + nombre));
   }
 
   /** El pax de la fila pulsada ({_item} numérico de la lista de huéspedes). */

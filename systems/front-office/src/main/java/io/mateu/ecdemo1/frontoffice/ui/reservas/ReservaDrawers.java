@@ -169,6 +169,33 @@ final class ReservaDrawers {
         .build();
   }
 
+  /**
+   * Antes de marcar un no show: se pregunta, porque no se deshace solo — si nadie más de la reserva ha
+   * llegado, es el no show de la reserva, y el CRS la cancela con su cargo (y lo lleva a Opera).
+   */
+  Dialog confirmarNoShow(int pax, String nombre) {
+    return Dialog.builder()
+        .id("dialog-no-show")
+        .headerTitle("¿Marcar no show?")
+        .width("28rem")
+        .content(VerticalLayout.builder()
+            .style("gap: .25rem;")
+            .content(List.of(
+                Text.builder().text(nombre + " no se ha presentado.").build(),
+                Text.builder().text("Si nadie más de la reserva ha llegado, es el no show de la reserva: el CRS la"
+                    + " cancela con su cargo y lo lleva a Opera.").noMargins(true).build(),
+                Button.builder()
+                    .label("Marcar no show")
+                    .actionId("confirmarNoShowPax")
+                    .parameters(Map.of("_item", pax))
+                    .buttonStyle(ButtonStyle.primary)
+                    .build(),
+                Button.builder().label("Cancelar").actionId("cancelarNoShowPax").build()))
+            .build())
+        .initialData(Map.of("stayId", r.stayId))
+        .build();
+  }
+
   /** El modal de decisión post-check-in: seguir con la siguiente llegada del grupo o volver al listado. */
   Dialog siguienteDelGrupo(Stay siguiente) {
     var guest = r.queries.view(siguiente.id()).guest();

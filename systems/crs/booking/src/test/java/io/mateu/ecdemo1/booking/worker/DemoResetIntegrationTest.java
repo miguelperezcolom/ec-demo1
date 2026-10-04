@@ -69,6 +69,10 @@ class DemoResetIntegrationTest {
     DemoTaskHandlers handlers;
     @Autowired
     List<StreamBindingsPause> bindingsPauses;
+    @Autowired
+    io.mateu.workflow.worker.api.TaskRegistration<io.mateu.ecdemo1.demoreset.DemoResetTask.Input, Void> resetTask;
+    @Autowired
+    io.mateu.ecdemo1.booking.domain.catalog.CrsCatalog catalog;
 
     @BeforeEach
     void open() {
@@ -170,5 +174,31 @@ class DemoResetIntegrationTest {
         assertThat(handlers.seedDemoBookings(new DemoTaskHandlers.Seed("reset-demo:4", null), context("p4"))
                 .seededBookings()).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from crs_booking", Integer.class)).isEqualTo(before);
+    }
+
+    @Test
+    void theResetTaskAlsoStopsSellingTheRatePlansOpenedSince() throws Exception {
+        mvc.perform(post("/catalog/hotels/MRU01/rate-plans").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"EMPLEADOS-27\",\"name\":\"Empleados 2027\",\"factor\":0.5}"))
+                .andExpect(status().is2xxSuccessful());
+        assertThat(catalog.codes("MRU01").ratePlans()).extracting(r -> r.code()).contains("EMPLEADOS-27");
+        var progress = new java.util.ArrayList<String>();
+        var context = new TaskContext() {
+            public String taskExecutionId() { return "te"; }
+            public String processId() { return "p5"; }
+            public String workflowDefinitionId() { return "reset-demo"; }
+            public String stepId() { return "step"; }
+            public boolean isCancelled() { return false; }
+            public void progress(String message) { progress.add(message); }
+        };
+
+        resetTask.handler().handle(new io.mateu.ecdemo1.demoreset.DemoResetTask.Input("reset-demo:5", "admin"), context);
+
+        assertThat(count("catalog_rate_plan")).isZero();
+        assertThat(catalog.codes("MRU01").ratePlans()).extracting(r -> r.code()).doesNotContain("EMPLEADOS-27");
+        assertThat(progress).anyMatch(m -> m.contains("MRU01:EMPLEADOS-27"));
+        mvc.perform(get("/catalog")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("EMPLEADOS-27"))));
     }
 }
