@@ -47,6 +47,9 @@ import java.util.List;
 // Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
 // what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
 @Script(src = "/_inbox/push/push.js")
+// Its own colours, so it does not look like the data plane: indigo (Redwood's GBU line) as the
+// accent in Vaadin, and the top bar and colour strip in Redwood (static/theme/console-theme.js).
+@Script(src = "/theme/console-theme.js")
 @Logo("/images/riu.svg")
 @FavIcon("/images/riu.svg")
 // The catalogues are listings with long ids and long URLs in them; the default ~900px container
@@ -74,7 +77,7 @@ import java.util.List;
 // RIU's red as the brand accent: a line under the band and the section's name in it (light theme, the
 // Vaadin build only — Redwood draws its band with its own neutral tokens). Not the primary colour — it
 // never means "clickable".
-@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#D2232A")
+@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#464c68")
 public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**
