@@ -789,6 +789,9 @@ Desde `e2e/` (usuario `demo` de Keycloak; credenciales de Opera y Salesforce en 
 
 - `npx playwright test` — **las pantallas**: las cuatro consolas y cada una de sus pantallas (menús,
   bandeja, auditoría…). No escribe nada; se puede lanzar siempre.
+- `DEMO_E2E_RESET=1 npm run demo:ui` — **la demo entera por la interfaz** (`e2e/demo-ui`): el reset
+  desde la página *Demo* y los flujos 1–8 como se hacen a mano, en Redwood. **Borra los datos de la
+  demo**; sin `DEMO_E2E_RESET=1` no arranca. Cómo lanzarla y qué automatiza: `e2e/README.md`.
 - `npm run demo` — **la historia de la demo** contra ec1, y al final el reset a la línea base
   (`E2E_RESET=0` para no resetear). Unos 5 minutos:
   1. una reserva nueva de MRU01 llega a Opera (XMAR) y al front office (se busca por localizador en su

@@ -1,49 +1,640 @@
-import { test } from '@playwright/test'
+import { Browser, Page, expect, test } from '@playwright/test'
+import { HOSTS, RENDERER, RUN, SalesforceFixture, Ui, after, day } from './ui'
 
 /**
- * WIP — paused until the pending UI changes are deployed (ec-demo1 #218 rate-plan screen, the Demo
- * page's state-aware actions, task Claim/Release from eventconductor #452, the Mateu Redwood/Vaadin
- * batches). Selectors get validated against the live UI after that deploy.
+ * The demo, from a reset to flow 8, through the consoles only — what the 2026-10-04 UI-only run did
+ * by hand (docs/poc-acl/demo.md, docs/poc-acl/grabacion-demo.md), as a spec that can be run again.
  *
- * The plan, step by step (test.describe.serial: a failure stops the chain), with what the
- * 2026-10-04 UI-only run used (/tmp/drun, screenshots in ec-demo1-ux/demo-run-2026-10-04):
+ * It WIPES the demo data: run it only through demo-ui.config.ts with DEMO_E2E_RESET=1
+ * (`DEMO_E2E_RESET=1 npm run demo:ui`, see e2e/README.md). Opera (a shared UAT) is never cleaned:
+ * the reset moves the demo to a new Opera context, and the run only creates its own reservations.
  *
- *  0  reset — CTRL/demo/admin, oj-c-menu-button → menuitem «Resetear la demo…» → #mateuConfirmAccept;
- *     CTRL/inbox/pending row «Confirmar el reset de la demo» → «Open» (same row) → /forms/task/<id>;
- *     «Claim» → tick «Sí, resetear la demo…» → «Complete»; Demo page lists steps until notify-result «hecho».
- *  1  onboarding — DATA/booking/bookings «+ 10 reservas demo» → confirm «Crear»;
- *     CTRL/integrations/frontoffice «New» → Opera property XMAR, Front office MRU01 → Save → poll
- *     «A person to activate it» → ⋯ Activate → confirm; CTRL/integrations/registry «New» → selects
- *     MRU01, XMAR → Save → poll «A person to approve the mapping»; CTRL/mapping/dictionary?integration=MRU01
- *     «Ask the agent» → poll no «Unmapped» → ⋯ Approve (no selection = all) → confirm; registry/MRU01
- *     poll «A person to activate it» → ⋯ Activate. PMS_REJECTED (RSV00138) causes: change the room
- *     type in the booking edit (Redwood: pencil on the room row → «Room type code»), retry with the
- *     next candidate (JS-SIDESEA, JS-STD, JS-SEA…), then Resolve on CTRL/mapping/causes/<key> if still open.
- *  2  returning customer — wizard (⋯ New on bookings) for an existing holder, same phone, other email
- *     → duplicate contact; FO «Escanear» on the ORIGINAL booking's holder, then on the NEW one →
- *     CTRL/customers/consolidations shows vía SCAN; FO shows the same customer code on both.
- *  3  FO data change — FO stay → holder «A mano»/«Editar» → phone → «Guardar kárdex» → «Pendiente de
- *     Salesforce»; DATA/customers/changes shows the request with a Salesforce Case id. Approval: the
- *     Salesforce UI needs MFA; the cluster secret ec-salesforce (SF_DOMAIN/SF_CLIENT_ID/SF_CLIENT_SECRET,
- *     client credentials, as e2e/demo/clients.ts and deploy/demo/ec1.py use) allows PATCH
- *     Case.Decision__c = 'Aprobada' — a clearly labelled test fixture; skip if unavailable.
- *  4  no show — booking arriving today; FO «No show» on each pax → CRS Cancelled (NOS fee), FO no show.
- *  5  walk-in — FO /reservas «Walk-in» → Inicio → room/rate/board → Continuar ×2 → holder → «Confirmar walk-in».
- *  6  Opera outage — Demo page «Aviso de reintentos tras (min)» = 2 → ⋯ «Aplicar el umbral de aviso»;
- *     ⋯ «Encender la caída de Opera»; new booking retries; inbox «Writing <loc> to the PMS keeps failing»;
- *     ⋯ «Apagar la caída de Opera»; booking gets its Opera number, written once.
- *  7  modify + cancel from the CRS — edit dates + room type, Save; ⋯ «Cancel booking» → reason OTR.
- *  8  new rate plan EMPLEADOS-27 — Call center → Catalogue → Rate plans (PR #218; skip if absent);
- *     booking waits MISSING_MAPPING; «Ask the agent»; select only the EMPLEADOS-27 proposal → Approve.
+ * Serial: each flow builds on the one before (flow 1 creates the integrations everything else uses),
+ * so a failure stops the chain and the following steps are reported as not run.
+ *
+ * Selector provenance: see ui.ts. Steps carry a «Not verified live» note listing what the first real
+ * run has to confirm; individual lines carry `// UNVERIFIED (probe denied): …`.
  */
-test.describe.serial('demo, UI only', () => {
-    test.fixme('0 reset from the Demo page', async () => {})
-    test.fixme('1 onboarding MRU01 → XMAR', async () => {})
-    test.fixme('2 returning customer, consolidated by scanning', async () => {})
-    test.fixme('3 front office data change → Salesforce Case', async () => {})
-    test.fixme('4 no show', async () => {})
-    test.fixme('5 walk-in', async () => {})
-    test.fixme('6 Opera outage', async () => {})
-    test.fixme('7 modify and cancel from the CRS', async () => {})
-    test.fixme('8 new rate plan EMPLEADOS-27', async () => {})
+
+const D = HOSTS.data
+const C = HOSTS.control
+const FO = HOSTS.frontOffice
+
+/** Room types to try, in order, when Opera refuses one with RSV00138 (not enough rooms of that type). */
+const ROOM_TYPES = (process.env.DEMO_ROOM_TYPES ?? 'JS-SEA,JS-SIDESEA,JS-STD,JS-ACCESSIBLE,JS-STD-KING').split(',')
+
+// What the flows hand to each other.
+const S: {
+    original?: string, originalHolder?: Holder, duplicate?: string,
+    outageBooking?: string,
+} = {}
+
+interface Holder { first: string, last: string, email: string, phone: string, nationality: string }
+
+interface NewBooking {
+    arrival: string, departure: string, holder: Holder,
+    room: string, rate: string, board: string, adults: number, guests: [string, string][],
+    channel?: string,
+}
+
+let browser: Browser
+let page: Page
+
+test.describe.serial(`demo, UI only (${RENDERER})`, () => {
+
+    test.beforeAll(async ({ browser: b }) => {
+        browser = b
+        const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: 'es-ES', timezoneId: 'Europe/Madrid' })
+        page = await ctx.newPage()
+    })
+
+    test.afterAll(async () => { await page?.context().close() })
+
+    // ── 0 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: the inbox row's «Open», the task page's Claim / checkbox / Complete (forms
+    // 2.23.8 hides Claim once claimed), the Demo page's step list after the reset.
+    test('0 · reset from the Demo page, confirmed in the inbox', async ({}, info) => {
+        test.setTimeout(15 * 60_000)
+        const ui = new Ui(page, info)
+        await ui.go(`${C}/demo/admin`, /Resetear la demo/)
+        const before = (await ui.text()).match(/Último reset:[^|]*/)?.[0] ?? ''
+        await ui.checkpoint('demo-page')
+        // Verified live: ⋯ → «Resetear la demo…» → «¿Resetear la demo?» Sí/No.
+        await ui.more('Resetear la demo…')
+        await ui.confirmIfAsked()
+        await ui.checkpoint('reset-launched')
+
+        // An administrator confirms it in the inbox.
+        await ui.pollPage(`${C}/inbox/pending`, /Title/, t => /Confirmar el reset de la demo/.test(t),
+            'the reset never asked for its confirmation in the inbox', 180_000, 10_000)
+        await ui.checkpoint('inbox-reset-task')
+        // UNVERIFIED (probe denied): the row's «Open» (0.60.0: it stays in the console).
+        await ui.openInboxRow('Confirmar el reset de la demo')
+        await ui.waitText(/Sí, resetear la demo/, 'the reset task never opened')
+        // UNVERIFIED (probe denied): «Claim» on the task page, then the checkbox by its label, then «Complete».
+        if (await ui.button('Claim').isVisible().catch(() => false)) await ui.click(ui.button('Claim'), 5_000)
+        await ui.click(page.getByText(/Sí, resetear la demo/).first(), 1_500)
+        await ui.checkpoint('reset-task-ticked')
+        await ui.click(ui.button('Complete'), 6_000)
+        await ui.checkpoint('reset-task-completed')
+
+        // The Demo page follows the reset to its last step.
+        await ui.pollPage(`${C}/demo/admin`, /Resetear la demo/,
+            t => { const now = t.match(/Último reset:[^|]*/)?.[0] ?? ''
+                   return now !== before && /completado/.test(now) && /notify-result \| hecho/.test(t) },
+            'the reset never completed on the Demo page', 10 * 60_000, 15_000)
+        await ui.checkpoint('reset-done')
+
+        // The data plane is empty.
+        await ui.go(`${D}/booking/bookings`, /\+ 10 reservas demo/)
+        await ui.checkpoint('bookings-empty')
+    })
+
+    // ── 1 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: the integration forms' selects («Opera property», «Crs hotel code») and the
+    // «Front office» input, the dictionary's «Ask the agent», the booking edit's room dialog (see
+    // fixRoomType).
+    test('1 · onboarding MRU01 → XMAR', async ({}, info) => {
+        test.setTimeout(45 * 60_000)
+        const ui = new Ui(page, info)
+
+        // Ten demo bookings in the CRS (verified live: the toolbar button; the dialog says «Crear»).
+        await ui.go(`${D}/booking/bookings`, /\+ 10 reservas demo/)
+        await ui.click(ui.button('+ 10 reservas demo'), 2_500)
+        await ui.confirmIfAsked(8_000)
+        await ui.reload(/Pms reservation id/)
+        await ui.waitText(/Confirmed/, 'the 10 demo bookings never showed')
+        await ui.checkpoint('bookings-10')
+
+        // PMS → front office: XMAR → MRU01.
+        await ui.go(`${C}/integrations/frontoffice`, /New/)
+        await ui.click(ui.button('New'), 5_000)
+        await ui.select('Opera property', /XMAR/) // UNVERIFIED (probe denied)
+        await ui.type('Front office', 'MRU01')    // UNVERIFIED (probe denied)
+        await ui.checkpoint('fo-integration-form')
+        await ui.click(ui.button('Save'), 6_000)
+        await ui.pollPage(`${C}/integrations/frontoffice/XMAR`, /Onboarding/, t => /A person to activate it/.test(t),
+            'the front office integration never got ready to activate', 5 * 60_000)
+        await ui.more('Activate')
+        await ui.confirmIfAsked()
+        await ui.pollPage(`${C}/integrations/frontoffice/XMAR`, /Onboarding/, t => /Waiting for \| Nothing/.test(t),
+            'the front office integration never became active', 3 * 60_000)
+        await ui.checkpoint('fo-integration-active')
+
+        // CRS → PMS: MRU01 → XMAR.
+        await ui.go(`${C}/integrations/registry`, /New/)
+        await ui.click(ui.button('New'), 5_000)
+        await ui.select('Crs hotel code', /MRU01/) // UNVERIFIED (probe denied)
+        await ui.select('Opera property', /^XMAR/) // UNVERIFIED (probe denied)
+        await ui.checkpoint('crs-integration-form')
+        await ui.click(ui.button('Save'), 6_000)
+        await ui.pollPage(`${C}/integrations/registry/MRU01`, /Onboarding/, t => /A person to approve the mapping/.test(t),
+            'the CRS integration never stopped at the mapping', 5 * 60_000)
+        await ui.checkpoint('crs-waiting-mapping')
+
+        // The dictionary: the agent proposes, a person approves everything it proposed.
+        await ui.go(`${C}/mapping/dictionary?integration=MRU01`, /Crs code/)
+        await ui.click(ui.button('Ask the agent'), 4_000) // UNVERIFIED (probe denied)
+        await ui.pollPage(`${C}/mapping/dictionary?integration=MRU01`, /Crs code/,
+            t => !/\| Unmapped \|/.test(t) && /\| Proposed \|/.test(t),
+            'the agent never proposed every code', 8 * 60_000, 20_000)
+        await ui.checkpoint('dictionary-proposed')
+        // ⋯ → Approve with nothing selected approves every proposal the filters show.
+        await ui.more('Approve')
+        await ui.confirmIfAsked(8_000)
+        await ui.checkpoint('dictionary-approved')
+
+        // Backfill, then activate.
+        await ui.pollPage(`${C}/integrations/registry/MRU01`, /Onboarding/, t => /A person to activate it/.test(t),
+            'the CRS integration never got ready to activate (backfill)', 10 * 60_000)
+        await ui.more('Activate')
+        await ui.confirmIfAsked(6_000)
+        await ui.checkpoint('crs-integration-active')
+
+        // Opera may refuse a seeded booking's room type (RSV00138): change it, as the demo does.
+        await settleRejections(ui)
+
+        // Every booking has its Opera number (listing: … | Status | Version | Pms reservation id).
+        await ui.pollPage(`${D}/booking/bookings`, /Pms reservation id/,
+            t => (t.match(/\| Confirmed \| \d+ \| \d{6,} \|/g) ?? []).length >= 10,
+            'not every demo booking reached Opera', 5 * 60_000)
+        await ui.checkpoint('bookings-in-opera')
+        await ui.go(`${FO}/reservas`, /Reservas/)
+        await ui.checkpoint('front-office-stays')
+    })
+
+    // ── 2 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: the wizard's room/guest dialogs (see createBooking), the front office's
+    // «Escanear» on a pax row, the Consolidations listing's text.
+    test('2 · returning customer: a duplicate, consolidated by scanning the document', async ({}, info) => {
+        test.setTimeout(30 * 60_000)
+        const ui = new Ui(page, info)
+
+        // A customer of the chain: the holder of the first demo booking.
+        await ui.go(`${D}/booking/bookings`, /Pms reservation id/)
+        const original = (await ui.text()).match(/Pms reservation id \| ([A-Z0-9]{6}) \|/)?.[1]
+        expect(original, 'no demo booking in the listing').toBeTruthy()
+        S.original = original!
+        await ui.go(`${D}/booking/bookings/${original}`, /In other systems/)
+        const holder: Holder = {
+            first: field(await ui.text(), 'Holder first name'),
+            last: field(await ui.text(), 'Holder last name'),
+            email: field(await ui.text(), 'Holder email'),
+            phone: field(await ui.text(), 'Holder phone'),
+            nationality: field(await ui.text(), 'Holder nationality') || 'ES',
+        }
+        S.originalHolder = holder
+        const originalCustomer = await holderCustomer(ui, original!)
+        await ui.checkpoint('original-booking')
+
+        // The same person books again: same name and phone, another email → a provisional duplicate.
+        const duplicate = await createBooking(ui, {
+            arrival: day(35), departure: day(38),
+            holder: { ...holder, email: `${holder.first}.${holder.last}.${RUN}@example.org`.toLowerCase().replace(/\s+/g, '') },
+            room: ROOM_TYPES[0], rate: 'DIRECTA', board: 'DESAYUNO', adults: 2,
+            guests: [[holder.first, holder.last]],
+        }, 'f2')
+        S.duplicate = duplicate
+        await ensureInOpera(ui, duplicate)
+        const duplicateCustomer = await holderCustomer(ui, duplicate)
+        expect(duplicateCustomer, 'the returning customer should first be a separate (provisional) customer').not.toBe(originalCustomer)
+        await ui.checkpoint('duplicate-customer')
+
+        // At the desk: scan the holder's document on the ORIGINAL booking first (the chain customer
+        // gets a document), then on the NEW one — the demo scanner reads that same document, and the
+        // MDM consolidates (docs/poc-acl/demo.md §9 «O en recepción, al escanear el documento»).
+        await scanHolder(ui, original!)
+        await scanHolder(ui, duplicate)
+
+        // Customers → Consolidations shows it, vía SCAN.
+        await ui.pollPage(`${C}/customers/consolidations`, /Survivor|Absorbed|Via/i,
+            t => new RegExp(`${duplicateCustomer}[^]{0,200}SCAN|SCAN[^]{0,200}${duplicateCustomer}`).test(t),
+            `the MDM never consolidated ${duplicateCustomer} by scanning`, 8 * 60_000)
+        await ui.checkpoint('consolidation-scan')
+
+        // Both bookings now point at the same customer (the survivor) — the code Opera and the front
+        // office get. The front office does not show the code on an arriving stay («En otros
+        // sistemas» is hidden in the arrival), so it is read where it is shown: the CRS booking.
+        await expect.poll(async () => (await holderCustomer(ui, duplicate)) === (await holderCustomer(ui, original!)),
+            { message: 'the two bookings never shared one customer code', timeout: 5 * 60_000, intervals: [15_000] }).toBe(true)
+        await ui.checkpoint('same-customer')
+    })
+
+    // ── 3 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: the pax row's «Editar»/«A mano», the kárdex field «Teléfono», «Guardar kárdex»,
+    // the change requests listing's columns.
+    test('3 · the front office changes the holder\'s data → a Salesforce Case', async ({}, info) => {
+        test.setTimeout(20 * 60_000)
+        const ui = new Ui(page, info)
+        const locator = S.duplicate!
+        const newPhone = '+34 6' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0')
+
+        await openStay(ui, locator)
+        // UNVERIFIED (probe denied): the holder is the first pax row; after the scan its second action is «Editar».
+        const edit = page.getByRole('button', { name: /^(Editar|A mano)$/ }).first()
+        await ui.click(edit, 4_000)
+        await ui.type('Teléfono', newPhone) // UNVERIFIED (probe denied)
+        await ui.click(ui.button('Guardar kárdex'), 6_000)
+        await ui.waitText(/Pendiente de Salesforce/, 'the holder never showed «Pendiente de Salesforce»')
+        await ui.checkpoint('kardex-pending')
+
+        // The MDM opens a Case in Salesforce: Clientes → Solicitudes de cambio shows its id.
+        const caseId = await ui.pollPage(`${D}/customers/changes`, /Solicitudes de cambio/,
+            t => t.match(new RegExp(`${escape(newPhone)} \\| Pendiente \\| (500[A-Za-z0-9]{12,15})`))?.[1],
+            'the change never became a Case in Salesforce', 5 * 60_000)
+        await ui.checkpoint('change-request-case')
+
+        // The decision is taken in Salesforce's UI, which needs MFA: a test fixture takes it instead.
+        const sf = SalesforceFixture.tryCreate()
+        test.skip(!sf, `Case ${caseId} exists; approving it needs Salesforce (its UI needs MFA) and the ` +
+            'ec-salesforce secret could not be read with kubectl — approve it by hand to finish flow 3')
+        await sf!.approveCase(caseId)
+
+        // It comes back on its own: the request is decided and the desk loses the mark.
+        await ui.pollPage(`${D}/customers/changes`, /Solicitudes de cambio/,
+            t => new RegExp(`${escape(newPhone)} \\| (?!Pendiente)`).test(t),
+            'the MDM never learnt the decision', 5 * 60_000)
+        await openStay(ui, locator)
+        await expect.poll(async () => !/Pendiente de Salesforce/.test(await ui.text()),
+            { message: 'the front office kept «Pendiente de Salesforce»', timeout: 5 * 60_000, intervals: [15_000] }).toBe(true)
+        await ui.checkpoint('kardex-approved')
+    })
+
+    // ── 4 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: the pax row's «No show» and its confirmation (new in 0.60.0), the stay's text after it.
+    test('4 · no show', async ({}, info) => {
+        test.setTimeout(20 * 60_000)
+        const ui = new Ui(page, info)
+        const locator = await createBooking(ui, {
+            arrival: day(0), departure: day(2),
+            holder: { first: 'Nora', last: `Lindqvist ${RUN}`, email: `nora.${RUN}@example.org`, phone: '+47 41234567', nationality: 'NO' },
+            room: ROOM_TYPES[0], rate: 'DIRECTA', board: 'DESAYUNO', adults: 2,
+            guests: [['Nora', `Lindqvist ${RUN}`], ['Erik', `Lindqvist ${RUN}`]],
+        }, 'f4')
+        await ensureInOpera(ui, locator)
+        await openStay(ui, locator)
+        await ui.checkpoint('stay-arriving')
+        // Every pax a no show → the reservation is one.
+        for (let i = 0; i < 2; i++) {
+            await ui.click(page.getByRole('button', { name: 'No show', exact: true }).first(), 2_500) // UNVERIFIED (probe denied)
+            await ui.confirmIfAsked(4_000)
+        }
+        await ui.checkpoint('no-show-marked')
+        await ui.pollPage(`${D}/booking/bookings/${locator}`, /In other systems/, t => /\| Cancelled \|/.test(t),
+            'the CRS never cancelled the no show', 5 * 60_000)
+        await ui.checkpoint('crs-cancelled-no-show')
+        await openStay(ui, locator)
+        await ui.waitText(/no show/i, 'the front office never showed the no show')
+        await ui.checkpoint('fo-no-show')
+    })
+
+    // ── 5 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: every walk-in field label (taken from the 2026-10-04 page text), its buttons.
+    test('5 · walk-in (guided process in the front office)', async ({}, info) => {
+        test.setTimeout(20 * 60_000)
+        const ui = new Ui(page, info)
+        await ui.go(`${FO}/reservas`, /Walk-in/)
+        await ui.click(page.getByRole('button', { name: /Walk-in/ }).first(), 6_000)
+        await ui.click(ui.button('Inicio'), 4_000) // UNVERIFIED (probe denied)
+        // UNVERIFIED (probe denied): the options read «Junior suite con balcón y vista al mar (JS-SEA)».
+        await ui.select('Habitación', new RegExp(`\\(${ROOM_TYPES[0]}\\)`))
+        await ui.select('Tarifa', /\(DIRECTA\)/)
+        await ui.select('Régimen', /\(DESAYUNO\)/)
+        await ui.checkpoint('walk-in-stay')
+        await ui.click(ui.button('Continuar'), 6_000)
+        await ui.waitText(/Precio del CRS/, 'the walk-in never priced the stay')
+        await ui.click(ui.button('Continuar'), 5_000)
+        await ui.type('Nombre', 'Paolo')
+        await ui.type('Apellidos', `Ricci ${RUN}`)
+        await ui.type('Email', `paolo.${RUN}@example.org`)
+        await ui.type('Teléfono', '+39 3471234567')
+        await ui.type('Nacionalidad', 'IT')
+        await ui.type('Documento', `YA${Math.floor(1e6 + Math.random() * 8e6)}`)
+        await ui.checkpoint('walk-in-holder')
+        await ui.click(ui.button('Continuar'), 5_000)
+        await ui.click(ui.button('Confirmar walk-in'), 8_000)
+        const crs = (await ui.text()).match(/El CRS la ha reservado como ([A-Z0-9]{6})/)?.[1]
+        expect(crs, 'the walk-in never got its CRS booking').toBeTruthy()
+        await ui.checkpoint('walk-in-confirmed')
+        await ensureInOpera(ui, crs!)
+        await ui.go(`${D}/booking/bookings/${crs}`, /In other systems/)
+        expect(await after(page, /Channel code/, 80)).toContain('WALKIN')
+        await ui.checkpoint('crs-walk-in')
+    })
+
+    // ── 6 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: «Apagar la caída de Opera» (the menu only offers it while the outage is on),
+    // the inbox notice's title, the journey's text.
+    test('6 · Opera outage: the booking waits, retries and is written once', async ({}, info) => {
+        test.setTimeout(30 * 60_000)
+        const ui = new Ui(page, info)
+        await ui.go(`${C}/demo/admin`, /Simulación/)
+        // Verified live: the field's label and the menu item.
+        await ui.type('Aviso de reintentos tras (min)', '2')
+        await ui.more('Aplicar el umbral de aviso')
+        await ui.confirmIfAsked()
+        await ui.more('Encender la caída de Opera')
+        await ui.confirmIfAsked()
+        await ui.waitText(/Simulación: Opera no responde/, 'the outage banner never showed')
+        await ui.checkpoint('outage-on')
+        try {
+            const locator = await createBooking(ui, {
+                arrival: day(40), departure: day(43),
+                holder: { first: 'Hanna', last: `Berg ${RUN}`, email: `hanna.${RUN}@example.org`, phone: '+49 1701234567', nationality: 'DE' },
+                room: ROOM_TYPES[0], rate: 'DIRECTA', board: 'DESAYUNO', adults: 2,
+                guests: [['Hanna', `Berg ${RUN}`], ['Jonas', `Berg ${RUN}`]],
+            }, 'f6')
+            S.outageBooking = locator
+            // The step retries; after the threshold the inbox says so (RETRYING_TOO_LONG).
+            await ui.pollPage(`${C}/inbox/pending`, /Title/, t => new RegExp(`${locator}[^|]*keeps failing|keeps failing[^|]*${locator}`).test(t),
+                'the inbox never said the write keeps failing', 8 * 60_000, 20_000)
+            await ui.checkpoint('inbox-retrying-too-long')
+        } finally {
+            // Always switch the simulation off, even when the step above failed.
+            await ui.go(`${C}/demo/admin`, /Simulación/)
+            const items = await ui.moreItems()
+            if (items.some(i => /Apagar la caída de Opera/.test(i))) {
+                await ui.more('Apagar la caída de Opera') // UNVERIFIED (probe denied)
+                await ui.confirmIfAsked()
+            }
+            await ui.checkpoint('outage-off')
+        }
+        const locator = S.outageBooking!
+        await ensureInOpera(ui, locator)
+        // Written once, after retries: the journey says how it ended.
+        await ui.go(`${D}/journey/bookings/${locator}`, /Recorrido de/)
+        await expect.poll(async () => {
+            const t = await ui.text()
+            if (!/tras reintentos/.test(t)) await ui.button('Actualizar').click().catch(() => {})
+            return /En Opera[^|]*tras reintentos/.test(t)
+        }, { message: 'the journey never showed the booking in Opera after retries', timeout: 3 * 60_000, intervals: [15_000] }).toBe(true)
+        await ui.checkpoint('journey-after-retries')
+    })
+
+    // ── 7 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: the cancellation dialog's reason select and its «Cancel booking» button.
+    test('7 · modify and cancel from the CRS', async ({}, info) => {
+        test.setTimeout(25 * 60_000)
+        const ui = new Ui(page, info)
+        const locator = S.outageBooking!
+        // One more night (dates seen working by label on 2026-10-04), and another room type.
+        await ui.go(`${D}/booking/bookings/${locator}/edit`, /Departure/)
+        await ui.type('Departure', day(44))
+        const next = ROOM_TYPES.find(r => r !== ROOM_TYPES[0]) ?? ROOM_TYPES[0]
+        await changeRoomType(ui, next, false)
+        await ui.click(ui.button('Save'), 6_000)
+        await ui.checkpoint('crs-modified')
+        await ensureInOpera(ui, locator, 45_000)
+        await openStay(ui, locator)
+        await ui.waitText(/4N/, 'the front office never showed the four nights')
+        await ui.checkpoint('fo-modified')
+
+        // Cancel it.
+        await ui.go(`${D}/booking/bookings/${locator}`, /In other systems/)
+        await ui.more('Cancel booking')
+        await ui.select('Reason', /^OTR/) // UNVERIFIED (probe denied): the dialog's reason field label.
+        await ui.click(page.getByRole('button', { name: 'Cancel booking', exact: true }).last(), 6_000)
+        await ui.pollPage(`${D}/booking/bookings/${locator}`, /In other systems/, t => /\| Cancelled \|/.test(t),
+            'the CRS never cancelled it', 3 * 60_000)
+        await ui.checkpoint('crs-cancelled')
+        await openStay(ui, locator)
+        await ui.waitText(/[Cc]ancelad/, 'the front office never showed the cancellation')
+        await ui.checkpoint('fo-cancelled')
+    })
+
+    // ── 8 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Not verified live: the rate plans screen (#218, /booking/catalogue/ratePlans: Hotel, Code, Name,
+    // Factor), the dictionary's «Withdraw», row selection.
+    test('8 · a new rate plan with the integration already active (EMPLEADOS-27)', async ({}, info) => {
+        test.setTimeout(30 * 60_000)
+        const ui = new Ui(page, info)
+        const code = 'EMPLEADOS-27'
+
+        // Call center → Catalogue → Rate plans (ec-demo1 #218).
+        await page.goto(`${D}/booking/catalogue/ratePlans`, { waitUntil: 'domcontentloaded' })
+        await page.waitForTimeout(2_500)
+        await ui.signInIfAsked()
+        const present = await expect.poll(async () => /Rate plans/.test(await ui.text()), { timeout: 90_000 }).toBe(true).then(() => true, () => false)
+        test.skip(!present, 'Call center → Catalogue → Rate plans (/booking/catalogue/ratePlans, ec-demo1 #218) is not deployed')
+        await ui.checkpoint('rate-plans')
+        if (!new RegExp(`\\| ${code} \\|`).test(await ui.text())) {
+            await ui.more('New') // UNVERIFIED (probe denied): a Crud's New, in the ⋯ menu as on Bookings.
+            await ui.select('Hotel', /MRU01/)
+            await ui.type('Code', code)
+            await ui.type('Name', 'Empleados de la cadena de vacaciones 2027')
+            await ui.type('Factor', '0.5')
+            await ui.checkpoint('rate-plan-form')
+            await ui.click(ui.button('Save'), 6_000)
+        }
+
+        // A code mapped earlier (the catalogue may have carried it into flow 1's approval) would not
+        // wait: withdraw it, as the 2026-10-04 run did, so the booking shows the new-code path.
+        await ui.go(`${C}/mapping/dictionary?integration=MRU01`, /Crs code/)
+        if (await ui.pageUntil(new RegExp(`${code} \\| [^|]+ \\| \\d+ \\| Approved`))) {
+            await ui.selectRow(code)
+            await ui.more('Withdraw')
+            await ui.confirmIfAsked(6_000)
+        }
+
+        const locator = await createBooking(ui, {
+            arrival: day(47), departure: day(50),
+            holder: { first: 'Lucía', last: `Navarro ${RUN}`, email: `lucia.${RUN}@example.org`, phone: '+34 611223344', nationality: 'ES' },
+            room: 'JS-STD', rate: code, board: 'SOLO-ALOJAMIENTO', adults: 2,
+            guests: [['Lucía', `Navarro ${RUN}`], ['Pablo', `Navarro ${RUN}`]],
+        }, 'f8')
+        const cause = `MISSING_MAPPING:MRU01:RATE_PLAN:${code}`
+        await ui.pollPage(`${C}/mapping/causes`, /Key/, t => new RegExp(`${cause} \\|[^]{0,300}?\\| Open`).test(t),
+            `the booking never waited on ${cause}`, 5 * 60_000)
+        await ui.checkpoint('cause-missing-mapping')
+
+        await ui.go(`${C}/mapping/dictionary?integration=MRU01`, /Crs code/)
+        await ui.click(ui.button('Ask the agent'), 4_000)
+        const proposed = new RegExp(`${code} \\| 432040HLXMU \\| \\d+ \\| Proposed`)
+        await expect.poll(async () => { await ui.reload(/Crs code/); return ui.pageUntil(proposed) },
+            { message: `the agent never proposed 432040HLXMU for ${code}`, timeout: 5 * 60_000, intervals: [15_000] }).toBe(true)
+        // Approve only that one: select its row first (with nothing selected, Approve takes them all).
+        await ui.selectRow('432040HLXMU')
+        await ui.checkpoint('proposal-selected')
+        await ui.more('Approve')
+        await ui.confirmIfAsked(8_000)
+        await ensureInOpera(ui, locator)
+        await ui.pollPage(`${C}/mapping/causes`, /Key/, t => new RegExp(`${cause} \\|[^]{0,300}?\\| Resolved`).test(t),
+            `${cause} never resolved`, 3 * 60_000)
+        await ui.checkpoint('cause-resolved')
+    })
 })
+
+// ── the shared moves ────────────────────────────────────────────────────────────────────────────────
+
+/** A detail page's field value: the cell after «label |». */
+function field(text: string, label: string): string {
+    return text.match(new RegExp(`\\| ${label} \\| ([^|]+) \\|`))?.[1]?.trim() ?? ''
+}
+
+function escape(s: string) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+
+/** The MDM customer the CRS shows for a booking's holder: «Holder · customer | Name · C-…». */
+async function holderCustomer(ui: Ui, locator: string): Promise<string> {
+    await ui.go(`${D}/booking/bookings/${locator}`, /In other systems/)
+    const id = (await ui.text()).match(/Holder · customer \| [^|]*?(C-[0-9A-F]{12})/)?.[1]
+    if (!id) throw new Error(`${locator} shows no holder customer`)
+    return id
+}
+
+/**
+ * The call center's wizard: Bookings → ⋯ New → Stay, Rooms, Guests, Payments, Summary → «Create booking».
+ * Verified live: ⋯ → «New» → /booking/newBooking, and the Stay step's fields by label. Not verified
+ * live: the room/guest dialogs (their fields by label, their «Save»).
+ */
+async function createBooking(ui: Ui, b: NewBooking, tag: string): Promise<string> {
+    const page = ui.page
+    await ui.go(`${D}/booking/bookings`, /Pms reservation id/)
+    await ui.more('New')
+    await ui.waitText(/Holder first name/, 'the new booking wizard never opened')
+    await ui.select('Hotel code', /^MRU01/)
+    await ui.select('Channel code', new RegExp(`^${b.channel ?? 'WEB'} `))
+    await ui.type('Arrival', b.arrival)
+    await ui.type('Departure', b.departure)
+    await ui.type('Holder first name', b.holder.first)
+    await ui.type('Holder last name', b.holder.last)
+    if (b.holder.email) await ui.type('Holder email', b.holder.email)
+    if (b.holder.phone) await ui.type('Holder phone', b.holder.phone)
+    if (b.holder.nationality) await ui.type('Holder nationality', b.holder.nationality)
+    await ui.checkpoint(`${tag}-wizard-stay`)
+    await ui.click(ui.button('Next'), 3_000)
+
+    // UNVERIFIED (probe denied): the room dialog's fields by label («Line», «Room type code»,
+    // «Rate plan code», «Board code», «Adults») and its «Save» (the last Save on the page).
+    await ui.click(ui.button('Add'), 3_000)
+    await ui.type('Line', '1')
+    await ui.select('Room type code', new RegExp(`^${b.room} —`), 'last')
+    await ui.select('Rate plan code', new RegExp(`^${b.rate} —`), 'last')
+    await ui.select('Board code', new RegExp(`^${b.board} —`), 'last')
+    await ui.type('Adults', String(b.adults))
+    await ui.checkpoint(`${tag}-wizard-room`)
+    await ui.click(page.getByRole('button', { name: 'Save', exact: true }).last(), 3_000)
+    await ui.click(ui.button('Next'), 3_000)
+
+    // UNVERIFIED (probe denied): the guest dialog's fields («Room line», «First name», «Last name», «Type»).
+    for (const [first, last] of b.guests) {
+        await ui.click(ui.button('Add'), 3_000)
+        await ui.type('Room line', '1')
+        await ui.type('First name', first)
+        await ui.type('Last name', last)
+        await ui.select('Type', /^Adult/, 'last')
+        await ui.click(page.getByRole('button', { name: 'Save', exact: true }).last(), 3_000)
+    }
+    await ui.click(ui.button('Next'), 3_000) // Payments
+    await ui.click(ui.button('Next'), 3_000) // Summary
+    await ui.checkpoint(`${tag}-wizard-summary`)
+    await ui.click(ui.button('Create booking'), 6_000)
+    const createdLocator = async () => (await ui.text()).match(/Booking ([A-Z0-9]{6}) created/)?.[1]
+        ?? page.url().match(/\/booking\/bookings\/([A-Z0-9]{6})$/)?.[1]
+    await expect.poll(createdLocator, { message: `the wizard never created the booking (${(await ui.text()).match(/(Unknown|Invalid|inválid|rror)[^|]{0,200}/)?.[0] ?? ''})`, timeout: 60_000 }).toBeTruthy()
+    const created = (await createdLocator())!
+    await ui.checkpoint(`${tag}-created-${created}`)
+    return created
+}
+
+/**
+ * Waits until the booking has its Opera number. On a PMS_REJECTED cause for it (RSV00138: Opera has no
+ * rooms of that type those nights — XMAR is a shared UAT and its availability moves), changes the room
+ * type through the booking's edit and tries the next one of ROOM_TYPES, as the demo's operator does.
+ */
+async function ensureInOpera(ui: Ui, locator: string, settle = 0) {
+    if (settle) await ui.page.waitForTimeout(settle)
+    const tried = new Set<string>()
+    for (let attempt = 0; attempt <= ROOM_TYPES.length; attempt++) {
+        const end = Date.now() + 4 * 60_000
+        let refused = false
+        while (Date.now() < end) {
+            refused = await rejected(ui, locator)
+            if (refused) break
+            await ui.go(`${D}/booking/bookings/${locator}`, /In other systems/)
+            if (/^\d+$/.test(field(await ui.text(), 'Opera reservation'))) return
+            await ui.page.waitForTimeout(15_000)
+        }
+        if (!refused) throw new Error(`${locator} never reached Opera in 4 min (and no PMS_REJECTED cause for it)`)
+        await ui.checkpoint(`${locator}-pms-rejected`)
+        await ui.go(`${D}/booking/bookings/${locator}`, /In other systems/)
+        tried.add((await ui.text()).match(/Room 1 · ([A-Z-]+)/)?.[1] ?? '')
+        const next = ROOM_TYPES.find(r => !tried.has(r))
+        if (!next) break
+        tried.add(next)
+        await ui.go(`${D}/booking/bookings/${locator}/edit`, /Departure/)
+        await changeRoomType(ui, next, true)
+        // The cause closes on its own when the new version is in Opera («vN is in Opera»); if it is
+        // still open after that, Resolve it from the cause, which retries the write.
+        await ui.page.waitForTimeout(45_000)
+        if (await rejected(ui, locator)) {
+            await ui.go(`${C}/mapping/causes/PMS_REJECTED:MRU01:${locator}:upsert-reservation`, /Cause/)
+            if (await ui.button('Resolve').isVisible().catch(() => false)) {
+                await ui.click(ui.button('Resolve'), 3_000)
+                await ui.confirmIfAsked(10_000)
+            }
+            await ui.page.waitForTimeout(30_000)
+        }
+    }
+    throw new Error(`${locator}: Opera refused every room type tried (${[...tried].filter(Boolean).join(', ')}) — set DEMO_ROOM_TYPES`)
+}
+
+/** Flow 1: every seeded booking Opera refused (RSV00138), put right one by one. */
+async function settleRejections(ui: Ui) {
+    await ui.page.waitForTimeout(60_000)
+    await ui.go(`${C}/mapping/causes`, /Key/)
+    const locators = new Set([...(await ui.text()).matchAll(/PMS_REJECTED:MRU01:([A-Z0-9]{6}):[^|]+ \|[^]{0,300}?\| Open/g)].map(m => m[1]))
+    for (const l of locators) await ensureInOpera(ui, l)
+}
+
+async function rejected(ui: Ui, locator: string): Promise<boolean> {
+    const p = await ui.page.context().newPage()
+    try {
+        const u = new Ui(p, ui.info)
+        await u.go(`${C}/mapping/causes`, /Key/)
+        return new RegExp(`PMS_REJECTED:MRU01:${locator}:[^|]+ \\|[^]{0,300}?\\| Open`).test(await u.text())
+    } finally {
+        await p.close()
+    }
+}
+
+/**
+ * On the booking's edit page: the room row's pencil → «Room type code» → the new one → the dialog's
+ * Save; then (if `save`) the booking's Save. Seen working on 2026-10-04 with the pencil located by its
+ * icon class and the select by coordinates; the select is reached by its label here.
+ */
+async function changeRoomType(ui: Ui, roomType: string, save: boolean) {
+    const page = ui.page
+    await ui.waitText(/Room type code/, 'the edit page never showed the rooms')
+    const pencil = page.locator('oj-c-button, oj-button, button').filter({ has: page.locator('[class*=edit], [class*=pencil]') })
+    await ui.click(pencil.first(), 3_000)
+    // UNVERIFIED (probe denied): the room dialog's select by label (the run clicked at its coordinates).
+    await ui.select('Room type code', new RegExp(`^${roomType} —`), 'last')
+    await ui.checkpoint(`room-type-${roomType}`)
+    await ui.click(page.getByRole('button', { name: 'Save', exact: true }).last(), 2_500)
+    if (save) await ui.click(page.getByRole('button', { name: 'Save', exact: true }).first(), 6_000)
+}
+
+/** The front office's stay: from the listing (a cold deep link has not always rendered the reservation). */
+async function openStay(ui: Ui, locator: string) {
+    await ui.go(`${FO}/reservas`, /Reservas/)
+    const row = ui.page.getByText(locator, { exact: true }).first()
+    if (await row.isVisible().catch(() => false)) {
+        await ui.click(row, 6_000)
+    } else {
+        await ui.go(`${FO}/reservas/${locator}`, /Huéspedes|Reservas/)
+    }
+    await ui.waitText(/Huéspedes|Estancia/, `the front office never opened ${locator}`)
+}
+
+/** «Escanear» on the holder (the first pax row) and wait for the scan to land. */
+async function scanHolder(ui: Ui, locator: string) {
+    await openStay(ui, locator)
+    // UNVERIFIED (probe denied): the pax row's action button «Escanear» (HuespedesPanel.paxItem),
+    // «Reescanear» once the kárdex is complete — then nothing to do.
+    const scan = ui.page.getByRole('button', { name: 'Escanear', exact: true }).first()
+    if (!(await scan.isVisible().catch(() => false))) return
+    await ui.click(scan, 6_000)
+    await ui.confirmIfAsked()
+    await ui.waitText(/Doc [A-Z0-9]|Kárdex OK|Reescanear/, `the scan never landed on ${locator}`)
+    await ui.checkpoint(`scanned-${locator}`)
+}
