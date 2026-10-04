@@ -133,6 +133,17 @@ public record CrsCatalog(List<Hotel> hotels,
         }
     }
 
+    /**
+     * Back to the rate plans the catalog was built with: those opened since ({@link #addRatePlan}) are
+     * no longer sold — what the demo's reset does to the running CRS once it has emptied the table
+     * that kept them. {@code built} is the catalog as built, before any addition.
+     */
+    public void forgetAddedRatePlans(CrsCatalog built) {
+        ratePlans.retainAll(built.ratePlans());
+        hotels.stream().filter(h -> h.codes() != null)
+                .forEach(h -> h.codes().ratePlans().retainAll(built.codes(h.code()).ratePlans()));
+    }
+
     public RatePlan ratePlan(String hotelCode, String code) {
         return find(codes(hotelCode).ratePlans(), RatePlan::code, code, "rate plan of hotel " + hotelCode);
     }
