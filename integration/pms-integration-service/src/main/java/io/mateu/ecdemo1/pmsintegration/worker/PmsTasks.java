@@ -39,6 +39,11 @@ public class PmsTasks {
     public static final String RECORD_NO_SHOW = "record-no-show";
     public static final String POST_CHARGE = "post-charge";
     public static final String REVERSE_CHARGE = "reverse-charge";
+    public static final String NEW_OPERA_CONTEXT = "new-opera-context";
+
+    /** new-opera-context's input: the reset-demo process asking. */
+    public record ContextTask(String processKey) {
+    }
 
     @Bean
     public TaskRegistration<TaskHandlers.ReservationTask, TaskHandlers.GuestProfile> ensureGuestProfileTask(
@@ -137,6 +142,23 @@ public class PmsTasks {
         return new TaskRegistration<>(REVERSE_CHARGE, 1, TOPIC, ChargeHandlers.ChargeTask.class,
                 ChargeHandlers.ChargeReversed.class, watched(watch, handlers::reverseCharge,
                         ChargeHandlers.ChargeTask::pmsHotelCode, input -> input.stayId() + "/" + input.lineId()));
+    }
+
+    // ── the demo's reset (reset-demo) ───────────────────────────────────────────────────────────────
+
+    /** A new Opera context for the demo's next run, taken at once and kept in the ec-demo-run ConfigMap. */
+    @Bean
+    public TaskRegistration<ContextTask, io.mateu.ecdemo1.pmsintegration.demo.NewOperaContext.Output> newOperaContextTask(
+            io.mateu.ecdemo1.pmsintegration.demo.NewOperaContext contexts) {
+        return new TaskRegistration<>(NEW_OPERA_CONTEXT, 1, TOPIC, ContextTask.class,
+                io.mateu.ecdemo1.pmsintegration.demo.NewOperaContext.Output.class, (input, context) -> {
+                    try {
+                        return contexts.renew(input == null ? null : input.processKey());
+                    } catch (RuntimeException e) {
+                        log.warn("Step {} of {} failed: {}", context.stepId(), context.processId(), e.getMessage());
+                        throw new TaskFailure(e.getMessage() == null ? e.toString() : e.getMessage());
+                    }
+                });
     }
 
     /**

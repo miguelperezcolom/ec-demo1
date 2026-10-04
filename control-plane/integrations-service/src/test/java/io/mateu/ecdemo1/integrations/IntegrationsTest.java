@@ -200,6 +200,10 @@ class IntegrationsTest {
     MockMvc mvc;
     @Autowired
     ObjectMapper objectMapper;
+    @Autowired
+    io.mateu.ecdemo1.demoreset.DemoReset demoReset;
+    @Autowired
+    java.util.List<io.mateu.ecdemo1.demoreset.ConsumerPause> consumerPauses;
 
     @BeforeEach
     void reset() {
@@ -397,6 +401,25 @@ class IntegrationsTest {
         assertThat(audited.get(0).response()).contains("Registered");
         assertThat(audited.get(1).response()).contains("Only an active integration can be paused");
         assertThat(audited.get(1).parameters()).contains(id);
+    }
+
+    @Test
+    void theDemoResetEmptiesWhatTheIntegrationMadeWithItsConsumersPausedAndBack() {
+        register();
+        assertThat(integrations.count()).isEqualTo(1);
+        assertThat(consumerPauses).hasAtLeastOneElementOfType(io.mateu.ecdemo1.demoreset.StreamBindingsPause.class);
+
+        var outcome = demoReset.run();
+
+        assertThat(outcome.tables()).containsExactly("integration", "backfill_run", "fo_integration", "fo_backfill_run",
+                "outbox_message");
+        assertThat(integrations.count()).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from outbox_message", Integer.class)).isZero();
+        // and again: nothing left to empty, nothing fails
+        demoReset.run();
+        // the service goes on working: a new integration after the reset
+        register();
+        assertThat(integrations.count()).isEqualTo(1);
     }
 
     @Test

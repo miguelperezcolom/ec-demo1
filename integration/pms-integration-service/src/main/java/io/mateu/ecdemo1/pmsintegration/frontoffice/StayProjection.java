@@ -31,7 +31,7 @@ import java.util.HashSet;
  * <p>Transient failures — Opera not answering — propagate, and the engine retries the step.
  */
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 @Slf4j
 public class StayProjection {
 
@@ -44,6 +44,14 @@ public class StayProjection {
     final PmsIntegrationProperties properties;
     final StreamBridge streamBridge;
     final ObjectMapper objectMapper;
+    /** The run's context in Opera, swapped at runtime by reset-demo. */
+    final io.mateu.ecdemo1.pmsintegration.config.OperaContext context;
+
+    public StayProjection(OperaStays stays, IntegrationClients integration, OhipProperties ohip,
+                          PmsIntegrationProperties properties, StreamBridge streamBridge, ObjectMapper objectMapper) {
+        this(stays, integration, ohip, properties, streamBridge, objectMapper,
+                ohip == null ? null : io.mateu.ecdemo1.pmsintegration.config.OperaContext.of(ohip));
+    }
 
     public void project(String hotel, String reservationId) {
         var found = stays.byId(hotel, reservationId);
@@ -59,7 +67,7 @@ public class StayProjection {
                         ((p.firstName() == null ? "" : p.firstName()) + " " + (p.lastName() == null ? "" : p.lastName())).trim(),
                         p.documentNumber(), p.email(), p.phone()))
                 .orElse(null);
-        var command = StayMapper.toWriteStay(hotel, reservation, new StayMapper.Context(ohip.externalSystemCode(),
+        var command = StayMapper.toWriteStay(hotel, reservation, new StayMapper.Context(context.externalSystemCode(),
                 new HashSet<>(properties.noShowCancellationCodes()), customerId, master));
         send(command);
         log.info("{}/{} ({}) to the front office: {} {}..{} {} {} v{}", hotel, reservationId,

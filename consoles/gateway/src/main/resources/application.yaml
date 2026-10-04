@@ -124,6 +124,14 @@ spring:
           predicates:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_api-usage/**
+        # The demo's banner, «Simulación: Opera no responde» while the control plane's Demo page has an
+        # Opera outage simulated, in every console's header — the front office's too. Signed in; it says
+        # nothing else. The Demo page itself (/_demo) is the control host's alone, below.
+        - id: demo-banner
+          uri: ${INTEGRATIONS_URL:http://integrations-service:8126}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/_demo-banner/**
 
         # The four demo services. Each one's Mateu UI is served under the prefix its @UI
         # annotation declares, and the shell names the same prefix in a RemoteMenu — so a path
@@ -329,6 +337,14 @@ spring:
           predicates:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_integrations/**
+
+        # The demo's administration: reset it to zero (the engine's reset-demo) and simulate an Opera
+        # outage. Served by integrations-service, on the control host behind ai-admin.
+        - id: demo
+          uri: ${INTEGRATIONS_URL:http://integrations-service:8126}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_demo/**
 
         - id: mapping
           uri: ${MAPPING_URL:http://mapping-service:8122}

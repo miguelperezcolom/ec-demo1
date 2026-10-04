@@ -26,7 +26,7 @@
              against. `shared` is the engine's own DTO jar and tracks the engine image tag in
              deploy/values/eventconductor.yaml — the events on the wire are defined there, so a
              mismatch is a deserialization failure at runtime and not a compile error. -->
-        <mateu.version>3.0-alpha.385</mateu.version>
+        <mateu.version>3.0-alpha.387</mateu.version>
         <eventconductor.version>2.23.1</eventconductor.version>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
         <spring-ai.version>1.0.0</spring-ai.version>
@@ -89,6 +89,21 @@
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
+        </dependency>
+        <!-- The demo's reset (process reset-demo): reset@1, this service emptying its own tables with its
+             consumers paused. Installed from supporting/demo-reset first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <!-- The engine's worker runtime: it binds the task topic (consumeWorkerEvent), runs each task on
+             the handler registered for it and answers the engine on `upstream` — today the demo's
+             reset@1. -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>worker-kafka</artifactId>
+            <version>${eventconductor.version}</version>
         </dependency>
         <dependency>
             <groupId>io.mateu.workflow</groupId>

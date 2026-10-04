@@ -179,6 +179,19 @@ integrations:
     opera: ${USAGE_OPERA_URLS:${PMS_INTEGRATION_URL:http://localhost:8123}}
     timeout: ${USAGE_TIMEOUT:2s}
     cache: ${USAGE_CACHE:15s}
+  # The demo's administration: the control plane's «Demo» page (/_demo) and the steps of reset-demo this
+  # service serves (purge-engine, check-demo-health, notify-reset-result).
+  demo:
+    # The engine's database, read for the reset-demo runs and emptied by purge-engine. Empty: no engine.
+    engine-db-url: ${ENGINE_DB_URL:}
+    engine-db-username: ${ENGINE_DB_USERNAME:${DB_USERNAME:workflow}}
+    engine-db-password: ${ENGINE_DB_PASSWORD:${DB_PASSWORD:}}
+    # Where the engine's process pages are (/workflow/processes/<id>).
+    data-console-url: ${DATA_CONSOLE_URL:https://ec1.mateu.io}
+    booking-url: ${BOOKING_URL:http://localhost:8108}
+    # What check-demo-health asks after a reset: name=url, each a Spring Boot health.
+    health: ${DEMO_HEALTH:booking=http://localhost:8108/actuator/health/readiness}
+    health-timeout: ${DEMO_HEALTH_TIMEOUT:3s}
 
 springdoc:
   packages-to-scan: io.mateu.ecdemo1.integrations.rest

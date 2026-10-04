@@ -20,7 +20,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <mateu.version>3.0-alpha.385</mateu.version>
+        <mateu.version>3.0-alpha.387</mateu.version>
         <eventconductor.version>2.23.1</eventconductor.version>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
         <spring-ai.version>1.0.0</spring-ai.version>
@@ -67,6 +67,21 @@
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
+        </dependency>
+        <!-- The demo's reset (process reset-demo): reset@1, this service emptying its own tables with its
+             consumers paused. Installed from supporting/demo-reset first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <!-- The engine's worker runtime: it binds the task topic (consumeWorkerEvent), runs each task on
+             the handler registered for it and answers the engine on `upstream` — today the demo's
+             reset@1. -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>worker-kafka</artifactId>
+            <version>${eventconductor.version}</version>
         </dependency>
         <!-- The published language: notices (what it publishes) and customer-notices (what it takes
              from the MDM). Installed from ../../contracts first. -->
@@ -142,6 +157,26 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>redpanda</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

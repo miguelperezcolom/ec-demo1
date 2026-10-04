@@ -20,12 +20,13 @@
 
     <properties>
         <java.version>21</java.version>
-        <mateu.version>3.0-alpha.385</mateu.version>
+        <mateu.version>3.0-alpha.387</mateu.version>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
         <!-- Ahead of what Boot 3.4.3 manages (1.18.36), which does not run on a JDK 25 javac and
              fails the build with "TypeTag :: UNKNOWN" rather than anything that names Lombok.
              1.18.44 is what the Boot 4 modules here already resolve to. -->
         <lombok.version>1.18.44</lombok.version>
+        <eventconductor.version>2.23.1</eventconductor.version>
         <!-- Ahead of what Boot 3.4.3 manages (1.20.x), whose docker-java speaks an API version
              Docker 29 no longer accepts. 1.21.4 is what the engine's own container tests use. -->
         <testcontainers.version>1.21.4</testcontainers.version>
@@ -77,6 +78,24 @@
             <artifactId>contracts-testing</artifactId>
             <version>1.0.0</version>
             <scope>test</scope>
+        </dependency>
+
+        <!-- The demo's reset (process reset-demo): the engine's task reset@1 on the topic audit-tasks —
+             the worker runtime (worker-kafka) and the reset every service does to itself (demo-reset). -->
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>shared</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.workflow</groupId>
+            <artifactId>worker-kafka</artifactId>
+            <version>${eventconductor.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>demo-reset</artifactId>
+            <version>0.1.0</version>
         </dependency>
 
         <dependency>

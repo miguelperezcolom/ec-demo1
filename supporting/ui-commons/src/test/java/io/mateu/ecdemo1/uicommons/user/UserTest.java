@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,5 +62,18 @@ class UserTest {
                 .singleElement().isInstanceOf(HorizontalLayout.class);
         assertThat(UserWidget.of(request(Map.of()))).isEmpty();
         assertThat(UserWidget.withInboxBadge(request(Map.of()))).isEmpty();
+        assertThat(UserWidget.withDemoBanner(request(Map.of()))).isEmpty();
+    }
+
+    @Test
+    void every_header_carries_the_demos_banner_first() {
+        var signedIn = request(Map.of("Authorization", ANA));
+        for (var header : List.of(UserWidget.withInboxBadge(signedIn), UserWidget.withDemoBanner(signedIn))) {
+            var layout = (HorizontalLayout) header.get(0);
+            assertThat(layout.content().get(0)).isInstanceOfSatisfying(io.mateu.uidl.data.MicroFrontend.class, banner -> {
+                assertThat(banner.baseUrl()).isEqualTo("/_demo-banner");
+                assertThat(banner.route()).isEqualTo("/banner");
+            });
+        }
     }
 }

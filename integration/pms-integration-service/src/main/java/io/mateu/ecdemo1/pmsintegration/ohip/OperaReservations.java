@@ -12,12 +12,18 @@ import java.util.Optional;
 
 /** Reservations and deposits in Opera (rsv, csh), found by the CRS's locator. */
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class OperaReservations {
 
     final OhipClient ohip;
     final OhipProperties properties;
     final ObjectMapper objectMapper;
+    /** The run's context in Opera, swapped at runtime by reset-demo. */
+    final io.mateu.ecdemo1.pmsintegration.config.OperaContext context;
+
+    public OperaReservations(OhipClient ohip, OhipProperties properties, ObjectMapper objectMapper) {
+        this(ohip, properties, objectMapper, io.mateu.ecdemo1.pmsintegration.config.OperaContext.of(properties));
+    }
 
     /**
      * The reservation the CRS knows by this locator, if Opera has it — whole. A search answers with
@@ -26,7 +32,7 @@ public class OperaReservations {
      */
     public Optional<JsonNode> byLocator(String hotelId, String locator) {
         var found = ohip.get(hotelId, "/rsv/v1/hotels/{h}/reservations?externalReferenceIds={id}&externalSystemCodes={ext}",
-                hotelId, locator, properties.externalSystemCode()).body().path("reservations").path("reservationInfo");
+                hotelId, locator, context.externalSystemCode()).body().path("reservations").path("reservationInfo");
         if (!found.isArray() || found.isEmpty()) {
             return Optional.empty();
         }

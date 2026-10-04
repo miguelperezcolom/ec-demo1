@@ -46,4 +46,8 @@ public interface BookingEntityRepository extends JpaRepository<BookingEntity, St
     List<BookingEntity> future(@Param("hotel") String hotel, @Param("from") LocalDate from,
                                @Param("afterArrival") LocalDate afterArrival, @Param("afterId") String afterId,
                                Pageable pageable);
+
+    /** The bookings whose comments carry this text — a seed's tag — oldest first. */
+    @Query("select b.id from BookingEntity b where b.comments like concat('%', :text, '%') order by b.created, b.id")
+    List<String> idsCommentedWith(@Param("text") String text);
 }

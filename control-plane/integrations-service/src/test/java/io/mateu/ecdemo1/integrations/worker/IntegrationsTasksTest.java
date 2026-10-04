@@ -58,7 +58,8 @@ class IntegrationsTasksTest {
     /** Every @Bean method of IntegrationsTasks that makes a registration, as Spring would call them. */
     List<TaskRegistration<?, ?>> registrations() {
         return Arrays.stream(IntegrationsTasks.class.getDeclaredMethods())
-                .filter(m -> m.getReturnType() == TaskRegistration.class && m.getParameterCount() == 1)
+                .filter(m -> m.getReturnType() == TaskRegistration.class && m.getParameterCount() == 1
+                        && m.getParameterTypes()[0] == TaskHandlers.class)
                 .map(m -> {
                     try {
                         return (TaskRegistration<?, ?>) m.invoke(tasks, handlers);

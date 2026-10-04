@@ -42,6 +42,10 @@ los procesos con su paso e intentos, las causas, los avisos, Opera y la estancia
 
 ## Simular una caída de Opera
 
+Desde la consola de control también: **Demo → Encender la caída de Opera**, un interruptor dentro del
+conector, sin reinicios ni NetworkPolicy, con banner en las consolas — ver
+[La página Demo](/operacion/pagina-demo/). El script corta la red de verdad:
+
 ```sh
 deploy/demo/opera-outage.sh on [--alert-after 2m] [--auto-off 15m]
 deploy/demo/opera-outage.sh off [--restore-alert]
@@ -58,6 +62,9 @@ para la demo (reinicia el conector: hacerlo **antes** de la reserva). El corte s
 el umbral a sus 10 min.
 
 ## Volver atrás
+
+A cero también desde la consola de control, sin parar nada: **Demo → Resetear la demo** (el proceso
+`reset-demo`, ver [La página Demo](/operacion/pagina-demo/)).
 
 | Script | Qué hace |
 | :----- | :------- |

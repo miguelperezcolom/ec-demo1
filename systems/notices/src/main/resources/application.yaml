@@ -18,7 +18,7 @@ spring:
   cloud:
     function:
       # The customers' notices, as the MDM sends them (Salesforce is their master).
-      definition: consumeCustomerNotices
+      definition: consumeWorkerEvent;consumeCustomerNotices
     stream:
       kafka:
         binder:
@@ -40,6 +40,17 @@ spring:
             consumer:
               start-offset: earliest
       bindings:
+        # IN: the tasks the engine dispatches for this worker — today reset@1, the demo's reset
+        # (process reset-demo): the notices service empties its own tables, its other consumers paused. A topic
+        # and a group of its own.
+        consumeWorkerEvent-in-0:
+          destination: notices-tasks
+          group: ec-demo1-notices-worker
+          consumer:
+            concurrency: 1
+        # OUT, via StreamBridge: the replies back to the engine.
+        upstream:
+          destination: upstream
         # OUT, via the outbox relay: every notice, whole, on notices — the front office keeps its copy.
         noticeEvents:
           destination: notices

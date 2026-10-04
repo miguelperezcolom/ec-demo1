@@ -41,15 +41,37 @@ public final class UserWidget {
     private UserWidget() {
     }
 
-    /** The greeting and its popover alone — the front office's header. */
+    /**
+     * The banner a simulated Opera outage shows in every console while it is on — «Simulación: Opera no
+     * responde» — and nothing at all otherwise: the control plane's Demo page switches it
+     * (integrations-service, /_demo-banner, asked again every few seconds).
+     */
+    public static Component demoBanner() {
+        return MicroFrontend.builder()
+                .baseUrl("/_demo-banner")
+                .route("/banner")
+                .build();
+    }
+
+    /** The greeting and its popover alone. */
     public static List<Component> of(HttpRequest httpRequest) {
         return DisplayOnlyTokenClaims.of(httpRequest)
                 .map(claims -> List.<Component>of(popover(claims)))
                 .orElse(List.of());
     }
 
+    /** The front office's header: the demo's banner, then the greeting — one layout, as the consoles'. */
+    public static List<Component> withDemoBanner(HttpRequest httpRequest) {
+        return DisplayOnlyTokenClaims.of(httpRequest)
+                .map(claims -> List.<Component>of(HorizontalLayout.builder()
+                        .content(List.of(demoBanner(), popover(claims)))
+                        .style("align-items: center;")
+                        .build()))
+                .orElse(List.of());
+    }
+
     /**
-     * The consoles' header: the inbox badge — what waits for the signed-in user, the notifications
+     * The consoles' header: the demo's banner (empty unless an Opera outage is simulated), the inbox badge — what waits for the signed-in user, the notifications
      * and the forms engine's tasks of their roles — and then the greeting.
      */
     public static List<Component> withInboxBadge(HttpRequest httpRequest) {
@@ -64,7 +86,9 @@ public final class UserWidget {
     public static List<Component> withInboxBadge(HttpRequest httpRequest, List<Component> before) {
         return DisplayOnlyTokenClaims.of(httpRequest)
                 .map(claims -> {
-                    var content = new java.util.ArrayList<Component>(before);
+                    var content = new java.util.ArrayList<Component>();
+                    content.add(demoBanner());
+                    content.addAll(before);
                     content.add(MicroFrontend.builder()
                             .baseUrl("/_inbox")
                             .route("/badge")

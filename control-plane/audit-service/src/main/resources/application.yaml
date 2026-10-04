@@ -7,7 +7,8 @@ spring:
 
   cloud:
     function:
-      definition: consumeAudit
+      # The trail's topic, and the engine's tasks (worker-kafka: the demo's reset, worker.AuditTasks).
+      definition: consumeAudit;consumeWorkerEvent
     stream:
       kafka:
         binder:
@@ -20,6 +21,15 @@ spring:
         consumeAudit-in-0:
           destination: audit
           group: ec-demo1-audit
+        # IN: the engine's tasks for the audit — the steps of reset-demo that name the topic
+        # audit-tasks. consumeWorkerEvent is the engine's worker runtime (worker-kafka); it is never
+        # paused by the reset it runs (demo-reset keeps it), consumeAudit is.
+        consumeWorkerEvent-in-0:
+          destination: audit-tasks
+          group: ec-demo1-audit-worker
+        # OUT: the replies to the engine.
+        upstream:
+          destination: upstream
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/audit}

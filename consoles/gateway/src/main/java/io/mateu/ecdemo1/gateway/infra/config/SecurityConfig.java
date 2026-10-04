@@ -140,6 +140,8 @@ public class SecurityConfig {
                         // which the route api-usage-page only redirects to the shell's route for it.
                         .pathMatchers(HttpMethod.GET, "/_api-usage/apis").permitAll()
                         .pathMatchers("/_api-usage/**").authenticated()
+                        // The demo's banner (a simulated Opera outage), on every host: signed in, nothing else.
+                        .pathMatchers("/_demo-banner/**").authenticated()
                         // The two demo CRUD services, guarded the same way and for the same
                         // reason: none of them authenticates anything of its own, so this is
                         // the only thing between their screens and whoever types the path. Users
@@ -194,7 +196,10 @@ public class SecurityConfig {
                                 // The registration rules: what the law requires of every guest.
                                 "/_registration-rules/**",
                                 // The audit trail: who did what is personal data too.
-                                "/_audit/**")).hasRole("ai-admin")
+                                "/_audit/**",
+                                // The demo's administration: resetting it to zero deletes data,
+                                // Salesforce's too; simulating an Opera outage stops the PMS.
+                                "/_demo/**")).hasRole("ai-admin")
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Without this, a realm admin's token arrives with no authorities and
