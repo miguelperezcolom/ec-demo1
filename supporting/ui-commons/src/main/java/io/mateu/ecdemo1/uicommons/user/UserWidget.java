@@ -65,7 +65,7 @@ public final class UserWidget {
         return DisplayOnlyTokenClaims.of(httpRequest)
                 .map(claims -> List.<Component>of(HorizontalLayout.builder()
                         .content(List.of(demoBanner(), popover(claims)))
-                        .style("align-items: center;")
+                        .style("align-items: center; gap: 4px; --mateu-content-gutter: 0px;") // no gutter: see withInboxBadge
                         .build()))
                 .orElse(List.of());
     }
@@ -96,7 +96,10 @@ public final class UserWidget {
                     content.add(popover(claims));
                     return List.<Component>of(HorizontalLayout.builder()
                             .content(content)
-                            .style("align-items: center;") // the inbox is an icon button: centred with the greeting
+                            // The remote widgets in it are views, and Mateu gives a view the content gutter (24px each
+                            // side): an empty demo banner was 48px of nothing between the chat and the bell. Here
+                            // there is no content to frame, so no gutter, and a small gap between the icons.
+                            .style("align-items: center; gap: 4px; --mateu-content-gutter: 0px;")
                             .build());
                 })
                 .orElse(List.of());
