@@ -5,6 +5,7 @@ import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Menu;
 import io.mateu.ecdemo1.booking.infra.in.ui.pages.BookingCrudOrchestrator;
 import io.mateu.ecdemo1.booking.infra.in.ui.pages.NewBookingWizard;
+import io.mateu.ecdemo1.booking.infra.in.ui.pages.catalog.CatalogueMenu;
 
 public class BookingMenu {
 
@@ -19,6 +20,11 @@ public class BookingMenu {
     @Hidden
     @Label("New booking")
     NewBookingWizard newBooking;
+
+    /** The CRS's catalogue: the rate plans of each hotel, and New to open one (demo flow 8). */
+    @Menu
+    @Label("Catalogue")
+    CatalogueMenu catalogue;
 
 
 }
