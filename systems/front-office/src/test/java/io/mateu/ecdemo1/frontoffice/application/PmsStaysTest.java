@@ -338,4 +338,18 @@ class PmsStaysTest {
     assertThat(CustomerEvents.apply(kardex, new CustomerChanged("E2", Instant.now(), "C-NOBODY", 1,
         event.data(), true, null, null, null, List.of()))).isFalse();
   }
+
+  @Test
+  void theCrsAgreedPriceIsKeptNextToOperasTotal() {
+    var w = stay("R-AGREED", "LOC-AGREED", "2026-09-27T10:00:00");
+    var withAgreed = new WriteStay(w.commandId(), w.pmsHotelCode(), w.pmsReservationId(), w.confirmationNumber(),
+        w.crsLocator(), w.externalReferences(), w.pmsVersion(), w.status(), w.holder(), w.companions(), w.roomTypeCode(),
+        w.ratePlanCode(), w.boardCode(), w.checkIn(), w.checkOut(), w.pax(), w.agency(), new BigDecimal("346.00"),
+        w.currency(), new BigDecimal("306.00"));
+
+    assertThat(pms.take(withAgreed)).isEqualTo(Outcome.WRITTEN);
+
+    assertThat(stays.findById("LOC-AGREED").orElseThrow().total()).isEqualByComparingTo("346.00");
+    assertThat(links.agreedOf("LOC-AGREED")).hasValueSatisfying(a -> assertThat(a).isEqualByComparingTo("306.00"));
+  }
 }

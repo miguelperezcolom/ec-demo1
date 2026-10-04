@@ -75,13 +75,28 @@ public sealed interface FrontOfficeCommand {
      * @param boardCode          the PMS's package that is the board; null for room only
      * @param agency             who sold it, in words: the travel agent or company on the reservation, or
      *                           the PMS's source
-     * @param total              what the stay costs as the PMS rates it (for a no-show: its fee)
+     * @param total              what the stay costs as the PMS rates it (for a no-show: its fee): its rate
+     *                           and the packages the PMS posts apart from it — what the PMS will bill
+     * @param agreedTotal        the price the CRS agreed: the rate the PMS keeps fixed, without the packages
+     *                           it posts apart (Opera's BRKFST); null for one born in the PMS, or unknown
      */
     record WriteStay(String commandId, String pmsHotelCode, String pmsReservationId, String confirmationNumber,
                      String crsLocator, List<String> externalReferences, String pmsVersion, PmsStatus status,
                      Person holder, List<Person> companions, String roomTypeCode, String ratePlanCode,
                      String boardCode, LocalDate checkIn, LocalDate checkOut, int pax, String agency,
-                     BigDecimal total, String currency) implements FrontOfficeCommand {
+                     BigDecimal total, String currency, BigDecimal agreedTotal) implements FrontOfficeCommand {
+
+        /** Without the CRS's agreed price: a command written before it was carried, or one born in the PMS. */
+        public WriteStay(String commandId, String pmsHotelCode, String pmsReservationId, String confirmationNumber,
+                         String crsLocator, List<String> externalReferences, String pmsVersion, PmsStatus status,
+                         Person holder, List<Person> companions, String roomTypeCode, String ratePlanCode,
+                         String boardCode, LocalDate checkIn, LocalDate checkOut, int pax, String agency,
+                         BigDecimal total, String currency) {
+            this(commandId, pmsHotelCode, pmsReservationId, confirmationNumber, crsLocator, externalReferences,
+                    pmsVersion, status, holder, companions, roomTypeCode, ratePlanCode, boardCode, checkIn, checkOut,
+                    pax, agency, total, currency, null);
+        }
+
         @Override
         public String key() {
             return pmsHotelCode + "/" + pmsReservationId;

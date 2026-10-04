@@ -59,7 +59,8 @@ public final class StayMapper {
                 isoLocal(r.path("lastModifyDateTime").asText(r.path("createDateTime").asText(""))), status(r, context),
                 holder, companions(r), text(rate.path("roomType")), text(rate.path("ratePlanCode")), board(r),
                 OperaStays.date(stay.path("arrivalDate")), OperaStays.date(stay.path("departureDate")), pax,
-                agency(r, rate), total(r, stay, rate, context), currency(rate));
+                agency(r, rate), total(r, stay, rate, context), currency(rate),
+                crsLocator == null ? null : total(stay, rate));
     }
 
     static PmsStatus status(JsonNode r, Context context) {
@@ -137,7 +138,8 @@ public final class StayMapper {
         }
         return new WriteStay(w.commandId(), w.pmsHotelCode(), w.pmsReservationId(), w.confirmationNumber(), w.crsLocator(),
                 w.externalReferences(), w.pmsVersion(), w.status(), w.holder(), List.copyOf(companions), w.roomTypeCode(),
-                w.ratePlanCode(), w.boardCode(), w.checkIn(), w.checkOut(), w.pax(), w.agency(), w.total(), w.currency());
+                w.ratePlanCode(), w.boardCode(), w.checkIn(), w.checkOut(), w.pax(), w.agency(), w.total(), w.currency(),
+                w.agreedTotal());
     }
 
     static String fullName(io.mateu.ecdemo1.integration.model.reservation.Person p) {
@@ -231,7 +233,8 @@ public final class StayMapper {
      * What the stay costs as Opera will charge it: its rate's total and, but for a no-show's fee or a
      * cancellation, the packages Opera posts apart from the rate ({@code addToRate} false) — the board at
      * XMAR (BRKFST, 40 MUR a night): Opera's folio, and so its invoice, carries them, and the front
-     * office's accommodation line must too for the totals to match.
+     * office's accommodation line must too for the totals to match. The CRS's agreed price — the rate
+     * alone, which Opera keeps fixed — travels next to it ({@code agreedTotal}), for the desk to see both.
      */
     static BigDecimal total(JsonNode r, JsonNode stay, JsonNode rate, Context context) {
         var total = total(stay, rate);

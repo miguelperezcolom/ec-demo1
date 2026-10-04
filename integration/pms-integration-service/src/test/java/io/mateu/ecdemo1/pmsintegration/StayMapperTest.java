@@ -85,6 +85,8 @@ class StayMapperTest {
         assertThat(stay.checkOut()).isEqualTo(LocalDate.of(2026, 11, 12));
         assertThat(stay.pax()).isEqualTo(3);
         assertThat(stay.total()).isEqualByComparingTo(new BigDecimal("372"));
+        // the CRS's price, as Opera keeps it fixed: the rate alone
+        assertThat(stay.agreedTotal()).isEqualByComparingTo(new BigDecimal("372"));
         assertThat(stay.currency()).isEqualTo("MUR");
         assertThat(stay.agency()).isEqualTo("Directo · Central Reservation");
         assertThat(stay.key()).isEqualTo("XMAR/39484601");
@@ -203,6 +205,8 @@ class StayMapperTest {
 
         // The rate (306) and the breakfast Opera posts apart (40): what Opera's folio will carry for the stay.
         assertThat(stay.total()).isEqualByComparingTo(new BigDecimal("346"));
+        // born in Opera (no CRS locator): no price the CRS agreed
+        assertThat(stay.agreedTotal()).isNull();
     }
 
     static io.mateu.ecdemo1.integration.model.reservation.Person crsPerson(String first, String last) {

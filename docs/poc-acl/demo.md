@@ -554,6 +554,14 @@ El CRS es el dueño de todas las reservas; el front office es un canal más (`WA
 Hace falta la equivalencia `WALKIN → WLK` (canal, MRU01), que el agente propone en el alta. El CRS no
 modela disponibilidad: el presupuesto es un precio, no una habitación bloqueada.
 
+**Precio del CRS y total de Opera.** El precio del CRS es el acordado con el huésped (régimen incluido) y
+viaja a Opera como tarifa fija. Opera suma **aparte** el paquete del régimen cuando la tarifa no lo incluye
+(BRKFST en XMAR, 20 MUR por persona y noche): su total —lo que factura, y lo que siguen el folio, la
+preautorización y la factura del front office— es mayor (walk-in 306 → 346). La estancia del front office
+enseña los dos: **PRECIO CRS** y **TOTAL OPERA** (con «+40 paquetes de Opera»); iguales, un solo «TOTAL
+RESERVA». El desayuno se cobra así dos veces: el arreglo de fondo es de la proyección a Opera (una tarifa
+de XMAR que incluya el paquete, o el régimen fuera del precio fijo), pendiente de probarlo contra Opera.
+
 ## Flujo 6. Opera no responde: un proceso bloqueado espera, no falla
 
 Los cinco flujos de la grabación (1, alta: §4–7; 2, cliente que vuelve: §9; 3, cambio de datos: §10;

@@ -34,15 +34,34 @@ public final class GuestHeaders {
         .title(FrontOffice.withFlag(stayId, 1, guest.id(), guest.name()))
         .badges(badges)
         .subtitle(staySubtitle(stay))
-        .facts(
-            List.of(
-                Fact.builder().label("TOTAL RESERVA").value(euros(stay.total())).build(),
-                Fact.builder().label("AGENCIA").value(stay.agency()).build()))
+        .facts(totalFacts(stay.total(), FrontOffice.agreedPrice(stayId).orElse(null), stay.agency()))
         .metricLabel("FIDELIDAD")
         .metricValue(points(guest))
         .metricCaption(guest.stays() + " estancias")
         .style("width: 100%;")
         .build();
+  }
+
+  /**
+   * What the stay costs. The CRS's price is the one agreed with the guest — the rate Opera keeps fixed —;
+   * Opera's total adds the packages it posts apart from the rate (XMAR's breakfast, BRKFST), and that is
+   * what Opera bills and the folio, the preauthorization and the invoice follow. Equal (or the CRS's
+   * unknown, born in Opera): one «TOTAL RESERVA», as before; different: both, the CRS's first, and by
+   * how much Opera's goes over.
+   */
+  static List<Fact> totalFacts(BigDecimal total, BigDecimal agreed, String agency) {
+    var facts = new ArrayList<Fact>();
+    if (agreed == null || total == null || agreed.compareTo(total) == 0) {
+      facts.add(Fact.builder().label("TOTAL RESERVA").value(euros(total)).build());
+    } else {
+      var over = total.subtract(agreed);
+      facts.add(Fact.builder().label("PRECIO CRS").value(euros(agreed)).build());
+      facts.add(Fact.builder().label("TOTAL OPERA")
+          .value(euros(total) + " (" + (over.signum() > 0 ? "+" : "−") + euros(over.abs()) + " paquetes de Opera)")
+          .build());
+    }
+    facts.add(Fact.builder().label("AGENCIA").value(agency).build());
+    return facts;
   }
 
   /** The departing guest's banner at check-out. */

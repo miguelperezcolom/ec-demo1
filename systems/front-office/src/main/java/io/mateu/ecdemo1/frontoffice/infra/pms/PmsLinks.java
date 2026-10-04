@@ -51,4 +51,14 @@ public class PmsLinks {
     jdbc.update("update stay set pms_reservation_id = ?, pms_version = ?, rate_plan = ? where id = ?",
         pmsReservationId, pmsVersion, ratePlan, stayId);
   }
+
+  /** The price the CRS agreed for the stay (the rate the PMS keeps fixed); null when unknown. */
+  public void agreed(String stayId, java.math.BigDecimal agreedTotal) {
+    jdbc.update("update stay set agreed_total = ? where id = ?", agreedTotal, stayId);
+  }
+
+  public Optional<java.math.BigDecimal> agreedOf(String stayId) {
+    return jdbc.query("select agreed_total from stay where id = ?", (rs, n) -> rs.getBigDecimal(1), stayId).stream()
+        .filter(java.util.Objects::nonNull).findFirst();
+  }
 }
