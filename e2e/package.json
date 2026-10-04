@@ -5,7 +5,8 @@
   "scripts": {
     "test": "playwright test",
     "report": "playwright show-report",
-    "demo": "playwright test --config demo.config.ts"
+    "demo": "playwright test --config demo.config.ts",
+    "demo:ui": "playwright test --config demo-ui.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0"
