@@ -36,6 +36,9 @@ public class Inbox {
 
     public static final String EVERYONE = "*";
 
+    /** A task's inbox item is {@code task/} and the task's id. */
+    static final String TASK_PREFIX = "task/";
+
     final InboxItemRepository items;
     final InboxSeenRepository seen;
     final ResolutionRepository resolutions;
@@ -77,7 +80,7 @@ public class Inbox {
      */
     @Transactional
     public void task(HumanTask t) {
-        var id = "task/" + t.taskId();
+        var id = TASK_PREFIX + t.taskId();
         if (!t.open()) {
             resolve(id, t.userId(), t.at() == null ? clock.instant() : t.at().plusMillis(1));
             return;
@@ -90,7 +93,7 @@ public class Inbox {
         item.title = t.formName() == null || t.formName().isBlank() ? "Task " + t.formId() : t.formName();
         item.body = "A form waits to be filled in" + (t.userId() == null || t.userId().isBlank() ? "" : ", by " + t.userId())
                 + ". Process " + t.processId() + ", step " + t.stepId() + ".";
-        item.link = properties.inbox().tasksLink();
+        item.link = properties.inbox().linkTo(t.taskId());
         var plan = routing.plan(Recipient.TASK, null);
         var required = t.requiredRoles() == null || t.requiredRoles().isEmpty()
                 ? properties.inbox().rolesOf(t.formId()) : t.requiredRoles();
@@ -140,6 +143,21 @@ public class Inbox {
     /** What waits for this person — theirs by name, or by one of these roles — newest first. */
     public List<InboxItem> openFor(Collection<String> roles, String username) {
         return items.findByResolvedAtIsNullOrderByCreatedAtDesc().stream().filter(i -> visibleTo(i, roles, username)).toList();
+    }
+
+    /**
+     * Where an item is resolved. A task's is worked out from the task, not read from the row: rows
+     * written before tasks had a page of their own carry the tasks list, and an inbox item lives as
+     * long as its task waits.
+     */
+    public String linkOf(InboxItem item) {
+        if (item == null) {
+            return null;
+        }
+        if (InboxItem.Kind.TASK.name().equals(item.kind) && item.id != null && item.id.startsWith(TASK_PREFIX)) {
+            return properties.inbox().linkTo(item.id.substring(TASK_PREFIX.length()));
+        }
+        return item.link;
     }
 
     public java.util.Optional<InboxItem> find(String id) {

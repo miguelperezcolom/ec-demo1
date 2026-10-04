@@ -63,7 +63,7 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
         var rows = inbox.openFor(Caller.roles(httpRequest), Caller.username(httpRequest)).stream()
                 .filter(i -> text.isEmpty() || (i.title + " " + i.body + " " + i.hotelCode + " " + i.type).toLowerCase().contains(text))
                 .sorted(order(seenAt))
-                .map(i -> row(i, seen))
+                .map(i -> row(i, inbox.linkOf(i), seen))
                 .toList();
         return Paging.page(rows, request);
     }
@@ -84,8 +84,8 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
         });
     }
 
-    static InboxRow row(InboxItem i, Set<String> seen) {
-        var open = i.link == null || i.link.isBlank() ? new ColumnAction[0] : new ColumnAction[] {new ColumnAction("open", "Open")};
+    static InboxRow row(InboxItem i, String link, Set<String> seen) {
+        var open = link == null || link.isBlank() ? new ColumnAction[0] : new ColumnAction[] {new ColumnAction("open", "Open")};
         return new InboxRow(i.id, i.createdAt == null ? "" : WHEN.format(i.createdAt), kind(i), i.hotelCode, i.title, i.body,
                 seen.contains(i.id), new ColumnActionGroup(open));
     }
@@ -103,11 +103,14 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
     /** The row's Open: marks it seen and goes where it is resolved. */
     public Object open(HttpRequest httpRequest) {
         var item = inbox.find(clickedId(httpRequest)).orElse(null);
-        if (item == null || item.link == null || item.link.isBlank()) {
+        var link = inbox.linkOf(item);
+        if (link == null || link.isBlank()) {
             return null;
         }
         inbox.markSeen(List.of(item.id), Caller.username(httpRequest));
-        return List.of(UICommand.navigateTo(destination(item.link, origin(httpRequest))), UICommand.dispatchEvent(SEEN));
+        // A task's link is a path, so it opens in the console the inbox is open in: the forms engine's
+        // page for that task answers on both (see CommunicationProperties.Inbox).
+        return List.of(UICommand.navigateTo(destination(link, origin(httpRequest))), UICommand.dispatchEvent(SEEN));
     }
 
     /**
