@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -202,5 +203,40 @@ class StayMapperTest {
 
         // The rate (306) and the breakfast Opera posts apart (40): what Opera's folio will carry for the stay.
         assertThat(stay.total()).isEqualByComparingTo(new BigDecimal("346"));
+    }
+
+    static io.mateu.ecdemo1.integration.model.reservation.Person crsPerson(String first, String last) {
+        return new io.mateu.ecdemo1.integration.model.reservation.Person(first, last,
+                io.mateu.ecdemo1.integration.model.reservation.GuestType.ADULT, null, null, null, "ES", null, null, null);
+    }
+
+    static io.mateu.ecdemo1.integration.model.reservation.Reservation crs(
+            List<io.mateu.ecdemo1.integration.model.reservation.Person> guests) {
+        return new io.mateu.ecdemo1.integration.model.reservation.Reservation("MRU01", "QS4KX8", 1,
+                io.mateu.ecdemo1.integration.model.reservation.ReservationStatus.CONFIRMED, "WEB", null, null,
+                java.time.LocalDate.of(2026, 11, 2), java.time.LocalDate.of(2026, 11, 5), "EUR", crsPerson("Ebba", "Johansson"),
+                List.of(new io.mateu.ecdemo1.integration.model.reservation.Room(1, "JS-STD", "DIRECTA", "AD", 2, List.of(),
+                        guests, List.of())), List.of(), new java.math.BigDecimal("918"), null, null);
+    }
+
+    @Test
+    void theCompanionsOperaDoesNotNameAreTheCrsGuests() throws Exception {
+        var stay = StayMapper.toWriteStay("XMAR", reservation("Reserved", "", CRS_REFS), NO_CUSTOMER);
+        var bare = new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.WriteStay(stay.commandId(),
+                stay.pmsHotelCode(), stay.pmsReservationId(), stay.confirmationNumber(), stay.crsLocator(),
+                stay.externalReferences(), stay.pmsVersion(), stay.status(),
+                new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.Person(null, "P1", "Ebba Johansson",
+                        null, null, null),
+                List.of(), stay.roomTypeCode(), stay.ratePlanCode(), stay.boardCode(), stay.checkIn(), stay.checkOut(), 2,
+                stay.agency(), stay.total(), stay.currency());
+
+        var named = StayMapper.withCrsGuests(bare, crs(List.of(crsPerson("Ebba", "Johansson"), crsPerson("Lucía", "Pérez"))));
+
+        assertThat(named.companions()).extracting(c -> c.name()).containsExactly("Lucía Pérez");
+        assertThat(named.holder().name()).isEqualTo("Ebba Johansson");
+        // no more than the stay's pax, and nothing to do without the CRS's booking
+        assertThat(StayMapper.withCrsGuests(bare, crs(List.of(crsPerson("Lucía", "Pérez"), crsPerson("Ivo", "Sanz"))))
+                .companions()).hasSize(1);
+        assertThat(StayMapper.withCrsGuests(bare, null)).isSameAs(bare);
     }
 }

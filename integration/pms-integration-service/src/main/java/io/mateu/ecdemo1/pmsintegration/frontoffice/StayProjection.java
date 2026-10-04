@@ -46,11 +46,13 @@ public class StayProjection {
     final ObjectMapper objectMapper;
     /** The run's context in Opera, swapped at runtime by reset-demo. */
     final io.mateu.ecdemo1.pmsintegration.config.OperaContext context;
+    /** Which CRS hotel an Opera property is: the CRS's guests are read by the CRS's hotel code. */
+    final io.mateu.ecdemo1.pmsintegration.connections.Connections connections;
 
     public StayProjection(OperaStays stays, IntegrationClients integration, OhipProperties ohip,
                           PmsIntegrationProperties properties, StreamBridge streamBridge, ObjectMapper objectMapper) {
         this(stays, integration, ohip, properties, streamBridge, objectMapper,
-                ohip == null ? null : io.mateu.ecdemo1.pmsintegration.config.OperaContext.of(ohip));
+                ohip == null ? null : io.mateu.ecdemo1.pmsintegration.config.OperaContext.of(ohip), null);
     }
 
     public void project(String hotel, String reservationId) {
@@ -69,6 +71,7 @@ public class StayProjection {
                 .orElse(null);
         var command = StayMapper.toWriteStay(hotel, reservation, new StayMapper.Context(context.externalSystemCode(),
                 new HashSet<>(properties.noShowCancellationCodes()), customerId, master));
+        command = StayMapper.withCrsGuests(command, crsReservation(hotel, command));
         send(command);
         log.info("{}/{} ({}) to the front office: {} {}..{} {} {} v{}", hotel, reservationId,
                 command.crsLocator() == null ? "born in Opera" : "CRS " + command.crsLocator(), command.status(),
@@ -76,6 +79,29 @@ public class StayProjection {
                 command.pmsVersion());
         if (customerId != null) {
             integration.xref(customerId, "FRONT_OFFICE", customerId, hotel + "/" + reservationId);
+        }
+    }
+
+    /**
+     * The CRS's booking behind the stay, when Opera knows fewer of its people than it has: Opera holds
+     * the holder's profile only — the integration writes no profile for the others — so their names
+     * are the CRS's. Null when it was born in Opera, when Opera already names everyone, or when the CRS
+     * does not answer (the stay goes as Opera has it, and the next projection names them).
+     */
+    io.mateu.ecdemo1.integration.model.reservation.Reservation crsReservation(String hotel, FrontOfficeCommand.WriteStay command) {
+        if (command.crsLocator() == null || connections == null
+                || (command.companions() == null ? 0 : command.companions().size()) >= command.pax() - 1) {
+            return null;
+        }
+        try {
+            var crsHotel = connections.integrations().stream().filter(i -> hotel.equals(i.pmsHotelCode()))
+                    .map(io.mateu.ecdemo1.integration.model.integration.IntegrationView::crsHotelCode)
+                    .findFirst().orElse(null);
+            return crsHotel == null ? null : integration.reservation(crsHotel, command.crsLocator());
+        } catch (RuntimeException e) {
+            log.info("{}: the CRS's guests of {} not read ({}); the stay goes with Opera's", hotel, command.crsLocator(),
+                    e.getMessage());
+            return null;
         }
     }
 

@@ -105,6 +105,50 @@ public final class StayMapper {
                 or(m.email(), person.email()), or(m.phone(), person.phone()));
     }
 
+    /**
+     * The stay with the CRS booking's people where Opera has none: Opera's companions first (they carry
+     * a profile), then the CRS's guests that are neither the holder nor already among them, by name, up
+     * to the stay's pax — so the front office reads «Lucía Pérez», not «Acompañante 2».
+     */
+    public static WriteStay withCrsGuests(WriteStay w, io.mateu.ecdemo1.integration.model.reservation.Reservation crs) {
+        if (crs == null || crs.rooms() == null) {
+            return w;
+        }
+        var companions = new ArrayList<Person>(w.companions() == null ? List.of() : w.companions());
+        var named = new java.util.HashSet<String>();
+        companions.forEach(c -> named.add(key(c.name())));
+        if (w.holder() != null) {
+            named.add(key(w.holder().name()));
+        }
+        if (crs.holder() != null) {
+            named.add(key(fullName(crs.holder())));
+        }
+        for (var room : crs.rooms()) {
+            for (var guest : room.guests() == null ? List.<io.mateu.ecdemo1.integration.model.reservation.Person>of() : room.guests()) {
+                if (companions.size() >= w.pax() - 1) {
+                    break;
+                }
+                var name = fullName(guest);
+                if (name.isBlank() || !named.add(key(name))) {
+                    continue;
+                }
+                companions.add(new Person(null, null, name, guest.documentNumber(), guest.email(), guest.phone()));
+            }
+        }
+        return new WriteStay(w.commandId(), w.pmsHotelCode(), w.pmsReservationId(), w.confirmationNumber(), w.crsLocator(),
+                w.externalReferences(), w.pmsVersion(), w.status(), w.holder(), List.copyOf(companions), w.roomTypeCode(),
+                w.ratePlanCode(), w.boardCode(), w.checkIn(), w.checkOut(), w.pax(), w.agency(), w.total(), w.currency());
+    }
+
+    static String fullName(io.mateu.ecdemo1.integration.model.reservation.Person p) {
+        return ((p.firstName() == null ? "" : p.firstName()) + " " + (p.lastName() == null ? "" : p.lastName())).strip();
+    }
+
+    static String key(String name) {
+        return name == null ? "" : java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", " ").strip();
+    }
+
     static List<Person> companions(JsonNode r) {
         var list = new ArrayList<Person>();
         var guests = r.path("reservationGuests");
