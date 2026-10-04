@@ -31,7 +31,18 @@ import java.util.NoSuchElementException;
 @Title("Causes")
 public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<CauseViewModel, String> {
 
-    static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
+    /**
+     * The consoles' time, as everywhere else (the journey's, the demo page's, the front office's): the
+     * pods run in UTC, and a cause opened at 11:46 read 09:46.
+     */
+    static final ZoneId ZONE = ZoneId.of("Europe/Madrid");
+    static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZONE);
+    static final DateTimeFormatter MOMENT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZONE);
+
+    /** A moment, in the consoles' time; empty when there is none. */
+    static String moment(java.time.Instant at) {
+        return at == null ? "" : MOMENT.format(at);
+    }
 
     final CauseQueries causes;
     final ObjectProvider<CauseViewModel> detail;
@@ -41,7 +52,7 @@ public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<Caus
     @Override
     public ListingData<CauseRow> search(SearchRequest request, HttpRequest httpRequest) {
         return DbPaging.page(request, p -> causes.page(request.searchText(), p), c -> new CauseRow(c.causeKey,
-                c.type.name(), c.hotelCode, causes.waitingOn(c.causeKey),
+                c.type.name(), c.hotelCode, CauseRow.reason(c.type, c.description), causes.waitingOn(c.causeKey),
                 c.openedAt == null ? "" : WHEN.format(c.openedAt), c.openings,
                 c.status == CauseStatus.OPEN ? new Status(StatusType.WARNING, "Open")
                         : new Status(StatusType.SUCCESS, "Resolved")));

@@ -460,7 +460,7 @@ public class TaskHandlers {
         } catch (PmsRejectedException e) {
             integration.await(required(task, ProcessVariables.PROCESS_KEY, input.processKey()),
                     required(task, ProcessVariables.DEFINITION_ID, input.definitionId()), null,
-                    partner.code(), input.variables(), List.of(Cause.pmsRejectedPartner(partner.code(), e.getMessage())));
+                    partner.code(), input.variables(), List.of(Cause.pmsRejectedPartner(partner.code(), e.reason())));
             return new PartnerProfiled(Outcome.WAIT.name(), null, null);
         }
     }
@@ -507,7 +507,7 @@ public class TaskHandlers {
     void rejected(TaskContext task, ReservationTask input, Reservation r, String what, PmsRejectedException e) {
         log.warn("Opera refused the {}: {} ({})", what, e.getMessage(), e.errorCode());
         await(input, r, List.of(Cause.pmsRejectedReservation(r.hotelCode(), r.locator(), task.stepId(),
-                "%s — %s".formatted(e.getMessage(), e.errorCode()))));
+                e.reason())));
     }
 
     void await(ReservationTask input, Reservation r, List<Cause> causes) {

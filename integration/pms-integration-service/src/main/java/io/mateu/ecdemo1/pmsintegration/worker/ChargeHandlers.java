@@ -240,7 +240,7 @@ public class ChargeHandlers {
                 input.lineId(), input.stayId(), e.getMessage(), e.errorCode());
         TaskHandlers.tag("opera.refused", e.getMessage());
         await(input, List.of(Cause.pmsRejectedReservation(input.hotelCode(), input.locator(), task.stepId(),
-                "%s — %s".formatted(e.getMessage(), e.errorCode()))));
+                e.reason())));
         outcomes.charge(input.pmsHotelCode(), reservationId, input.stayId(), input.lineId(), reversal, true, e.getMessage(), null);
     }
 

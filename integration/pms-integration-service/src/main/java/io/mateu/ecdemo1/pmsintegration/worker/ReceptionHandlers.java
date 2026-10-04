@@ -386,7 +386,7 @@ public class ReceptionHandlers {
                 input.stayId(), e.getMessage(), e.errorCode());
         TaskHandlers.tag("opera.refused", e.getMessage());
         await(input, List.of(Cause.pmsRejectedReservation(input.hotelCode(), input.locator(), task.stepId(),
-                "%s — %s".formatted(e.getMessage(), e.errorCode()))));
+                e.reason())));
         outcomes.refused(input.pmsHotelCode(), reservationId, input.stayId(), operation, e.getMessage());
         var wait = Outcome.WAIT.name();
         if (output == RoomAssigned.class) {

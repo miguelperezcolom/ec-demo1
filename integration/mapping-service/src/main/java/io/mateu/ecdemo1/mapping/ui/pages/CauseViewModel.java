@@ -124,10 +124,10 @@ public class CauseViewModel implements Identifiable, VisibilitySupplier {
         type = cause.type.name();
         description = cause.description;
         hotel = cause.hotelCode;
-        openedAt = String.valueOf(cause.openedAt);
-        resolved = cause.resolvedAt == null ? "" : cause.resolvedAt + " by " + cause.resolvedBy;
+        openedAt = CausesPage.moment(cause.openedAt);
+        resolved = cause.resolvedAt == null ? "" : CausesPage.moment(cause.resolvedAt) + " by " + cause.resolvedBy;
         waiting = queries.processesPendingOn(cause.causeKey).stream()
-                .map(w -> new WaitingRow(w.processKey, w.definitionId, w.subject, String.valueOf(w.createdAt),
+                .map(w -> new WaitingRow(w.processKey, w.definitionId, w.subject, CausesPage.moment(w.createdAt),
                         w.status.name(), w.engineProcessId == null ? "unknown" : w.engineProcessId,
                         rowActions ? new ColumnActionGroup(new ColumnAction[] {new ColumnAction("discardWaiter", "Descartar")})
                                 : null))
