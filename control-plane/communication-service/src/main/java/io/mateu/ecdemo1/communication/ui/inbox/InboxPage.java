@@ -86,7 +86,7 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
 
     static InboxRow row(InboxItem i, String link, Set<String> seen) {
         var open = link == null || link.isBlank() ? new ColumnAction[0] : new ColumnAction[] {new ColumnAction("open", "Open")};
-        return new InboxRow(i.id, i.createdAt == null ? "" : WHEN.format(i.createdAt), kind(i), i.hotelCode, i.title, i.body,
+        return new InboxRow(i.id, i.createdAt == null ? "" : WHEN.format(i.createdAt), kind(i), i.hotelCode, i.title, detailOf(i),
                 seen.contains(i.id), new ColumnActionGroup(open));
     }
 
@@ -179,5 +179,12 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
         }
         var direct = parameters.get("id");
         return direct == null ? null : String.valueOf(direct);
+    }
+
+    /** The row's detail: the whole title first — the column cuts it — and then what it says. */
+    static String detailOf(io.mateu.ecdemo1.communication.store.InboxItem i) {
+        var title = i.title == null ? "" : i.title;
+        var body = i.body == null ? "" : i.body;
+        return title.isBlank() ? body : body.isBlank() ? title : title + "\n\n" + body;
     }
 }
