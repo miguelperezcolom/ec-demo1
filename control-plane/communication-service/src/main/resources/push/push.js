@@ -1,7 +1,8 @@
-// Web Push for the consoles and the front office: loaded by every shell (@Script), served by
-// communication-service through the gateway.
+// The inbox's script, loaded by every shell (@Script) and served by communication-service through
+// the gateway: the inbox badge's navigation (just below), and Web Push for the consoles and the
+// front office.
 //
-// Waits for the Keycloak token the bootstrap page keeps in localStorage, registers the service
+// Web Push waits for the Keycloak token the bootstrap page keeps in localStorage, registers the service
 // worker, and — once the person allowed notifications — tells the inbox where this browser is. It
 // does so on every load, so the roles it receives for are always the current ones. The permission
 // is only asked after a click: browsers ignore, or block, a request nobody asked for.
@@ -15,6 +16,52 @@
 // for good), and <ec-push-toggle> — the "Avisos" line of the user menu — which says the state of this
 // browser (activados / desactivados / bloqueados por el navegador / no disponibles) and turns them on
 // or off, or sends a test. window.ecPush is the same, for a console to call.
+// The inbox badge's way in (InboxBadge): an element carrying data-ec-route navigates there in-app.
+// Mateu sanitises the HTML it renders, so the badge cannot carry an onclick; this listens once, on
+// the document, and turns a click on it — or Enter or Space where it is not an upgraded button (the
+// Redwood shell has no <vaadin-button>) — into the navigation-requested event the menu sends, with
+// the pod that owns the route. Both renderers listen for that event. Capture phase and composedPath:
+// in the Vaadin shell the badge lives inside shadow roots, and a click must reach this however the
+// components in between handle it.
+(() => {
+  if (window.__ecRouteLinks) return;
+  window.__ecRouteLinks = true;
+
+  const target = event => {
+    for (const node of event.composedPath()) {
+      if (node instanceof Element && node.hasAttribute('data-ec-route')) return node;
+    }
+    return null;
+  };
+
+  const go = (link, event) => {
+    event.preventDefault();
+    link.dispatchEvent(new CustomEvent('navigation-requested', {
+      detail: {
+        route: link.getAttribute('data-ec-route'),
+        consumedRoute: '',
+        baseUrl: link.getAttribute('data-ec-base-url') || '',
+        uriPrefix: '',
+        serverSideType: link.getAttribute('data-ec-server-side-type') || undefined,
+      },
+      bubbles: true,
+      composed: true,
+    }));
+  };
+
+  document.addEventListener('click', event => {
+    const link = target(event);
+    if (link) go(link, event);
+  }, true);
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const link = target(event);
+    // an upgraded <vaadin-button> turns Enter and Space into a click by itself
+    if (link && !customElements.get(link.localName)) go(link, event);
+  }, true);
+})();
+
 (() => {
   if (window.ecPush) return; // loaded twice: the first one is already at work
 

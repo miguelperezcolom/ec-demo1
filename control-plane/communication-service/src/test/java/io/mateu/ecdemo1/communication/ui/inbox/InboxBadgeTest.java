@@ -25,8 +25,31 @@ class InboxBadgeTest {
                 .startsWith("<vaadin-button theme=\"tertiary icon\"")
                 .contains("aria-label=\"Bandeja (2 · 2 urgentes)\"", "title=\"Bandeja (2 · 2 urgentes)\"")
                 .contains("icon=\"vaadin:bell-o\"")
-                .contains("'/inbox/pending'")
                 .doesNotContain("<a ", "&nbsp;", "Inbox (", "vaadin:bell\"");
+    }
+
+    /**
+     * Mateu sanitises rendered HTML (DOMPurify): an inline handler is stripped, and with it the way
+     * in. The badge says where it goes in data attributes, which survive; the inbox's script makes
+     * the navigation.
+     */
+    @Test
+    void itOpensTheInboxWithoutInlineHandlers() {
+        var html = InboxBadge.html(2, 1);
+        assertThat(html)
+                .contains("data-ec-route=\"/inbox/pending\"", "data-ec-base-url=\"/_inbox\"",
+                        "data-ec-server-side-type=\"" + InboxHome.class.getName() + "\"")
+                .doesNotContainPattern("(?i)\\son[a-z]+\\s*=")
+                .doesNotContain("javascript:", "<script");
+    }
+
+    @Test
+    void theInboxScriptTurnsTheBadgeIntoANavigation() throws Exception {
+        try (var in = InboxBadgeTest.class.getResourceAsStream("/push/push.js")) {
+            assertThat(in).isNotNull();
+            var script = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            assertThat(script).contains("data-ec-route", "'navigation-requested'", "composedPath()");
+        }
     }
 
     @Test

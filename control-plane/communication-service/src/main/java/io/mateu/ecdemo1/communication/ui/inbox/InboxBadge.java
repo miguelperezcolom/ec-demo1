@@ -37,7 +37,8 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
 
     String content = "";
 
-    Object refresh() {
+    // Public: since Mateu 386 an unmarked method is an action only if it is public.
+    public Object refresh() {
         return new State(this);
     }
 
@@ -57,25 +58,29 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
         return "Bandeja (" + waiting + (urgent > 0 ? " · " + urgent + (urgent == 1 ? " urgente" : " urgentes") : "") + ")";
     }
 
+    /** Where the badge goes: the inbox's pending items, a route of the inbox's own pod. */
+    static final String ROUTE = "/inbox/pending";
+
     /**
      * The badge as the header's other icon buttons: a tertiary icon button with an outline bell in
      * the header's icon colour, and the count as a small pill over the bell's top end — red while
      * something urgent waits. The words are in its tooltip and accessible name, not on the bar.
      *
-     * <p>It is HTML because both shells draw it from the same string. The Vaadin shell upgrades
-     * {@code <vaadin-button>} into a Lumo button (size, hover, focus ring). The Redwood shell has no
-     * such element: there it stays a plain focusable element ({@code role}, {@code tabindex}, and the
-     * keydown that a real button would not need), its {@code <vaadin-icon>} becomes the Redwood bell,
-     * and the colours fall back to the header's own (the {@code --lumo-*} ones are not defined there,
-     * except the urgent red, which the Redwood header sets to its light danger tone).
+     * <p>It is HTML because both shells draw it from the same string: Redwood draws a remote header
+     * widget from its {@code Text}s alone, so a Mateu button or element would not be there at all.
+     * The Vaadin shell upgrades {@code <vaadin-button>} into a Lumo button (size, hover, focus ring).
+     * The Redwood shell has no such element: there it stays a plain focusable element ({@code role},
+     * {@code tabindex}), its {@code <vaadin-icon>} becomes the Redwood bell, and the colours fall back
+     * to the header's own (the {@code --lumo-*} ones are not defined there, except the urgent red,
+     * which the Redwood header sets to its light danger tone).
+     *
+     * <p>No inline handlers: Mateu sanitises rendered HTML, and an {@code onclick} does not survive
+     * it. The {@code data-ec-route} attributes say where it goes, and the inbox's script, which every
+     * shell loads ({@code /_inbox/push/push.js}), turns a click on it — or Enter or Space where it is
+     * not a real button — into the same {@code navigation-requested} the menu sends: an in-app
+     * navigation in both renderers, to a route of this pod.
      */
     static String html(int waiting, long urgent) {
-        var go = "event.preventDefault(); this.dispatchEvent(new CustomEvent('navigation-requested', {"
-                + "detail: {route: '/inbox/pending', consumedRoute: '', baseUrl: '/_inbox', uriPrefix: '',"
-                + " serverSideType: '" + InboxHome.class.getName() + "'}, bubbles: true, composed: true}))";
-        // Redwood: Enter and Space on the (non-upgraded) element; a vaadin-button handles them itself
-        var keys = "if (!customElements.get('vaadin-button') && (event.key === 'Enter' || event.key === ' ')) {"
-                + " event.preventDefault(); this.click(); }";
         var label = label(waiting, urgent);
         var bell = "<vaadin-icon icon=\"vaadin:bell-o\" style=\"width: var(--lumo-icon-size-m, 1.25em);"
                 + " height: var(--lumo-icon-size-m, 1.25em);\"></vaadin-icon>";
@@ -89,7 +94,8 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
                 + "\">" + (waiting > 99 ? "99+" : String.valueOf(waiting)) + "</span>";
         return "<vaadin-button theme=\"tertiary icon\" role=\"button\" tabindex=\"0\""
                 + " aria-label=\"" + label + "\" title=\"" + label + "\""
-                + " onclick=\"" + go + "\" onkeydown=\"" + keys + "\""
+                + " data-ec-route=\"" + ROUTE + "\" data-ec-base-url=\"/_inbox\""
+                + " data-ec-server-side-type=\"" + InboxHome.class.getName() + "\""
                 + " style=\"position: relative; display: inline-flex; align-items: center; justify-content: center;"
                 + " min-width: var(--lumo-size-m, 2.25rem); height: var(--lumo-size-m, 2.25rem); margin: 0; cursor: pointer;"
                 + " color: var(--mateu-header-icon-color, var(--lumo-secondary-text-color, currentColor));\">"
