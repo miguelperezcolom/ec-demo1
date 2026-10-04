@@ -39,13 +39,12 @@ import org.springframework.stereotype.Service;
 @Title("Walk-in")
 @Subtitle("Un cliente sin reserva: la estancia, el precio del CRS, el titular y la confirmación")
 @Style(StyleConstants.CONTAINER)
-// Redwood's Guided Process: the walk-in opens on its overview — the four steps side by side, each
-// marked completed once done — and «Inicio» goes through them with the step list on the right. It
-// is a process started from nothing, where seeing the whole of it first helps; the check-in keeps
-// the steps across the top (it opens from a stay, and its steps need the full width)
-@WizardProgress(WizardProgressStyle.RAIL)
+// the steps across the top, like the check-in: in Redwood a train over the step (a list of steps
+// under 768px), with the wizard's own Atrás / Siguiente in the footer. RAIL would make it Redwood's
+// Guided Process instead — an overview of columns, then the step list down the right-hand side —,
+// which is not how the desk wants it
+@WizardProgress(WizardProgressStyle.STEPS)
 // the screens are written in Spanish; without this the wizard's own buttons read Back / Next
-// (Vaadin's — the guided process brings its own, in the browser's language)
 @WizardLabels(back = "Atrás", next = "Siguiente")
 public class WalkInWizard extends Wizard {
 
