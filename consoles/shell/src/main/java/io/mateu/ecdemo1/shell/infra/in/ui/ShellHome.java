@@ -75,11 +75,12 @@ import java.util.List;
 // and the booking service over MCP, and each of those decides what it is willing to expose.
 @AI(sse = "/ai/api/agent/stream")
 // The light/dark switch in the header, next to the chat toggle: the theme otherwise follows the OS only.
-// The menu on top, declared: since Mateu 385 a shell with remote menus keeps the variant it declares
-// (the client no longer forces MENU_ON_TOP), and AUTO would pick another one for this many entries.
+// Two levels, as in the control console and Opera Cloud: the hamburger lists the sections (each one a
+// service's remote menu) and the band below the header shows the active section's own entries.
+// Declared, since AUTO never picks it.
 // RIU's red as the brand accent: a line under the menu band and the console name in it (light theme).
 // Not the primary colour — it never means "clickable".
-@App(value = AppVariant.MENU_ON_TOP, themeToggle = true, accentColor = "#D2232A")
+@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#D2232A")
 public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**

@@ -211,7 +211,9 @@ forms:
   image: miguelperezcolom/forms-standalone-app
   # 2.19.0: announces its human tasks (HumanTaskChanged, topic human-tasks) — the inbox shows them.
   # 2.23.6: jackson 3.1.7 (CVE-2026-89407/-91776/-91777).
-  imageTag: "2.23.6"
+  # 2.23.7: a task page by its own route (/forms/task/{id}) — the inbox links to it; claim takes the
+  # signed-in user, only the assignee completes (eventconductor#451).
+  imageTag: "2.23.7"
   replicas: 1
   servicePort: 8106
   # The engine owns its schema now. It always could — the image ships flyway-core and

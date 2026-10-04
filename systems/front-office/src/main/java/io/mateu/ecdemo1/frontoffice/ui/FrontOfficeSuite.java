@@ -26,6 +26,9 @@ import java.util.List;
 // The hotel's staff log in with the chain's Keycloak, as in the consoles (same realm and client).
 @io.mateu.uidl.annotations.KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
 @App(themeToggle = true) // variante AUTO: menú plano de RouteLinks → TABS (in-app navigation)
+// Sus propios colores, para no parecer una consola más: la barra superior y la franja de color en
+// azul petróleo (la línea Health de Redwood) — static/theme/console-theme.js.
+@io.mateu.uidl.annotations.Script(src = "/theme/console-theme.js")
 @io.mateu.uidl.annotations.Logo("/images/riu.svg")
 @io.mateu.uidl.annotations.FavIcon("/images/riu.svg")
 // Web Push at the desk: the inbox's script, through the gateway (front.ec1's /_inbox/push/**). It
