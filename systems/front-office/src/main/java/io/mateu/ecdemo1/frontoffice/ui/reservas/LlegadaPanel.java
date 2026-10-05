@@ -69,6 +69,33 @@ final class LlegadaPanel {
     return operaciones(stay).stream().allMatch(Op::done);
   }
 
+  /** The operations the check-in wizard does itself; the others are done only on their card here. */
+  static final java.util.Set<String> EN_EL_WIZARD =
+      java.util.Set.of("documentos", "habitacion", "firma", "cobro", "llave", "extras");
+
+  /** Where «check-in» goes: straight in, to the wizard, or back to a card the wizard has not got. */
+  enum Siguiente { DIRECTO, WIZARD, TARJETA }
+
+  /**
+   * What the check-in button does with what is missing. Anything the wizard can do, or the service's
+   * own checks (the registration rules' data, a blocking notice unread), opens the wizard; what only a
+   * card does (the wifi card) is asked for on the card — the wizard would be another dead end.
+   */
+  static Siguiente siguiente(List<Op> ops, boolean listoParaDirecto, boolean avisosLeidos) {
+    var pendientes = ops.stream().filter(op -> !op.done()).toList();
+    if (!listoParaDirecto || !avisosLeidos || pendientes.stream().anyMatch(op -> EN_EL_WIZARD.contains(op.id()))) {
+      return Siguiente.WIZARD;
+    }
+    return pendientes.isEmpty() ? Siguiente.DIRECTO : Siguiente.TARJETA;
+  }
+
+  /** What is missing that only its card does, for the desk: «Tarjeta wifi («Crear»)». */
+  static String soloEnTarjeta(List<Op> ops) {
+    return ops.stream().filter(op -> !op.done() && !EN_EL_WIZARD.contains(op.id()))
+        .map(op -> op.title() + (op.actionLabel() == null ? "" : " («" + op.actionLabel() + "»)"))
+        .collect(Collectors.joining(", "));
+  }
+
   /** The check-in operations of an arriving stay — completed and pending, with quick actions. */
   List<Op> operaciones(Stay stay) {
     var ops = r.queries.ops(stay.id());
