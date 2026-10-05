@@ -368,7 +368,9 @@ public class ReservaOverview
             "opIncidencia", "crearIncidencia", "enviarMensaje",
             "opExtras", "extras360", "cerrarExtras", "opFirma", "opFirmaDone",
             "buscarCargos", "seleccionarCargo", "cambiarMetodo", "confirmPayment", "entendidoCheckout",
-            "anularCargo", "comprobarHabitacion", "completarCheckin")
+            "anularCargo", "comprobarHabitacion", "completarCheckin",
+            // Mateu 392 refuses an action a component does not declare here («not an action»)
+            "noShowPax", "confirmarNoShowPax", "cancelarNoShowPax", "guardarExtras")
         .contains(actionId);
   }
 
