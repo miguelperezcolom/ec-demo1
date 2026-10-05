@@ -63,6 +63,16 @@ public class CheckInWizard extends Wizard {
   boolean populated;
   int selectedPax = 1;
 
+  /**
+   * The conditional steps this check-in run shows, comma separated — frozen when the run opens
+   * ({@link #populate()}): a step that was pending then stays on the train once done (✓) instead of
+   * vanishing because it no longer is pending.
+   */
+  String pasos;
+
+  /** The steps shown only when something they do is pending; the rest always apply. */
+  static final List<String> PASOS_CONDICIONALES = List.of("avisos", "identidad", "habitacion", "extras");
+
   @Label("Avisos")
   AvisosStep avisos = new AvisosStep();
 
@@ -138,6 +148,9 @@ public class CheckInWizard extends Wizard {
     extras.setExtrasSeleccionados("");
     extras.setExtrasTotal(0);
     confirmar.setStayId(stayId);
+    // the run's steps: what is pending NOW, kept for the whole run
+    pasos = null;
+    pasos = String.join(",", PASOS_CONDICIONALES.stream().filter(this::stepApplies).toList());
     // operaciones ya completadas desde la Reserva 360 (o un wizard anterior): el paso
     // Confirmar las muestra en verde y no las vuelve a pedir
     var ops = queries.ops(stayId);
@@ -227,7 +240,7 @@ public class CheckInWizard extends Wizard {
             this, UICommand.dispatchEvent("pax-seleccionado", Map.of("paxIndex", selectedPax)));
       }
       case "refrescarIdentidad" -> {
-        return this;
+        return siguientePax(httpRequest);
       }
       case "encodeKey" -> {
         // SSE: re-render immediately as "Grabando llave…"; 5 s later (the encoder finishes)
@@ -292,6 +305,29 @@ public class CheckInWizard extends Wizard {
     }
   }
 
+  /**
+   * A document was scanned (or registered by hand) for the selected pax: the desk goes on to the next
+   * pax still lacking identity — the band selects it and the Documento island re-points to it — and,
+   * once none is left, to the next step. Any other refresh (a contact edit) just re-renders.
+   */
+  Object siguientePax(HttpRequest httpRequest) {
+    if (!Boolean.parseBoolean(param(httpRequest, "avanzar"))
+        || !"identidad".equals(currentStepField().getName())) {
+      return this;
+    }
+    var next = queries.nextPendingPax(stayId, selectedPax);
+    if (next > 0) {
+      selectedPax = next;
+      identidad.setSelectedPax(selectedPax);
+      identidad.load(httpRequest);
+      return List.of(
+          this, UICommand.dispatchEvent("pax-seleccionado", Map.of("paxIndex", selectedPax)));
+    }
+    var result = super.handleAction("next", httpRequest);
+    syncConfirmar();
+    return result;
+  }
+
   static String param(HttpRequest httpRequest, String name) {
     var rq = httpRequest.runActionRq();
     if (rq == null || rq.parameters() == null || rq.parameters().get(name) == null) {
@@ -336,6 +372,9 @@ public class CheckInWizard extends Wizard {
     if (stayId == null || stayId.isBlank()) {
       return true;
     }
+    if (pasos != null) {
+      return pasoDeLaRun(pasos, stepFieldName);
+    }
     if (completando()) {
       return switch (stepFieldName) {
         case "identidad" -> queries.pendingPax(queries.view(stayId).stay()) > 0;
@@ -352,6 +391,12 @@ public class CheckInWizard extends Wizard {
       case "extras" -> !queries.ops(stayId).extras();
       default -> true;
     };
+  }
+
+  /** Whether a step belongs to the run whose frozen conditional steps are {@code pasos}. */
+  static boolean pasoDeLaRun(String pasos, String stepFieldName) {
+    return !PASOS_CONDICIONALES.contains(stepFieldName)
+        || java.util.Arrays.asList(pasos.split(",")).contains(stepFieldName);
   }
 
   /** The stay is already in (its check-in was forced): the wizard completes what it owes. */

@@ -356,7 +356,8 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
               .withProgressBar()
               .done("Documento verificado", "Identidad leída del documento")
               .closeAfter(1)
-              .withCommand(UICommand.dispatchEvent("documento-escaneado"))
+              // avanzar: the wizard and this island go on to the next pax still lacking identity
+              .withCommand(UICommand.dispatchEvent("documento-escaneado", java.util.Map.of("avanzar", true)))
               .run(
                   progress ->
                       Flux.range(1, 4)
@@ -369,12 +370,27 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
                                 return progress.step(SCAN_STEPS[i - 1], i / 4.0);
                               }));
       case "save" -> {
+        // registering a pending pax by hand completes it like a scan: go on to the next one; a
+        // contact edit of a complete pax stays on it
+        boolean registro = !pax().complete();
         var result =
             new ArrayList<Object>((java.util.Collection<?>) super.handleAction(actionId, httpRequest));
-        result.add(UICommand.dispatchEvent("documento-escaneado"));
+        result.add(UICommand.dispatchEvent("documento-escaneado", java.util.Map.of("avanzar", registro)));
         yield result;
       }
-      case "reloadDocumento" -> reload();
+      case "reloadDocumento" -> {
+        // the same next pax the wizard selects (both read it from the stay), so the band and the
+        // island agree whichever reload lands last
+        var avanzar = httpRequest.runActionRq().parameters() == null ? null
+            : httpRequest.runActionRq().parameters().get("avanzar");
+        if (Boolean.parseBoolean(String.valueOf(avanzar)) && stayId != null && !stayId.isBlank()) {
+          var next = queries.nextPendingPax(stayId, paxIndex());
+          if (next > 0) {
+            paxIndex = next;
+          }
+        }
+        yield reload();
+      }
       case "cambiarPax" -> {
         var raw = httpRequest.runActionRq().parameters().get("paxIndex");
         if (raw instanceof Number number) {
