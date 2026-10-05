@@ -34,6 +34,34 @@ public final class CheckInChecklist {
   }
 
   /**
+   * The pax the desk goes on to after {@code after} (1 = the holder): the next one, in order and
+   * wrapping round, that still lacks a verified identity and is not a no-show; 0 when none is left.
+   */
+  public static int nextPendingPax(Stay stay, Guest holder, CheckInOps ops, int after) {
+    int pax = Math.max(stay.pax(), 1);
+    int from = after < 1 || after > pax ? pax : after;
+    for (int k = 1; k <= pax; k++) {
+      int candidate = (from - 1 + k) % pax + 1;
+      if (paxPending(stay, holder, ops, candidate)) {
+        return candidate;
+      }
+    }
+    return 0;
+  }
+
+  /** Whether pax {@code paxN} (1 = the holder) still lacks a verified identity, no-shows aside. */
+  static boolean paxPending(Stay stay, Guest holder, CheckInOps ops, int paxN) {
+    if (ops.isNoShow(paxN)) {
+      return false;
+    }
+    if (paxN == 1) {
+      return holder == null || !holder.identityComplete();
+    }
+    var companions = stay.companions();
+    return paxN - 2 >= companions.size() || !companions.get(paxN - 2).identityComplete();
+  }
+
+  /**
    * What the check-in still lacks to be complete: the identity document of each pax (no-shows aside)
    * and the guest's signature on the registration card. Empty, the stay can check in; otherwise only a
    * forced check-in lets it in, and it stays incomplete until these are done.

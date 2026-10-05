@@ -79,6 +79,12 @@ public class StayQueries {
     return CheckInChecklist.pendingPax(stay, guests.findById(stay.guestId()).orElse(null), ops(stay.id()));
   }
 
+  /** The next pax after {@code after} still lacking a verified identity (wrapping round), 0 when none. */
+  public int nextPendingPax(String stayId, int after) {
+    var stay = stay(stayId);
+    return CheckInChecklist.nextPendingPax(stay, guests.findById(stay.guestId()).orElse(null), ops(stay.id()), after);
+  }
+
   /** Whether the desk can check the stay in with no question left to ask — the registration rules' data included. */
   public boolean readyForDirectCheckIn(Stay stay) {
     return CheckInChecklist.readyForDirectCheckIn(stay, guests.findById(stay.guestId()).orElse(null),
