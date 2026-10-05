@@ -337,11 +337,12 @@ public class ReservaOverview
     }
     var stay = stay();
     return switch (stay.status()) {
-      // habilitado SOLO con todos los cardex OK (no-shows aparte) y las operaciones hechas
+      // siempre habilitado: con todo hecho confirma; si falta algo, lleva a completarlo (iniciarCheckin)
+      // — un botón gris no dice qué falta
       case ARRIVING -> List.of(
-          Button.builder().label("Confirmar check-in").actionId("iniciarCheckin")
+          Button.builder().label(llegada().listo(stay) ? "Confirmar check-in" : "Completar check-in")
+              .actionId("iniciarCheckin")
               .buttonStyle(ButtonStyle.primary)
-              .disabled(!llegada().listo(stay))
               .build());
       case IN_HOUSE -> List.of(
           Button.builder().label("Check-out").actionId("irCheckout").buttonStyle(ButtonStyle.primary).build(),
@@ -620,14 +621,25 @@ public class ReservaOverview
   }
 
   /**
-   * Con todo resuelto (pax, habitación, ancillaries) no hay nada que preguntar: check-in directo y
-   * la 360 se re-renderiza ya in-house, sin pasar por el wizard; si falta algo, el wizard.
+   * Con todo resuelto (las operaciones de la llegada, los datos de registro, los avisos) no hay nada
+   * que preguntar: check-in directo y la 360 se re-renderiza ya in-house, sin pasar por el wizard. Si
+   * falta algo que el wizard hace, el wizard; si solo falta lo que hace una tarjeta (la wifi), se dice
+   * cuál y se queda aquí.
    */
   private Object iniciarCheckin() {
     var stay = stay();
+    var ops = llegada().operaciones(stay);
     // un aviso bloqueante sin leer se lee en el primer paso del wizard
-    if (!queries.readyForDirectCheckIn(stay) || !notices.checkInAcknowledged(stay)) {
-      return URI.create("/checkin/" + stayId);
+    switch (LlegadaPanel.siguiente(ops, queries.readyForDirectCheckIn(stay), notices.checkInAcknowledged(stay))) {
+      case WIZARD -> {
+        return URI.create("/checkin/" + stayId);
+      }
+      case TARJETA -> {
+        return List.of(this, new Message("Falta: " + LlegadaPanel.soloEnTarjeta(ops)
+            + ". Hazlo en su tarjeta y vuelve a pulsar «Confirmar check-in»."));
+      }
+      case DIRECTO -> {
+      }
     }
     Stay checkedIn;
     try {
