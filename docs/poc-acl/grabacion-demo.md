@@ -121,7 +121,7 @@ Pegar esto en una sesión de Claude Code abierta en `~/IdeaProjects/ec-demo1`:
   - **Renderizador:** Redwood en las consolas (`rw.ec1.mateu.io`, `rw-console.ec1.mateu.io`) y en
     el front office. Si algo de Redwood falla en una toma, se graba esa toma en Vaadin
     (`ec1.mateu.io`, `console.ec1.mateu.io`).
-  - **Login:** demo/demo en Keycloak.
+  - **Login:** el usuario `demo` en Keycloak (contraseña en `deploy/.secrets/credentials.env`).
 - **Duración:** unos 20 minutos en total (ver arriba; la espera del flujo 6 se recorta en el montaje).
 
 ## Reset

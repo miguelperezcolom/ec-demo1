@@ -153,7 +153,7 @@ o el evento (`…:evt-…`).
 
 **No `ALL` en la demo**: el UAT de Opera es compartido, y con `ALL` el front office de MRU01 pasa a tener
 todas las reservas de XMAR en la ventana — el 2026-09-27, 814 estancias `OP-…` con huéspedes reales de
-otros, con sus datos de contacto, a la vista con demo/demo. El ámbito no se cambia después de dar de alta
+otros, con sus datos de contacto, a la vista con el usuario demo. El ámbito no se cambia después de dar de alta
 la integración: otro ámbito es otra integración (dar de baja la actual y dar de alta otra).
 
 **Ojo, nombres de Opera**: el front office enseña las palabras de Opera — «Standard King», «Suite
