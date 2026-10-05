@@ -1,5 +1,6 @@
 e2e/playwright-report
 e2e/test-results
+e2e/demo-ui-report
 .idea
 *.iml
 node_modules
