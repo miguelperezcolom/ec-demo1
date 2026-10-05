@@ -335,6 +335,8 @@ apply_dashboard ia-tokens            ia-tokens.json            ia-tokens.json
 apply_dashboard ia-agents            ia-agents.json            ia-agents.json
 apply_dashboard booking-traces       booking-traces.json       booking-traces.json
 apply_dashboard external-apis        external-apis.json        external-apis.json
+# The errors the browsers' renderers report (Mateu's POST <base>/mateu/v3/client-log, logger mateu.client).
+apply_dashboard client-errors        client-errors.json        client-errors.json
 
 echo "══ 6/6  Waiting for the workloads ══"
 kubectl rollout status deployment/ec-eventconductor-orchestrator -n "$NS" --timeout=10m
