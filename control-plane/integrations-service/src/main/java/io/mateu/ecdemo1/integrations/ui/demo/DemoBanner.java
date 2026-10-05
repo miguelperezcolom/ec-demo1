@@ -38,7 +38,11 @@ public class DemoBanner implements Hydratable, ComponentTreeSupplier {
 
     String content = "";
 
-    Object refresh() {
+    // Public: since Mateu 392 a non-public method without an action annotation is not an action, and
+
+    // the class-level @Action(id = "refresh") the triggers call does not count — it was refused (403).
+
+    public Object refresh() {
         return new State(this);
     }
 
