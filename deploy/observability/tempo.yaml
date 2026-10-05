@@ -44,6 +44,10 @@ tempo:
         wait: 10s
       span_metrics:
         dimensions: [service.name, span.name, status.code]
+  # As long as the journey page looks back (JourneyProperties.lookback, 7 days; Tempo searches at
+  # most 168 h) and as Loki keeps logs. The chart's default is 24h: a booking's journey vanished
+  # the day after it was made, while the page still listed the booking.
+  retention: 168h
   storage:
     trace: { backend: local }
   receivers:
