@@ -55,6 +55,9 @@ public class BookingDBQueryService implements BookingQueryService {
                 if (criteria.hotelCode() != null) {
                     where.add(cb.equal(root.get("hotelCode"), criteria.hotelCode()));
                 }
+                if (criteria.ids() != null && !criteria.ids().isEmpty()) {
+                    where.add(root.get("id").in(criteria.ids()));
+                }
                 if (criteria.statuses() != null && !criteria.statuses().isEmpty()) {
                     where.add(root.get("status").in(criteria.statuses().stream().map(Enum::name).toList()));
                 }
