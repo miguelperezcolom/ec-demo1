@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.integrations.frontoffice;
 
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCatalogueSummary;
 import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand;
+import io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeHotel;
 import io.mateu.ecdemo1.integration.model.integration.ConnectivityCheck;
 import io.mateu.ecdemo1.integration.model.integration.OhipConnection;
 import io.mateu.ecdemo1.integration.model.notification.NotificationRequested;
@@ -93,9 +94,27 @@ public class FrontOfficeIntegrations {
 
     // ── what a person does ──────────────────────────────────────────────────
 
-    /** Registers the integration and starts its onboarding. One per PMS property. */
+    /**
+     * Registers the integration and starts its onboarding. One per PMS property. The front office has to
+     * serve the hotel, and take that property's stays: asked here, so a code it does not know is refused
+     * now and not found out when its notifications reach no one. A front office that does not answer is
+     * not a refusal — the onboarding's connectivity gate waits for it, and asks again.
+     */
     @Audited("Register front office integration")
     public FrontOfficeIntegration register(Registration r, String by) {
+        require(r.pmsHotelCode(), "the PMS property");
+        require(r.frontOfficeCode(), "the front office");
+        var url = blankOr(r.frontOfficeUrl(), properties.frontOfficeUrl());
+        List<FrontOfficeHotel> served = null;
+        try {
+            served = services.frontOfficeHotels(url);
+        } catch (RuntimeException e) {
+            log.warn("Front office {} did not say which hotels it serves: {}", url, e.getMessage());
+        }
+        var refused = notServed(served, url, r.frontOfficeCode().trim(), r.pmsHotelCode().trim());
+        if (refused != null) {
+            throw new IllegalArgumentException(refused);
+        }
         return writes.write(() -> {
             require(r.pmsHotelCode(), "the PMS property");
             require(r.frontOfficeCode(), "the front office");
@@ -392,7 +411,10 @@ public class FrontOfficeIntegrations {
         ConnectivityCheck frontOffice;
         try {
             var summary = services.frontOfficeCatalogueSummary(i.frontOfficeUrl);
-            frontOffice = new ConnectivityCheck(true, "front office %s reachable%s".formatted(i.frontOfficeUrl,
+            var refused = notServed(services.frontOfficeHotels(i.frontOfficeUrl), i.frontOfficeUrl, i.frontOfficeCode,
+                    i.pmsHotelCode);
+            frontOffice = refused != null ? new ConnectivityCheck(false, refused)
+                    : new ConnectivityCheck(true, "front office %s reachable%s".formatted(i.frontOfficeUrl,
                     summary == null || summary.pmsHotelCode() == null ? " (no PMS catalogue yet)"
                             : " (holds %s's catalogue)".formatted(summary.pmsHotelCode())));
         } catch (RuntimeException e) {
@@ -523,6 +545,27 @@ public class FrontOfficeIntegrations {
         return integrations.findFirstByPmsHotelCodeAndStatusNot(pmsHotelCode, FoIntegrationStatus.DECOMMISSIONED)
                 .or(() -> integrations.findByPmsHotelCodeOrderByCreatedAtDesc(pmsHotelCode).stream().findFirst())
                 .orElseThrow(() -> new NoSuchElementException("No front office integration for property " + pmsHotelCode));
+    }
+
+    /**
+     * Why the front office at {@code url} is not the one for this hotel and property; null if it is, or if
+     * it does not say which hotels it serves ({@code served} null).
+     */
+    static String notServed(List<FrontOfficeHotel> served, String url, String frontOfficeCode, String pmsHotelCode) {
+        if (served == null) {
+            return null;
+        }
+        var hotel = served.stream().filter(h -> h.code().equalsIgnoreCase(frontOfficeCode)).findFirst();
+        if (hotel.isEmpty()) {
+            return "The front office at %s does not serve %s: it serves %s".formatted(url, frontOfficeCode,
+                    served.isEmpty() ? "no hotel" : String.join(", ", served.stream()
+                            .map(h -> "%s (%s, Opera %s)".formatted(h.code(), h.name(), h.pmsHotelCode())).toList()));
+        }
+        if (!pmsHotelCode.equalsIgnoreCase(hotel.get().pmsHotelCode())) {
+            return "The front office's %s takes the stays of Opera %s, not %s".formatted(hotel.get().code(),
+                    hotel.get().pmsHotelCode(), pmsHotelCode);
+        }
+        return null;
     }
 
     static void require(String value, String what) {

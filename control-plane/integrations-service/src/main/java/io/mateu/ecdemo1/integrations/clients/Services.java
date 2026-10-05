@@ -102,6 +102,20 @@ public class Services {
                 .body(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCatalogueSummary.class);
     }
 
+    /**
+     * The hotels the front office serves, with the PMS property each takes; null when it does not say —
+     * a front office built before it did answers 404.
+     */
+    public List<io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeHotel> frontOfficeHotels(String frontOfficeUrl) {
+        try {
+            return frontOffices.computeIfAbsent(frontOfficeUrl, url -> client(url, reader)).get()
+                    .uri("/api/hotels").retrieve().body(new ParameterizedTypeReference<>() {
+                    });
+        } catch (HttpClientErrorException.NotFound e) {
+            return null;
+        }
+    }
+
     // ── the mapping ───────────────────────────────────────────────────────────
 
     public List<PendingCode> pendingMappings(String crsHotelCode) {

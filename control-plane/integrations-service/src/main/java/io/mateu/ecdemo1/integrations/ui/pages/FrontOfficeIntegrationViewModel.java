@@ -6,6 +6,8 @@ import io.mateu.ecdemo1.integrations.frontoffice.FoPolling;
 import io.mateu.ecdemo1.integrations.frontoffice.FrontOfficeIntegrations;
 import io.mateu.ecdemo1.integrations.rest.FrontOfficeIntegrationDto;
 import io.mateu.ecdemo1.integrations.store.FrontOfficeIntegration;
+import io.mateu.ecdemo1.integrations.ui.suppliers.FrontOfficeHotelLabel;
+import io.mateu.ecdemo1.integrations.ui.suppliers.FrontOfficeHotelOptions;
 import io.mateu.ecdemo1.integrations.ui.suppliers.OperaPropertyLabel;
 import io.mateu.ecdemo1.integrations.ui.suppliers.OperaPropertyOptions;
 import io.mateu.uidl.annotations.Action;
@@ -53,9 +55,10 @@ public class FrontOfficeIntegrationViewModel implements Identifiable, io.mateu.u
     @EditableOnlyWhenCreating
     @Lookup(search = OperaPropertyOptions.class, label = OperaPropertyLabel.class)
     String operaProperty;
-    /** The front office's hotel, as it names itself. */
+    /** The front office's hotel, as it names itself: one of those it says it serves. */
     @NotEmpty
     @EditableOnlyWhenCreating
+    @Lookup(search = FrontOfficeHotelOptions.class, label = FrontOfficeHotelLabel.class)
     String frontOffice;
     String name;
     /** Where the front office answers the integration's queries; the stays and the catalogue go by Kafka. */

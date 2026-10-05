@@ -76,6 +76,8 @@ class FrontOfficeIntegrationsTest {
     // The world around the integration, changed by each test.
     static volatile boolean operaWorks = true;
     static volatile boolean frontOfficeUp = true;
+    /** The hotels the front office says it serves; null: it does not say (404), as one built before it did. */
+    static volatile String frontOfficeServes;
     /** The catalogue command the front office says it holds. */
     static volatile String frontOfficeHolds = null;
     /** The property's reservations: id → last modification. */
@@ -114,6 +116,7 @@ class FrontOfficeIntegrationsTest {
                          {"type":"PACKAGE","code":"BRKFST","description":"Desayuno buffet"},
                          {"type":"ROOM","code":"001","description":"Doble Baño Jardín Balcón","extra":"DBJB"}]""";
                 case "/front-office/reservations" -> stamps(query);
+                case "/api/hotels" -> !frontOfficeUp ? null : frontOfficeServes == null ? "404" : frontOfficeServes;
                 case "/api/pms-catalogue/summary" -> frontOfficeUp ? """
                         {"pmsHotelCode":%s,"commandId":%s,"syncedAt":null,"counts":{"ROOM_TYPE":2,"PACKAGE":1,"ROOM":1}}"""
                         .formatted(frontOfficeHolds == null ? "null" : "\"XMAR\"",
@@ -122,6 +125,8 @@ class FrontOfficeIntegrationsTest {
             };
             if (body == null) {
                 exchange.sendResponseHeaders(503, -1);
+            } else if (body.equals("404")) {
+                exchange.sendResponseHeaders(404, -1);
             } else {
                 var bytes = body.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -177,11 +182,14 @@ class FrontOfficeIntegrationsTest {
         operaWorks = true;
         frontOfficeUp = true;
         frontOfficeHolds = null;
+        frontOfficeServes = SERVES_MRU01;
         reservations.clear();
         for (var n = 1; n <= 5; n++) {
             reservations.put("R" + n, "2026-09-2%dT10:00:00".formatted(n));
         }
     }
+
+    static final String SERVES_MRU01 = "[{\"code\":\"MRU01\",\"name\":\"Riu Demo Mauricio\",\"pmsHotelCode\":\"XMAR\"}]";
 
     /** Registered without saying a scope: it gets the default, only what the chain's integration wrote. */
     String register() {
@@ -322,6 +330,35 @@ class FrontOfficeIntegrationsTest {
         functions.consumePmsReservations().accept(org.springframework.messaging.support.MessageBuilder
                 .withPayload("not json".getBytes(StandardCharsets.UTF_8)).build());
         assertThat(integration(id).getStatus()).isEqualTo(FoIntegrationStatus.ACTIVE);
+    }
+
+    @Test
+    void theFrontOfficeHasToServeTheHotelAndTakeTheProperty() {
+        assertThatThrownBy(() -> lifecycle.register(new FrontOfficeIntegrations.Registration("XMAR", "RANDOM1", null, null,
+                null, null), "ana")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not serve RANDOM1").hasMessageContaining("MRU01 (Riu Demo Mauricio, Opera XMAR)");
+        assertThatThrownBy(() -> lifecycle.register(new FrontOfficeIntegrations.Registration("XMU", "MRU01", null, null,
+                null, null), "ana")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("takes the stays of Opera XMAR, not XMU");
+        assertThat(integrations.findAll()).isEmpty();
+        assertThat(calls).anyMatch(c -> c.equals("GET /api/hotels"));
+
+        // A front office that does not say which hotels it serves is not a refusal.
+        frontOfficeServes = null;
+        assertThat(lifecycle.register(new FrontOfficeIntegrations.Registration("XMAR", "MRU01", null, null, null, null),
+                "ana").frontOfficeCode).isEqualTo("MRU01");
+    }
+
+    @Test
+    void registeredWhileTheFrontOfficeWasDownItsConnectivityFailsIfItDoesNotServeTheHotel() {
+        frontOfficeUp = false;
+        var id = lifecycle.register(new FrontOfficeIntegrations.Registration("XMAR", "RANDOM1", null, null, null, null),
+                "ana").id;
+        frontOfficeUp = true;
+        lifecycle.stepVerifyConnectivity(id);
+        assertThat(integration(id).getStatus()).isEqualTo(FoIntegrationStatus.CONNECTIVITY_FAILED);
+        assertThat(integration(id).connectivityMessage).contains("does not serve RANDOM1");
+        assertThat(lifecycle.gateOpen(integration(id))).isFalse();
     }
 
     @Test
