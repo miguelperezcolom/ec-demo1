@@ -1,6 +1,8 @@
 {
   "realm": "ec-demo1",
   "enabled": true,
+  "ssoSessionIdleTimeout": 86400,
+  "ssoSessionMaxLifespan": 86400,
   "sslRequired": "external",
   "registrationAllowed": false,
   "loginTheme": "keycloak",
