@@ -110,9 +110,19 @@ public class ReservationPayload {
             if (partner.billingMode() == BillingMode.NO_FRONT) {
                 // The partner pays the stay: room and board go to its window; the guest's window keeps
                 // what the guest consumes (F001, "ventanas de folio").
-                var routing = reservation.putArray("routingInstructions").addObject();
-                routing.put("folioWindowNo", 2).put("profileId", partnerProfileId);
-                routing.putArray("transactionCodes").add("ROOM").add("PACKAGE");
+                // OHIP's shape (rsv routingInfoType): a folio routing to window 2 with the partner as
+                // payee, and one instruction for the whole stay carrying the transaction codes. A flat
+                // {folioWindowNo, profileId, transactionCodes} is 400 OPERAWS-GEN01242 «Unknown property
+                // … routingInstructions -> null -> folioWindowNo».
+                var folio = reservation.putArray("routingInstructions").addObject().putObject("folio");
+                folio.put("folioWindowNo", 2);
+                folio.putObject("payeeInfo").putObject("payeeId").put("id", partnerProfileId).put("type", "Profile");
+                var instruction = folio.putArray("instructions").addObject();
+                instruction.putObject("duration").put("daily", true).putObject("timeSpan")
+                        .put("startDate", r.arrival().toString()).put("endDate", r.departure().toString());
+                var trx = instruction.putArray("transactionCodes");
+                trx.addObject().put("transactionCode", "ROOM");
+                trx.addObject().put("transactionCode", "PACKAGE");
             }
         }
         reservation.putObject("userDefinedFields").putArray("numericUDFs").addObject()

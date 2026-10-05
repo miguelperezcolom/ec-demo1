@@ -120,9 +120,19 @@ class ReservationPayloadTest {
         var noFront = payload.build(reservation(List.of(), "AD"), codes(), "RIUPMI", "G1", partner(BillingMode.NO_FRONT), "P1", "Agent");
 
         assertThat(front.path("reservations").path("reservation").get(0).has("routingInstructions")).isFalse();
-        var routing = noFront.path("reservations").path("reservation").get(0).path("routingInstructions").get(0);
-        assertThat(routing.path("folioWindowNo").asInt()).isEqualTo(2);
-        assertThat(routing.path("profileId").asText()).isEqualTo("P1");
+        var routings = noFront.path("reservations").path("reservation").get(0).path("routingInstructions");
+        assertThat(routings.size()).isEqualTo(1);
+        // OHIP's routingInfoType: everything hangs from «folio»; a flat folioWindowNo is OPERAWS-GEN01242.
+        var routing = routings.get(0);
+        assertThat(routing.has("folioWindowNo")).isFalse();
+        var folio = routing.path("folio");
+        assertThat(folio.path("folioWindowNo").asInt()).isEqualTo(2);
+        assertThat(folio.path("payeeInfo").path("payeeId").path("id").asText()).isEqualTo("P1");
+        assertThat(folio.path("payeeInfo").path("payeeId").path("type").asText()).isEqualTo("Profile");
+        var instruction = folio.path("instructions").get(0);
+        assertThat(instruction.path("duration").path("timeSpan").path("startDate").asText()).isEqualTo("2026-10-09");
+        assertThat(instruction.path("duration").path("timeSpan").path("endDate").asText()).isEqualTo("2026-10-11");
+        assertThat(instruction.path("transactionCodes").findValuesAsText("transactionCode")).containsExactly("ROOM", "PACKAGE");
     }
 
     @Test
