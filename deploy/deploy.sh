@@ -109,6 +109,9 @@ append_if_missing CP_CRYPTO_KEY "$(openssl rand -base64 32)"
 append_if_missing INTEGRATIONS_CRYPTO_KEY "$(openssl rand -base64 32)"
 # The documentation site's password (doc.ec1.mateu.io, user `riu`), for the docs-basic-auth Secret below.
 append_if_missing DOCS_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+# The demo user's password (realm ec-demo1). Only read when the realm is first imported: changing it
+# here later does not change it in a running Keycloak — use kcadm.sh set-password for that.
+append_if_missing DEMO_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
 append_if_missing DOCS_ORACLE_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
 
 # shellcheck disable=SC1090
@@ -121,6 +124,7 @@ kubectl create secret generic ec-postgres -n "$NS" \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic keycloak-admin -n "$NS" \
   --from-literal=password="$KEYCLOAK_ADMIN_PASSWORD" \
+  --from-literal=demo-password="$DEMO_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic grafana-admin -n "$OBS_NS" \
   --from-literal=admin-user=admin \
@@ -351,8 +355,8 @@ cat <<EOF
 
 Done.
 
-  Console   https://ec1.mateu.io          demo / demo
-  Control   https://console.ec1.mateu.io  demo / demo  (needs the realm role \`ai-admin\`)
+  Console   https://ec1.mateu.io          demo / \$DEMO_PASSWORD
+  Control   https://console.ec1.mateu.io  demo / \$DEMO_PASSWORD  (needs the realm role \`ai-admin\`)
   Keycloak  https://auth.ec1.mateu.io     admin / \$KEYCLOAK_ADMIN_PASSWORD
   Grafana   https://grafana.ec1.mateu.io  admin / \$GRAFANA_ADMIN_PASSWORD
   Kafka     https://kafka.ec1.mateu.io    admin / \$KAFKA_CONSOLE_PASSWORD

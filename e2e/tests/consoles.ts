@@ -136,7 +136,9 @@ export const CONSOLES: Console[] = [
 ]
 
 const USER = process.env.DEMO_USER ?? 'demo'
-const PASSWORD = process.env.DEMO_PASSWORD ?? 'demo'
+// No default: the repository is public, so the password is not in it. It is in deploy/.secrets.
+const PASSWORD = process.env.DEMO_PASSWORD
+if (!PASSWORD) throw new Error('DEMO_PASSWORD is not set (see DEMO_PASSWORD in deploy/.secrets/credentials.env)')
 
 /**
  * Signs in through Keycloak and waits for the shell to be up.

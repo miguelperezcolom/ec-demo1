@@ -112,6 +112,10 @@ spec:
               value: admin
             - name: KC_BOOTSTRAP_ADMIN_PASSWORD
               valueFrom: { secretKeyRef: { name: keycloak-admin, key: password } }
+            # The demo user's password. The realm file says ${DEMO_PASSWORD} and Keycloak fills it in
+            # on import: the repository is public, so the password itself lives only in the Secret.
+            - name: DEMO_PASSWORD
+              valueFrom: { secretKeyRef: { name: keycloak-admin, key: demo-password } }
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL

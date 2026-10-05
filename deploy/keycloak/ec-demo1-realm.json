@@ -89,7 +89,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "demo",
+          "value": "${DEMO_PASSWORD}",
           "temporary": false
         }
       ],

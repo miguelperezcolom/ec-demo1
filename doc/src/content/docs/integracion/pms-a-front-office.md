@@ -28,7 +28,7 @@ la propiedad, también las nacidas en Opera.
 
 :::caution[No `ALL` en ec1]
 El UAT de Opera es compartido. Con `ALL`, el front office de MRU01 pasó a tener todas las reservas de
-XMAR de la ventana —814 estancias con huéspedes reales de otros, a la vista con `demo/demo`—. El ámbito
+XMAR de la ventana —814 estancias con huéspedes reales de otros, a la vista con el usuario `demo`—. El ámbito
 no se cambia después del alta: otro ámbito es otra integración.
 :::
 
