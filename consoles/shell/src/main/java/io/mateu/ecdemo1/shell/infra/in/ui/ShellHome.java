@@ -78,9 +78,10 @@ import java.util.List;
 // Two levels, as in the control console and Opera Cloud: the hamburger lists the sections (each one a
 // service's remote menu) and the band below the header shows the active section's own entries.
 // Declared, since AUTO never picks it.
-// RIU's red as the brand accent: a line under the menu band and the console name in it (light theme).
-// Not the primary colour — it never means "clickable".
-@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#D2232A")
+// RIU's red as the brand accent: the console name in it, and under the menu band a colour strip Mateu
+// draws from it (Vaadin only; seed 11, the one chosen — Redwood shows Spectra's own). Not the primary
+// colour — it never means "clickable".
+@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#D2232A", accentStripSeed = 11)
 public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**
