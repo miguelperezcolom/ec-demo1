@@ -152,7 +152,7 @@ export class Ui {
     /** A text/date field by its label — getByLabel(exact) resolves once per input (verified live on the wizard). */
     async type(label: string, value: string) {
         const f = this.page.getByLabel(label, { exact: true }).first()
-        await f.click()
+        await f.click({ timeout: 30_000 })
         await f.fill(value)
         await f.press('Tab')
         await this.page.waitForTimeout(500)
@@ -169,6 +169,21 @@ export class Ui {
         const target = scope === 'first' ? f.first() : f.last()
         await this.click(target, 1_500)
         await this.click(this.page.getByRole('option').filter({ hasText: option }).first(), 1_000)
+    }
+
+    /**
+     * Turns a boolean field on and checks it took. Redwood draws it as an oj-switch whose label does
+     * not toggle it (seen in the 2026-10-06 run: the reset task completed with confirmado=false);
+     * its thumb carries role=switch / aria-checked. Vaadin: the field's vaadin-checkbox.
+     */
+    async switchOn(fieldId: string) {
+        const field = this.page.locator(`[data-field-id="${fieldId}"]`).first()
+        const thumb = vaadin ? field : field.locator('[role=switch]').first()
+        const on = async () => vaadin
+            ? (await field.getAttribute('checked')) !== null
+            : (await thumb.getAttribute('aria-checked')) === 'true'
+        if (!(await on())) await this.click(thumb, 1_000)
+        if (!(await on())) throw new Error(`the ${fieldId} switch did not turn on`)
     }
 
     /** A listing row's selection checkbox: the selector at the same height as `text` (as the 2026-10-04 run did). */
