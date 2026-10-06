@@ -77,7 +77,9 @@ import java.util.List;
 // RIU's red as the brand accent: a line under the band and the section's name in it (light theme, the
 // Vaadin build only — Redwood draws its band with its own neutral tokens). Not the primary colour — it
 // never means "clickable".
-@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#464c68", accentStrip = "/images/strip-control-plane.svg")
+// The strip under the band is Mateu's, drawn from the accent (Vaadin only, seed 11); Redwood's is in
+// static/theme/console-theme.js.
+@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#464c68", accentStripSeed = 11)
 public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**
