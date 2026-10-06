@@ -15,6 +15,63 @@ SERVICES="audit-service booking communication-service crs-integration-service cu
 pg_pod() { kubectl -n $NS get pod -o name | grep eventconductor-postgres | head -1; }
 # psql against one database, reading SQL from stdin
 psql_in() { kubectl -n $NS exec -i "$(pg_pod)" -- sh -c "psql -U \"\$POSTGRES_USER\" -v ON_ERROR_STOP=1 -q -d $1"; }
+
+# Moving a file between here and the database pod. kubectl exec's stream to and from ec1 is slow (a few
+# KB/s) and can end early while still exiting 0: a baseline restore that way put the engine's processes
+# back without their steps (COPY step_execution_entity cut at a row: «missing data for column status»).
+# So nothing big crosses as a bare stream any more: files go compressed and are compared by checksum on
+# both sides — again, a few times, if they have to — before anything uses them.
+pod_cksum() { kubectl -n $NS exec "$(pg_pod)" -- cksum "$1" | awk '{print $1, $2}'; }
+local_cksum() { cksum < "$1" | awk '{print $1, $2}'; }
+pod_get() { # pod_get <file in the pod> <local file>
+  local try
+  for try in 1 2 3; do
+    kubectl -n $NS exec "$(pg_pod)" -- cat "$1" > "$2" || true
+    [ "$(local_cksum "$2")" = "$(pod_cksum "$1")" ] && return 0
+    echo "  $(basename "$2"): came back incomplete (attempt $try)" >&2
+  done
+  return 1
+}
+pod_put() { # pod_put <local file> <file in the pod>
+  local try
+  for try in 1 2 3; do
+    kubectl -n $NS exec -i "$(pg_pod)" -- sh -c "cat > '$2'" < "$1" || true
+    [ "$(pod_cksum "$2")" = "$(local_cksum "$1")" ] && return 0
+    echo "  $(basename "$1"): arrived incomplete (attempt $try)" >&2
+  done
+  return 1
+}
+
+# pg_dump ends every dump it finishes with this line: one without it was cut short, and restoring it
+# restores some tables and not others. Takes a compressed dump, or a plain one from an older baseline.
+DUMP_TRAILER='-- PostgreSQL database dump complete'
+dump_complete() { gzip -dcf "$1" 2>/dev/null | tail -n 5 | grep -qF -- "$DUMP_TRAILER"; }
+
+# The baseline's dump of a database: <db>.sql.gz, or <db>.sql from a baseline taken before they were
+# compressed. Prints nothing when it has none.
+baseline_dump() {
+  if [ -f "$BASELINE/$1.sql.gz" ]; then echo "$BASELINE/$1.sql.gz"
+  elif [ -f "$BASELINE/$1.sql" ]; then echo "$BASELINE/$1.sql"; fi
+}
+
+# The script that puts back the engine's state tables: empties them and loads the baseline's rows. One
+# script, so that it runs as one transaction (psql_file): the processes never come back without their steps.
+engine_restore_sql() { # engine_restore_sql <baseline dump>
+  echo "truncate $(echo $ENGINE_TABLES | tr ' ' ',');"
+  gzip -dcf "$1"
+}
+
+# Runs a SQL script (compressed or not) in the pod against a database in ONE transaction, stopping at
+# the first error: all of it is applied, or none of it. The script is sent as a file, checked, first.
+psql_file() { # psql_file <db> <local script>
+  local remote="/tmp/ec-demo-restore-$1.sql.gz" gz
+  gz=$(mktemp)
+  gzip -dcf "$2" | gzip -c > "$gz"
+  pod_put "$gz" "$remote" || { rm -f "$gz"; return 1; }
+  rm -f "$gz"
+  kubectl -n $NS exec "$(pg_pod)" -- sh -c "gzip -dc '$remote' | psql -U \"\$POSTGRES_USER\" -v ON_ERROR_STOP=1 -q -1 -d $1 > /dev/null; rc=\$?; rm -f '$remote'; exit \$rc"
+}
+
 # one value, or one column
 psql_value() { kubectl -n $NS exec "$(pg_pod)" -- sh -c "psql -U \"\$POSTGRES_USER\" -Atc \"$2\" -d $1"; }
 

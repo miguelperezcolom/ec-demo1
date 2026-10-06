@@ -12,13 +12,26 @@ cd "$(dirname "$0")"
 . ./common.sh
 P=$(pg_pod)
 TMP=$(mktemp -d "${BASELINE}.new.XXXX" 2>/dev/null || { mkdir -p "$(dirname "$BASELINE")"; mktemp -d "${BASELINE}.new.XXXX"; })
+# Each dump is written and compressed in the pod, brought back checked (pod_get), and kept only when
+# pg_dump finished it (dump_complete). A dump that cannot be had whole saves no baseline: the one there stays.
+dump() { # dump <name> <pg_dump arguments...>
+  local name=$1; shift
+  kubectl -n $NS exec "$P" -- sh -c "pg_dump -U \"\$POSTGRES_USER\" --no-owner --no-privileges $* | gzip -c > /tmp/ec-snapshot-$name.sql.gz"
+  if ! pod_get "/tmp/ec-snapshot-$name.sql.gz" "$TMP/$name.sql.gz" || ! dump_complete "$TMP/$name.sql.gz"; then
+    echo "  $name: the dump did not come back whole — baseline NOT saved, the previous one stays"
+    kubectl -n $NS exec "$P" -- rm -f "/tmp/ec-snapshot-$name.sql.gz"
+    rm -rf "$TMP"
+    exit 1
+  fi
+  kubectl -n $NS exec "$P" -- rm -f "/tmp/ec-snapshot-$name.sql.gz"
+}
 for db in $DATABASES; do
-  kubectl -n $NS exec "$P" -- sh -c "pg_dump -U \"\$POSTGRES_USER\" --clean --if-exists --no-owner --no-privileges -d $db" > "$TMP/$db.sql"
-  echo "  $db: $(du -h "$TMP/$db.sql" | cut -f1)"
+  dump "$db" --clean --if-exists -d "$db"
+  echo "  $db: $(du -h "$TMP/$db.sql.gz" | cut -f1)"
 done
 tables=$(for t in $ENGINE_TABLES; do printf -- "-t %s " "$t"; done)
-kubectl -n $NS exec "$P" -- sh -c "pg_dump -U \"\$POSTGRES_USER\" --data-only --no-owner --no-privileges $tables -d $ENGINE_DB" > "$TMP/$ENGINE_DB.sql"
-echo "  $ENGINE_DB (state tables): $(du -h "$TMP/$ENGINE_DB.sql" | cut -f1)"
+dump "$ENGINE_DB" --data-only $tables -d "$ENGINE_DB"
+echo "  $ENGINE_DB (state tables): $(du -h "$TMP/$ENGINE_DB.sql.gz" | cut -f1)"
 opera_context > "$TMP/opera-context"
 echo "  Opera context: $(cat "$TMP/opera-context")"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$TMP/taken-at"
