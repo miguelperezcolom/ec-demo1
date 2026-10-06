@@ -22,8 +22,15 @@ echo "Resetting ec1's demo to the baseline of $(cat "$BASELINE/taken-at")"
 # here — before anything stops — rather than found half-way, with the services down.
 RESTORED=""
 for db in $DATABASES; do
-  if [ -f "$BASELINE/$db.sql" ]; then RESTORED="$RESTORED $db"
+  if [ -n "$(baseline_dump $db)" ]; then RESTORED="$RESTORED $db"
   else echo "  $db: not in this baseline, left as it is (take a new one with snapshot.sh)"; fi
+done
+[ -n "$(baseline_dump $ENGINE_DB)" ] || { echo "The baseline has no dump of the engine ($ENGINE_DB): take a new one with snapshot.sh"; exit 1; }
+# A dump cut short restores some tables and not others — the engine's processes without their steps,
+# a service's database half-way. Refused here, with nothing stopped yet, not found after the restore.
+for db in $RESTORED $ENGINE_DB; do
+  dump_complete "$(baseline_dump $db)" \
+    || { echo "The baseline's dump of $db is incomplete (cut short when it was taken): take a new one with snapshot.sh"; exit 1; }
 done
 
 WORK=$(mktemp -d)
@@ -34,12 +41,26 @@ echo "Stopping the services and the engine"
 for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=0 >/dev/null; done
 for d in $SERVICES; do kubectl -n $NS wait --for=delete pod -l app=$d --timeout=180s >/dev/null 2>&1 || true; done
 sleep 5
+# From here on a failure must not leave ec1 down: whatever happens, the services start again. Each
+# database is restored in one transaction (psql_file), so one that fails is left as it was, not half-way.
+STARTED=""
+start_services() {
+  [ -n "$STARTED" ] && return 0
+  STARTED=1
+  echo "Starting the services and the engine"
+  for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=1 >/dev/null; done
+  for d in $SERVICES; do kubectl -n $NS rollout status deploy/$d --timeout=420s | tail -1; done
+}
+trap 'rc=$?; if [ $rc -ne 0 ]; then echo "FAILED (exit $rc): the reset did not finish — what was not restored is as it was"; start_services || true; fi' EXIT
 
 echo "Restoring the databases"
 for db in $RESTORED; do
-  psql_in $db < "$BASELINE/$db.sql" > /dev/null && echo "  $db"
+  psql_file $db "$(baseline_dump $db)" || { echo "  $db: NOT restored, left as it was"; exit 1; }
+  echo "  $db"
 done
-{ echo "truncate $(echo $ENGINE_TABLES | tr ' ' ',');"; cat "$BASELINE/$ENGINE_DB.sql"; } | psql_in $ENGINE_DB > /dev/null && echo "  $ENGINE_DB (state tables)"
+engine_restore_sql "$(baseline_dump $ENGINE_DB)" > "$WORK/$ENGINE_DB.sql"
+psql_file $ENGINE_DB "$WORK/$ENGINE_DB.sql" || { echo "  $ENGINE_DB: NOT restored, left as it was"; exit 1; }
+echo "  $ENGINE_DB (state tables)"
 
 echo "Salesforce"
 psql_value customer_mdm "select id from customer" > "$WORK/customers-baseline"
@@ -53,8 +74,6 @@ echo "delete from salesforce_cursor where name like 'pubsub%'; update salesforce
 echo "Opera"
 set_opera_context "$(cat "$BASELINE/opera-context" 2>/dev/null || echo "$OPERA_CONTEXT_DEFAULT")"
 
-echo "Starting the services and the engine"
-for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=1 >/dev/null; done
-for d in $SERVICES; do kubectl -n $NS rollout status deploy/$d --timeout=420s | tail -1; done
+start_services
 rm -rf "$WORK"
 echo "Done: ec1's demo is at its baseline."
