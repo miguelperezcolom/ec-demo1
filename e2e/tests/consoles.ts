@@ -135,6 +135,9 @@ export const CONSOLES: Console[] = [
     },
 ]
 
+// https on ec1; http for the local cluster (deploy/local/up.sh: E2E_SCHEME=http, hosts *.localhost:8800).
+export const SCHEME = process.env.E2E_SCHEME ?? 'https'
+
 const USER = process.env.DEMO_USER ?? 'demo'
 // No default: the repository is public, so the password is not in it. It is in deploy/.secrets.
 const PASSWORD = process.env.DEMO_PASSWORD
@@ -148,7 +151,7 @@ if (!PASSWORD) throw new Error('DEMO_PASSWORD is not set (see DEMO_PASSWORD in d
  * deployment nobody runs.
  */
 export async function signIn(page: Page, console_: Console) {
-    await page.goto(`https://${console_.host}/`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${SCHEME}://${console_.host}/`, { waitUntil: 'domcontentloaded' })
     // The bootstrap page redirects to Keycloak on its own; give it the round trip.
     await page.waitForTimeout(3_000)
     if (page.url().includes('/realms/')) {
@@ -199,7 +202,8 @@ const readMenuLabels = (page: Page) => page.evaluate(() => {
     }
     walk(document)
     return Array.from(new Set(labels))
-})
+// Still navigating (Keycloak's SSO round trip on every page load): no labels yet, the poll goes on.
+}).catch(() => [] as string[])
 
 /**
  * Whether a screen actually rendered, rather than merely answering 200.
@@ -227,7 +231,9 @@ export async function screenRendered(page: Page): Promise<{ ok: boolean; why: st
         if (unsupported) return { ok: false, why: `renderer placeholder: ${unsupported[0]}` }
         if (text.trim().length < 20) return { ok: false, why: 'the page rendered nothing' }
         return { ok: true, why: '' }
-    })
+    // A page load goes to Keycloak and back (SSO) before the shell mounts: evaluate() lands in the
+    // middle of it now and then. That is "not yet", and the poll goes on, as in screenIs below.
+    }).catch((e: Error) => ({ ok: false, why: `the page was still navigating (${e.message.split('\n')[0]})` }))
 }
 
 /**
