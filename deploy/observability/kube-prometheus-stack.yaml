@@ -2,13 +2,12 @@
 #
 #   helm upgrade --install kps prometheus-community/kube-prometheus-stack \
 #     -n observability -f deploy/observability/kube-prometheus-stack.yaml
-# Pinned to ccx33 (8 vCPU / 32 GB), which nothing in the ec-demo1 namespace requests. That is the
-# separation: pod anti-affinity is namespace-scoped by default, so it cannot keep these pods off
-# the engine's nodes from here — a distinct instance type can, and needs no rule on either side.
-#
-# One node for the whole stack rather than one each: Prometheus, Grafana, Loki and Tempo are the
-# thing that has to keep working while the engine is being stressed, and what they must not share
-# is the engine, not each other.
+# In hel1 with the rest of ec1, on whatever amd64 node Karpenter picks — a region, not an instance
+# type. Until 2026-10-07 the stack was pinned to its own ccx23, kept off the engine's nodes for the
+# load tests (a distinct instance type was the separation); that topology was retired on 2026-10-01,
+# and the pin had left a dedicated-vCPU node in fsn1 (Hetzner had no ccx23 in hel1) costing ~86 €/month
+# — almost half the cluster — plus a second load balancer, one per region with nodes, for nothing.
+# A single-type pin also has no fallback when Hetzner runs out of that type in the region.
 # Alertmanager: the alerts go to people, through communication-service — its recipients table says
 # who, its inbox and Web Push are how (control-plane/communication-service, AlertmanagerWebhook). Only
 # the rules labelled notify: ec-demo1 (prometheus-rules.yaml) are sent; the chart's own defaults —
@@ -24,7 +23,7 @@ alertmanager:
   ingress:
     enabled: false
   alertmanagerSpec:
-    nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+    nodeSelector: { topology.kubernetes.io/region: hel1, kubernetes.io/arch: amd64 }
     retention: 120h
     resources:
       requests: { memory: "32Mi", cpu: "10m" }
@@ -75,20 +74,20 @@ prometheus-node-exporter:
     requests: { memory: "32Mi", cpu: "20m" }
     limits:   { memory: "64Mi" }
 kube-state-metrics:
-  nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+  nodeSelector: { topology.kubernetes.io/region: hel1, kubernetes.io/arch: amd64 }
   resources:
     requests: { memory: "64Mi", cpu: "20m" }
     limits:   { memory: "128Mi" }
 
 prometheusOperator:
-  nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+  nodeSelector: { topology.kubernetes.io/region: hel1, kubernetes.io/arch: amd64 }
   resources:
     requests: { memory: "128Mi", cpu: "50m" }
     limits:   { memory: "256Mi", cpu: "500m" }
 
 prometheus:
   prometheusSpec:
-    nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+    nodeSelector: { topology.kubernetes.io/region: hel1, kubernetes.io/arch: amd64 }
     retention: 24h
     scrapeInterval: 30s
     # Tempo's metrics generator derives service-graph and span metrics from traces and writes them
@@ -129,7 +128,7 @@ prometheus:
             target_label: pod
 
 grafana:
-  nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+  nodeSelector: { topology.kubernetes.io/region: hel1, kubernetes.io/arch: amd64 }
   # No password in version control: the Secret is created at deploy time by deploy/deploy.sh.
   admin:
     existingSecret: grafana-admin

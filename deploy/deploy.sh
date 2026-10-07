@@ -297,12 +297,13 @@ kubectl apply -f deploy/manifests/71-ia-control-plane.yaml
 kubectl apply -f deploy/manifests/72-control-shell.yaml
 
 echo "══ 5/6  Observability (Prometheus, Grafana, Loki, Tempo, Alloy) ══"
-helm upgrade --install kps prometheus-community/kube-prometheus-stack \
+# Every chart pinned to the version running on ec1, so a redeploy is not also an unplanned upgrade.
+helm upgrade --install kps prometheus-community/kube-prometheus-stack --version 88.6.1 \
   -n "$OBS_NS" -f deploy/observability/kube-prometheus-stack.yaml --timeout 15m
-helm upgrade --install loki grafana/loki -n "$OBS_NS" -f deploy/observability/loki.yaml --timeout 15m
+helm upgrade --install loki grafana/loki --version 7.3.0 -n "$OBS_NS" -f deploy/observability/loki.yaml --timeout 15m
 # Pinned: tempo.yaml carries a copy of this chart version's config template (max_attribute_bytes).
 helm upgrade --install tempo grafana/tempo --version 1.24.4 -n "$OBS_NS" -f deploy/observability/tempo.yaml --timeout 15m
-helm upgrade --install alloy grafana/alloy -n "$OBS_NS" -f deploy/observability/alloy.yaml --timeout 15m
+helm upgrade --install alloy grafana/alloy --version 1.12.1 -n "$OBS_NS" -f deploy/observability/alloy.yaml --timeout 15m
 kubectl apply -f deploy/observability/servicemonitors.yaml
 # The alerts — the external APIs (Salesforce's allowance and errors, OHIP not answering, its 429s) and
 # the platform's health (a service down, a pod crash-looping): PrometheusRules the operator picks up by

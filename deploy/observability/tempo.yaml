@@ -1,4 +1,4 @@
-nodeSelector: { node.kubernetes.io/instance-type: ccx23 }
+nodeSelector: { topology.kubernetes.io/region: hel1, kubernetes.io/arch: amd64 }
 # Traces on a volume, as deployed: without this block a `deploy.sh` run would put Tempo back on an
 # emptyDir and lose every trace on its next restart.
 persistence:

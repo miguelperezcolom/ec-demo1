@@ -1,9 +1,13 @@
 controller:
   type: daemonset
-  # No instance-type selector, unlike the rest of the stack. This is the DaemonSet that reads
-  # every pod's logs, so it has to run on every node — pinning it to the observability node would
-  # leave it collecting only its own, and blind to the engine it exists to watch.
+  # No region selector, unlike the rest of the stack. This is the DaemonSet that reads every pod's
+  # logs, so it has to run on every node — pinning it would leave it blind to the pods it exists to
+  # watch.
   nodeSelector: { kubernetes.io/arch: amd64 }
+  # A full node otherwise keeps it out for good: on 2026-10-07 it had sat Pending for 20 h on a cx33
+  # with 98 % of its memory requested, so nothing on that node reached Loki. At this priority the
+  # scheduler evicts an ordinary pod to make room, and that pod lands elsewhere or gets a new node.
+  priorityClassName: system-node-critical
 alloy:
   # Logs are read from the node's own files (/var/log/pods), not streamed through the API server:
   # Cloudfleet support (2026-10-03) flagged that loki.source.kubernetes, with every Alloy pod
