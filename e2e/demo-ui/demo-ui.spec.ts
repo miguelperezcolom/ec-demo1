@@ -22,6 +22,7 @@ const FO = HOSTS.frontOffice
 
 /** Room types to try, in order, when Opera refuses one with RSV00138 (not enough rooms of that type). */
 const ROOM_TYPES = (process.env.DEMO_ROOM_TYPES ?? 'JS-SEA,JS-SIDESEA,JS-STD,JS-ACCESSIBLE,JS-STD-KING').split(',')
+const OUTAGE_ROOM = process.env.DEMO_OUTAGE_ROOM ?? 'JS-SIDESEA'
 
 // What the flows hand to each other.
 const S: {
@@ -71,9 +72,9 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         // UNVERIFIED (probe denied): the row's «Open» (0.60.0: it stays in the console).
         await ui.openInboxRow('Confirmar el reset de la demo')
         await ui.waitText(/Sí, resetear la demo/, 'the reset task never opened')
-        // UNVERIFIED (probe denied): «Claim» on the task page, then the checkbox by its label, then «Complete».
+        // Verified live (2026-10-06): «Claim», then the «confirmado» switch (its label does not toggle it), then «Complete».
         if (await ui.button('Claim').isVisible().catch(() => false)) await ui.click(ui.button('Claim'), 5_000)
-        await ui.click(page.getByText(/Sí, resetear la demo/).first(), 1_500)
+        await ui.switchOn('confirmado')
         await ui.checkpoint('reset-task-ticked')
         await ui.click(ui.button('Complete'), 6_000)
         await ui.checkpoint('reset-task-completed')
@@ -109,8 +110,8 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         // PMS → front office: XMAR → MRU01.
         await ui.go(`${C}/integrations/frontoffice`, /New/)
         await ui.click(ui.button('New'), 5_000)
-        await ui.select('Opera property', /XMAR/) // UNVERIFIED (probe denied)
-        await ui.type('Front office', 'MRU01')    // UNVERIFIED (probe denied)
+        await ui.select('Opera property', /XMAR/) // verified live (2026-10-06)
+        await ui.select('Front office', /MRU01/)  // a lookup of the front office's hotels, not an input
         await ui.checkpoint('fo-integration-form')
         await ui.click(ui.button('Save'), 6_000)
         await ui.pollPage(`${C}/integrations/frontoffice/XMAR`, /Onboarding/, t => /A person to activate it/.test(t),
@@ -261,7 +262,7 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
     })
 
     // ── 4 ──────────────────────────────────────────────────────────────────────────────────────────
-    // Not verified live: the pax row's «No show» and its confirmation (new in 0.60.0), the stay's text after it.
+    // Not verified live: the stay's text after the no show.
     test('4 · no show', async ({}, info) => {
         test.setTimeout(20 * 60_000)
         const ui = new Ui(page, info)
@@ -276,8 +277,10 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         await ui.checkpoint('stay-arriving')
         // Every pax a no show → the reservation is one.
         for (let i = 0; i < 2; i++) {
-            await ui.click(page.getByRole('button', { name: 'No show', exact: true }).first(), 2_500) // UNVERIFIED (probe denied)
-            await ui.confirmIfAsked(4_000)
+            // Verified live (2026-10-06): the pax's «No show» asks in the front office's own dialog
+            // «¿Marcar no show?» → «Marcar no show» (not Mateu's confirm).
+            await ui.click(page.getByRole('button', { name: 'No show', exact: true }).first(), 2_500)
+            await ui.click(page.getByRole('dialog', { name: '¿Marcar no show?' }).getByRole('button', { name: 'Marcar no show', exact: true }), 4_000)
         }
         await ui.checkpoint('no-show-marked')
         await ui.pollPage(`${D}/booking/bookings/${locator}`, /In other systems/, t => /\| Cancelled \|/.test(t),
@@ -341,7 +344,10 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
             const locator = await createBooking(ui, {
                 arrival: day(40), departure: day(43),
                 holder: { first: 'Hanna', last: `Berg ${RUN}`, email: `hanna.${RUN}@example.org`, phone: '+49 1701234567', nationality: 'DE' },
-                room: ROOM_TYPES[0], rate: 'DIRECTA', board: 'DESAYUNO', adults: 2,
+                // A room type XMAR has on these dates (JS-SEA is refused there: RSV00138, both runs of
+                // 2026-10-07): if Opera refused it after the outage, the version written would be the
+                // corrected one, not the retried one the journey has to show.
+                room: OUTAGE_ROOM, rate: 'DIRECTA', board: 'DESAYUNO', adults: 2,
                 guests: [['Hanna', `Berg ${RUN}`], ['Jonas', `Berg ${RUN}`]],
             }, 'f6')
             S.outageBooking = locator
@@ -361,6 +367,9 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         }
         const locator = S.outageBooking!
         await ensureInOpera(ui, locator)
+        await ui.go(`${D}/booking/bookings/${locator}`, /In other systems/)
+        expect((await ui.text()).match(/Room 1 · ([A-Z-]+)/)?.[1],
+            `Opera refused ${OUTAGE_ROOM} on these dates after the outage, so the retried version was replaced: set DEMO_OUTAGE_ROOM`).toBe(OUTAGE_ROOM)
         // Written once, after retries: the journey says how it ended.
         await ui.go(`${D}/journey/bookings/${locator}`, /Recorrido de/)
         await expect.poll(async () => {
@@ -403,8 +412,7 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
     })
 
     // ── 8 ──────────────────────────────────────────────────────────────────────────────────────────
-    // Not verified live: the rate plans screen (#218, /booking/catalogue/ratePlans: Hotel, Code, Name,
-    // Factor), the dictionary's «Withdraw», row selection.
+    // Not verified live: the rate plan form's «Save», the dictionary's «Withdraw», row selection.
     test('8 · a new rate plan with the integration already active (EMPLEADOS-27)', async ({}, info) => {
         test.setTimeout(30 * 60_000)
         const ui = new Ui(page, info)
@@ -418,13 +426,18 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         test.skip(!present, 'Call center → Catalogue → Rate plans (/booking/catalogue/ratePlans, ec-demo1 #218) is not deployed')
         await ui.checkpoint('rate-plans')
         if (!new RegExp(`\\| ${code} \\|`).test(await ui.text())) {
-            await ui.more('New') // UNVERIFIED (probe denied): a Crud's New, in the ⋯ menu as on Bookings.
+            // Verified live (2026-10-06): here «New» is a toolbar button of its own (no ⋯ menu).
+            await ui.click(ui.button('New'), 5_000)
             await ui.select('Hotel', /MRU01/)
             await ui.type('Code', code)
             await ui.type('Name', 'Empleados de la cadena de vacaciones 2027')
-            await ui.type('Factor', '0.5')
+            // The browser runs in es-ES: Redwood's number field reads «0.5» as 5 (the «.» groups
+            // thousands) and the CRS refuses it (2026-10-06 run). The decimal comma is what a user types.
+            await ui.type('Factor', '0,5')
             await ui.checkpoint('rate-plan-form')
             await ui.click(ui.button('Save'), 6_000)
+            await ui.go(`${D}/booking/catalogue/ratePlans`, /Rate plans/)
+            expect(await ui.pageUntil(new RegExp(`\\| ${code} \\|`)), `the rate plan ${code} was not created`).toBe(true)
         }
 
         // A code mapped earlier (the catalogue may have carried it into flow 1's approval) would not
@@ -503,10 +516,9 @@ async function createBooking(ui: Ui, b: NewBooking, tag: string): Promise<string
     await ui.checkpoint(`${tag}-wizard-stay`)
     await ui.click(ui.button('Next'), 3_000)
 
-    // UNVERIFIED (probe denied): the room dialog's fields by label («Line», «Room type code»,
-    // «Rate plan code», «Board code», «Adults») and its «Save» (the last Save on the page).
+    // Verified live (2026-10-06): the «New room» dialog numbers its Line itself (read-only); its
+    // comboboxes «Room type code», «Rate plan code», «Board code», the «Adults» textbox and «Save».
     await ui.click(ui.button('Add'), 3_000)
-    await ui.type('Line', '1')
     await ui.select('Room type code', new RegExp(`^${b.room} —`), 'last')
     await ui.select('Rate plan code', new RegExp(`^${b.rate} —`), 'last')
     await ui.select('Board code', new RegExp(`^${b.board} —`), 'last')
