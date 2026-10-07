@@ -16,10 +16,12 @@ export type Renderer = 'redwood' | 'vaadin'
 export const RENDERER: Renderer = (process.env.DEMO_RENDERER as Renderer) ?? 'redwood'
 
 const vaadin = RENDERER === 'vaadin'
+// https on ec1; http for the local cluster (deploy/local/up.sh: E2E_SCHEME=http, hosts *.localhost:8800).
+const SCHEME = (process.env.E2E_SCHEME ?? 'https') + '://'
 export const HOSTS = {
-    data: 'https://' + (process.env.DEMO_DATA_HOST ?? (vaadin ? 'ec1.mateu.io' : 'rw.ec1.mateu.io')),
-    control: 'https://' + (process.env.DEMO_CONTROL_HOST ?? (vaadin ? 'console.ec1.mateu.io' : 'rw-console.ec1.mateu.io')),
-    frontOffice: 'https://' + (process.env.DEMO_FRONT_HOST ?? 'front.ec1.mateu.io'),
+    data: SCHEME + (process.env.DEMO_DATA_HOST ?? (vaadin ? 'ec1.mateu.io' : 'rw.ec1.mateu.io')),
+    control: SCHEME + (process.env.DEMO_CONTROL_HOST ?? (vaadin ? 'console.ec1.mateu.io' : 'rw-console.ec1.mateu.io')),
+    frontOffice: SCHEME + (process.env.DEMO_FRONT_HOST ?? 'front.ec1.mateu.io'),
 }
 
 const USER = process.env.DEMO_USER ?? 'demo'
