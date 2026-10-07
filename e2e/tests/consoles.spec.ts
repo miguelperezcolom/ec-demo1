@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { CONSOLES, signIn, menuLabels, screenRendered, screenIs } from './consoles'
+import { CONSOLES, SCHEME, signIn, menuLabels, screenRendered, screenIs } from './consoles'
 
 /**
  * Every screen of every console, on both planes and through both renderers.
@@ -69,7 +69,7 @@ for (const console_ of CONSOLES) {
         // route for the inbox instead.
         test('the inbox opens by its service path, /_inbox', async ({ page }) => {
             await signIn(page, console_)
-            await page.goto(`https://${console_.host}/_inbox`, { waitUntil: 'domcontentloaded' })
+            await page.goto(`${SCHEME}://${console_.host}/_inbox`, { waitUntil: 'domcontentloaded' })
             await expect
                 .poll(async () => await page.locator('text=Mark as seen').count() > 0,
                       { message: '/_inbox did not open the inbox', timeout: 90_000 })
@@ -80,17 +80,19 @@ for (const console_ of CONSOLES) {
         for (const screen of console_.screens) {
             test(`${screen.menu} → ${screen.entry} renders`, async ({ page }) => {
                 await signIn(page, console_)
-                await page.goto(`https://${console_.host}${screen.route}`,
+                await page.goto(`${SCHEME}://${console_.host}${screen.route}`,
                                 { waitUntil: 'domcontentloaded' })
                 // The route load and its search are two round trips; the second is what fills the
                 // grid, and asserting before it lands is the flakiest thing this suite could do.
+                // The poll's own last reading, not a second evaluate(): a page load still goes to
+                // Keycloak and back (SSO) right after it first paints, and a second look can land
+                // in the middle of that. screenIs below waits for the right screen across it.
+                let rendered = { ok: false, why: '' }
                 await expect
-                    .poll(async () => (await screenRendered(page)).ok,
+                    .poll(async () => (rendered = await screenRendered(page)).ok,
                           { message: `${screen.route} never rendered`, timeout: 60_000 })
                     .toBe(true)
-
-                const { ok, why } = await screenRendered(page)
-                expect(ok, `${console_.name} ${screen.route}: ${why}`).toBe(true)
+                expect(rendered.ok, `${console_.name} ${screen.route}: ${rendered.why}`).toBe(true)
 
                 // Rendering is not arriving. A route that lands on the wrong screen still renders
                 // one, so the page has to name itself as the screen the menu entry opens.
