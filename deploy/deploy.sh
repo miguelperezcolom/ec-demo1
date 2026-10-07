@@ -56,6 +56,8 @@ kubectl get svc -n ingress-nginx ingress-nginx-controller \
 
 echo "══ 2/6  Namespaces and secrets ══"
 kubectl apply -f deploy/manifests/00-namespace.yaml
+# inotify limits on every node (a DaemonSet in kube-system).
+kubectl apply -f deploy/manifests/01-node-sysctl.yaml
 kubectl create namespace "$OBS_NS" --dry-run=client -o yaml | kubectl apply -f -
 
 # Generated once and reused: regenerating on every run would rotate the password the running
@@ -222,6 +224,28 @@ else
   echo "OPERA_* not set — skipping the ec-opera secret; integrations-service will not start without it."
 fi
 
+# Web Push's VAPID keys (communication-service signs what it sends with them), from
+# ~/.config/ec-demo1/webpush.env. Generated once and kept: new keys orphan every browser already
+# subscribed. Without them nothing is pushed; the inbox works the same.
+WEBPUSH_ENV="${WEBPUSH_ENV:-$HOME/.config/ec-demo1/webpush.env}"
+if [ -f "$WEBPUSH_ENV" ]; then
+  kubectl create secret generic ec-webpush -n "$NS" --from-env-file="$WEBPUSH_ENV" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "$WEBPUSH_ENV not found — skipping the ec-webpush secret; no browser will be notified."
+fi
+
+# The Google Chat spaces communication-service posts alerts to. Optional: only when the webhook is in
+# credentials.env (deploy/local/up.sh leaves it out, so a local cluster never posts to ec1's spaces).
+# Created only when missing: ec1's carries a second space (GOOGLE_CHAT_WEBHOOK_2) added by hand, which
+# re-applying from credentials.env would drop.
+if [ -n "${GOOGLE_CHAT_WEBHOOK:-}" ] && ! kubectl get secret ec-googlechat -n "$NS" >/dev/null 2>&1; then
+  kubectl create secret generic ec-googlechat -n "$NS" \
+    --from-literal=GOOGLE_CHAT_WEBHOOK="$GOOGLE_CHAT_WEBHOOK" \
+    ${GOOGLE_CHAT_WEBHOOK_2:+--from-literal=GOOGLE_CHAT_WEBHOOK_2="$GOOGLE_CHAT_WEBHOOK_2"} \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
 # The postfix relay's Gmail App Password. Bought, not derived, like the Anthropic key — so the
 # secret is created only when it is present. Without it postfix starts but Gmail refuses the relay,
 # and any mail Keycloak sends stays queued; nothing else is affected.
@@ -258,6 +282,7 @@ kubectl delete job keycloak-db-init -n "$NS" --ignore-not-found
 kubectl apply -f deploy/manifests/10-keycloak.yaml
 kubectl apply -f deploy/manifests/11-postfix.yaml
 kubectl apply -f deploy/manifests/30-shell.yaml
+kubectl apply -f deploy/manifests/31-shell-redwood.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
 kubectl apply -f deploy/manifests/50-kafka-console.yaml
@@ -295,6 +320,9 @@ kubectl apply -f deploy/manifests/12-embeddings.yaml
 kubectl apply -f deploy/manifests/70-cp-postgres.yaml
 kubectl apply -f deploy/manifests/71-ia-control-plane.yaml
 kubectl apply -f deploy/manifests/72-control-shell.yaml
+kubectl apply -f deploy/manifests/73-control-shell-redwood.yaml
+# The catalogued APIs as MCP servers, read from the control plane.
+kubectl apply -f deploy/manifests/74-api-mcp.yaml
 
 echo "══ 5/6  Observability (Prometheus, Grafana, Loki, Tempo, Alloy) ══"
 # Every chart pinned to the version running on ec1, so a redeploy is not also an unplanned upgrade.
