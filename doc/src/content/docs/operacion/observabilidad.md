@@ -5,8 +5,11 @@ description: Prometheus, Grafana, Loki y Tempo en ec1 — los dashboards propios
 
 La pila está en el namespace `observability`, desplegada por `deploy.sh` desde
 `deploy/observability/`: **kube-prometheus-stack** (Prometheus y Grafana, `grafana.ec1.mateu.io`),
-**Loki** (logs de todos los pods, 7 días), **Tempo** (trazas) y **Alloy** (recolección). Todo salvo
-Alloy y node-exporter va fijado a nodos `ccx23`: ver la excepción en [El clúster](/operacion/cluster/).
+**Loki** (logs de todos los pods, 7 días), **Tempo** (trazas) y **Alloy** (recolección). Va en hel1
+con el resto de ec1, fijada solo a región y arquitectura; Alloy, que tiene que estar en todos los nodos,
+lleva prioridad de sistema (ver [El clúster](/operacion/cluster/)). Los cuatro charts van fijados en
+`deploy.sh` a la versión que corre en ec1 (kps 88.6.1, loki 7.3.0, tempo 1.24.4, alloy 1.12.1): un
+redespliegue no es también una actualización.
 
 - **Métricas**: Prometheus recoge `/actuator/prometheus` de los pods anotados con `prometheus.io/*` y los
   ServiceMonitors de `servicemonitors.yaml`. Retención de 24 h.
@@ -30,6 +33,7 @@ pod. `deploy.sh` los aplica con `apply_dashboard <nombre> <clave> <fichero>`.
 | **IA agents** | `ia-agents.json` | Prompts y llamadas a herramientas recientes, con su contenido si se captura |
 | **IA token usage** | `ia-tokens.json` | Tokens por agente |
 | **External APIs** | `external-apis.json` | El consumo de Salesforce y de Opera |
+| **Errores del navegador** | `client-errors.json` | Los errores que los renderers de las consolas mandan desde el navegador (`client-error` en Loki) |
 
 :::note[La clave de cada ConfigMap]
 El sidecar escribe todos los dashboards en un único directorio y Grafana deriva el id interno de esa
@@ -78,6 +82,13 @@ componentes que un clúster gestionado no expone) no van a nadie.
 - Una alerta crítica silencia las de aviso del mismo servicio.
 
 Alertmanager guarda su estado en un `emptyDir`: un reinicio olvida los silencios.
+
+:::note[Lo que dura cada cosa]
+Prometheus y Alertmanager van en `emptyDir`: un reinicio pierde las métricas y los silencios. Loki y
+Tempo tienen volumen, pero **dormir ec1 borra el de Loki** (su StatefulSet borra el PVC al bajar a 0), y
+moverlos de región también (los volúmenes de Hetzner son de una ubicación). Para lo que tiene que durar,
+el lugar es la base de datos de cada servicio y la auditoría, no los logs.
+:::
 
 ## Dónde mirar
 

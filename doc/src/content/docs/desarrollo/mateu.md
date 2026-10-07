@@ -5,7 +5,7 @@ description: Cómo se usa Mateu en ec-demo1 — pantallas federadas, dos rendere
 
 [Mateu](https://mateu.io) es el framework de interfaces de todas las pantallas de ec-demo1: cada servicio
 describe sus pantallas en Java (view models con anotaciones) y el renderer las dibuja. La versión es la
-misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.383`).
+misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.402`).
 
 ## Cómo se usa aquí
 
@@ -17,7 +17,16 @@ misma en todos los módulos (`mateu.version`, hoy `3.0-alpha.383`).
   servicios no saben quién las pinta.
 - **`ui-commons`** tiene lo que comparten: el paginado, el widget del usuario y la bandeja de la
   cabecera, las tablas de «otros sistemas», la base de los CRUD de catálogo y los KPI de consumo.
-- **Keycloak** va en la anotación `@KeycloakSecured` de la consola, compilada en la página de arranque.
+- **Keycloak** va en la anotación `@KeycloakSecured` de la consola, **compilada** en la página de
+  arranque: la URL (`https://auth.ec1.mateu.io`) no se puede cambiar al arrancar. El entorno local la
+  reescribe en el ingress (ver [Entorno local](/desarrollo/entorno-local/#cómo-está-hecho)); que Mateu
+  la deje cambiar en ejecución está pendiente.
+- **Un registro que no existe es una página «no encontrado»**, no un error. Si al cargar una ruta la
+  pantalla lanza `NoSuchElementException`, Mateu pinta en su lugar una página con un icono, **el mensaje
+  de la excepción como título** y la vuelta a la ruta padre (en Redwood, el *empty state* de Spectra). El
+  mensaje es lo que lee el usuario, en el idioma de la pantalla: `new NoSuchElementException("Reserva " +
+  id + " no encontrada")`, no «No stay X» ni un `Optional.get()` pelado (sin mensaje útil, Mateu pone uno
+  genérico con el id). Una acción sobre una pantalla que sí existe no cambia: sigue siendo un error.
 
 ## Subir de versión
 

@@ -48,9 +48,28 @@ converge el clúster.
 6. Esperar a que todo esté listo.
 
 **Las contraseñas se generan la primera vez** en `deploy/.secrets/credentials.env`, que git ignora, y
-una segunda ejecución no las cambia (añade solo las que falten). Dos cosas no se generan porque se
-compran o se piden: la clave de Anthropic (`ANTHROPIC_API_KEY`, línea comentada que hay que rellenar) y
-la *App Password* del relay de correo. Tampoco crea el DNS: `ec1` y `*.ec1` tienen que apuntar al
+una segunda ejecución no las cambia (añade solo las que falten). Lo que se compra o se pide no se
+genera, y cada secreto se crea solo si su valor está:
+
+| Secreto | De dónde |
+| :-- | :-- |
+| `ec-opera` | `OPERA_*` en `credentials.env` (sin él, integrations-service no arranca) |
+| `ec-salesforce` | `SF_DOMAIN`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET` |
+| `ec-anthropic` | `ANTHROPIC_API_KEY` |
+| `postfix-relay` | `POSTFIX_RELAY_PASSWORD` (vacío si no está: el correo se queda en cola) |
+| `ec-webpush` | `~/.config/ec-demo1/webpush.env` (las claves VAPID; unas nuevas dejan huérfanos los navegadores suscritos) |
+| `ec-googlechat` | `GOOGLE_CHAT_WEBHOOK`, **solo si el secreto no existe**: el de ec1 lleva un segundo espacio añadido a mano |
+
+**Las credenciales de los LLM** no son de `deploy.sh`: se dan de alta en la consola de control (*IA →
+LLMs*) y se guardan en `cp-postgres`, cifradas con `CP_CRYPTO_KEY`.
+
+:::note[Desde cero, de verdad]
+Hasta el 07-10-2026, `deploy.sh` no reconstruía ec1 entero: no aplicaba las dos consolas Redwood
+(`31-shell-redwood`, `73-control-shell-redwood`), `74-api-mcp` ni `01-node-sysctl`, y `ec-webpush` y
+`ec-googlechat` se habían creado a mano. Se descubrió desplegando en un clúster vacío
+([Entorno local](/desarrollo/entorno-local/)), que es la forma de comprobarlo: todo manifiesto nuevo va
+también en `deploy.sh`.
+::: Tampoco crea el DNS: `ec1` y `*.ec1` tienen que apuntar al
 balanceador del ingress antes de que Let's Encrypt emita nada; el comodín cubre cualquier host nuevo, y
 cada uno recibe su certificado por HTTP-01 la primera vez que se resuelve.
 
