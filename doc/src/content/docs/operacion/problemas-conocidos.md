@@ -58,6 +58,13 @@ módulo.
 Los comportamientos que pintaban mal sin ningún error se corrigieron en Mateu `3.0-alpha.374`. Aun así,
 comprobar cada formulario nuevo en un navegador. Ver [Mateu](/desarrollo/mateu/).
 
+**Una release de Mateu no llega a Maven Central** («Bundle has content that does NOT have a .pom file»,
+para todos los módulos y para `io/mateu`): la imagen `ubuntu-24.04` de GitHub del 04-10-2026 pasó Maven de
+3.9.16 a 3.10.0, y con él `central-publishing-maven-plugin` 0.11.0 deja los `maven-metadata` en el
+paquete. El workflow de publicación de Mateu fija Maven 3.9.16 desde la `3.0-alpha.402` (mateu#724). Lo
+que dice Central de un despliegue: el workflow *Central deployment status* de Mateu, con el
+`deploymentId` del log.
+
 ## Spring y Spring AI
 
 **Una herramienta MCP que no aparece**: Spring AI descarta en silencio un `@Tool` que devuelve `Object`
@@ -74,6 +81,21 @@ stock. Fijar solo región y arquitectura. Ver [El clúster](/operacion/cluster/)
 
 **El disco de la máquina de build se llena**: `buildx --push` guarda cada imagen también en local. Ver
 [Despliegue](/operacion/despliegue/).
+
+**El último nodo no se va al dormir ec1**: el PodDisruptionBudget de `hcloud-csi-controller` rechaza su
+desalojo cuando no queda otro nodo («Failed to drain node, 3 pods are waiting to be evicted»).
+`deploy/sleep.sh` borra esos pods en vez de desalojarlos. Ver [El clúster](/operacion/cluster/#dormir-y-despertar-ec1).
+
+**Reservas sin código de cliente en Opera, o una pantalla que se queda en «Not found.» un momento**: es
+Karpenter moviendo pods para consolidar, que reinicia lo que tiene una réplica. Pasa sobre todo en los
+15 minutos siguientes a un cambio de nodos.
+
+**El entorno local contesta «404 page not found» en el puerto 80**: es el Traefik del k3s de esta
+máquina, que se queda `127.0.0.1:80` y `:443`. Por eso el entorno local va en el 8800.
+
+**El agente de mapeado no propone nada** («names LLM 'alejandro' … which is no credential»): el LLM está
+en el catálogo pero sin credencial. Pasa en una instalación nueva: las credenciales se dan de alta en la
+consola de control, no en el despliegue. Ver [Entorno local](/desarrollo/entorno-local/#lo-que-no-trae-una-instalación-nueva).
 
 ## El motor
 

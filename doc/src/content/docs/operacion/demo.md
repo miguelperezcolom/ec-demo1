@@ -16,6 +16,22 @@ de lo que dejó escrito —reservas e interlocutores se buscan antes de escribir
 `CorporateId`— y durante la demo solo se modifica **lo que se crea en la demo** (una reserva nueva, el
 cambio de datos sobre su titular), nunca lo de la línea base.
 
+## La demo vive en un solo sitio
+
+La demo corre **en ec1 o en el [entorno local](/desarrollo/entorno-local/), nunca en los dos a la vez**
+(decidido el 07-10-2026). Los dos usan el mismo UAT de Opera y la misma org de Salesforce: con los dos
+vivos, dos MDM oirían los mismos eventos y gastarían el mismo cupo diario. Así, un reset en el sitio
+activo puede borrar lo que haya en Salesforce.
+
+- **Pasar de ec1 a local**: `deploy/sleep.sh` (ec1 sin nodos, ver [El clúster](/operacion/cluster/#dormir-y-despertar-ec1))
+  y, en local, el onboarding.
+- **Volver a ec1**: `deploy/wake.sh`. Su línea base no sirve tal cual si el entorno local borró los
+  contactos: `reset.sh` reescribe los de la línea base **por su Id** de Salesforce, y un contacto borrado
+  no se reescribe. Hay que hacer en ec1 zero + onboarding y tomar una línea base nueva.
+- **Antes de un onboarding o un snapshot**, que Karpenter no esté moviendo pods (ver
+  [El clúster](/operacion/cluster/#nodos)): un MDM que no responde mientras se escribe en Opera deja
+  perfiles sin código de cliente.
+
 ## Preparar
 
 ```sh
@@ -70,7 +86,12 @@ A cero también desde la consola de control, sin parar nada: **Demo → Resetear
 | :----- | :------- |
 | `snapshot.sh` | Guarda la **línea base** de ec1 en `~/.local/share/ec-demo1/demo-baseline`, con nada en marcha (ningún proceso corriendo, nada en un outbox) |
 | `reset.sh` | Vuelve a la línea base (~4 min): restaura las bases de datos de los servicios y el estado del motor; en Salesforce borra los contactos y Cases que creó la demo (solo los de ec1: la org se comparte con el entorno local) y devuelve los de la línea base a sus datos; el MDM retoma los eventos de Salesforce desde ahora; repone el contexto de Opera de la línea base |
-| `zero.sh` | Vuelve a **antes de integrar nada** (~3 min): vacía reservas, integraciones, mapeados, clientes, huéspedes, estancias, notificaciones, avisos de recepción (los de `notices` y la copia del front office), auditoría y procesos; en Salesforce borra todos los contactos y los Cases del MDM. Se queda lo configurado: interlocutores, habitaciones y catálogos del front office, reglas de registro, definiciones, usuarios y Keycloak |
+| `zero.sh` | Vuelve a **antes de integrar nada** (~3 min): vacía reservas, integraciones, mapeados, clientes, huéspedes, estancias, notificaciones, avisos de recepción (los de `notices` y la copia del front office), auditoría y procesos; en Salesforce borra todos los contactos y los Cases del MDM —los de solicitudes de cambio **y los de avisos de recepción** (`MdmAvisoId__c`): un contacto con un Case no se puede borrar—. Se queda lo configurado: interlocutores, habitaciones y catálogos del front office, reglas de registro, definiciones, usuarios y Keycloak |
+
+`zero.sh` y `reset.sh` **dicen lo que Salesforce se niega a borrar** («NOT deleted …, con el motivo»): la
+API con `allOrNone=false` contesta 200 aunque un registro no se borre, y hasta el 07-10-2026 cinco
+contactos con un aviso sobrevivían a `zero.sh` sin que nadie se enterara. `reset.sh` borra también los
+Cases de aviso creados después de la línea base.
 
 Las bases de datos que entran en la línea base y en `reset.sh` son las de `DATABASES` en
 `deploy/demo/common.sh`: `audit`, `booking`, `communication`, `crs_integration`, `customer_mdm`,
@@ -94,7 +115,9 @@ kubectl -n ec-demo1 get cm ec-demo-run -o jsonpath='{.data.OPERA_EXTERNAL_SYSTEM
 
 ## Salesforce en la demo
 
-- Los duplicados que la demo fusiona en Salesforce («Marcos Ruiz», «Lucía Fernández») son del **MDM
-  local**, no de ec1: `reset.sh` no los devuelve tras una fusión. Los recupera
-  `dedup.py --restore dedup-out/dedup_result_<ts>.json`.
+- Los duplicados que fusionaba la demo de deduplicación («Marcos Ruiz», «Lucía Fernández») eran del
+  **MDM local** y ya no están en la org: `zero.sh` borra todos los contactos. Si hacen falta otra vez,
+  `dedup.py --restore dedup-out/dedup_result_<ts>.json` los recupera de la papelera (15 días); pasado
+  eso, hay que crearlos de nuevo. El flujo 2 de la demo (un cliente que repite, consolidado al escanear
+  el documento) crea su propio duplicado.
 - El cupo de la API es compartido: ver [Consumo de Salesforce y Opera](/operacion/consumo-apis-externas/).
