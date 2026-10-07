@@ -71,7 +71,7 @@ public class RecipientsCrud extends Crud<RecipientViewModel, RecipientViewModel,
 
     @Override
     public RecipientViewModel view(String id, HttpRequest httpRequest) {
-        return viewModel.load(queries.find(id).orElseThrow(() -> new NoSuchElementException("No recipient " + id)));
+        return viewModel.load(queries.find(id).orElseThrow(() -> new NoSuchElementException("Recipient " + id + " not found")));
     }
 
     @Override

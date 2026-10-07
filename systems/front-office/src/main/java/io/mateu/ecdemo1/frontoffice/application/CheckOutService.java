@@ -49,7 +49,7 @@ public class CheckOutService {
   }
 
   Stay checkOutNow(String stayId, String by) {
-    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("Reserva " + stayId + " no encontrada"));
     if (!stay.inHouse()) {
       return stay;
     }

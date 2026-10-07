@@ -63,7 +63,7 @@ public class ChangeRequestsPage implements Listing<ChangeRequestRow>, Searchable
 
     @Override
     public CustomerCard view(String id, HttpRequest httpRequest) {
-        var request = requests.find(id).orElseThrow(() -> new NoSuchElementException("No change request " + id));
+        var request = requests.find(id).orElseThrow(() -> new NoSuchElementException("Solicitud de cambio " + id + " no encontrada"));
         return card.getObject().load(resolution.survivorOf(request.customerId));
     }
 }

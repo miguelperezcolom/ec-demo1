@@ -75,7 +75,7 @@ public class IntegrationCrud extends Crud<IntegrationViewModel, IntegrationViewM
     /** By the CRS hotel: it is the row's id, and what the URL of a screen carries. */
     private Integration find(String crsHotelCode) {
         return queries.byCrsHotel(crsHotelCode)
-                .orElseThrow(() -> new NoSuchElementException("No integration for hotel " + crsHotelCode));
+                .orElseThrow(() -> new NoSuchElementException("Integration for hotel " + crsHotelCode + " not found"));
     }
 
     @Override

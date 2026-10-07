@@ -35,7 +35,7 @@ public class IncidentService {
   }
 
   Incident open(String stayId, IncidentType type, String title, String comment) {
-    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("Reserva " + stayId + " no encontrada"));
     var now = LocalDateTime.now(clock);
     var incident = new Incident("inc-" + System.currentTimeMillis(), type, type.icon(),
         blank(title) ? "Incidencia de " + type.label().toLowerCase(Locale.forLanguageTag("es")) : title,
@@ -47,7 +47,7 @@ public class IncidentService {
   @Transactional
   public void resolve(String stayId, String code) {
     audit.run("Incident resolved", stayId, null, StayAudit.params("incident", code), () -> {
-      var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+      var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("Reserva " + stayId + " no encontrada"));
       return stays.save(stay.resolveIncident(code));
     }, s -> "Incidencia " + code + " resuelta");
   }

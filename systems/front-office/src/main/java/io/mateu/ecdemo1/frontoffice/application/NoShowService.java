@@ -48,7 +48,7 @@ public class NoShowService {
   }
 
   Outcome toggle(String stayId, int pax) {
-    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("Reserva " + stayId + " no encontrada"));
     var ops = checkInOps.save(stayId, checkInOps.of(stayId).toggleNoShow(pax));
     var nobodyArrived = stay.status() == StayStatus.ARRIVING && CheckInChecklist.nobodyArrived(stay, ops);
     // The report leaves with the mark (and its audit): all saved, or none.

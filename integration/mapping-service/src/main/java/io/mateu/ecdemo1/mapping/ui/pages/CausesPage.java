@@ -60,7 +60,7 @@ public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<Caus
 
     @Override
     public CauseViewModel view(String key, HttpRequest httpRequest) {
-        return detail.getObject().load(causes.cause(key).orElseThrow(() -> new NoSuchElementException("No cause " + key)),
+        return detail.getObject().load(causes.cause(key).orElseThrow(() -> new NoSuchElementException("Cause " + key + " not found")),
                 !redwood(httpRequest));
     }
 

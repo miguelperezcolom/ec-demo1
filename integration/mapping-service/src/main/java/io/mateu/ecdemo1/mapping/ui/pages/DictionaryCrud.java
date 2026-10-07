@@ -284,7 +284,7 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
                     .split("\\|", 3);
             return viewModel.loadUnmapped(parts[0], CodeType.valueOf(parts[1]), parts[2]);
         }
-        return viewModel.load(queries.entry(id).orElseThrow(() -> new NoSuchElementException("No mapping entry " + id)));
+        return viewModel.load(queries.entry(id).orElseThrow(() -> new NoSuchElementException("Mapping entry " + id + " not found")));
     }
 
     @Override

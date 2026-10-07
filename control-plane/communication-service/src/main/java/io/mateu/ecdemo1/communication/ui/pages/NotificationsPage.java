@@ -91,6 +91,6 @@ public class NotificationsPage implements Listing<NotificationRow>, Searchable, 
 
     @Override
     public NotificationViewModel view(String id, HttpRequest httpRequest) {
-        return detail.getObject().load(notifications.byId(id).orElseThrow(() -> new NoSuchElementException("No notification " + id)));
+        return detail.getObject().load(notifications.byId(id).orElseThrow(() -> new NoSuchElementException("Notification " + id + " not found")));
     }
 }

@@ -76,7 +76,7 @@ public class FrontOfficeIntegrationCrud extends Crud<FrontOfficeIntegrationViewM
 
     private FrontOfficeIntegration find(String pmsHotelCode) {
         return queries.byProperty(pmsHotelCode)
-                .orElseThrow(() -> new NoSuchElementException("No front office integration for property " + pmsHotelCode));
+                .orElseThrow(() -> new NoSuchElementException("Front office integration for property " + pmsHotelCode + " not found"));
     }
 
     @Override
