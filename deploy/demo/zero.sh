@@ -5,7 +5,8 @@
 #     catalogue it was given, notifications, the reception notices, audit, the engine's processes;
 #   - what is set up, not integrated, stays: the ERP's partners, the front office's rooms and
 #     catalogs, the registration rules, the process definitions, content, users and Keycloak;
-#   - Salesforce loses every contact and the MDM's change-request Cases.
+#   - Salesforce loses every contact and the MDM's Cases (change requests and reception notices: a
+#     contact with a Case cannot be deleted).
 # Opera is not touched, and never cleaned: what earlier runs wrote stays there. So each run gets a
 # context of its own for the CRS locator in the reservations' external references — ECDEMO1-<MMddHHmm>,
 # UTC, in the ec-demo-run ConfigMap — and a new random locator that repeats an old one does not find,
@@ -38,7 +39,7 @@ wipe crs_integration inbox_entry outbox_message
 wipe integrations integration backfill_run fo_integration fo_backfill_run outbox_message
 wipe mapping cause mapping_entry partner_profile waiter waiter_cause outbox_message
 wipe communication inbox_item inbox_seen notification resolution
-wipe customer_mdm customer customer_source customer_xref consolidation change_request outbox_message
+wipe customer_mdm customer customer_source customer_xref consolidation change_request customer_notice inbox_entry outbox_message
 wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line pms_catalogue pms_catalogue_sync command_inbox walk_in check_in_ops forced_check_in stay_invoice folio_line_pms pax_registration_data customer_nationality customer_notice stay_notice_ack
 echo "update room set occupancy = 'FREE';" | psql_in front_office
 wipe notices notice outbox_message
@@ -66,14 +67,19 @@ def ids(soql):
         found += [r["Id"] for r in page["records"]]
     return found
 # Two hundred records a call (sObject Collections), not one: the org's daily API allowance counts calls.
+# allOrNone=false answers 200 even when a record is not deleted: what failed is said, not swallowed.
 def delete(records):
+    failed = 0
     for i in range(0, len(records), 200):
-        call("DELETE", "/composite/sobjects?allOrNone=false&ids=" + ",".join(records[i:i + 200]))
-cases = ids("SELECT Id FROM Case WHERE MdmRequestId__c != null")
-delete(cases)
-contacts = ids("SELECT Id FROM Contact")
-delete(contacts)
-print(f"  deleted {len(cases)} Case(s) and {len(contacts)} contact(s)")
+        for r in call("DELETE", "/composite/sobjects?allOrNone=false&ids=" + ",".join(records[i:i + 200])):
+            if not r["success"]:
+                failed += 1
+                print(f"  NOT deleted {r['id']}: {'; '.join(e['message'].strip() for e in r['errors'])}")
+    return len(records) - failed
+# A contact with a Case is not deleted: the MDM's Cases go first, notices (MdmAvisoId__c) included.
+cases = delete(ids("SELECT Id FROM Case WHERE MdmRequestId__c != null OR MdmAvisoId__c != null"))
+contacts = delete(ids("SELECT Id FROM Contact"))
+print(f"  deleted {cases} Case(s) and {contacts} contact(s)")
 EOF
 # The MDM resumes Salesforce's events from now: the deletions just made are not the MDM's to replay.
 echo "delete from salesforce_cursor where name like 'pubsub%'; update salesforce_cursor set until = now() where name = 'poll';" | psql_in customer_mdm
