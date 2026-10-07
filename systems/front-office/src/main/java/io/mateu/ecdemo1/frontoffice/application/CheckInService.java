@@ -227,6 +227,6 @@ public class CheckInService {
   }
 
   Stay find(String stayId) {
-    return stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+    return stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("Reserva " + stayId + " no encontrada"));
   }
 }

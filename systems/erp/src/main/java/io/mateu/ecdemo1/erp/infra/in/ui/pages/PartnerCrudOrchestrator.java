@@ -68,7 +68,7 @@ public class PartnerCrudOrchestrator extends Crud<PartnerViewModel, PartnerViewM
     }
 
     private Partner find(String code) {
-        return repository.findByCode(code).orElseThrow(() -> new NoSuchElementException("Partner not found: " + code));
+        return repository.findByCode(code).orElseThrow(() -> new NoSuchElementException("Partner " + code + " not found"));
     }
 
     @Override

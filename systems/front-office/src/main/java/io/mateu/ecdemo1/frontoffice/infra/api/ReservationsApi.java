@@ -101,7 +101,7 @@ public class ReservationsApi {
   @Transactional
   public Written cancel(@PathVariable String locator,
       @org.springframework.web.bind.annotation.RequestBody(required = false) Cancellation cancellation) {
-    var stay = stays.findById(stayOf(locator, null)).orElseThrow(() -> new NoSuchElementException("No stay " + locator));
+    var stay = stays.findById(stayOf(locator, null)).orElseThrow(() -> new NoSuchElementException("Reserva " + locator + " no encontrada"));
     var noShow = cancellation != null && Boolean.TRUE.equals(cancellation.noShow());
     var cancelled = stays.save(noShow ? stay.noShow(cancellation.total()) : stay.cancel());
     return new Written(stay.id(), cancelled.guestId(), cancelled.status().name(), false);
@@ -109,7 +109,7 @@ public class ReservationsApi {
 
   @GetMapping("/{locator}")
   public Written get(@PathVariable String locator) {
-    var stay = stays.findById(stayOf(locator, null)).orElseThrow(() -> new NoSuchElementException("No stay " + locator));
+    var stay = stays.findById(stayOf(locator, null)).orElseThrow(() -> new NoSuchElementException("Reserva " + locator + " no encontrada"));
     return new Written(stay.id(), stay.guestId(), stay.status().name(), false);
   }
 

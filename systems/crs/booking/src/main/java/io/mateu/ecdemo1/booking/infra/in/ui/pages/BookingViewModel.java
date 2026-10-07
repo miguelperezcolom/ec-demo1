@@ -238,7 +238,7 @@ public class BookingViewModel implements Identifiable, VisibilitySupplier, io.ma
     }
 
     public void save(HttpRequest httpRequest) {
-        var stored = queryService.getById(id).orElseThrow(() -> new NoSuchElementException("Booking not found: " + id));
+        var stored = queryService.getById(id).orElseThrow(() -> new NoSuchElementException("Booking " + id + " not found"));
         if (!stored.hotelCode().equals(hotelCode)) {
             throw new IllegalArgumentException("A booking cannot move to another hotel: cancel it and create a new one");
         }

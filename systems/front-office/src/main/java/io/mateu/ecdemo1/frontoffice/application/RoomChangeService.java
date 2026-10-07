@@ -60,7 +60,7 @@ public class RoomChangeService {
   }
 
   Optional<Room> change(String stayId, String roomNumber) {
-    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+    var stay = stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("Reserva " + stayId + " no encontrada"));
     var room = rooms.findByNumber(roomNumber).filter(Room::assignable).orElse(null);
     var refused = stay.inHouse() && checkInRefused(stayId);
     if (room == null && (!stay.inHouse() || refused)) {

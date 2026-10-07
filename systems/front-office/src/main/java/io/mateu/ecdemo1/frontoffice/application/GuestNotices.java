@@ -415,7 +415,7 @@ public class GuestNotices {
   }
 
   Stay stay(String stayId) {
-    return stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("No stay " + stayId));
+    return stays.findById(stayId).orElseThrow(() -> new NoSuchElementException("Reserva " + stayId + " no encontrada"));
   }
 
   static String shown(String value) {
