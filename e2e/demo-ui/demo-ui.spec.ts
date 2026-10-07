@@ -22,13 +22,12 @@ const FO = HOSTS.frontOffice
 
 /** Room types to try, in order, when Opera refuses one with RSV00138 (not enough rooms of that type). */
 const ROOM_TYPES = (process.env.DEMO_ROOM_TYPES ?? 'JS-SEA,JS-SIDESEA,JS-STD,JS-ACCESSIBLE,JS-STD-KING').split(',')
+const OUTAGE_ROOM = process.env.DEMO_OUTAGE_ROOM ?? 'JS-SIDESEA'
 
 // What the flows hand to each other.
 const S: {
     original?: string, originalHolder?: Holder, duplicate?: string,
     outageBooking?: string,
-    /** The room type Opera last took (XMAR's inventory refuses some on some dates: RSV00138). */
-    acceptedRoom?: string,
 } = {}
 
 interface Holder { first: string, last: string, email: string, phone: string, nationality: string }
@@ -345,9 +344,10 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
             const locator = await createBooking(ui, {
                 arrival: day(40), departure: day(43),
                 holder: { first: 'Hanna', last: `Berg ${RUN}`, email: `hanna.${RUN}@example.org`, phone: '+49 1701234567', nationality: 'DE' },
-                // A room type Opera has taken: if it refused this one after the outage, the version
-                // written would be the corrected one, not the retried one the journey has to show.
-                room: S.acceptedRoom ?? ROOM_TYPES[0], rate: 'DIRECTA', board: 'DESAYUNO', adults: 2,
+                // A room type XMAR has on these dates (JS-SEA is refused there: RSV00138, both runs of
+                // 2026-10-07): if Opera refused it after the outage, the version written would be the
+                // corrected one, not the retried one the journey has to show.
+                room: OUTAGE_ROOM, rate: 'DIRECTA', board: 'DESAYUNO', adults: 2,
                 guests: [['Hanna', `Berg ${RUN}`], ['Jonas', `Berg ${RUN}`]],
             }, 'f6')
             S.outageBooking = locator
@@ -367,6 +367,9 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         }
         const locator = S.outageBooking!
         await ensureInOpera(ui, locator)
+        await ui.go(`${D}/booking/bookings/${locator}`, /In other systems/)
+        expect((await ui.text()).match(/Room 1 · ([A-Z-]+)/)?.[1],
+            `Opera refused ${OUTAGE_ROOM} on these dates after the outage, so the retried version was replaced: set DEMO_OUTAGE_ROOM`).toBe(OUTAGE_ROOM)
         // Written once, after retries: the journey says how it ended.
         await ui.go(`${D}/journey/bookings/${locator}`, /Recorrido de/)
         await expect.poll(async () => {
@@ -560,11 +563,7 @@ async function ensureInOpera(ui: Ui, locator: string, settle = 0) {
             refused = await rejected(ui, locator)
             if (refused) break
             await ui.go(`${D}/booking/bookings/${locator}`, /In other systems/)
-            const t = await ui.text()
-            if (/^\d+$/.test(field(t, 'Opera reservation'))) {
-                S.acceptedRoom = t.match(/Room 1 · ([A-Z-]+)/)?.[1] ?? S.acceptedRoom
-                return
-            }
+            if (/^\d+$/.test(field(await ui.text(), 'Opera reservation'))) return
             await ui.page.waitForTimeout(15_000)
         }
         if (!refused) throw new Error(`${locator} never reached Opera in 4 min (and no PMS_REJECTED cause for it)`)
