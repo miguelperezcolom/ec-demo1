@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Puts Salesforce back for a demo reset, from what reset.sh leaves in WORK:
 
-- deletes the Cases of change requests ec1 made after the baseline, and the contacts of customers
-  ec1 created after it — ec1's only: the org is shared with the local environment, whose contacts
+- deletes the Cases of change requests and reception notices ec1 made after the baseline, and the
+  contacts of customers ec1 created after it (a contact with a Case is not deleted) — ec1's only: the org is shared with the local environment, whose contacts
   ec1 does not know;
 - writes the baseline customers' data back onto their contacts (Salesforce is the master; a demo
   may have changed them).
@@ -32,9 +32,15 @@ def ids(soql):
 
 
 def delete(records):
-    """Two hundred a call (sObject Collections), not one: the org's daily API allowance counts calls."""
+    """Two hundred a call (sObject Collections), not one: the org's daily API allowance counts calls.
+    allOrNone=false answers 200 even when a record is not deleted: what failed is said, not swallowed."""
+    failed = 0
     for i in range(0, len(records), 200):
-        call("DELETE", "/composite/sobjects?allOrNone=false&ids=" + ",".join(records[i:i + 200]))
+        for r in call("DELETE", "/composite/sobjects?allOrNone=false&ids=" + ",".join(records[i:i + 200])):
+            if not r["success"]:
+                failed += 1
+                print(f"  NOT deleted {r['id']}: {'; '.join(e['message'].strip() for e in r['errors'])}")
+    return len(records) - failed
 
 
 def quoted(values):
@@ -43,16 +49,19 @@ def quoted(values):
 
 new_requests = sorted(lines("requests-now") - lines("requests-baseline"))
 new_customers = sorted(lines("customers-now") - lines("customers-baseline"))
+new_notices = sorted(lines("notices-now") - lines("notices-baseline"))
 cases = ids(f"SELECT Id FROM Case WHERE MdmRequestId__c IN ({quoted(new_requests)})") if new_requests else []
+for i in range(0, len(new_notices), 100):
+    cases += ids(f"SELECT Id FROM Case WHERE MdmAvisoId__c IN ({quoted(new_notices[i:i + 100])})")
 for i in range(0, len(new_customers), 100):
     chunk = new_customers[i:i + 100]
     cases += ids(f"SELECT Id FROM Case WHERE MdmId__c IN ({quoted(chunk)})")
-delete(sorted(set(cases)))
+cases = delete(sorted(set(cases)))
 contacts = []
 for i in range(0, len(new_customers), 100):
     contacts += ids(f"SELECT Id FROM Contact WHERE MDM_Id__c IN ({quoted(new_customers[i:i + 100])})")
-delete(contacts)
-print(f"  deleted {len(set(cases))} Case(s) and {len(contacts)} contact(s) the demo created")
+contacts = delete(contacts)
+print(f"  deleted {cases} Case(s) and {contacts} contact(s) the demo created")
 
 raw = (work / "contacts-baseline.json").read_text().strip()
 baseline = [{"attributes": {"type": "Contact"}, "MDM_Id__c": c["id"], "FirstName": c["firstName"], "LastName": c["lastName"] or "?",

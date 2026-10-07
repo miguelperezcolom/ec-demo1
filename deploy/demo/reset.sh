@@ -36,6 +36,7 @@ done
 WORK=$(mktemp -d)
 psql_value customer_mdm "select id from customer" > "$WORK/customers-now"
 psql_value customer_mdm "select id from change_request" > "$WORK/requests-now" 2>/dev/null || : > "$WORK/requests-now"
+psql_value customer_mdm "select id from customer_notice" > "$WORK/notices-now" 2>/dev/null || : > "$WORK/notices-now"
 
 echo "Stopping the services and the engine"
 for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=0 >/dev/null; done
@@ -65,6 +66,7 @@ echo "  $ENGINE_DB (state tables)"
 echo "Salesforce"
 psql_value customer_mdm "select id from customer" > "$WORK/customers-baseline"
 psql_value customer_mdm "select id from change_request" > "$WORK/requests-baseline" 2>/dev/null || : > "$WORK/requests-baseline"
+psql_value customer_mdm "select id from customer_notice" > "$WORK/notices-baseline" 2>/dev/null || : > "$WORK/notices-baseline"
 psql_value customer_mdm "select json_agg(json_build_object('id', id, 'firstName', first_name, 'lastName', last_name, 'email', email, 'phone', phone, 'birthDate', birth_date, 'nationality', nationality, 'documentType', document_type, 'documentNumber', document_number)) from customer where status <> 'MERGED' and salesforce_contact_id is not null" > "$WORK/contacts-baseline.json"
 python3 salesforce.py "$WORK"
 # The MDM resumes Salesforce's events from now, and its poll looks from now: what happened during
