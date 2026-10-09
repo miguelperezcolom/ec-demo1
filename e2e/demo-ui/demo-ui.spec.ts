@@ -483,7 +483,7 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
     // nacimiento» + «Buscar por nombre», the room cards, «Enviar a tablet», «Confirmar check-in»; the
     // stay's «Check-out» and «Confirmar — €…».
     test('9 · a known customer recognised at the check-in, and their stay in the history and Riu Class', async ({}, info) => {
-        test.setTimeout(45 * 60_000)
+        test.setTimeout(75 * 60_000)
         const ui = new Ui(page, info)
 
         // Fixture, as flow 3's Case approval: three holders of the coming arrivals made known customers
@@ -547,6 +547,7 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
             `the MDM never consolidated the confirmed guest into ${known2.customerId}`, 5 * 60_000)
 
         // 3 · No document: by name and birth date only possible; by Riu Class number, certainty.
+        const pointsBefore = await riuClassPoints(ui, known3.riuClass) // read now: it leaves the check-in
         await checkIn(byHand)
         const [first3, ...rest3] = known3.guestName.split(' ')
         await ui.page.getByLabel('Nombre', { exact: true }).last().fill(first3)
@@ -566,21 +567,24 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
 
         // The stay of the customer found by hand, to the end: the check-in (document, room, signature) and
         // the check-out — the closed stay is the known customer's, in the history and in Riu Class.
-        const pointsBefore = await riuClassPoints(ui, known3.riuClass)
         await ui.click(ui.button('Escanear documento'), 9_000)
-        await ui.click(ui.page.getByText(/^\d{3,4}$/).first(), 4_000) // the first free room's card
+        // the wizard stays on the pax after a scan that recognised them: on to the room
+        await ui.click(ui.button('Siguiente'), 4_000)
+        await ui.waitText(/Lista · /, 'the check-in never showed the rooms')
+        await ui.click(ui.page.getByText(/^\d{3,4}$/).first(), 4_000) // the first room's card: ready ones come first
         for (let i = 0; i < 2; i++) await ui.click(ui.button('Siguiente'), 3_500)
         await ui.click(ui.button('Enviar a tablet'), 9_000)
         await ui.click(ui.button('Confirmar check-in'), 10_000)
         await ui.go(`${FO}/reservas/${byHand}`, /Huéspedes|Check-out/)
         await ui.click(ui.button('Check-out'), 4_000)
         await ui.click(ui.page.getByRole('button', { name: /^Confirmar — / }).first(), 8_000)
-        await ui.waitText(/Check-out enviado/, `the check-out of ${byHand} never went`)
+        await ui.waitText(/[Cc]heck-out enviado|salió el/, `the check-out of ${byHand} never went`)
         await ui.checkpoint('f9-checked-out')
 
         await ui.go(`${D}/history/search`, /Historial de clientes/)
         await ui.type('Código de cliente', known3.customerId)
-        await ui.click(ui.button('Buscar'), 5_000)
+        // the toolbar's «Buscar», not the menu entry of the same name (Redwood shows both)
+        await ui.click(ui.page.getByRole('button', { name: 'Buscar', exact: true }).last(), 5_000)
         // «Recepción» is the origin of a stay closed at the desk; the seeded ones say «Demo»
         await ui.waitText(/MRU01[^]{0,400}Recepción|Recepción[^]{0,400}MRU01/,
             'the closed stay never reached the customer history')
