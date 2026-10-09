@@ -39,7 +39,7 @@ class CheckInWizardStepsTest {
     when(queries.pendingPax(any())).thenReturn(pendingPax);
     when(notices.forStay(any(), any())).thenReturn(List.of());
     var wizard = new CheckInWizard(queries, mock(CheckInService.class), mock(RoomRepository.class), notices,
-        mock(IncompleteCheckIns.class));
+        mock(IncompleteCheckIns.class), mock(io.mateu.ecdemo1.frontoffice.application.Recognition.class));
     wizard.stayId = "S-1";
     wizard.populate();
     return wizard;

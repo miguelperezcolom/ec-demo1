@@ -335,3 +335,40 @@ create table if not exists customer_nationality (
     source      varchar(20),
     updated_at  timestamp
 );
+
+-- Who each pax of a stay was recognised as at the desk (the chain's customer, by document, email,
+-- Riu Class number, or only possibly — candidates by name and birth date, as JSON). Kept, not
+-- recomputed: the check-in's screens are rebuilt on every interaction, the MDM is asked once per scan.
+create table if not exists pax_recognition (
+    stay_id       varchar(64)   not null,
+    pax           int           not null,
+    customer_id   varchar(64),
+    customer_name varchar(200),
+    certainty     varchar(10)   not null,
+    matched_by    varchar(20)   not null,
+    candidates    varchar(4000),
+    riu_class     varchar(40),
+    confirmed_at  timestamp,
+    confirmed_by  varchar(200),
+    updated_at    timestamp,
+    primary key (stay_id, pax)
+);
+
+-- The last document scanned of each pax and what the MDM said of it: what a later confirmation of
+-- who the pax is sends the MDM again, so that the new document joins the customer confirmed.
+create table if not exists pax_scan (
+    stay_id           varchar(64)  not null,
+    pax               int          not null,
+    first_name        varchar(100),
+    last_name         varchar(200),
+    document_type     varchar(20),
+    document_number   varchar(50),
+    birth_date        date,
+    nationality       varchar(10),
+    issuing_country   varchar(10),
+    expiry            date,
+    lookup            varchar(20),
+    found_customer_id varchar(64),
+    scanned_at        timestamp,
+    primary key (stay_id, pax)
+);

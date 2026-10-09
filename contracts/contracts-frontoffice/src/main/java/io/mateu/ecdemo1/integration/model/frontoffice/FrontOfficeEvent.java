@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 
 /**
  * What happened at a hotel's reception, as the front office says it: a guest checked in, checked out,
@@ -27,6 +29,7 @@ import java.time.Instant;
         @JsonSubTypes.Type(value = FrontOfficeEvent.NoShowReported.class, name = "no-show-reported"),
         @JsonSubTypes.Type(value = FrontOfficeEvent.ChargePosted.class, name = "charge-posted"),
         @JsonSubTypes.Type(value = FrontOfficeEvent.ChargeVoided.class, name = "charge-voided"),
+        @JsonSubTypes.Type(value = FrontOfficeEvent.StayClosed.class, name = "stay-closed"),
 })
 public sealed interface FrontOfficeEvent {
 
@@ -122,5 +125,35 @@ public sealed interface FrontOfficeEvent {
                         String pmsHotelCode, String pmsReservationId, String lineId, ChargeKind kind, String code,
                         String description, BigDecimal amount, String currency, String by)
             implements FrontOfficeEvent {
+    }
+
+    /**
+     * A stay is over: the guests checked out and the desk closed it (CM-R13 of the HLA). It carries
+     * everything a customer's stay history needs — the dates, the room, who stayed, what they spent —
+     * so that whoever keeps that history does not depend on the order of the events before it.
+     * Published at the check-out, after {@link GuestCheckedOut}, even when the stay is not linked to
+     * the PMS: the history is the chain's, not the PMS's.
+     *
+     * @param guests   who stayed, holder first: each with the id the front office knows them by — the
+     *                 MDM's customer code ({@code C-…}) when it has one, else its own ({@code pax-2},
+     *                 {@code opera-…}, {@code wi-…})
+     * @param charges  what the stay spent at the desk, per kind of charge, voided lines left out; the
+     *                 accommodation is not here — it is not a consumption
+     * @param total    the sum of {@code charges}
+     * @param currency ISO 4217; null for the PMS property's own
+     */
+    record StayClosed(String eventId, Instant at, String hotelCode, String stayId, String crsLocator,
+                      String pmsHotelCode, String pmsReservationId, LocalDate arrival, LocalDate departure,
+                      int nights, String roomNumber, String roomType, String board, List<StayGuest> guests,
+                      List<ChargeTotal> charges, BigDecimal total, String currency)
+            implements FrontOfficeEvent {
+    }
+
+    /** One guest of a closed stay: the id the front office knows them by, and whether they held the reservation. */
+    record StayGuest(String customerId, boolean holder) {
+    }
+
+    /** What a closed stay spent on one kind of charge. */
+    record ChargeTotal(ChargeKind kind, BigDecimal amount) {
     }
 }

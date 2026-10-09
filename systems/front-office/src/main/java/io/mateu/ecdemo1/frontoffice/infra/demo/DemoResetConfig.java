@@ -19,7 +19,7 @@ public class DemoResetConfig {
             "guest", "guest_kardex", "guest_preference", "stay", "stay_add_on", "stay_companion", "stay_incident",
             "folio", "folio_line", "pms_catalogue", "pms_catalogue_sync", "command_inbox", "walk_in", "check_in_ops",
             "forced_check_in", "stay_invoice", "folio_line_pms", "pax_registration_data", "customer_nationality",
-            "customer_notice", "stay_notice_ack")
+            "customer_notice", "stay_notice_ack", "pax_recognition", "pax_scan")
         .then("update room set occupancy = 'FREE'");
   }
 }

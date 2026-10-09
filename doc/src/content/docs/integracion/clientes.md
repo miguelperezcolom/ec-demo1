@@ -156,11 +156,45 @@ enseña en el check-in y el check-out: ver [Un sistema propio](/front-office/sis
 
 - lo que el cliente no tiene (documento, fecha de nacimiento, nacionalidad) se rellena y llega al
   contacto de Salesforce **sin Case**;
-- lo que contradice al maestro (otro nombre, otra fecha, otro documento) va como Case;
+- **un documento que no es de nadie se añade** a los suyos, aunque ya tenga otro: el DNI en un viaje y el
+  pasaporte en el siguiente no se contradicen;
+- lo que contradice al maestro (otro nombre, otra fecha) va como Case;
 - si el documento ya es de **otro cliente**, es la misma persona: el MDM consolida el provisional en el
   que tiene el documento (alias, reservas re-apuntadas, `CustomersMerged`) y fusiona los dos contactos
   en Salesforce con `merge()` de la API SOAP. Solo si es seguro: el documento es de un único cliente,
-  el pasajero no tenía otro y el nombre coincide.
+  el pasajero no tenía otro y el nombre coincide;
+- si **recepción confirmó** quién es (`confirmedCustomerId`: por su número Riu Class o su email, ver
+  [Reconocer al cliente en el check-in](/front-office/reconocer-al-cliente/)), el MDM consolida el código
+  del pasajero en ese cliente (vía `DESK_CONFIRMED`) y le añade el documento. Si el documento es de un
+  tercero, no se le da: va como Case.
+
+## Varios documentos por cliente
+
+Cada cliente tiene **todos los documentos** que se le han visto (`customer_document`): tipo, número, país
+emisor, caducidad, origen (escaneo, reserva o cliente) y cuándo se vio por primera y última vez.
+
+- **La clave es país emisor + número normalizado, sin el tipo**: un mismo número leído como «DOC» o como
+  «PASAPORTE» es el mismo documento, y dos números iguales de países distintos no se confunden. Sin país
+  (una reserva no lo trae), se toma la nacionalidad; sin nada, solo el número.
+- El documento de `Customer` (`documentType`, `documentNumber`) sigue siendo **el principal**: es el que va
+  a Salesforce y al `GoldenRecord`, que además lleva la lista entera (`documents`). Proyectar a Salesforce
+  todos los documentos queda pendiente (CM-F15 del HLA).
+- Al arrancar, el MDM copia a la tabla el documento principal de los clientes que aún no lo tienen
+  (idempotente).
+
+## Buscar al cliente
+
+Dos lecturas, rápidas y sin efectos, para el front office (y para los agentes, por MCP:
+`findCustomerByDocument`, `findCandidates`):
+
+| | Petición | Respuesta |
+| :-- | :-- | :-- |
+| **Certeza** | `GET /identities/lookup` con **uno** de: `documentNumber` (+ `country`), `email`, `riuClass` | **200** el cliente superviviente (`customerId`, `status`, `matchedBy`, nombre y fecha de nacimiento); **404** nadie; **409** `{ambiguous, matchedBy, count}` si es de varios |
+| **Posible** | `GET /identities/candidates?firstName&lastName&birthDate&nationality` | Hasta 5 clientes vivos con el mismo nombre normalizado y **la misma fecha de nacimiento** (obligatoria: sin ella, ninguno), primero los de la misma nacionalidad, con qué coincidió. **Nunca une a nadie** |
+
+Un documento ambiguo contesta **409** y no una lista: recepción no debe ver los datos de varios clientes.
+El número **Riu Class** es una referencia cruzada del cliente (`RIU_CLASS`), como la de Salesforce o la de
+Opera: `GET /customers?xref=RIU_CLASS:RC…` también lo encuentra.
 
 ## Contactos marcados por calidad del dato
 

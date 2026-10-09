@@ -9,14 +9,17 @@ import java.time.Instant;
 
 /**
  * Where a customer is known outside the MDM, and by what: its Salesforce contact, its guest in a
- * hotel's front office, its guest profile in Opera for a reservation. The MDM keeps them so that a
+ * hotel's front office, its guest profile in Opera for a reservation, its Riu Class card. The MDM keeps them so that a
  * change of the customer — which Salesforce decides — reaches every copy of it.
  */
 @Entity
-@Table(name = "customer_xref", indexes = @Index(name = "customer_xref_customer", columnList = "customerId"))
+@Table(name = "customer_xref", indexes = {
+        @Index(name = "customer_xref_customer", columnList = "customerId"),
+        @Index(name = "customer_xref_system_reference", columnList = "system,reference")})
 public class Xref {
 
-    public enum Target { SALESFORCE, FRONT_OFFICE, OPERA }
+    /** RIU_CLASS: the customer's Riu Class membership; the reference is the member number, trimmed, upper case. */
+    public enum Target { SALESFORCE, FRONT_OFFICE, OPERA, RIU_CLASS }
 
     /** customerId|system|reference. */
     @Id
@@ -27,6 +30,14 @@ public class Xref {
     /** Where the reference is meaningful: the hotel and reservation of an Opera profile, a front office's hotel. */
     public String context;
     public Instant seenAt;
+
+    /** The reference as it is kept: a Riu Class number however it was typed — "rc 0012 " is not another card. */
+    public static String reference(Target target, String reference) {
+        if (reference == null) {
+            return null;
+        }
+        return target == Target.RIU_CLASS ? reference.trim().toUpperCase(java.util.Locale.ROOT) : reference;
+    }
 
     public static String key(String customerId, String system, String reference) {
         return customerId + "|" + system + "|" + reference;

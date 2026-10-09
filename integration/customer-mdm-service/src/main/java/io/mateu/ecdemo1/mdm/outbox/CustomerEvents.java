@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.integration.model.customer.CustomerChanged;
 import io.mateu.ecdemo1.integration.model.customer.CustomersMerged;
 import io.mateu.ecdemo1.integration.model.customer.GoldenRecord;
 import io.mateu.ecdemo1.mdm.store.Customer;
+import io.mateu.ecdemo1.mdm.store.CustomerDocumentRepository;
 import io.mateu.ecdemo1.mdm.store.SourceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ public class CustomerEvents {
     final Outbox outbox;
     final SourceRepository sources;
     final Clock clock;
+    final CustomerDocumentRepository documents;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void changed(Customer c, boolean dataChanged, String changeRequestId, String decision, String reason) {
@@ -35,9 +37,13 @@ public class CustomerEvents {
                 golden(survivor), absorbedId, reservations(survivor.id)));
     }
 
-    static GoldenRecord golden(Customer c) {
+    /** With every document the MDM knows of the customer, the main one among them. */
+    GoldenRecord golden(Customer c) {
+        var known = documents.findByCustomerIdOrderByFirstSeenAtAsc(c.id).stream()
+                .map(d -> new GoldenRecord.IdentityDocument(d.type, d.number, d.issuingCountry))
+                .toList();
         return new GoldenRecord(c.firstName, c.lastName, c.email, c.phone, c.nationality, c.birthDate, c.documentType,
-                c.documentNumber);
+                c.documentNumber, known);
     }
 
     List<String> reservations(String customerId) {

@@ -1,0 +1,105 @@
+server:
+  port: 8134
+
+spring:
+  application:
+    name: ec-demo1-loyalty
+
+  ai:
+    mcp:
+      server:
+        name: loyalty
+        version: 1.0.0
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  cloud:
+    function:
+      # The engine's tasks (the demo's reset), the closed stays (points) and the customers' merges.
+      definition: consumeWorkerEvent;consumeFrontOfficeEvents;consumeCustomerEvents
+    stream:
+      kafka:
+        binder:
+          # Consumers continue the trace their record carries.
+          enable-observation: true
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          # From the beginning the first time: a stay closed before this service first ran still earns
+          # its points (the accrual table makes a replay harmless).
+          consumeFrontOfficeEvents-in-0:
+            consumer:
+              start-offset: earliest
+          consumeCustomerEvents-in-0:
+            consumer:
+              start-offset: earliest
+      bindings:
+        # IN: the tasks the engine dispatches for this worker — today reset@1, the demo's reset
+        # (process reset-demo): the loyalty service empties its own tables, its other consumers paused.
+        consumeWorkerEvent-in-0:
+          destination: loyalty-tasks
+          group: ec-demo1-loyalty-worker
+          consumer:
+            concurrency: 1
+        # OUT, via StreamBridge: the replies back to the engine.
+        upstream:
+          destination: upstream
+        # IN: the front office's events; only StayClosed matters here — points for the members who stayed.
+        consumeFrontOfficeEvents-in-0:
+          destination: front-office-events
+          group: ec-demo1-loyalty-front-office
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
+        # IN: the MDM's customers; only CustomersMerged matters here — the membership follows the survivor.
+        consumeCustomerEvents-in-0:
+          destination: customers
+          group: ec-demo1-loyalty-customers
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/loyalty}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:6}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+messaging:
+  outbox:
+    # It publishes nothing: the shared library's inbox is what it uses, and a relay would only poll an
+    # empty table.
+    relay: false
+
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error

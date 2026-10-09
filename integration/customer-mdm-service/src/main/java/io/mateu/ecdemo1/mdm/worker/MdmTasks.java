@@ -35,7 +35,7 @@ public class MdmTasks {
     @Bean
     public DemoResetPlan demoResetPlan() {
         return DemoResetPlan.truncate("customer-mdm",
-                "customer", "customer_source", "customer_xref", "consolidation", "change_request", "outbox_message");
+                "customer", "customer_document", "customer_source", "customer_xref", "consolidation", "change_request", "outbox_message");
     }
 
     @Bean

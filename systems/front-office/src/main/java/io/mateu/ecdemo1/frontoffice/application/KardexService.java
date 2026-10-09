@@ -63,11 +63,21 @@ public class KardexService {
    * and the pax it belongs to. Holder and companions alike.
    */
   public DemoDocuments.Scanned scanned(String stayId, int pax) {
-    return audit.run("Document scanned", stayId, null, StayAudit.params("pax", pax), () -> scan(stayId, pax),
+    return audit.run("Document scanned", stayId, null, StayAudit.params("pax", pax), () -> scan(stayId, pax, false),
         d -> "Documento " + d.documentType() + " leído y enviado al maestro de clientes");
   }
 
-  DemoDocuments.Scanned scan(String stayId, int pax) {
+  /**
+   * As {@link #scanned}, the demo scanner reading a passport the chain has never seen of the same
+   * person (same name and birth date, another number): the demo's returning customer with a new document.
+   */
+  public DemoDocuments.Scanned scannedNewPassport(String stayId, int pax) {
+    return audit.run("Document scanned", stayId, null, StayAudit.params("pax", pax, "variant", "new passport"),
+        () -> scan(stayId, pax, true),
+        d -> "Documento " + d.documentType() + " leído y enviado al maestro de clientes");
+  }
+
+  DemoDocuments.Scanned scan(String stayId, int pax, boolean newPassport) {
     var stay = stay(stayId);
     var guest = pax <= 1 ? guestOf(stayId) : null;
     var companion = pax <= 1 ? null : stay.companionAt(pax);
@@ -76,7 +86,8 @@ public class KardexService {
     var customerId = pax <= 1 ? guest.id() : companion == null ? null : companion.companionId();
     var locator = locatorOf(stayId);
     // The scanner reads before the transaction: it may ask the booking and the MDM, and nobody waits on a lock for it.
-    var document = scanner.scan(new DemoScanner.Pax(locator, pax, name, current, customerId, stay.checkIn()));
+    var who = new DemoScanner.Pax(locator, pax, name, current, customerId, stay.checkIn());
+    var document = newPassport ? scanner.scanNewPassport(who) : scanner.scan(who);
     transaction.executeWithoutResult(status -> {
       if (pax <= 1) {
         guests.save(guestOf(stayId).scanned(document.documentNumber()));
@@ -87,7 +98,8 @@ public class KardexService {
       var command = new CustomerCommand.RecordScannedIdentity(commandId, hotel, locator, stayId, pax,
           customerId != null && customerId.startsWith("C-") ? customerId : null, document.firstName(),
           document.lastName(), document.documentType(), document.documentNumber(), document.birthDate(),
-          document.nationality(), "front office " + hotel + " · " + stayId + " pax " + pax);
+          document.nationality(), "front office " + hotel + " · " + stayId + " pax " + pax,
+          document.issuingCountry(), document.expiry(), null);
       outbox.append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), command);
       // what the document says is registration data too: the rules may ask for it
       if (registrationData != null) {
@@ -96,13 +108,28 @@ public class KardexService {
         read.put(Field.DOCUMENT_NUMBER, document.documentNumber());
         read.put(Field.NATIONALITY, document.nationality());
         read.put(Field.BIRTH_DATE, document.birthDate() == null ? null : document.birthDate().toString());
+        read.put(Field.DOCUMENT_ISSUING_COUNTRY, document.issuingCountry());
+        read.put(Field.DOCUMENT_EXPIRY, document.expiry() == null ? null : document.expiry().toString());
         read.values().removeIf(v -> v == null || v.isBlank());
         registrationData.put(stayId, pax, read);
       }
       // the document may be the last step a forced check-in owed
       incomplete.settle(stayId, null);
     });
+    // who the pax is in the chain: asked of the MDM once the scan is saved — a read the check-in never
+    // waits long for, and never fails by
+    if (recognition != null) {
+      recognition.afterScan(stayId, pax, document);
+    }
     return document;
+  }
+
+  /** Who a scanned pax is in the chain; none in a test that does not wire it. */
+  Recognition recognition;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setRecognition(Recognition recognition) {
+    this.recognition = recognition;
   }
 
   /** The CRS's locator of a stay: its id, or — for a walk-in — the one the CRS gave it (the stay's own until then). */

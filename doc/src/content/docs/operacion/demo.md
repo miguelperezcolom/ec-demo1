@@ -43,6 +43,8 @@ deploy/demo/demo-prep.sh seed arriving-today   # flujo 4: una reserva que llega 
 deploy/demo/demo-prep.sh seed arriving-opera-today   # check-in / check-out: una reserva que llega en
                                                # la fecha de negocio de Opera, y sus habitaciones limpias
 deploy/demo/demo-prep.sh seed walk-in          # flujo 5: los datos a teclear
+deploy/demo/demo-prep.sh seed known-customers [--count 3]   # check-in: clientes conocidos (documento, Riu
+                                               # Class, historial), tras el onboarding
 ```
 
 Las comprobaciones: todos los despliegues listos; el motor; cada tarea servida por un worker vivo en su

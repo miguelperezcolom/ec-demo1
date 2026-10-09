@@ -24,6 +24,8 @@
         <module>systems/erp</module>
         <module>systems/front-office</module>
         <module>systems/notices</module>
+        <module>systems/customer-history</module>
+        <module>systems/loyalty</module>
         <module>systems/pms/opera-mock</module>
         <!-- contracts: the language they speak, one library per context, and its schemas -->
         <module>contracts</module>

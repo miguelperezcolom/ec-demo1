@@ -8,7 +8,7 @@
   "x-owner" : "customer-mdm-service",
   "x-key" : "customerId",
   "x-producers" : [ "customer-mdm-service" ],
-  "x-consumers" : [ "crs-integration-service", "front-office" ],
+  "x-consumers" : [ "crs-integration-service", "front-office", "customer-history" ],
   "x-java-type" : "io.mateu.ecdemo1.integration.model.customer.CustomerEvent",
   "x-discriminator" : "type",
   "oneOf" : [ {
@@ -125,9 +125,15 @@
         },
         "documentNumber" : {
           "type" : [ "string", "null" ]
+        },
+        "documents" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/GoldenRecord.IdentityDocument"
+          }
         }
       },
-      "required" : [ "firstName", "lastName", "email", "phone", "nationality", "birthDate", "documentType", "documentNumber" ],
+      "required" : [ "firstName", "lastName", "email", "phone", "nationality", "birthDate", "documentType", "documentNumber", "documents" ],
       "additionalProperties" : false
     },
     "GoldenRecord-nullable" : {
@@ -136,6 +142,22 @@
       }, {
         "$ref" : "#/$defs/GoldenRecord"
       } ]
+    },
+    "GoldenRecord.IdentityDocument" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "type" : [ "string", "null" ]
+        },
+        "number" : {
+          "type" : [ "string", "null" ]
+        },
+        "issuingCountry" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "number", "issuingCountry" ],
+      "additionalProperties" : false
     }
   },
   "examples" : [ {
@@ -152,7 +174,16 @@
       "nationality" : "ES",
       "birthDate" : "1990-05-17",
       "documentType" : "PASSPORT",
-      "documentNumber" : "X1234567"
+      "documentNumber" : "X1234567",
+      "documents" : [ {
+        "type" : "PASSPORT",
+        "number" : "X1234567",
+        "issuingCountry" : "ES"
+      }, {
+        "type" : "DNI",
+        "number" : "12345678Z",
+        "issuingCountry" : "ES"
+      } ]
     },
     "dataChanged" : true,
     "changeRequestId" : "CR-7",
@@ -173,7 +204,8 @@
       "nationality" : "ES",
       "birthDate" : null,
       "documentType" : null,
-      "documentNumber" : null
+      "documentNumber" : null,
+      "documents" : null
     },
     "absorbedId" : "C-00051",
     "reservations" : [ "MRU01/12E45", "MRU01/0099" ]

@@ -33,6 +33,7 @@ public class SalesforceProjection {
     final CustomerRepository customers;
     final CustomerEvents events;
     final Xrefs xrefs;
+    final io.mateu.ecdemo1.mdm.documents.CustomerDocuments documents;
     final Clock clock;
 
     /**
@@ -64,6 +65,9 @@ public class SalesforceProjection {
             customer.salesforceContactId = contact.get().path("Id").asText(customer.salesforceContactId);
         }
         if (changed) {
+            // The document Salesforce holds is one of the customer's, whatever others the MDM knows of.
+            documents.add(customer.id, customer.documentType, customer.documentNumber, customer.nationality, null,
+                    io.mateu.ecdemo1.mdm.store.CustomerDocument.Origin.CUSTOMER.name());
             customer.version++;
             customer.updatedAt = clock.instant();
             // It is Salesforce's own data: nothing to send back.

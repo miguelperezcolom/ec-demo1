@@ -66,7 +66,11 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
   @Getter(AccessLevel.NONE) final RegistrationRequirementsService registration;
 
   /** A prototype bean: Mateu takes the island from Spring; the Identidad step asks Mateu for one too. */
-  public DocumentoView(StayQueries queries, KardexService kardex, RegistrationRequirementsService registration) {
+  @Getter(AccessLevel.NONE) final io.mateu.ecdemo1.frontoffice.application.Recognition recognition;
+
+  public DocumentoView(StayQueries queries, KardexService kardex, RegistrationRequirementsService registration,
+                       io.mateu.ecdemo1.frontoffice.application.Recognition recognition) {
+    this.recognition = recognition;
     this.queries = queries;
     this.kardex = kardex;
     this.registration = registration;
@@ -92,6 +96,11 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
 
     @Label("")
     Button escanear = new Button("Escanear documento", "escanear");
+
+    // demo: the same guest hands over a passport the chain has never seen — the desk is offered the
+    // customers they may be, and confirms with their Riu Class number or email
+    @Label("")
+    Button pasaporteNuevo = new Button("Simular pasaporte nuevo", "escanearPasaporteNuevo");
 
     @Label("")
     Button rellenar = new Button("Rellenar a mano", "edit");
@@ -119,6 +128,10 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     /** What the destination's registration rules ask of this pax, and what of it the kárdex has. */
     @Label("Registro de viajeros")
     String registro;
+
+    // demo: re-scan the pax as if they handed over a new passport (see DocumentoPendiente)
+    @Label("")
+    Button pasaporteNuevo = new Button("Simular pasaporte nuevo", "escanearPasaporteNuevo");
   }
 
   /**
@@ -343,6 +356,7 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
   public List<Action> actions(HttpRequest httpRequest) {
     var actions = new ArrayList<>(super.actions(httpRequest));
     actions.add(Action.builder().id("escanear").sse(true).build());
+    actions.add(Action.builder().id("escanearPasaporteNuevo").sse(true).build());
     actions.add(Action.builder().id("reloadDocumento").build());
     actions.add(Action.builder().id("cambiarPax").build());
     return actions;
@@ -351,24 +365,8 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
   @Override
   public Object handleAction(String actionId, HttpRequest httpRequest) {
     return switch (actionId) {
-      case "escanear" ->
-          LongTask.create("Escaneando documento…")
-              .withProgressBar()
-              .done("Documento verificado", "Identidad leída del documento")
-              .closeAfter(1)
-              // avanzar: the wizard and this island go on to the next pax still lacking identity
-              .withCommand(UICommand.dispatchEvent("documento-escaneado", java.util.Map.of("avanzar", true)))
-              .run(
-                  progress ->
-                      Flux.range(1, 4)
-                          .delayElements(Duration.ofMillis(450))
-                          .map(
-                              i -> {
-                                if (i == 4 && stayId != null && !stayId.isBlank()) {
-                                  kardex.scanned(stayId, paxIndex());
-                                }
-                                return progress.step(SCAN_STEPS[i - 1], i / 4.0);
-                              }));
+      case "escanear" -> escanear(false);
+      case "escanearPasaporteNuevo" -> escanear(true);
       case "save" -> {
         // registering a pending pax by hand completes it like a scan: go on to the next one; a
         // contact edit of a complete pax stays on it
@@ -383,7 +381,8 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
         // island agree whichever reload lands last
         var avanzar = httpRequest.runActionRq().parameters() == null ? null
             : httpRequest.runActionRq().parameters().get("avanzar");
-        if (Boolean.parseBoolean(String.valueOf(avanzar)) && stayId != null && !stayId.isBlank()) {
+        if (Boolean.parseBoolean(String.valueOf(avanzar)) && stayId != null && !stayId.isBlank()
+            && !recognition.hasNews(stayId, paxIndex())) {
           var next = queries.nextPendingPax(stayId, paxIndex());
           if (next > 0) {
             paxIndex = next;
@@ -402,6 +401,35 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
       }
       default -> super.handleAction(actionId, httpRequest);
     };
+  }
+
+  /**
+   * The scan, as a progress dialog over SSE; done, the island and the wizard go on to the next pax
+   * still lacking identity — unless the scan recognised this one (they stay on it to see it).
+   * {@code pasaporte}: the demo's new passport of the same person.
+   */
+  private Object escanear(boolean pasaporte) {
+    return LongTask.create(pasaporte ? "Escaneando pasaporte…" : "Escaneando documento…")
+        .withProgressBar()
+        .done("Documento verificado", "Identidad leída del documento")
+        .closeAfter(1)
+        // avanzar: the wizard and this island go on to the next pax still lacking identity
+        .withCommand(UICommand.dispatchEvent("documento-escaneado", java.util.Map.of("avanzar", true)))
+        .run(
+            progress ->
+                Flux.range(1, 4)
+                    .delayElements(Duration.ofMillis(450))
+                    .map(
+                        i -> {
+                          if (i == 4 && stayId != null && !stayId.isBlank()) {
+                            if (pasaporte) {
+                              kardex.scannedNewPassport(stayId, paxIndex());
+                            } else {
+                              kardex.scanned(stayId, paxIndex());
+                            }
+                          }
+                          return progress.step(SCAN_STEPS[i - 1], i / 4.0);
+                        }));
   }
 
   /** The embedded mediator only re-renders on a route change — alternate the view route. */

@@ -168,6 +168,24 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_notices/**
 
+        # Historial de clientes: a customer's stays in the chain, for the head office — the business's,
+        # so on the data plane's hosts only. Only its screens: its REST API (/customers/{code}/summary, which
+        # the front office reads) and its MCP server stay inside the cluster.
+        - id: customer-history
+          uri: ${CUSTOMER_HISTORY_URL:http://customer-history:8133}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_history/**
+
+        # Riu Class: the loyalty programme's members, tiers, points and accruals (a demo service) — the
+        # business's, so on the data plane's hosts only. Only its screens: its REST API (/members, which the
+        # front office reads) and its MCP server stay inside the cluster.
+        - id: loyalty
+          uri: ${LOYALTY_URL:http://loyalty:8134}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_loyalty/**
+
         # Registro de huéspedes: the registration rules — governance, so on the control hosts only, and
         # only its screens: its REST API (/rules) and its MCP server stay inside the cluster.
         - id: registration-rules
@@ -277,6 +295,16 @@ spring:
           predicates:
             - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
             - Path=/sse,/mcp/**
+          filters:
+            - SetStatus=404
+
+        # Its /demo is the demo's seeding (known customers: documents, Riu Class numbers, stay
+        # history), called by deploy/demo/ec1.py from inside the cluster, with no token: not from here.
+        - id: front-office-demo-not-public
+          uri: no://op
+          predicates:
+            - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/demo/**
           filters:
             - SetStatus=404
 

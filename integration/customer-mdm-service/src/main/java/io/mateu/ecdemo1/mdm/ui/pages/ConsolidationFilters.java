@@ -9,9 +9,10 @@ public class ConsolidationFilters {
 
     /**
      * Who noticed the consolidation first: Salesforce's Pub/Sub event, the poll that backs it up, or
-     * the MDM itself, when a scanned document already belonged to another customer.
+     * the MDM itself, when a scanned document already belonged to another customer (SCAN) or the desk
+     * confirmed a pax is a known customer (DESK_CONFIRMED).
      */
-    public enum Via { EVENT, POLL, SCAN }
+    public enum Via { EVENT, POLL, SCAN, DESK_CONFIRMED }
 
     Set<Via> via;
 

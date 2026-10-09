@@ -33,7 +33,8 @@ public class Xrefs {
         }
     }
 
-    void save(String customerId, Xref.Target target, String reference, String context) {
+    void save(String customerId, Xref.Target target, String given, String context) {
+        var reference = Xref.reference(target, given);
         var id = Xref.key(customerId, target.name(), reference);
         var xref = xrefs.findById(id).orElseGet(Xref::new);
         xref.id = id;

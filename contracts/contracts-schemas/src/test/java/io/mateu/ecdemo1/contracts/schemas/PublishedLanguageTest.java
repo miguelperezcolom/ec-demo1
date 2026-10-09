@@ -46,11 +46,13 @@ class PublishedLanguageTest {
                         .describedAs("The MDM's customers: a golden record created or changed, two customers merged. "
                                 + "Carries the reservations the customer is on, so a reader can re-project them.")
                         .ownedBy("customer-mdm-service").keyedBy("customerId")
-                        .producedBy("customer-mdm-service").consumedBy("crs-integration-service", "front-office")
+                        .producedBy("customer-mdm-service").consumedBy("crs-integration-service", "front-office", "customer-history")
                         .messages(CustomerEvent.class)
                         .example(new CustomerChanged("E-1", AT, "C-00042", 3,
                                         new GoldenRecord("Ana", "García", "ana@example.com", "+34600000000", "ES",
-                                                LocalDate.of(1990, 5, 17), "PASSPORT", "X1234567"),
+                                                LocalDate.of(1990, 5, 17), "PASSPORT", "X1234567",
+                                                List.of(new GoldenRecord.IdentityDocument("PASSPORT", "X1234567", "ES"),
+                                                        new GoldenRecord.IdentityDocument("DNI", "12345678Z", "ES"))),
                                         true, "CR-7", "APPROVED", null, List.of("MRU01/12E45")),
                                 new CustomersMerged("E-2", AT, "C-00042", 4,
                                         new GoldenRecord("Ana", "García", "ana@example.com", null, "ES", null, null, null),
@@ -129,7 +131,7 @@ class PublishedLanguageTest {
                                         "+34600000000", "X1234567", "front-office"),
                                 new CustomerCommand.RecordScannedIdentity("CMD-2", "MRU01", "12E45", "ST-9", 1, null,
                                         "Ana", "García", "PASSPORT", "X1234567", LocalDate.of(1990, 5, 17), "ES",
-                                        "front-office")),
+                                        "front-office", "ES", LocalDate.of(2031, 3, 1), "C-00042")),
                 TopicSpec.topic("projection-requests")
                         .describedAs("A reservation to project again by the same path a change in the CRS takes — "
                                 + "a backfill's, once per reservation.")
@@ -186,7 +188,7 @@ class PublishedLanguageTest {
                                 + "and its folio: the pms-fo integration records each in it through the engine, and a "
                                 + "no-show goes on to the CRS for its fee.")
                         .ownedBy("front-office").keyedBy("hotelCode/stayId")
-                        .producedBy("front-office").consumedBy("integrations-service")
+                        .producedBy("front-office").consumedBy("integrations-service", "customer-history")
                         .messages(FrontOfficeEvent.class)
                         .example(new FrontOfficeEvent.GuestCheckedIn("E-4", AT, "MRU01", "12E45", "12E45", "XMAR",
                                         "123456", "205", 2, "ana"),
@@ -199,7 +201,17 @@ class PublishedLanguageTest {
                                         "Late check-out (salida 15:00)", new BigDecimal("50.00"), "MUR", "ana"),
                                 new FrontOfficeEvent.ChargeVoided("E-8", AT, "MRU01", "12E45", "12E45", "XMAR", "123456",
                                         "L-9B1E4A20", FrontOfficeEvent.ChargeKind.CONSUMPTION, "MB-02", "Minibar",
-                                        new BigDecimal("12.50"), "MUR", "ana")),
+                                        new BigDecimal("12.50"), "MUR", "ana"),
+                                new FrontOfficeEvent.StayClosed("E-9", AT, "MRU01", "12E45", "12E45", "XMAR", "123456",
+                                        LocalDate.of(2026, 11, 8), LocalDate.of(2026, 11, 12), 4, "205", "JS-SEA",
+                                        "TODO-INCLUIDO",
+                                        List.of(new FrontOfficeEvent.StayGuest("C-00042", true),
+                                                new FrontOfficeEvent.StayGuest("pax-2", false)),
+                                        List.of(new FrontOfficeEvent.ChargeTotal(FrontOfficeEvent.ChargeKind.ADD_ON,
+                                                        new BigDecimal("120.00")),
+                                                new FrontOfficeEvent.ChargeTotal(FrontOfficeEvent.ChargeKind.LATE_CHECK_OUT,
+                                                        new BigDecimal("50.00"))),
+                                        new BigDecimal("170.00"), "MUR")),
                 TopicSpec.topic("pms-reservations")
                         .describedAs("A reservation written in the PMS — for whoever follows the PMS (the pms-fo integration).")
                         .ownedBy("pms-integration-service").keyedBy("pmsHotelCode/pmsReservationId")

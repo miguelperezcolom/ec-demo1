@@ -87,7 +87,11 @@ class MdmContractsTest {
         source.hotelCode = "MRU01";
         source.locator = "12E45";
         when(sources.findByCustomerIdOrderByFirstSeenAsc("C-00042")).thenReturn(List.of(source, source));
-        var events = new CustomerEvents(outbox, sources, clock);
+        // Two documents the MDM knows of her: the golden record carries both, the main one among them.
+        var documents = mock(io.mateu.ecdemo1.mdm.store.CustomerDocumentRepository.class);
+        when(documents.findByCustomerIdOrderByFirstSeenAtAsc("C-00042")).thenReturn(List.of(
+                document("PASSPORT", "X1234567", "ES"), document("DNI", "12345678Z", "ES")));
+        var events = new CustomerEvents(outbox, sources, clock, documents);
 
         events.changed(customer(), true, "CR-7", "APPROVED", null);
         events.changed(customer(), false, null, "REJECTED", "not the same person");
@@ -97,6 +101,15 @@ class MdmContractsTest {
         var payloads = written(Outbox.CUSTOMERS, 3);
         payloads.forEach(schema::assertValid);
         assertThat(payloads.getFirst()).contains("\"reservations\":[\"MRU01/12E45\"]");
+        assertThat(payloads.getFirst()).contains("\"documents\":[{\"type\":\"PASSPORT\",\"number\":\"X1234567\",\"issuingCountry\":\"ES\"}");
+    }
+
+    static io.mateu.ecdemo1.mdm.store.CustomerDocument document(String type, String number, String country) {
+        var d = new io.mateu.ecdemo1.mdm.store.CustomerDocument();
+        d.type = type;
+        d.number = number;
+        d.issuingCountry = country;
+        return d;
     }
 
     @Test

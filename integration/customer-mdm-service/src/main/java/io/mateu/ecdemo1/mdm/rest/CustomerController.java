@@ -47,12 +47,12 @@ public class CustomerController {
         return ChangeRequestView.of(changeRequests.get(id));
     }
 
-    /** Where a customer is known outside the MDM: a front office's guest, an Opera profile. */
+    /** Where a customer is known outside the MDM: a front office's guest, an Opera profile, a Riu Class card. */
     public record XrefRequest(String target, String reference, String context) {
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/customers/{id}/xrefs")
-    @Operation(summary = "Record where a customer is known outside the MDM (SALESFORCE, FRONT_OFFICE, OPERA)")
+    @Operation(summary = "Record where a customer is known outside the MDM (SALESFORCE, FRONT_OFFICE, OPERA, RIU_CLASS — the member number)")
     public void xref(@PathVariable String id, @org.springframework.web.bind.annotation.RequestBody XrefRequest xref) {
         xrefs.record(resolution.survivorOf(id).id, io.mateu.ecdemo1.mdm.store.Xref.Target.valueOf(xref.target()), xref.reference(), xref.context());
     }
@@ -84,7 +84,7 @@ public class CustomerController {
 
     @GetMapping("/customers")
     @Operation(summary = "Customers whose name, email, document or code contains the text; merged ones are left out. "
-            + "With xref=SYSTEM:REFERENCE (SALESFORCE, FRONT_OFFICE, OPERA), the customer known by that reference there")
+            + "With xref=SYSTEM:REFERENCE (SALESFORCE, FRONT_OFFICE, OPERA, RIU_CLASS), the customer known by that reference there")
     public List<CustomerView> search(@RequestParam(defaultValue = "") String q, @RequestParam(required = false) String xref) {
         if (xref != null && !xref.isBlank()) {
             return byXref(xref);
@@ -108,9 +108,9 @@ public class CustomerController {
         if (parts.length != 2 || parts[1].isBlank()) {
             throw new IllegalArgumentException("xref is SYSTEM:REFERENCE, e.g. OPERA:20538296");
         }
-        var system = io.mateu.ecdemo1.mdm.store.Xref.Target.valueOf(parts[0].trim().toUpperCase(Locale.ROOT)).name();
+        var target = io.mateu.ecdemo1.mdm.store.Xref.Target.valueOf(parts[0].trim().toUpperCase(Locale.ROOT));
         var found = new java.util.LinkedHashMap<String, Customer>();
-        for (var x : xrefRepository.findBySystemAndReference(system, parts[1].trim())) {
+        for (var x : xrefRepository.findBySystemAndReference(target.name(), io.mateu.ecdemo1.mdm.store.Xref.reference(target, parts[1].trim()))) {
             var survivor = resolution.survivorOf(x.customerId);
             found.putIfAbsent(survivor.id, survivor);
         }

@@ -169,6 +169,22 @@ public class ReservaOverview
   @Hidden String cargoBusqueda;
   @Hidden String ultimaBusqueda;
 
+  // ── «Cliente»: el pax cuyo reconocimiento se muestra y la búsqueda de recepción (Riu Class / email,
+  // o nombre + fecha de nacimiento) — campos de la página que pintan los FormField del panel ──────
+  @Hidden int paxCliente = 1;
+  @Hidden String clienteBusqueda;
+  @Hidden String clienteNombre;
+  @Hidden String clienteApellidos;
+  @Hidden String clienteNacimiento;
+
+  /** Who each pax is in the chain; none in a test that builds the page by hand. */
+  @Getter(AccessLevel.NONE) io.mateu.ecdemo1.frontoffice.application.Recognition recognition;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setRecognition(io.mateu.ecdemo1.frontoffice.application.Recognition recognition) {
+    this.recognition = recognition;
+  }
+
   // ── header del huésped (por estado) ──────────────────────────────────────────
   @Section(value = "", frameless = true)
   @Label("")
@@ -270,7 +286,7 @@ public class ReservaOverview
         .headerTitle("Huéspedes")
         .overview(VerticalLayout.builder()
             .style("width: 100%; gap: 1rem;")
-            .content(List.of(huespedes().rail(stay, false)))
+            .content(List.of(huespedes().rail(stay, false), huespedes().cliente(stay)))
             .build())
         .panels(List.of(
             FoldoutPanel.builder()
@@ -370,7 +386,8 @@ public class ReservaOverview
             "buscarCargos", "seleccionarCargo", "cambiarMetodo", "confirmPayment", "entendidoCheckout",
             "anularCargo", "comprobarHabitacion", "completarCheckin",
             // Mateu 392 refuses an action a component does not declare here («not an action»)
-            "noShowPax", "confirmarNoShowPax", "cancelarNoShowPax", "guardarExtras")
+            "noShowPax", "confirmarNoShowPax", "cancelarNoShowPax", "guardarExtras",
+            "clientePax", "confirmarCliente", "buscarClientePorNombre")
         .contains(actionId);
   }
 
@@ -450,6 +467,31 @@ public class ReservaOverview
         yield List.of(new Message("Kárdex registrado — " + nombre), UICommand.closeModal("cardex-guardado"));
       }
       case "refrescarReserva" -> this;
+      case "clientePax" -> {
+        paxCliente = (int) Double.parseDouble(param(httpRequest, "paxIndex"));
+        yield this;
+      }
+      case "confirmarCliente" -> {
+        if (recognition == null) {
+          yield new Message("El reconocimiento de clientes no está disponible");
+        }
+        var answer = recognition.confirm(stayId, paxCliente, DeskUser.name(), clienteBusqueda);
+        if (answer.done()) {
+          clienteBusqueda = null;
+        }
+        yield List.of(this, new Message((answer.done() ? "★ " : "") + answer.message()));
+      }
+      case "buscarClientePorNombre" -> {
+        if (recognition == null) {
+          yield new Message("El reconocimiento de clientes no está disponible");
+        }
+        var nombre = nameOf(paxCliente).trim().split("\\s+", 2);
+        var answer = recognition.searchByName(stayId, paxCliente,
+            blank(clienteNombre) ? nombre[0] : clienteNombre.trim(),
+            blank(clienteApellidos) ? (nombre.length > 1 ? nombre[1] : null) : clienteApellidos.trim(),
+            fecha(clienteNacimiento));
+        yield List.of(this, new Message(answer.message()));
+      }
       case "opHabitacion" -> llegada().drawerHabitacion(stay());
       case "volverHabitacion" -> {
         modoHabitacion = false;
@@ -826,6 +868,19 @@ public class ReservaOverview
   private static String drawerText(HttpRequest httpRequest, String field) {
     var estado = httpRequest.runActionRq().componentState();
     return estado != null && estado.get(field) != null ? String.valueOf(estado.get(field)) : "";
+  }
+
+  private static boolean blank(String value) {
+    return value == null || value.isBlank();
+  }
+
+  /** A date the page's date field posted («2026-10-09», maybe with a time); null if none or not one. */
+  static java.time.LocalDate fecha(String value) {
+    try {
+      return blank(value) ? null : java.time.LocalDate.parse(value.trim().length() > 10 ? value.trim().substring(0, 10) : value.trim());
+    } catch (RuntimeException e) {
+      return null;
+    }
   }
 
   private static String orBlank(String value) {

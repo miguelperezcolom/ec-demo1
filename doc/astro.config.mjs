@@ -78,6 +78,7 @@ export default defineConfig({
 						{ label: 'Clientes: MDM y Salesforce', slug: 'integracion/clientes' },
 						{ label: 'Causas, avisos y bandeja', slug: 'integracion/causas-y-avisos' },
 						{ label: 'Avisos de recepción', slug: 'integracion/avisos' },
+						{ label: 'Historial de clientes y Riu Class', slug: 'integracion/historial-y-riu-class' },
 						{ label: 'El recorrido de una reserva', slug: 'integracion/recorrido' },
 					],
 				},
@@ -93,6 +94,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Un sistema propio', slug: 'front-office/sistema-propio' },
 						{ label: 'Reglas de registro del kárdex', slug: 'front-office/reglas-de-registro' },
+						{ label: 'Reconocer al cliente en el check-in', slug: 'front-office/reconocer-al-cliente' },
 					],
 				},
 				{

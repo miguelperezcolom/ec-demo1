@@ -96,6 +96,24 @@ public class DemoScanner {
     return new Scanned(first, last, made.documentType(), made.documentNumber(), birthOr(booked, made), made.nationality());
   }
 
+  /**
+   * The demo's second case: the same person — the same name, birth date and nationality the scanner
+   * reads for them — hands over a passport the chain has never seen ({@link DemoDocuments#newPassport}).
+   * The third, a guest with no document, is just not scanning.
+   */
+  public Scanned scanNewPassport(Pax pax) {
+    var usual = scan(pax);
+    // New for this stay: one derived from the person alone would be new only the first time — once the MDM
+    // keeps it as theirs, «a new passport» would already be a known document on the next demo or test.
+    // The same stay gives the same one, so scanning it again is the same passport.
+    var seed = DemoDocuments.seed(usual.firstName(), usual.lastName()) ^ DemoDocuments.hash("stay:" + pax.locator());
+    var number = DemoDocuments.newPassport(seed);
+    if (number.equals(usual.documentNumber())) {
+      number = DemoDocuments.newPassport(~seed);
+    }
+    return usual.withDocument(DemoDocuments.PASSPORT, number);
+  }
+
   static LocalDate birthOr(Booked booked, Scanned made) {
     return booked != null && booked.birthDate() != null ? booked.birthDate() : made.birthDate();
   }

@@ -3,14 +3,14 @@ NS=ec-demo1
 BASELINE=${EC_DEMO_BASELINE:-$HOME/.local/share/ec-demo1/demo-baseline}
 
 # The services' databases, whole: their state is the demo's state. (content, users and keycloak are not.)
-DATABASES="audit booking communication crs_integration customer_mdm front_office integrations mapping notices partners registration_rules"
+DATABASES="audit booking communication crs_integration customer_history customer_mdm front_office integrations loyalty mapping notices partners registration_rules"
 # The engine's database only by its state tables: processes, their steps, the forms' tasks, locks and
 # overrides. Its history — logs, the outbox, the task dedup store — is gigabytes and not the demo's state.
 ENGINE_DB=workflow
 ENGINE_TABLES="process_entity step_execution_entity form_execution_entity process_lock process_lock_waiter resource_entity process_index task_override"
 
 # What stops while the state is put back, and starts again after.
-SERVICES="audit-service booking communication-service crs-integration-service customer-mdm-service front-office integrations-service mapping-service erp notices pms-integration-service registration-rules ec-eventconductor-orchestrator ec-eventconductor-forms"
+SERVICES="audit-service booking communication-service crs-integration-service customer-mdm-service front-office integrations-service mapping-service erp notices customer-history loyalty pms-integration-service registration-rules ec-eventconductor-orchestrator ec-eventconductor-forms"
 
 pg_pod() { kubectl -n $NS get pod -o name | grep eventconductor-postgres | head -1; }
 # psql against one database, reading SQL from stdin
@@ -57,7 +57,12 @@ baseline_dump() {
 # The script that puts back the engine's state tables: empties them and loads the baseline's rows. One
 # script, so that it runs as one transaction (psql_file): the processes never come back without their steps.
 engine_restore_sql() { # engine_restore_sql <baseline dump>
-  echo "truncate $(echo $ENGINE_TABLES | tr ' ' ',');"
+  # Only the state tables this engine has: a fresh install of the orchestrator has no task_override (ec1's
+  # came with an older version), and truncating a table that is not there fails the whole restore.
+  local wanted existing
+  wanted=$(printf "'%s'," $ENGINE_TABLES); wanted=${wanted%,}
+  existing=$(psql_value "$ENGINE_DB" "select string_agg(table_name, ',') from information_schema.tables where table_schema = current_schema() and table_name in ($wanted)")
+  echo "truncate ${existing:-$(echo $ENGINE_TABLES | tr ' ' ',')};"
   gzip -dcf "$1"
 }
 

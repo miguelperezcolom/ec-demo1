@@ -25,6 +25,18 @@ public final class Normalizer {
         return (type == null || type.isBlank() ? "DOC" : type.trim().toUpperCase(Locale.ROOT)) + ":" + clean;
     }
 
+    /**
+     * The number alone, as {@link #document} cleans it: what identifies a document whatever type it was
+     * read as — "DOC" one day, "PASSPORT" the next.
+     */
+    public static String documentNumber(String number) {
+        if (number == null || number.isBlank()) {
+            return null;
+        }
+        var clean = number.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        return clean.isEmpty() ? null : clean;
+    }
+
     /** Letters only, no accents, lower case: "García" and "garcia" are the same surname. */
     public static String name(String first, String last) {
         var joined = ((first == null ? "" : first) + " " + (last == null ? "" : last));
