@@ -298,6 +298,16 @@ spring:
           filters:
             - SetStatus=404
 
+        # Its /demo is the demo's seeding (known customers: documents, Riu Class numbers, stay
+        # history), called by deploy/demo/ec1.py from inside the cluster, with no token: not from here.
+        - id: front-office-demo-not-public
+          uri: no://op
+          predicates:
+            - Host=${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/demo/**
+          filters:
+            - SetStatus=404
+
         # Its chat: the same path as the consoles' (Mateu's @AI client posts to /ai/api/agent/stream),
         # to the same agent pod, stamped as the front office's console — its routes do not share a
         # prefix a routing rule could key on, and its host is what says the question comes from the

@@ -140,9 +140,10 @@ class FrontDeskUseCasesTest {
     checkIn.checkIn(complete(a), null, List.of());
     checkOut.checkOut(a.stayId());
 
-    // Events of the desk, for the PMS (the master of the stay), in the outbox with the decisions.
+    // Events of the desk, for the PMS (the master of the stay), in the outbox with the decisions; and the
+    // stay closed, for the customer history, with the check-out.
     assertThat(outbox.all(CommandOutbox.FRONT_OFFICE_EVENTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
-        .extracting(e -> e.type()).containsExactly("GuestCheckedIn", "GuestCheckedOut");
+        .extracting(e -> e.type()).containsExactly("GuestCheckedIn", "GuestCheckedOut", "StayClosed");
     assertThat(outbox.all(CommandOutbox.FRONT_OFFICE_EVENTS)).filteredOn(e -> e.key().equals("MRU01/" + a.stayId()))
         .first().satisfies(e -> assertThat(e.payload()).contains("\"type\":\"guest-checked-in\"",
             "\"crsLocator\":\"" + a.stayId() + "\"", "\"roomNumber\":\"" + a.room() + "\"", "\"pmsHotelCode\":\"XMAR\""));

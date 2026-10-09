@@ -27,8 +27,9 @@ public final class GuestHeaders {
     var view = FrontOffice.stayView(stayId);
     var stay = view.stay();
     var guest = view.guest();
+    var known = FrontOffice.recognition(stayId, 1);
     var badges = new ArrayList<Chip>();
-    badges.add(Tiers.chip(guest.tier()));
+    badges.add(Tiers.chip(tier(guest, known)));
     walkIn(stay).ifPresent(badges::add);
     return EntityHeader.builder()
         .title(FrontOffice.withFlag(stayId, 1, guest.id(), guest.name()))
@@ -36,8 +37,8 @@ public final class GuestHeaders {
         .subtitle(staySubtitle(stay))
         .facts(totalFacts(stay.total(), FrontOffice.agreedPrice(stayId).orElse(null), stay.agency()))
         .metricLabel("FIDELIDAD")
-        .metricValue(points(guest))
-        .metricCaption(guest.stays() + " estancias")
+        .metricValue(points(guest, known))
+        .metricCaption(staysCaption(guest, known))
         .style("width: 100%;")
         .build();
   }
@@ -72,7 +73,7 @@ public final class GuestHeaders {
     // no folio facts here — the check-out screen shows the breakdown and the preauth below
     return EntityHeader.builder()
         .title(FrontOffice.withFlag(stayId, 1, guest.id(), guest.name()))
-        .badges(List.of(Tiers.chip(guest.tier())))
+        .badges(List.of(Tiers.chip(tier(guest, FrontOffice.recognition(stayId, 1)))))
         .subtitle(
             stay.roomLabel() + " · " + stay.roomType() + " · " + stay.board() + " · "
                 + stay.nights() + "N")
@@ -86,8 +87,9 @@ public final class GuestHeaders {
     var stay = view.stay();
     var guest = view.guest();
     var folio = view.folio();
+    var known = FrontOffice.recognition(stayId, 1);
     var badges = new ArrayList<Chip>();
-    badges.add(Tiers.chip(guest.tier()));
+    badges.add(Tiers.chip(tier(guest, known)));
     if (stay.wishesTotal() > 0) {
       badges.add(Chip.builder().label(wishes(stay)).color("success").build());
     }
@@ -109,8 +111,8 @@ public final class GuestHeaders {
                     .value(euros(folio == null ? null : folio.preauthorized()))
                     .build()))
         .metricLabel("FIDELIDAD")
-        .metricValue(points(guest))
-        .metricCaption(guest.stays() + " estancias")
+        .metricValue(points(guest, known))
+        .metricCaption(staysCaption(guest, known))
         .style("width: 100%;")
         .build();
   }
@@ -142,6 +144,32 @@ public final class GuestHeaders {
 
   public static String wishes(Stay stay) {
     return "Deseos " + stay.wishesGranted() + "/" + stay.wishesTotal();
+  }
+
+  /**
+   * The holder's tier: Riu Class's, when the desk knows the customer and the loyalty service answers;
+   * else the guest's own.
+   */
+  static io.mateu.ecdemo1.frontoffice.domain.guest.GuestTier tier(Guest guest,
+      io.mateu.ecdemo1.frontoffice.application.Recognition.View known) {
+    return known.known() ? known.loyalty().map(l -> {
+      try {
+        return io.mateu.ecdemo1.frontoffice.domain.guest.GuestTier.valueOf(l.tier());
+      } catch (RuntimeException e) {
+        return guest.tier();
+      }
+    }).orElse(guest.tier()) : guest.tier();
+  }
+
+  /** The holder's points: Riu Class's when it answers for a customer the desk knows, else the guest's own. */
+  static String points(Guest guest, io.mateu.ecdemo1.frontoffice.application.Recognition.View known) {
+    return known.known() && known.loyalty().isPresent()
+        ? CustomerPanels.points(known.loyalty().get().points()) : points(guest);
+  }
+
+  /** «N estancias»: the chain's, from the customer history, when the desk knows the customer; else the guest's own. */
+  static String staysCaption(Guest guest, io.mateu.ecdemo1.frontoffice.application.Recognition.View known) {
+    return known.stays().map(s -> s.stays() + " estancias en la cadena").orElse(guest.stays() + " estancias");
   }
 
   /** Loyalty points with thousands separator: 48500 → "48.500". */

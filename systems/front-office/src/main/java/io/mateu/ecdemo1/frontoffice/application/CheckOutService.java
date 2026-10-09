@@ -60,6 +60,8 @@ public class CheckOutService {
     // The PMS is the master of the stay and of its folio: the check-out goes up to it, with this
     // transaction; its invoice comes back to the stay.
     reception.checkedOut(departed, by);
+    // and the stay is closed for the chain: its customer history learns of it, in this transaction too
+    reception.closed(departed, by);
     return departed;
   }
 }

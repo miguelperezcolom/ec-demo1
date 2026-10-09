@@ -97,9 +97,13 @@ public class CheckInWizard extends Wizard {
   final io.mateu.ecdemo1.frontoffice.application.GuestNotices notices;
   final io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete;
 
+  final io.mateu.ecdemo1.frontoffice.application.Recognition recognition;
+
   public CheckInWizard(StayQueries queries, CheckInService checkIn, RoomRepository rooms,
                        io.mateu.ecdemo1.frontoffice.application.GuestNotices notices,
-                       io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete) {
+                       io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete,
+                       io.mateu.ecdemo1.frontoffice.application.Recognition recognition) {
+    this.recognition = recognition;
     this.queries = queries;
     this.incomplete = incomplete;
     this.checkIn = checkIn;
@@ -122,7 +126,9 @@ public class CheckInWizard extends Wizard {
       populated = true;
       populate();
     }
+    var before = identidad;
     identidad = new IdentidadStep();
+    identidad.keepSearch(before);
     identidad.setSelectedPax(selectedPax);
     identidad.load(httpRequest);
     syncConfirmar();
@@ -292,6 +298,22 @@ public class CheckInWizard extends Wizard {
       case "forzarCheckin" -> {
         return forzarCheckin();
       }
+      case "confirmarCliente" -> {
+        // the guest says who they are — Riu Class number or email: certainty, and their history
+        var answer = recognition.confirm(stayId, selectedPax,
+            io.mateu.ecdemo1.frontoffice.infra.security.DeskUser.name(), identidad.getClienteRiuClassOEmail());
+        if (answer.done()) {
+          identidad.clearSearch();
+        }
+        identidad.load(httpRequest);
+        return List.of(this, new Message((answer.done() ? "★ " : "") + answer.message()));
+      }
+      case "buscarClientePorNombre" -> {
+        var answer = recognition.searchByName(stayId, selectedPax, nombreOPax(identidad.getClienteNombre(), 0),
+            nombreOPax(identidad.getClienteApellidos(), 1), identidad.getClienteNacimiento());
+        identidad.load(httpRequest);
+        return List.of(this, new Message(answer.message()));
+      }
       case "firmaCapturada" -> {
         confirmar.setFirmaEstado("firmada");
         checkIn.registrationSigned(stayId, io.mateu.ecdemo1.frontoffice.infra.security.DeskUser.name());
@@ -315,6 +337,11 @@ public class CheckInWizard extends Wizard {
         || !"identidad".equals(currentStepField().getName())) {
       return this;
     }
+    // the scan recognised the pax — or possibly: the desk stays on them to see it (and to confirm)
+    if (recognition.hasNews(stayId, selectedPax)) {
+      identidad.load(httpRequest);
+      return this;
+    }
     var next = queries.nextPendingPax(stayId, selectedPax);
     if (next > 0) {
       selectedPax = next;
@@ -326,6 +353,21 @@ public class CheckInWizard extends Wizard {
     var result = super.handleAction("next", httpRequest);
     syncConfirmar();
     return result;
+  }
+
+  /**
+   * What the desk typed for the name search, or else the selected pax's own name — its first word
+   * ({@code part} 0) or the rest (1).
+   */
+  String nombreOPax(String typed, int part) {
+    if (typed != null && !typed.isBlank()) {
+      return typed.trim();
+    }
+    var view = queries.view(stayId);
+    var companion = selectedPax <= 1 ? null : view.stay().companionAt(selectedPax);
+    var name = selectedPax <= 1 ? view.guest().name() : companion == null ? null : companion.name();
+    var parts = (name == null ? "" : name.trim()).split("\\s+", 2);
+    return part < parts.length && !parts[part].isBlank() ? parts[part] : null;
   }
 
   static String param(HttpRequest httpRequest, String name) {
@@ -350,7 +392,9 @@ public class CheckInWizard extends Wizard {
             "firmaCapturada",
             "preautorizado",
             "llaveGrabada",
-            "forzarCheckin")) {
+            "forzarCheckin",
+            "confirmarCliente",
+            "buscarClientePorNombre")) {
       actions.add(Action.builder().id(id).build());
     }
     // stream two increments each: the in-flight state now, the confirmation 5 s later

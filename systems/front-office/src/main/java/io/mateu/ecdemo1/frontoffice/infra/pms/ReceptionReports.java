@@ -108,6 +108,38 @@ public class ReceptionReports {
   }
 
   /**
+   * The stay is closed — its guests left: in the check-out's transaction, what the chain keeps of it
+   * (the customer history) goes out as one event that carries everything — dates, room, who slept
+   * there, what was spent by kind — so its reader needs no other event, nor their order. Unlike
+   * {@link #checkedOut}, it goes out for a stay the PMS does not have too: the history is the chain's,
+   * not Opera's; the stay's references are then simply null.
+   */
+  public void closed(Stay stay, String by) {
+    var refs = refs(stay.id());
+    var guests = new java.util.ArrayList<FrontOfficeEvent.StayGuest>();
+    guests.add(new FrontOfficeEvent.StayGuest(stay.guestId(), true));
+    stay.companions().stream().map(io.mateu.ecdemo1.frontoffice.domain.stay.Companion::companionId)
+        // a slot nobody registered ("pax-2") is nobody: the same id in every stay, it would gather strangers' stays
+        .filter(id -> id != null && !id.isBlank() && !id.matches("pax-\\d+"))
+        .forEach(id -> guests.add(new FrontOfficeEvent.StayGuest(id, false)));
+    // what the folio says was spent, by kind — the accommodation is the PMS's, and not a spend here
+    var byKind = new java.util.EnumMap<FrontOfficeEvent.ChargeKind, java.math.BigDecimal>(FrontOfficeEvent.ChargeKind.class);
+    folios.findByStayId(stay.id()).ifPresent(folio -> folio.lines().stream()
+        .filter(FolioLine::counts)
+        .filter(line -> line.kind() != null && line.kind() != ChargeKind.ACCOMMODATION)
+        .forEach(line -> byKind.merge(kind(line.kind()), line.amount(), java.math.BigDecimal::add)));
+    var charges = byKind.entrySet().stream()
+        .map(e -> new FrontOfficeEvent.ChargeTotal(e.getKey(), e.getValue())).toList();
+    var total = charges.stream().map(FrontOfficeEvent.ChargeTotal::amount)
+        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+    outbox.appendEvent(new FrontOfficeEvent.StayClosed("SC-" + UUID.randomUUID(), clock.instant(), hotel, stay.id(),
+        refs.crsLocator(), pmsHotel, refs.pmsReservationId(), stay.checkIn(), stay.checkOut(), (int) stay.nights(),
+        stay.roomNumber(), stay.roomType(), stay.board(), guests, charges, total, currency));
+    log.info("{}: closed — {} guest(s), {} {} spent — to the customer history", stay.id(), guests.size(), total,
+        currency == null ? "" : currency);
+  }
+
+  /**
    * Nobody of the stay's reservation came: in the caller's transaction, the PMS is asked to record it;
    * it reports it to the CRS, which applies its fee. What to tell the desk.
    */

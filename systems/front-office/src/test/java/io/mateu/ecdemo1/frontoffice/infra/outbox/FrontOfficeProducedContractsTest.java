@@ -95,6 +95,73 @@ class FrontOfficeProducedContractsTest {
                 .contains("\"kind\":\"LATE_CHECK_OUT\"").contains("\"pmsReservationId\":null");
     }
 
+    static io.mateu.ecdemo1.frontoffice.domain.stay.Stay departed(String id) {
+        return new io.mateu.ecdemo1.frontoffice.domain.stay.Stay(id, "C-00042", "1204", "Doble Superior", "Todo incluido",
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 5), 2, "Directo · WEB", new java.math.BigDecimal("800.00"),
+                io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED, 0, 0, null,
+                java.util.List.of(new io.mateu.ecdemo1.frontoffice.domain.stay.Companion("C-00043", "Leo García", "Adulto"),
+                        io.mateu.ecdemo1.frontoffice.domain.stay.Companion.pending(3)),
+                java.util.List.of(), java.util.Set.of());
+    }
+
+    /** The closed stay — for the customer history — carries its guests, its dates and its spend by kind. */
+    @Test
+    void aClosedStayIsWhatTheSchemaSays() {
+        var walkIns = mock(WalkIns.class);
+        when(walkIns.of("12E45")).thenReturn(Optional.empty());
+        var links = mock(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.class);
+        when(links.ofStay("12E45")).thenReturn(Optional.of(new io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.Link(
+                "12E45", "39486034", "2026-09-29T10:00:00")));
+        var folios = mock(io.mateu.ecdemo1.frontoffice.domain.folio.FolioRepository.class);
+        when(folios.findByStayId("12E45")).thenReturn(Optional.of(new io.mateu.ecdemo1.frontoffice.domain.folio.Folio(
+                "F-12E45", "12E45", null, java.util.List.of(
+                io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine.accommodation("4 noches", new java.math.BigDecimal("800.00")),
+                io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine.charged(
+                        io.mateu.ecdemo1.frontoffice.domain.folio.ChargeKind.CONSUMPTION, "MB-02", "Minibar", new java.math.BigDecimal("12.50")),
+                io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine.charged(
+                        io.mateu.ecdemo1.frontoffice.domain.folio.ChargeKind.CONSUMPTION, "RS-01", "Room service", new java.math.BigDecimal("30.00")),
+                io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine.charged(
+                        io.mateu.ecdemo1.frontoffice.domain.folio.ChargeKind.ADD_ON, "SPA", "Spa", new java.math.BigDecimal("40.00")).asVoided(),
+                io.mateu.ecdemo1.frontoffice.domain.folio.FolioLine.charged(
+                        io.mateu.ecdemo1.frontoffice.domain.folio.ChargeKind.LATE_CHECK_OUT, null, "Late check-out", new java.math.BigDecimal("50.00"))))));
+        var reports = new io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports("MRU01", "XMAR", "MUR", walkIns, links,
+                new CommandOutbox(outbox), mock(io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings.class), folios);
+
+        reports.closed(departed("12E45"), "ana");
+
+        var json = written(CommandOutbox.FRONT_OFFICE_EVENTS);
+        Contracts.topic("front-office-events").assertValid(json);
+        org.assertj.core.api.Assertions.assertThat(json).contains("\"type\":\"stay-closed\"")
+                .contains("\"crsLocator\":\"12E45\"").contains("\"pmsReservationId\":\"39486034\"")
+                .contains("\"arrival\":\"2026-10-01\"").contains("\"departure\":\"2026-10-05\"").contains("\"nights\":4")
+                .contains("{\"customerId\":\"C-00042\",\"holder\":true}")
+                .contains("{\"customerId\":\"C-00043\",\"holder\":false}").doesNotContain("pax-3")
+                .contains("{\"kind\":\"CONSUMPTION\",\"amount\":42.50}")
+                .contains("{\"kind\":\"LATE_CHECK_OUT\",\"amount\":50.00}").doesNotContain("ADD_ON")
+                .contains("\"total\":92.50").contains("\"currency\":\"MUR\"");
+    }
+
+    /** A stay the PMS never had — a walk-in nobody booked yet — is closed for the history all the same. */
+    @Test
+    void aStayNotInThePmsIsClosedAllTheSame() {
+        var walkIns = mock(WalkIns.class);
+        when(walkIns.of("OP-77")).thenReturn(Optional.empty());
+        var links = mock(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.class);
+        when(links.ofStay("OP-77")).thenReturn(Optional.empty());
+        var folios = mock(io.mateu.ecdemo1.frontoffice.domain.folio.FolioRepository.class);
+        when(folios.findByStayId("OP-77")).thenReturn(Optional.empty());
+        var reports = new io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports("MRU01", "XMAR", "", walkIns, links,
+                new CommandOutbox(outbox), mock(io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings.class), folios);
+
+        reports.closed(departed("OP-77"), null);
+
+        var json = written(CommandOutbox.FRONT_OFFICE_EVENTS);
+        Contracts.topic("front-office-events").assertValid(json);
+        org.assertj.core.api.Assertions.assertThat(json).contains("\"type\":\"stay-closed\"")
+                .contains("\"crsLocator\":null").contains("\"pmsReservationId\":null")
+                .contains("\"charges\":[]").contains("\"total\":0").contains("\"currency\":null");
+    }
+
     @Test
     void aProposedChangeIsWhatTheSchemaSays() {
         new CommandOutbox(outbox).append(CommandOutbox.CUSTOMER_COMMANDS, "C-00042", new CustomerCommand.ProposeChange(
@@ -113,6 +180,20 @@ class FrontOfficeProducedContractsTest {
         var json = written(CommandOutbox.CUSTOMER_COMMANDS);
         Contracts.topic("customer-commands").assertValid(json);
         org.assertj.core.api.Assertions.assertThat(json).contains("\"birthDate\":\"1990-05-17\"");
+    }
+
+    /** A scanned document the desk then confirmed as a customer's: issuing country, expiry and that customer. */
+    @Test
+    void aConfirmedScannedIdentityIsWhatTheSchemaSays() {
+        var command = new CustomerCommand.RecordScannedIdentity("SCAN-2", "MRU01", "12E45", "ST-9", 1, null, "Ana",
+                "García", "PASSPORT", "PA1234567", LocalDate.of(1990, 5, 17), "ES", "front office MRU01 · ST-9 pax 1",
+                "ES", LocalDate.of(2031, 2, 1), "C-00042");
+        new CommandOutbox(outbox).append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), command);
+
+        var json = written(CommandOutbox.CUSTOMER_COMMANDS);
+        Contracts.topic("customer-commands").assertValid(json);
+        org.assertj.core.api.Assertions.assertThat(json).contains("\"documentExpiry\":\"2031-02-01\"")
+                .contains("\"issuingCountry\":\"ES\"").contains("\"confirmedCustomerId\":\"C-00042\"");
     }
 
     /** An instant goes as the ISO string audit-service reads. */

@@ -41,6 +41,25 @@ public class FrontOffice {
   private final io.mateu.ecdemo1.frontoffice.domain.stay.WalkIns walkIns;
   private io.mateu.ecdemo1.frontoffice.application.Nationalities nationalities;
 
+  private io.mateu.ecdemo1.frontoffice.application.Recognition recognition;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void recognition(io.mateu.ecdemo1.frontoffice.application.Recognition recognition) {
+    this.recognition = recognition;
+  }
+
+  /**
+   * Who a pax of the stay is in the chain, as the desk recognised them (see
+   * {@link io.mateu.ecdemo1.frontoffice.application.Recognition}): nothing when it is not known — never
+   * the reason a screen does not open.
+   */
+  public static io.mateu.ecdemo1.frontoffice.application.Recognition.View recognition(String stayId, int pax) {
+    if (instance == null || instance.recognition == null || stayId == null) {
+      return io.mateu.ecdemo1.frontoffice.application.Recognition.View.none();
+    }
+    return instance.recognition.view(stayId, pax);
+  }
+
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   void nationalities(io.mateu.ecdemo1.frontoffice.application.Nationalities nationalities) {
     this.nationalities = nationalities;

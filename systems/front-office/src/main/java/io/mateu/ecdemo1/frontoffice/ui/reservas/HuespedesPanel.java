@@ -48,13 +48,13 @@ final class HuespedesPanel {
         io.mateu.ecdemo1.frontoffice.domain.notice.Notice.Moment.CHECK_IN);
     items.add(conAvisos(conKardex(paxItem(1, io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), 1, guest.id(), guest.name()), docAdulto(guest.document()),
         guest.identityComplete(), ops.isNoShow(1)), ops.isNoShow(1) ? null : kardex, guest),
-        io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, 1)));
+        conCliente(stay, 1, io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, 1))));
     var companions = stay.companions();
     for (int i = 0; i < companions.size(); i++) {
       var companion = companions.get(i);
       items.add(conAvisos(paxItem(i + 2, io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.withFlag(stay.id(), i + 2, companion.companionId(), companion.name()), companion.description(),
           companion.identityComplete(), ops.isNoShow(i + 2)),
-          io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, i + 2)));
+          conCliente(stay, i + 2, io.mateu.ecdemo1.frontoffice.ui.common.NoticeItems.lines(avisos, i + 2))));
     }
     for (int i = 2 + companions.size(); i <= stay.pax(); i++) {
       items.add(paxItem(i, "Acompañante " + i, "Pendiente de registro", false, ops.isNoShow(i)));
@@ -69,9 +69,63 @@ final class HuespedesPanel {
     return VerticalLayout.builder().style("width: 100%; gap: .5rem;").content(contenido).build();
   }
 
+  /** Las líneas del pax con, delante, quién es en la cadena: cliente conocido (y su resumen) o posible. */
+  static List<String> conCliente(Stay stay, int pax, List<String> lines) {
+    var linea = io.mateu.ecdemo1.frontoffice.ui.common.CustomerPanels.railLine(
+        io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.recognition(stay.id(), pax));
+    if (linea.isEmpty()) {
+      return lines;
+    }
+    var all = new ArrayList<String>();
+    all.add(linea.get());
+    all.addAll(lines);
+    return all;
+  }
+
+  /**
+   * «Cliente»: quién es en la cadena el pax elegido (uno por pax con más de uno) — «Cliente conocido»
+   * con el resumen de sus estancias y su Riu Class, o «Posible cliente conocido» con nombres y fechas
+   * de nacimiento — y la búsqueda de recepción preguntando al huésped: su número Riu Class o su email
+   * (da certeza) o su nombre y fecha de nacimiento (solo «posible»).
+   */
+  Component cliente(Stay stay) {
+    var pax = Math.max(1, Math.min(r.paxCliente, stay.pax()));
+    var contenido = new ArrayList<Component>();
+    contenido.add(Text.builder().text("Cliente").container(TextContainer.h3).style("margin: 0;").build());
+    if (stay.pax() > 1) {
+      var botones = new ArrayList<Component>();
+      for (int i = 1; i <= stay.pax(); i++) {
+        botones.add(Button.builder()
+            .id("cliente-pax-" + i)
+            .label(i + "/" + stay.pax())
+            .actionId("clientePax")
+            .parameters(java.util.Map.of("paxIndex", i))
+            .buttonStyle(i == pax ? io.mateu.uidl.data.ButtonStyle.primary : null)
+            .build());
+      }
+      contenido.add(io.mateu.uidl.data.HorizontalLayout.builder().content(botones)
+          .style("gap: .5rem; flex-wrap: wrap;").build());
+    }
+    contenido.add(io.mateu.ecdemo1.frontoffice.ui.common.CustomerPanels.panel(
+        io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.recognition(stay.id(), pax)));
+    contenido.add(campo("clienteBusqueda", "Nº Riu Class o email", FieldDataType.string));
+    contenido.add(Button.builder().id("confirmar-cliente").label("Confirmar cliente").actionId("confirmarCliente").build());
+    contenido.add(campo("clienteNombre", "Nombre", FieldDataType.string));
+    contenido.add(campo("clienteApellidos", "Apellidos", FieldDataType.string));
+    contenido.add(campo("clienteNacimiento", "Fecha de nacimiento", FieldDataType.date));
+    contenido.add(Button.builder().id("buscar-cliente").label("Buscar por nombre").actionId("buscarClientePorNombre").build());
+    return VerticalLayout.builder().style("width: 100%; gap: .5rem;").content(contenido).build();
+  }
+
+  private static Component campo(String id, String label, FieldDataType type) {
+    return FormField.builder().id(id).label(label).dataType(type).style("width: 100%; max-width: 28rem;").build();
+  }
+
   /** Preferencias, última estancia, quejas pendientes e historial del huésped principal. */
   Component perfilCliente() {
     var guest = r.view().guest();
+    // el titular conocido en la cadena, con estancias: el historial de clientes, no los datos de demo
+    var historial = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.recognition(r.stayId, 1).stays();
     var contenido = new ArrayList<Component>();
     contenido.add(Text.builder().text("Preferencias").container(TextContainer.h4).style("margin: 0;").build());
     contenido.add(io.mateu.uidl.data.BulletedList.builder()
@@ -79,8 +133,16 @@ final class HuespedesPanel {
         .build());
     contenido.add(Text.builder().text("Última estancia")
         .container(TextContainer.h4).style("margin: 1.5rem 0 0;").build());
-    contenido.add(Text.builder().text(guest.lastStaySummary()).noMargins(true).build());
-    contenido.add(Text.builder().text(guest.lastStayComplementaryInfo()).size(TextSize.xs).noMargins(true).build());
+    if (historial.isPresent()) {
+      var s = historial.get();
+      contenido.add(Text.builder().text(io.mateu.ecdemo1.frontoffice.ui.common.CustomerPanels.lastStay(s).orElse("—"))
+          .noMargins(true).build());
+      contenido.add(Text.builder().text(s.hotels() + (s.hotels() == 1 ? " hotel" : " hoteles")
+          + (s.topHotel() == null ? "" : " · el más repetido: " + s.topHotel())).size(TextSize.xs).noMargins(true).build());
+    } else {
+      contenido.add(Text.builder().text(guest.lastStaySummary()).noMargins(true).build());
+      contenido.add(Text.builder().text(guest.lastStayComplementaryInfo()).size(TextSize.xs).noMargins(true).build());
+    }
     if (guest.complaints() > 0) {
       contenido.add(Notice.builder()
           .text(guest.complaints() + " quejas pendientes")
@@ -88,8 +150,10 @@ final class HuespedesPanel {
           .build());
     }
     contenido.add(Text.builder()
-        .text(guest.stays() + " estancias · Cliente desde "
-            + (java.time.LocalDate.now().getYear() - guest.yearsAsClient() - 1))
+        .text(historial.map(s -> io.mateu.ecdemo1.frontoffice.ui.common.CustomerPanels.stays(s)
+                + io.mateu.ecdemo1.frontoffice.ui.common.CustomerPanels.since(s, null))
+            .orElse(guest.stays() + " estancias · Cliente desde "
+                + (java.time.LocalDate.now().getYear() - guest.yearsAsClient() - 1)))
         .size(TextSize.xs).noMargins(true).build());
     return VerticalLayout.builder().style("width: 100%; gap: .25rem;").content(contenido).build();
   }
@@ -151,6 +215,8 @@ final class HuespedesPanel {
       // la descripción del acompañante ya incluye su documento
       contenido.add(Text.builder().text(companion.description()).size(TextSize.xs).noMargins(true).build());
     }
+    // quién es cada huésped en la cadena (en casa también se puede confirmar)
+    contenido.add(cliente(stay));
     contenido.add(Text.builder().text("Salida").container(TextContainer.h3).style("margin: 0;").build());
     contenido.add(Text.builder().text(EstanciaPanel.salida(stay, view.folio())).noMargins(true).build());
     contenido.add(Text.builder().text(stay.nights() + " noches · " + stay.board())

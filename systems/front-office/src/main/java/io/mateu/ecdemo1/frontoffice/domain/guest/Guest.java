@@ -102,6 +102,13 @@ public record Guest(
         lastStayComplementaryInfo, preferences);
   }
 
+  /** The guest's loyalty standing, as the loyalty programme has it. */
+  public Guest withLoyalty(GuestTier tier, int loyaltyPoints) {
+    return new Guest(
+        id, name, document, documentVerified, email, phone, tier == null ? this.tier : tier, loyaltyPoints, stays,
+        nights, yearsAsClient, complaints, hotels, lastStaySummary, lastStayComplementaryInfo, preferences);
+  }
+
   /** The name as the desk corrects it. */
   public Guest rename(String name) {
     if (name == null || name.isBlank()) return this;

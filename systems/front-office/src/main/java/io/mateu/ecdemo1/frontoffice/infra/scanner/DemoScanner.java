@@ -96,6 +96,20 @@ public class DemoScanner {
     return new Scanned(first, last, made.documentType(), made.documentNumber(), birthOr(booked, made), made.nationality());
   }
 
+  /**
+   * The demo's second case: the same person — the same name, birth date and nationality the scanner
+   * reads for them — hands over a passport the chain has never seen ({@link DemoDocuments#newPassport}).
+   * The third, a guest with no document, is just not scanning.
+   */
+  public Scanned scanNewPassport(Pax pax) {
+    var usual = scan(pax);
+    var number = DemoDocuments.newPassport(DemoDocuments.seed(usual.firstName(), usual.lastName()));
+    if (number.equals(usual.documentNumber())) {
+      number = DemoDocuments.newPassport(~DemoDocuments.seed(usual.firstName(), usual.lastName()));
+    }
+    return usual.withDocument(DemoDocuments.PASSPORT, number);
+  }
+
   static LocalDate birthOr(Booked booked, Scanned made) {
     return booked != null && booked.birthDate() != null ? booked.birthDate() : made.birthDate();
   }

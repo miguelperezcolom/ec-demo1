@@ -14,7 +14,8 @@ import org.springframework.security.web.SecurityFilterChain;
  *
  * <p>{@code /api/**} — where the integration writes reservations — is open here and not routed from
  * the internet: the gateway does not take it to this service, and only the connector, inside the
- * cluster, calls it.
+ * cluster, calls it. So is {@code /demo/**} — the demo's seeding (known customers), called by its
+ * tooling inside the cluster.
  *
  * <p>The MCP server ({@code /sse}, {@code /mcp/**}) is the reception agent's: ia-agent forwards the
  * token of the person chatting on every call, and a tool knows from it whom the agent acts for — so a
@@ -26,7 +27,7 @@ public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/mateu/**", "/sse", "/mcp/**"))
+    http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/demo/**", "/mateu/**", "/sse", "/mcp/**"))
         // The SSE stream is written from async dispatches of the request that opened it — already
         // authorized; Spring Security would otherwise judge each dispatch again, with no token.
         .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
