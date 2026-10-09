@@ -48,6 +48,37 @@ class SalesforceCollectionsTest {
     }
 
     @Test
+    void theContactListsEveryDocument_theMainOneFirst() {
+        var c = customer("C-1");
+        c.documentType = "DNI";
+        c.documentNumber = "12345678-Z";
+        c.documents = List.of(
+                document("PASSPORT", "X1234567", "ESP", java.time.LocalDate.of(2031, 3, 12)),
+                document("DNI", "12345678Z", "ESP", null));
+        assertThat(SalesforceClient.contactFields(c)).containsEntry("Documentos__c",
+                "DNI · ESP · 12345678Z · principal\nPasaporte · ESP · X1234567 · caduca 12/03/2031");
+    }
+
+    @Test
+    void documentsNotRead_leaveTheContactsListAsItIs_noneEmptyIt() {
+        var c = customer("C-1");
+        assertThat(SalesforceClient.contactFields(c)).doesNotContainKey("Documentos__c");
+        c.documents = List.of();
+        assertThat(SalesforceClient.contactFields(c)).containsEntry("Documentos__c", null);
+    }
+
+    static io.mateu.ecdemo1.mdm.store.CustomerDocument document(String type, String number, String country,
+                                                                java.time.LocalDate expiry) {
+        var d = new io.mateu.ecdemo1.mdm.store.CustomerDocument();
+        d.type = type;
+        d.number = number;
+        d.numberKey = io.mateu.ecdemo1.mdm.resolution.Normalizer.documentNumber(number);
+        d.issuingCountry = country;
+        d.expiry = expiry;
+        return d;
+    }
+
+    @Test
     void anAnonymisedContactKeepsNothingPersonal_andSaysItIsAnonymised() {
         var c = customer("C-1");
         c.firstName = "Tomas";

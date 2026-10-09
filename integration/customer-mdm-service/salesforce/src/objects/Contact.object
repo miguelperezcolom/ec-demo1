@@ -33,6 +33,15 @@
         <required>false</required>
     </fields>
     <fields>
+        <fullName>Documentos__c</fullName>
+        <label>Documentos de identidad</label>
+        <description>Set by the MDM, not by hand: every identity document the chain knows of the customer, one per line (type, issuing country, number, expiry). The main one is also in Document type and Document number (HLA CM-F15).</description>
+        <type>LongTextArea</type>
+        <length>4000</length>
+        <visibleLines>4</visibleLines>
+        <required>false</required>
+    </fields>
+    <fields>
         <fullName>Estado_MDM__c</fullName>
         <label>Estado MDM</label>
         <description>Set by the MDM, not by hand: Provisional (a booking created it and nobody has cleaned it yet), Consolidado (cleaned, the golden record), Anonimizado (only a name and only cancelled or no-show bookings: its personal data were erased after the retention period).</description>

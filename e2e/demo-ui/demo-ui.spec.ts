@@ -509,6 +509,16 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         }
         const [byDocument, byPassport, byHand] = bookings
         const [known1, known2, known3] = seeded
+
+        // 0 · Before they arrive: the arrivals list marks the returning customers due by tomorrow — prepared
+        // ahead (the seeding briefs them), with their stays and their Riu Class tier.
+        const tomorrow = new Date(Date.now() + 86_400_000).toLocaleDateString('sv')   // ISO, local
+        if (seeded.some(k => k.arrival && k.arrival <= tomorrow)) {
+            await ui.go(`${FO}/reservas`, /Reservas/)
+            expect(await ui.pageUntil(/Repite · \d+ estancias?/), 'the arrivals list marked no returning customer').toBe(true)
+        } else {
+            info.annotations.push({ type: 'note', description: 'no seeded customer arrives by tomorrow: the arrivals briefing not checked' })
+        }
         // «¿es usted X?» with one candidate, «¿es usted uno de estos clientes?» and their names with several
         // (an environment where two customers share the name and the birth date): either way, X is offered
         // the panel, not a message toast that may still be on screen: «Cliente conocido — Name»
@@ -598,7 +608,7 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
 
 /** What the demo's seeding made known (POST /demo/known-customers, through ec1.py --json). */
 interface Known { stayId: string, guestName: string, customerId: string, riuClass: string, documentType: string,
-    documentNumber: string, birthDate: string }
+    documentNumber: string, birthDate: string, arrival?: string }
 
 /** A Riu Class member's points, as the data console's «Riu Class → Socios» shows them. */
 async function riuClassPoints(ui: Ui, member: string): Promise<number> {

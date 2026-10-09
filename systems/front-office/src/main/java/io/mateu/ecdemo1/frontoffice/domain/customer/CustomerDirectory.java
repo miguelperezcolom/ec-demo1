@@ -82,6 +82,14 @@ public interface CustomerDirectory {
   /** Up to five; none without a birth date, or when the MDM does not answer. */
   List<Candidate> candidates(String firstName, String lastName, LocalDate birthDate, String nationality);
 
+  /**
+   * The chain's customer an Opera profile is — the MDM's cross reference, the survivor if it was merged;
+   * empty when there is none, or the MDM does not answer.
+   */
+  default java.util.Optional<String> byOperaProfile(String profileId) {
+    return java.util.Optional.empty();
+  }
+
   /** Demo seeding: a document of the customer. Whether the MDM took it. */
   boolean addDocument(String customerId, String type, String number, String issuingCountry, LocalDate expiry,
                       String origin, LocalDate birthDate, String nationality);

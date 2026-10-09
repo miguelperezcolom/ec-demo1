@@ -324,6 +324,22 @@ class IdentityLookupTest {
                 .content("{\"type\":\"DNI\",\"number\":\" \"}")).andExpect(status().isBadRequest());
     }
 
+    @Test
+    void aSecondDocumentSendsTheContactAgain_itListsThemAll() throws Exception {
+        var leo = resolve("D16", person("Leo", "Vidal", "leo2@example.com", "ES", null, "DNI", "55555555K")).get(0).customerId();
+        db.update("update customer set salesforce_state = 'PROJECTED' where id = ?", leo);
+
+        addDocument(leo, """
+                {"type":"PASSPORT","number":"PAX555","issuingCountry":"ESP"}""");
+
+        var customer = customers.findById(leo).orElseThrow();
+        assertThat(customer.documentNumber).isEqualTo("55555555K");
+        assertThat(customer.salesforceState).isEqualTo(SalesforceState.PENDING);
+        customer.documents = documents.of(leo);
+        assertThat(io.mateu.ecdemo1.mdm.salesforce.SalesforceClientFields.contact(customer).get("Documentos__c"))
+                .asString().contains("principal").contains("Pasaporte · ESP · PAX555");
+    }
+
     org.springframework.test.web.servlet.ResultActions found(String param, String value) throws Exception {
         return mvc.perform(get("/identities/lookup").param(param, value)).andExpect(status().isOk());
     }

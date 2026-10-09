@@ -372,3 +372,17 @@ create table if not exists pax_scan (
     scanned_at        timestamp,
     primary key (stay_id, pax)
 );
+
+-- The summary of each arriving pax the chain knows — their stays and their Riu Class standing —,
+-- prepared before they arrive (today's and tomorrow's arrivals): the desk sees it in the arrivals list
+-- and at the check-in without asking customer-history and loyalty then. As JSON, as those services said it.
+create table if not exists arrival_briefing (
+    stay_id       varchar(64)   not null,
+    pax           int           not null,
+    customer_id   varchar(64)   not null,
+    customer_name varchar(200),
+    history       varchar(8000) not null,
+    loyalty       varchar(1000),
+    prepared_at   timestamp     not null,
+    primary key (stay_id, pax)
+);

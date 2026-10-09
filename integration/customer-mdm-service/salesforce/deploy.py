@@ -136,6 +136,8 @@ CONTACT_SECTIONS = {
     "Calidad del dato (MDM)": [
         ("Estado_MDM__c", "Readonly"), ("Calidad_Dato__c", "Readonly"), ("Origen__c", "Readonly"),
         ("MDM_Id__c", "Readonly")],
+    # Every document the MDM knows of the customer (HLA CM-F15); the main one is also in its own fields.
+    "Documentos de identidad (MDM)": [("Documentos__c", "Readonly")],
 }
 
 
@@ -167,9 +169,10 @@ def layout_sections(instance, access, sobject, name, sections):
     for label in missing:
         fields = [(f, b) for f, b in sections[label] if f not in placed]
         half = (len(fields) + 1) // 2
-        columns = [fields[:half], fields[half:]]
+        # one field (a long text) takes the whole width
+        columns = [fields] if len(fields) == 1 else [fields[:half], fields[half:]]
         metadata["layoutSections"].insert(1, {
-            "label": label, "style": "TwoColumnsTopToBottom", "customLabel": True,
+            "label": label, "style": "OneColumn" if len(columns) == 1 else "TwoColumnsTopToBottom", "customLabel": True,
             "detailHeading": True, "editHeading": True,
             "layoutColumns": [{"layoutItems": [{"field": f, "behavior": b} for f, b in column]} for column in columns]})
     # Salesforce does not take back its own metadata as it sent it: without the nulls, and without the

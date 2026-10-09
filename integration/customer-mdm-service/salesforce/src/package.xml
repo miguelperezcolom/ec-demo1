@@ -5,6 +5,7 @@
         <members>Contact.Nationality__c</members>
         <members>Contact.Document_Type__c</members>
         <members>Contact.Document_Number__c</members>
+        <members>Contact.Documentos__c</members>
         <members>Contact.Estado_MDM__c</members>
         <members>Contact.Calidad_Dato__c</members>
         <members>Contact.Origen__c</members>

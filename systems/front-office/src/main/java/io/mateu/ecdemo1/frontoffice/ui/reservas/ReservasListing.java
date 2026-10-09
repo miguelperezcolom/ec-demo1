@@ -44,10 +44,13 @@ public class ReservasListing
   final DemoReservationsService demoReservations;
   final io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIns forcedCheckIns;
   final io.mateu.ecdemo1.frontoffice.ui.common.Hotels hotels;
+  final io.mateu.ecdemo1.frontoffice.application.ArrivalsBriefing briefing;
 
   public ReservasListing(StayReadModel stayReads, StayRepository stays, DemoReservationsService demoReservations,
                          io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIns forcedCheckIns,
-                         io.mateu.ecdemo1.frontoffice.ui.common.Hotels hotels) {
+                         io.mateu.ecdemo1.frontoffice.ui.common.Hotels hotels,
+                         io.mateu.ecdemo1.frontoffice.application.ArrivalsBriefing briefing) {
+    this.briefing = briefing;
     this.forcedCheckIns = forcedCheckIns;
     this.hotels = hotels;
     this.stayReads = stayReads;
@@ -63,6 +66,8 @@ public class ReservasListing
   public enum Vista {
     @Label("Llegadas hoy")
     LLEGADAS_HOY,
+    @Label("Clientes que repiten")
+    REPITEN,
     @Label("Salidas hoy")
     SALIDAS_HOY,
     @Label("In house")
@@ -89,7 +94,8 @@ public class ReservasListing
       @Label("Noches") long noches,
       @Label("Estado") String estado,
       @Label("Check-in") Status checkin,
-      @Label("Tier") Status tier) {}
+      @Label("Tier") Status tier,
+      @Label("Cliente") Status cliente) {}
 
   @Override
   public ListingData<Reserva> search(SearchRequest request, HttpRequest httpRequest) {
@@ -98,6 +104,9 @@ public class ReservasListing
     // los check-in forzados aún incompletos (una consulta): su badge, y la vista que los reúne
     var incompletos = new java.util.HashMap<String, io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIn>();
     forcedCheckIns.open().forEach(f -> incompletos.put(f.stayId(), f));
+    // los clientes que repiten entre las llegadas, preparados antes de que lleguen (una consulta)
+    var repiten = new java.util.HashMap<String, io.mateu.ecdemo1.frontoffice.domain.customer.ArrivalBriefings.Briefing>();
+    briefing.holders().forEach(b -> repiten.put(b.stayId(), b));
     // Una consulta (estancia + huésped, sin colecciones); el filtro, el orden y la búsqueda sobre la
     // fila ya pintada siguen en memoria, que es lo que permite buscar por "Llega mañana".
     // Sólo las estancias del hotel elegido en el selector Hotel de la cabecera.
@@ -106,7 +115,7 @@ public class ReservasListing
     }
     var rows =
         stayReads.rows().stream()
-            .filter(s -> matchesVista(s, filtros == null ? null : filtros.vista, incompletos.keySet()))
+            .filter(s -> matchesVista(s, filtros == null ? null : filtros.vista, incompletos.keySet(), repiten.keySet()))
             .sorted(
                 java.util.Comparator.comparing((StayRow s) -> s.status().ordinal())
                     .thenComparing(
@@ -114,14 +123,15 @@ public class ReservasListing
                             s.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING
                                 ? s.checkIn()
                                 : s.checkOut()))
-            .map(s -> row(s, incompletos.get(s.id())))
+            .map(s -> row(s, incompletos.get(s.id()), repiten.get(s.id())))
             .filter(row -> matches(row, searchText))
             .toList();
     return Paging.page(rows, request);
   }
 
   /** El selector rápido: llegadas de hoy / salidas de hoy / en casa. */
-  private static boolean matchesVista(StayRow stay, Vista vista, java.util.Set<String> incompletos) {
+  private static boolean matchesVista(StayRow stay, Vista vista, java.util.Set<String> incompletos,
+                                      java.util.Set<String> repiten) {
     if (vista == null) {
       return true;
     }
@@ -134,6 +144,8 @@ public class ReservasListing
           (stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE
               || stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.DEPARTED)
               && stay.checkOut().isEqual(today);
+      case REPITEN ->
+          stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING && repiten.contains(stay.id());
       case IN_HOUSE ->
           stay.status() == io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.IN_HOUSE;
       case CHECKIN_INCOMPLETO ->
@@ -151,7 +163,17 @@ public class ReservasListing
         : new Status(io.mateu.uidl.data.StatusType.WARNING, "Check-in incompleto");
   }
 
-  private Reserva row(StayRow stay, io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIn forced) {
+  /** «Repite · 5 estancias · GOLD» (green) — a returning customer arriving, prepared before they arrive. */
+  static Status clienteBadge(StayRow stay, io.mateu.ecdemo1.frontoffice.domain.customer.ArrivalBriefings.Briefing b) {
+    if (b == null || stay.status() != io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus.ARRIVING) {
+      return null;
+    }
+    return new Status(io.mateu.uidl.data.StatusType.SUCCESS,
+        io.mateu.ecdemo1.frontoffice.application.ArrivalsBriefing.line(b));
+  }
+
+  private Reserva row(StayRow stay, io.mateu.ecdemo1.frontoffice.domain.stay.ForcedCheckIn forced,
+                      io.mateu.ecdemo1.frontoffice.domain.customer.ArrivalBriefings.Briefing repite) {
     var habitacion = stay.roomNumber() == null || stay.roomNumber().isBlank()
         ? "Sin asignar" : "Hab " + stay.roomNumber();
     return new Reserva(
@@ -162,7 +184,8 @@ public class ReservasListing
         java.time.temporal.ChronoUnit.DAYS.between(stay.checkIn(), stay.checkOut()),
         estadoLabel(stay.status(), stay.checkIn(), stay.checkOut()),
         checkinBadge(stay, forced),
-        Tiers.badge(stay.guestTier()));
+        Tiers.badge(stay.guestTier()),
+        clienteBadge(stay, repite));
   }
 
   private boolean matches(Reserva row, String searchText) {
@@ -171,7 +194,8 @@ public class ReservasListing
     }
     // The locator too: it is what the desk reads off a voucher or a call.
     var hay = (row.id() + " " + row.huesped() + " " + io.mateu.ecdemo1.frontoffice.ui.common.Flags.codeOf(row.bandera()) + " " + row.habitacion() + " " + row.estado() + " "
-        + (row.checkin() == null ? "" : row.checkin().message()) + " " + (row.tier() == null ? "" : row.tier().message()))
+        + (row.checkin() == null ? "" : row.checkin().message()) + " " + (row.tier() == null ? "" : row.tier().message())
+        + " " + (row.cliente() == null ? "" : row.cliente().message()))
         .toLowerCase();
     for (var word : searchText.trim().toLowerCase().split("\\s+")) {
       if (!hay.contains(word)) {
@@ -226,11 +250,23 @@ public class ReservasListing
     // la lógica vive en handleAction (dispatch uniforme con "view")
   }
 
+  /**
+   * Prepara ya el resumen de las llegadas de hoy y mañana — quién repite, sus estancias y su Riu Class —,
+   * sin esperar a la próxima vuelta (cada 10 minutos).
+   */
+  @io.mateu.uidl.annotations.ListToolbarButton(rowsSelectedRequired = false)
+  @io.mateu.uidl.annotations.Toolbar(order = 3)
+  @Label("Preparar llegadas")
+  public void prepararLlegadas() {
+    // la lógica vive en handleAction (dispatch uniforme con "view")
+  }
+
   // ── clic de fila: abrir la reserva como página según su estado ───────────────
 
   @Override
   public boolean supportsAction(String actionId) {
     return "view".equals(actionId) || "seedDemo".equals(actionId) || "walkIn".equals(actionId)
+        || "prepararLlegadas".equals(actionId)
         || Listing.super.supportsAction(actionId);
   }
 
@@ -239,6 +275,13 @@ public class ReservasListing
     if ("seedDemo".equals(actionId)) {
       return List.of(
           new io.mateu.uidl.data.Message(demoReservations.seed() + " reservas de demo creadas"),
+          io.mateu.uidl.data.UICommand.dispatchEvent("reservas-seeded"));
+    }
+    if ("prepararLlegadas".equals(actionId)) {
+      var p = briefing.prepare();
+      return List.of(
+          new io.mateu.uidl.data.Message(p.arrivals() + " llegadas hasta mañana: "
+              + (p.known() == 1 ? "1 cliente que repite" : p.known() + " clientes que repiten")),
           io.mateu.uidl.data.UICommand.dispatchEvent("reservas-seeded"));
     }
     if ("walkIn".equals(actionId)) {
