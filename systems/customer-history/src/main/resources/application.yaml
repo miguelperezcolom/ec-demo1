@@ -1,0 +1,105 @@
+server:
+  port: 8133
+
+spring:
+  application:
+    name: ec-demo1-customer-history
+
+  ai:
+    mcp:
+      server:
+        name: customer-history
+        version: 1.0.0
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  cloud:
+    function:
+      # The stays the front office closes, and the MDM's merges (to tie an absorbed code's stays to its survivor).
+      definition: consumeWorkerEvent;consumeFrontOfficeEvents;consumeCustomerEvents
+    stream:
+      kafka:
+        binder:
+          # Consumers continue the trace their record carries.
+          enable-observation: true
+          brokers: ${KAFKA_BROKERS:localhost:9192}
+          auto-create-topics: true
+        bindings:
+          # From the beginning the first time: every stay closed (and every merge) before this service
+          # existed is history too.
+          consumeFrontOfficeEvents-in-0:
+            consumer:
+              start-offset: earliest
+          consumeCustomerEvents-in-0:
+            consumer:
+              start-offset: earliest
+      bindings:
+        # IN: the tasks the engine dispatches for this worker — today reset@1, the demo's reset
+        # (process reset-demo): the service empties its own tables, its other consumers paused. A topic
+        # and a group of its own.
+        consumeWorkerEvent-in-0:
+          destination: customer-history-tasks
+          group: ec-demo1-customer-history-worker
+          consumer:
+            concurrency: 1
+        # OUT, via StreamBridge: the replies back to the engine.
+        upstream:
+          destination: upstream
+        # IN: the front office's events; only stay-closed is taken, once each (inbox).
+        consumeFrontOfficeEvents-in-0:
+          destination: front-office-events
+          group: ec-demo1-customer-history-front-office
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
+        # IN: the MDM's customers; only customers-merged is taken (the absorbed code becomes an alias).
+        consumeCustomerEvents-in-0:
+          destination: customers
+          group: ec-demo1-customer-history-customers
+          consumer:
+            max-attempts: 1000
+            back-off-initial-interval: 1000
+            back-off-max-interval: 60000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/customer_history}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:6}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+
+# It publishes nothing: the shared library's outbox table is created but never relayed.
+messaging:
+  outbox:
+    relay: false
+
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:0.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.kafka: error
+    org.springframework.cloud.stream: error
