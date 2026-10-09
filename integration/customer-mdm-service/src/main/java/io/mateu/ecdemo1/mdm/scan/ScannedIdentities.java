@@ -172,10 +172,10 @@ public class ScannedIdentities {
             target.documentKey = Normalizer.document(target.documentType, target.documentNumber);
             target.version++;
             target.updatedAt = clock.instant();
-            if (!filled.isEmpty() && target.salesforceState != SalesforceState.REMOVED
+            if (target.salesforceState != SalesforceState.REMOVED
                     && target.salesforceState != SalesforceState.ANONYMIZED && target.status != CustomerStatus.MERGED) {
                 // To Salesforce as any change of the golden record: the contact gets it, no Case. A document
-                // added beside the main one is not the contact's: Salesforce keeps only the main one.
+                // added beside the main one goes too — the contact lists every document (HLA CM-F15).
                 target.salesforceState = SalesforceState.PENDING;
             }
             customers.save(target);

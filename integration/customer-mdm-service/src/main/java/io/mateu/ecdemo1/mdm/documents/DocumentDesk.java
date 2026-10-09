@@ -70,9 +70,9 @@ public class DocumentDesk {
             c.documentNumber = d.number();
             c.documentKey = Normalizer.document(c.documentType, c.documentNumber);
         }
-        if ((main || filled) && c.salesforceState != SalesforceState.REMOVED
+        if ((main || filled || added) && c.salesforceState != SalesforceState.REMOVED
                 && c.salesforceState != SalesforceState.ANONYMIZED && c.status != CustomerStatus.MERGED) {
-            // The main document, the birth date and the nationality are the contact's: to Salesforce, as a
+            // The documents, the birth date and the nationality are the contact's: to Salesforce, as a
             // scan's would.
             c.salesforceState = SalesforceState.PENDING;
         }

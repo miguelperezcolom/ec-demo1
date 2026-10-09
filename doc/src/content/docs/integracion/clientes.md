@@ -177,8 +177,11 @@ emisor, caducidad, origen (escaneo, reserva o cliente) y cuándo se vio por prim
   «PASAPORTE» es el mismo documento, y dos números iguales de países distintos no se confunden. Sin país
   (una reserva no lo trae), se toma la nacionalidad; sin nada, solo el número.
 - El documento de `Customer` (`documentType`, `documentNumber`) sigue siendo **el principal**: es el que va
-  a Salesforce y al `GoldenRecord`, que además lleva la lista entera (`documents`). Proyectar a Salesforce
-  todos los documentos queda pendiente (CM-F15 del HLA).
+  a Salesforce y al `GoldenRecord`, que además lleva la lista entera (`documents`).
+- **En Salesforce, todos** (CM-F15 del HLA): el contacto lleva en `Documentos__c` (texto largo, solo
+  lectura en la página, sección *Documentos de identidad (MDM)*) un documento por línea —«Pasaporte · ESP ·
+  X1234567 · caduca 12/03/2031»—, el principal el primero y marcado. Un documento nuevo vuelve a enviar el
+  contacto. Es un campo y no un objeto hijo porque la Base Edition no admite más objetos propios.
 - Al arrancar, el MDM copia a la tabla el documento principal de los clientes que aún no lo tienen
   (idempotente).
 

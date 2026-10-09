@@ -110,6 +110,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Contact.Documentos__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Case.Aviso_Tipo__c</field>
         <readable>true</readable>
     </fieldPermissions>

@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.frontoffice.application;
 
+import io.mateu.ecdemo1.frontoffice.domain.customer.ArrivalBriefings;
 import io.mateu.ecdemo1.frontoffice.domain.customer.CustomerDirectory;
 import io.mateu.ecdemo1.frontoffice.domain.customer.CustomerDirectory.Lookup;
 import io.mateu.ecdemo1.frontoffice.domain.customer.CustomerDirectory.LookupQuery;
@@ -62,6 +63,7 @@ public class Recognition {
   final StayHistory history;
   final LoyaltyStatus loyalty;
   final PaxRecognitions recognitions;
+  final ArrivalBriefings briefings;
   final StayRepository stays;
   final GuestRepository guests;
   final WalkIns walkIns;
@@ -71,13 +73,14 @@ public class Recognition {
   final Clock clock = Clock.systemUTC();
 
   public Recognition(CustomerDirectory directory, StayHistory history, LoyaltyStatus loyalty,
-                     PaxRecognitions recognitions, StayRepository stays, GuestRepository guests, WalkIns walkIns,
+                     PaxRecognitions recognitions, ArrivalBriefings briefings, StayRepository stays, GuestRepository guests, WalkIns walkIns,
                      CommandOutbox outbox, @Value("${frontoffice.hotel:MRU01}") String hotel,
                      PlatformTransactionManager transactions) {
     this.directory = directory;
     this.history = history;
     this.loyalty = loyalty;
     this.recognitions = recognitions;
+    this.briefings = briefings;
     this.stays = stays;
     this.guests = guests;
     this.walkIns = walkIns;
@@ -123,7 +126,7 @@ public class Recognition {
       var paxId = paxId(stay, pax);
       var row = recognitions.of(stayId, pax).orElse(null);
       if (row != null && row.certainty() == Certainty.KNOWN) {
-        return known(row.customerId(), row.customerName(), row.matchedBy(), row.riuClass());
+        return known(stayId, pax, row.customerId(), row.customerName(), row.matchedBy(), row.riuClass());
       }
       if (row != null) {
         // what the last scan or search said wins over the reservation's code: a provisional C-… whose
@@ -131,15 +134,35 @@ public class Recognition {
         return new View(Certainty.POSSIBLE, row.matchedBy(), row.customerId(), row.customerName(), row.candidates(),
             Optional.empty(), Optional.empty());
       }
+      // the briefing's customer may be the one the pax's Opera profile is, not their id here
+      var briefed = briefings.of(stayId, pax);
+      if (briefed.isPresent()) {
+        // prepared before they arrived: known, with no service asked now
+        return briefed(briefed.get(), MatchedBy.CHAIN_CODE);
+      }
       if (chainKnown(paxId)) {
         // the reservation names them by a chain customer who has stayed with us: known without a scan
-        return known(paxId, paxName(stay, pax), MatchedBy.CHAIN_CODE, null);
+        return known(stayId, pax, paxId, paxName(stay, pax), MatchedBy.CHAIN_CODE, null);
       }
       return View.none();
     } catch (RuntimeException e) {
       log.info("{}: pax {} could not be recognised ({})", stayId, pax, e.getMessage());
       return View.none();
     }
+  }
+
+  /** Known: what the arrivals' briefing prepared of this customer, if it did; else asked now. */
+  View known(String stayId, int pax, String customerId, String name, MatchedBy by, String riuClass) {
+    var briefed = briefings.of(stayId, pax).filter(b -> b.customerId().equals(customerId));
+    if (briefed.isPresent() && (riuClass == null || briefed.get().loyalty() != null)) {
+      return briefed(briefed.get(), by);
+    }
+    return known(customerId, name, by, riuClass);
+  }
+
+  static View briefed(ArrivalBriefings.Briefing b, MatchedBy by) {
+    return new View(Certainty.KNOWN, by, b.customerId(), b.customerName(), List.of(), Optional.of(b.history()),
+        b.riuClass());
   }
 
   View known(String customerId, String name, MatchedBy by, String riuClass) {

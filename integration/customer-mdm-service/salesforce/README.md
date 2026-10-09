@@ -7,6 +7,7 @@ that deploys it. Salesforce cleans and deduplicates; the golden record is the MD
 | In `src/` | What for |
 | :-------- | :------- |
 | `Contact.MDM_Id__c` (external id, unique), `Nationality__c`, `Document_Type__c`, `Document_Number__c` | A customer is a contact, upserted by its MDM id |
+| `Contact.Documentos__c` (long text, read only on the page) | Every identity document the MDM knows of the customer, one per line — the main one is also in `Document_Type__c`/`Document_Number__c` (HLA CM-F15). Section *Documentos de identidad (MDM)* on the Contact layout |
 | `ClienteConsolidado__e` | The event the MDM subscribes to: a contact with an MDM id left — merged or deleted |
 | Flow `Mdm_Announce_Merge` | Publishes it before the delete. `MasterRecordId` is still empty then, so the event names only what left; the MDM reads the survivor afterwards with `queryAll` |
 | Flow `Mdm_Keep_Mdm_Id` | A merge must not give the survivor the absorbed contact's MDM id |

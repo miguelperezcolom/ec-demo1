@@ -32,7 +32,7 @@ public class DemoKnownCustomers {
   static final Logger log = LoggerFactory.getLogger(DemoKnownCustomers.class);
 
   public record Seeded(String stayId, String guestName, String customerId, String riuClass, String documentType,
-                       String documentNumber, java.time.LocalDate birthDate) {}
+                       String documentNumber, java.time.LocalDate birthDate, java.time.LocalDate arrival) {}
 
   final StayRepository stays;
   final GuestRepository guests;
@@ -41,9 +41,12 @@ public class DemoKnownCustomers {
   final CustomerDirectory directory;
   final StayHistory history;
   final LoyaltyStatus loyalty;
+  final ArrivalsBriefing briefing;
 
   public DemoKnownCustomers(StayRepository stays, GuestRepository guests, WalkIns walkIns, DemoScanner scanner,
-                            CustomerDirectory directory, StayHistory history, LoyaltyStatus loyalty) {
+                            CustomerDirectory directory, StayHistory history, LoyaltyStatus loyalty,
+                            ArrivalsBriefing briefing) {
+    this.briefing = briefing;
     this.stays = stays;
     this.guests = guests;
     this.walkIns = walkIns;
@@ -101,7 +104,13 @@ public class DemoKnownCustomers {
           guest.name(), code, document.documentType(), document.documentNumber(), member, tier, documented, xref,
           enrolled, stayed);
       seeded.add(new Seeded(stay.id(), guest.name(), code, member, document.documentType(), document.documentNumber(),
-          document.birthDate()));
+          document.birthDate(), stay.checkIn()));
+    }
+    // the arrivals list shows them as returning customers now, not at the briefing's next round
+    try {
+      briefing.prepare();
+    } catch (RuntimeException e) {
+      log.info("Known customers seeded; the arrivals not briefed now ({})", e.getMessage());
     }
     return seeded;
   }

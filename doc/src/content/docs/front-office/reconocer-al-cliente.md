@@ -41,6 +41,22 @@ cliente confirmado y le añade el documento. La próxima vez, ese pasaporte ya d
   coincide no le quita la certeza que da su código.
 :::
 
+## Antes de que lleguen: el resumen de las llegadas
+
+El front office prepara por adelantado a **los clientes que repiten** entre las llegadas de hoy y mañana
+(y las atrasadas): cada huésped que la reserva nombra con código de la cadena (`C-…`) **y tiene estancias**
+se guarda con el resumen de su historial y su nivel Riu Class (`arrival_briefing`).
+
+- **En *Reservas***: columna **Cliente** con «Repite · 5 estancias · GOLD» y la vista **Clientes que
+  repiten**. El botón **Preparar llegadas** lo hace al momento; si no, se prepara solo cada 10 minutos
+  (`frontoffice.arrivals-briefing.interval`).
+- **En el check-in**, un huésped ya preparado sale como «Cliente conocido» sin preguntar entonces a
+  `customer-history` ni a `loyalty`: si esos servicios no contestan en el mostrador, recepción lo ve igual.
+- Un código provisional sin estancias **no** se prepara: es alguien a quien aún no conocemos. Si un
+  servicio no contesta al preparar, se queda lo de la vuelta anterior; una reserva que deja de llegar
+  (check-in, cancelación, no show) pierde el suyo.
+- `seed known-customers` prepara las llegadas al acabar, para que la demo los enseñe sin esperar.
+
 ## Cómo funciona
 
 ```mermaid
@@ -96,7 +112,6 @@ Al hacer el **check-out**, la estancia llega al historial (`StayClosed`) y suma 
 
 ## Fuera de alcance
 
-- Traer el resumen de las llegadas del día antes de que lleguen.
-- Proyectar a Salesforce todos los documentos del cliente: solo viaja el principal (CM-F15 del HLA pide
-  varios).
-- El servicio real de Riu Class, y el historial anterior a la PoC (Rumbo).
+- El servicio real de Riu Class: `loyalty` es una demo, y el front office solo depende del puerto
+  `LoyaltyStatus`.
+- El historial anterior a la PoC (Rumbo).

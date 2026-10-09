@@ -44,6 +44,7 @@ final class InMemoryCustomers {
       byKey.clear();
       candidatesByLastName.clear();
       writes.clear();
+      operaProfiles.clear();
       down = false;
     }
 
@@ -71,6 +72,13 @@ final class InMemoryCustomers {
                                String origin, LocalDate birthDate, String nationality) {
       writes.add("document " + customerId + " " + type + " " + number + " " + issuingCountry + " " + origin);
       return true;
+    }
+
+    final Map<String, String> operaProfiles = new ConcurrentHashMap<>();
+
+    @Override
+    public java.util.Optional<String> byOperaProfile(String profileId) {
+      return down ? java.util.Optional.empty() : java.util.Optional.ofNullable(operaProfiles.get(profileId));
     }
 
     @Override

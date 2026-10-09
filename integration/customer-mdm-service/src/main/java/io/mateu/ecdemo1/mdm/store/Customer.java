@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
@@ -74,6 +75,12 @@ public class Customer {
     public Instant documentVerifiedAt;
     /** The marking its Salesforce contact has — {@code marking.Marking#key()} — to send it only when it changes. */
     public String markedAs;
+    /**
+     * Every document the MDM knows of the customer, read just before a projection to Salesforce (its
+     * contact lists them all, HLA CM-F15); null when not read — the contact's list is then left as it is.
+     */
+    @Transient
+    public java.util.List<CustomerDocument> documents;
     /**
      * When its Salesforce contact was anonymised, and why: only a name and only cancelled or no-show
      * bookings, past the retention period. The MDM keeps the record and the reason; Salesforce, nothing personal.

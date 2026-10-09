@@ -104,6 +104,23 @@ public class HttpCustomerDirectory implements CustomerDirectory {
   }
 
   @Override
+  public java.util.Optional<String> byOperaProfile(String profileId) {
+    if (quick == null || profileId == null || profileId.isBlank()) {
+      return java.util.Optional.empty();
+    }
+    try {
+      List<?> found = quick.get().uri(b -> b.path("/customers").queryParam("xref", "OPERA:" + profileId).build())
+          .retrieve().body(List.class);
+      return (found == null ? List.of() : found).stream()
+          .filter(Map.class::isInstance).map(c -> Http.text((Map<?, ?>) c, "id"))
+          .filter(java.util.Objects::nonNull).findFirst().map(String::valueOf);
+    } catch (RuntimeException e) {
+      log.info("The MDM could not be asked whose Opera profile {} is ({})", profileId, e.getMessage());
+      return java.util.Optional.empty();
+    }
+  }
+
+  @Override
   public boolean addDocument(String customerId, String type, String number, String issuingCountry, LocalDate expiry,
                              String origin, LocalDate birthDate, String nationality) {
     if (writes == null) {

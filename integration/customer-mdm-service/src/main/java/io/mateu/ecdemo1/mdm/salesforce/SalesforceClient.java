@@ -216,6 +216,7 @@ public class SalesforceClient {
         fields.put("Nationality__c", null);
         fields.put("Document_Type__c", null);
         fields.put("Document_Number__c", null);
+        fields.put("Documentos__c", null);
         fields.putAll(io.mateu.ecdemo1.mdm.marking.Marking.of(c).fields());
         return fields;
     }
@@ -307,9 +308,44 @@ public class SalesforceClient {
         fields.put("Nationality__c", c.nationality);
         fields.put("Document_Type__c", c.documentType);
         fields.put("Document_Number__c", c.documentNumber);
+        if (c.documents != null) {
+            fields.put("Documentos__c", documentsField(c));
+        }
         // How far it can be trusted: marked on every projection, so a new contact is born marked.
         fields.putAll(io.mateu.ecdemo1.mdm.marking.Marking.of(c).fields());
         return fields;
+    }
+
+    /**
+     * The contact's list of identity documents, one per line — «Pasaporte · ESP · X1234567 · caduca
+     * 12/03/2031 · principal» —, the main one first; null (the field emptied) when there is none.
+     */
+    static String documentsField(Customer c) {
+        if (c.documents == null || c.documents.isEmpty()) {
+            return null;
+        }
+        var main = io.mateu.ecdemo1.mdm.resolution.Normalizer.documentNumber(c.documentNumber);
+        var text = c.documents.stream()
+                .sorted(java.util.Comparator.comparing((io.mateu.ecdemo1.mdm.store.CustomerDocument d) -> !d.numberKey.equals(main)))
+                .map(d -> String.join(" · ", java.util.stream.Stream.of(
+                        documentType(d.type), d.issuingCountry, d.number,
+                        d.expiry == null ? null : "caduca " + d.expiry.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        d.numberKey.equals(main) ? "principal" : null).filter(java.util.Objects::nonNull).toList()))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        return text.length() <= 4000 ? text : text.substring(0, 3999) + "…";
+    }
+
+    static String documentType(String type) {
+        if (type == null) {
+            return "Documento";
+        }
+        return switch (type) {
+            case "DNI" -> "DNI";
+            case "PASSPORT" -> "Pasaporte";
+            case "ID_CARD" -> "Documento de identidad";
+            case "RESIDENCE" -> "Permiso de residencia";
+            default -> "Documento";
+        };
     }
 
     /**

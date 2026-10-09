@@ -35,6 +35,7 @@ public class Projection {
     final TransactionTemplate tx;
     final io.mateu.ecdemo1.mdm.change.Xrefs xrefs;
     final io.mateu.ecdemo1.mdm.marking.Origins origins;
+    final io.mateu.ecdemo1.mdm.documents.CustomerDocuments documents;
     final Clock clock;
     Backoff backoff;
 
@@ -70,6 +71,8 @@ public class Projection {
                     }));
                 }
             }
+            // all its documents go with it: the contact lists them (HLA CM-F15)
+            pending.documents = documents.of(pending.id);
             batch.add(pending);
         }
         if (batch.isEmpty()) {
