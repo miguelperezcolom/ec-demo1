@@ -103,9 +103,13 @@ public class DemoScanner {
    */
   public Scanned scanNewPassport(Pax pax) {
     var usual = scan(pax);
-    var number = DemoDocuments.newPassport(DemoDocuments.seed(usual.firstName(), usual.lastName()));
+    // New for this stay: one derived from the person alone would be new only the first time — once the MDM
+    // keeps it as theirs, «a new passport» would already be a known document on the next demo or test.
+    // The same stay gives the same one, so scanning it again is the same passport.
+    var seed = DemoDocuments.seed(usual.firstName(), usual.lastName()) ^ DemoDocuments.hash("stay:" + pax.locator());
+    var number = DemoDocuments.newPassport(seed);
     if (number.equals(usual.documentNumber())) {
-      number = DemoDocuments.newPassport(~DemoDocuments.seed(usual.firstName(), usual.lastName()));
+      number = DemoDocuments.newPassport(~seed);
     }
     return usual.withDocument(DemoDocuments.PASSPORT, number);
   }

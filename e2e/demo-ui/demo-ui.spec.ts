@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { Browser, Page, expect, test } from '@playwright/test'
 import { HOSTS, RENDERER, RUN, SalesforceFixture, Ui, after, day } from './ui'
 
@@ -475,7 +476,126 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
             `${cause} never resolved`, 3 * 60_000)
         await ui.checkpoint('cause-resolved')
     })
+
+    // ── 9 ──────────────────────────────────────────────────────────────────────────────────────────
+    // Verified live on the local cluster (2026-10-09): the check-in's «Escanear documento», «Simular
+    // pasaporte nuevo», «Nº Riu Class o email» + «Confirmar cliente», «Nombre»/«Apellidos»/«Fecha de
+    // nacimiento» + «Buscar por nombre», the room cards, «Enviar a tablet», «Confirmar check-in»; the
+    // stay's «Check-out» and «Confirmar — €…».
+    test('9 · a known customer recognised at the check-in, and their stay in the history and Riu Class', async ({}, info) => {
+        test.setTimeout(45 * 60_000)
+        const ui = new Ui(page, info)
+
+        // Fixture, as flow 3's Case approval: three holders of the coming arrivals made known customers
+        // — a document in the MDM, a Riu Class member, past stays — by the demo's seeding (kubectl decides
+        // which cluster). Each one then books again with another email, as a tour operator's booking comes:
+        // unidentified, a provisional customer of its own.
+        const seeded = JSON.parse(execFileSync('python3', [`${__dirname}/../../deploy/demo/ec1.py`, 'seed',
+            'known-customers', '--count', '3', '--json'], { encoding: 'utf8', timeout: 180_000 })) as Known[]
+        expect(seeded.length, 'the seeding found no arrival with a chain customer: walk the onboarding first').toBe(3)
+        const bookings: string[] = []
+        for (const [i, k] of seeded.entries()) {
+            const [first, ...rest] = k.guestName.split(' ')
+            const last = rest.join(' ')
+            const locator = await createBooking(ui, {
+                arrival: day(0), departure: day(2),
+                holder: { first, last, email: `${first}.${last}.${RUN}.f9@example.org`.toLowerCase().replace(/\s+/g, ''),
+                    phone: '', nationality: '' },
+                room: ROOM_TYPES[1], rate: 'DIRECTA', board: 'DESAYUNO', adults: 1, guests: [[first, last]],
+                channel: 'CALLCENTER',
+            }, `f9-${i}`)
+            await ensureInOpera(ui, locator)
+            bookings.push(locator)
+        }
+        const [byDocument, byPassport, byHand] = bookings
+        const [known1, known2, known3] = seeded
+        const panel = async () => (await ui.text()).match(/(Cliente conocido — [^|]{0,40}|Posible cliente conocido: [^|]{0,60})/)?.[0] ?? ''
+        const checkIn = async (locator: string) => {
+            await ui.go(`${FO}/checkin/${locator}`, /Check-In/)
+            await ui.waitText(/Documento|Habitación/, `the check-in of ${locator} never opened`)
+        }
+
+        // 1 · The document we already know: certainty, with their history and their Riu Class tier.
+        await checkIn(byDocument)
+        await ui.click(ui.button('Escanear documento'), 9_000)
+        await expect.poll(panel, { message: 'a known document did not recognise the customer', timeout: 60_000 })
+            .toContain(`Cliente conocido — ${known1.guestName}`)
+        await ui.waitText(/\d+ estancias · \d+ noches/, 'the known customer showed no stay history')
+        await ui.checkpoint('f9-known-by-document')
+
+        // 2 · A new passport of the same person: only possible, never the history — until the guest gives
+        // their Riu Class number. The MDM then consolidates the provisional code into them (DESK_CONFIRMED).
+        await checkIn(byPassport)
+        await ui.click(ui.button('Simular pasaporte nuevo'), 9_000)
+        await expect.poll(panel, { message: 'a new passport did not ask «¿es usted…?»', timeout: 60_000 })
+            .toContain(`Posible cliente conocido: ¿es usted ${known2.guestName}`)
+        await ui.checkpoint('f9-possible-by-passport')
+        await ui.page.getByLabel('Nº Riu Class o email').first().fill(known2.riuClass)
+        await ui.click(ui.button('Confirmar cliente'), 6_000)
+        await expect.poll(panel, { message: 'the Riu Class number did not confirm the customer', timeout: 60_000 })
+            .toContain(`Cliente conocido — ${known2.guestName}`)
+        await ui.checkpoint('f9-confirmed-by-riu-class')
+        await ui.pollPage(`${C}/customers/consolidations`, /Survivor|Absorbed|Via/i,
+            t => new RegExp(`${known2.customerId}[^]{0,300}DESK_CONFIRMED|DESK_CONFIRMED[^]{0,300}${known2.customerId}`).test(t),
+            `the MDM never consolidated the confirmed guest into ${known2.customerId}`, 5 * 60_000)
+
+        // 3 · No document: by name and birth date only possible; by Riu Class number, certainty.
+        await checkIn(byHand)
+        const [first3, ...rest3] = known3.guestName.split(' ')
+        await ui.page.getByLabel('Nombre', { exact: true }).last().fill(first3)
+        await ui.page.getByLabel('Apellidos', { exact: true }).last().fill(rest3.join(' '))
+        const [y, m, d] = known3.birthDate.split('-')
+        const birth = ui.page.getByLabel('Fecha de nacimiento').last()
+        await birth.fill(`${d}/${m}/${y}`)
+        await birth.press('Enter')
+        await ui.click(ui.button('Buscar por nombre'), 6_000)
+        await expect.poll(panel, { message: 'the search by name and birth date found nobody', timeout: 60_000 })
+            .toContain(`Posible cliente conocido: ¿es usted ${known3.guestName}`)
+        await ui.page.getByLabel('Nº Riu Class o email').first().fill(known3.riuClass)
+        await ui.click(ui.button('Confirmar cliente'), 6_000)
+        await expect.poll(panel, { message: 'the Riu Class number did not confirm the customer', timeout: 60_000 })
+            .toContain(`Cliente conocido — ${known3.guestName}`)
+        await ui.checkpoint('f9-known-by-hand')
+
+        // The stay of the customer found by hand, to the end: the check-in (document, room, signature) and
+        // the check-out — the closed stay is the known customer's, in the history and in Riu Class.
+        const pointsBefore = await riuClassPoints(ui, known3.riuClass)
+        await ui.click(ui.button('Escanear documento'), 9_000)
+        await ui.click(ui.page.getByText(/^\d{3,4}$/).first(), 4_000) // the first free room's card
+        for (let i = 0; i < 2; i++) await ui.click(ui.button('Siguiente'), 3_500)
+        await ui.click(ui.button('Enviar a tablet'), 9_000)
+        await ui.click(ui.button('Confirmar check-in'), 10_000)
+        await ui.go(`${FO}/reservas/${byHand}`, /Huéspedes|Check-out/)
+        await ui.click(ui.button('Check-out'), 4_000)
+        await ui.click(ui.page.getByRole('button', { name: /^Confirmar — / }).first(), 8_000)
+        await ui.waitText(/Check-out enviado/, `the check-out of ${byHand} never went`)
+        await ui.checkpoint('f9-checked-out')
+
+        await ui.go(`${D}/history/search`, /Historial de clientes/)
+        await ui.type('Código de cliente', known3.customerId)
+        await ui.click(ui.button('Buscar'), 5_000)
+        // «Recepción» is the origin of a stay closed at the desk; the seeded ones say «Demo»
+        await ui.waitText(/MRU01[^]{0,400}Recepción|Recepción[^]{0,400}MRU01/,
+            'the closed stay never reached the customer history')
+        await ui.checkpoint('f9-history')
+        await expect.poll(() => riuClassPoints(ui, known3.riuClass),
+            { message: 'the stay never added Riu Class points', timeout: 3 * 60_000, intervals: [15_000] })
+            .toBeGreaterThan(pointsBefore)
+        await ui.checkpoint('f9-riu-class-points')
+    })
 })
+
+/** What the demo's seeding made known (POST /demo/known-customers, through ec1.py --json). */
+interface Known { stayId: string, guestName: string, customerId: string, riuClass: string, documentType: string,
+    documentNumber: string, birthDate: string }
+
+/** A Riu Class member's points, as the data console's «Riu Class → Socios» shows them. */
+async function riuClassPoints(ui: Ui, member: string): Promise<number> {
+    await ui.go(`${D}/loyalty/members/${member}`, /Puntos/)
+    const field = ui.page.getByLabel('Puntos').first()
+    const value = (await field.inputValue().catch(() => '')) || ((await ui.text()).match(/Puntos\s*\|?\s*([\d.]+)/)?.[1] ?? '0')
+    return Number(value.replace(/[^\d]/g, '') || '0')
+}
 
 // ── the shared moves ────────────────────────────────────────────────────────────────────────────────
 
