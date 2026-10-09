@@ -69,6 +69,8 @@ its folder (`systems/erp` builds `ec-demo1-erp`); the root `pom.xml` only aggreg
 | `systems/erp/` | The ERP: the master of trading partners (tour operators, agencies, companies), with its own outbox |
 | `systems/front-office/` | The hotel's front office (MRU01): stays, check-in, the kárdex, no shows and walk-ins |
 | `systems/notices/` | The reception notices (Avisos) of a customer, a reservation or an agency, and when the desk sees them (before the arrival, check-in, in house, check-out). A reservation's and an agency's are made on the data plane's console; a customer's are Salesforce's, taken from the MDM. All of them go out on `notices`, where the front office keeps its copy |
+| `systems/customer-history/` | A customer's stays in the chain, by the MDM's customer code: kept from the front office's closed stays (`StayClosed`), with the MDM's merges as aliases. The front office shows its summary when it recognises a customer at the check-in; the head office has the detail. First piece of the "vista 360" |
+| `systems/loyalty/` | Riu Class, the loyalty programme — a demo of it: members, tier and points, which accrue from the closed stays. The front office asks it for a recognised customer's tier and points |
 | `systems/pms/opera-mock/` | An OHIP double for the local end-to-end suite only; ec1 works against the chain's real tenant |
 | **`integration/`** | **The ACL: what flows between the systems (data plane)** |
 | `integration/crs-integration-service/` | The CRS-side adapter: inbox, reread, canonical reservation, event → process router |

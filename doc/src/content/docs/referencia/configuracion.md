@@ -123,6 +123,8 @@ una tarea de la bandeja) y `HUMAN_TASKS_TOPIC` (`human-tasks`). Las alertas de A
 | `FRONT_OFFICE_URL` | `https://front.ec1.mateu.io` | Su propia URL, para el enlace de ese aviso |
 | `CONSOLE_URL` | `https://ec1.mateu.io` | Los enlaces a la reserva del CRS y a los clientes |
 | `CRS_INTEGRATION_URL`, `MDM_URL`, `AUDIT_URL`, `PMS_INTEGRATION_URL` | `http://<servicio>:<puerto>` | Los walk-ins y el escáner; las lecturas del MDM; el «Historial» de la reserva; las habitaciones libres y limpias de Opera |
+| `HISTORY_URL` | `http://customer-history:8133` | El historial de estancias del cliente reconocido en el check-in; vacío, no se enseña |
+| `LOYALTY_URL` | `http://loyalty:8134` | El nivel y los puntos Riu Class del cliente reconocido; vacío, no se enseñan |
 | `KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI` | Los mismos que el gateway | Su login |
 
 En `application.properties`: `FRONT_OFFICE_HOTEL_COUNTRY` (`MU`, el país del hotel para las reglas de
@@ -159,6 +161,17 @@ rastro.
 ### notices
 
 `ERP_URL=http://erp:8120`: el maestro de interlocutores; un aviso de agencia lleva el nombre de la agencia tal como la nombra el PMS.
+
+### customer-history
+
+Sin variables propias: lee `front-office-events` (solo `StayClosed`) y `customers` (solo `CustomersMerged`). Su API
+(`/customers/{code}/summary`, `/customers/{code}/stays`, `/demo/stays`) y su servidor MCP no salen del clúster.
+
+### loyalty
+
+Sin variables propias: lee `front-office-events` (solo `StayClosed`, para acumular puntos) y `customers` (solo
+`CustomersMerged`, para mover un socio al cliente superviviente). Su API (`/members`) y su servidor MCP no salen
+del clúster. Es una demo del programa Riu Class.
 
 ### registration-rules
 

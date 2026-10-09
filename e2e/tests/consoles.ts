@@ -72,6 +72,12 @@ const dataScreens: Screen[] = [
     // longer keeps its traces (it then says so), so the check does not depend on retention.
     { menu: 'Recorrido', entry: 'Recorridos de reservas', route: '/journey/bookings', title: 'Recorrido de las reservas' },
     { menu: 'Recorrido', entry: 'Recorrido de 36K69K', route: '/journey/bookings/36K69K', listing: false },
+    // A customer's stays in the chain (customer-history, /_history), for the head office: a code to type,
+    // so no table until something is searched.
+    { menu: 'Historial de clientes', entry: 'Buscar', route: '/history/search', title: 'Historial de clientes', listing: false },
+    // Riu Class, the demo loyalty service (/_loyalty): its members and what each stay added.
+    { menu: 'Riu Class', entry: 'Socios', route: '/loyalty/members' },
+    { menu: 'Riu Class', entry: 'Acumulaciones', route: '/loyalty/accruals' },
 ]
 
 /**
@@ -112,13 +118,13 @@ export const CONSOLES: Console[] = [
     {
         name: 'data · vaadin', plane: 'data', renderer: 'vaadin',
         host: host('CONSOLE_HOST', 'ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP', 'Clientes'],
+        menus: ['Admin', 'Call center', 'ERP', 'Clientes', 'Historial de clientes', 'Riu Class'],
         screens: dataScreens,
     },
     {
         name: 'data · redwood', plane: 'data', renderer: 'redwood',
         host: host('RW_CONSOLE_HOST', 'rw.ec1.mateu.io'),
-        menus: ['Admin', 'Call center', 'ERP', 'Clientes'],
+        menus: ['Admin', 'Call center', 'ERP', 'Clientes', 'Historial de clientes', 'Riu Class'],
         screens: dataScreens,
     },
     {
