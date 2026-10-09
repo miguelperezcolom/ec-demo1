@@ -538,7 +538,7 @@ def seed_walk_in():
     return 0
 
 
-def seed_known_customers(count):
+def seed_known_customers(count, as_json=False):
     """A few guests of today's and the coming arrivals, recognised at the check-in as known customers.
 
     Their customer codes are random on every reset, so this runs after the onboarding: the front office
@@ -546,6 +546,9 @@ def seed_known_customers(count):
     scanner reads) and a Riu Class number, has customer-history seed past stays, and sets their tier and
     points. Run it again and it does the same to the same guests."""
     status, seeded = http("POST", "front-office", f"/demo/known-customers?count={count}")
+    if as_json:
+        print(json.dumps(seeded or []))
+        return 0 if seeded else 1
     if not seeded:
         print("No arriving or in-house guest with an MDM code: walk the onboarding first.")
         return 1
@@ -605,6 +608,7 @@ def main(argv):
                                     "known-customers"])
     p.add_argument("--create", action="store_true")
     p.add_argument("--count", type=int, default=3)
+    p.add_argument("--json", action="store_true", help="known-customers: print what was seeded as JSON")
     a = ap.parse_args(argv)
 
     if a.cmd == "health":
@@ -698,7 +702,7 @@ def main(argv):
         if a.what == "arriving-opera-today":
             return seed_arriving_opera_today()
         if a.what == "known-customers":
-            return seed_known_customers(a.count)
+            return seed_known_customers(a.count, a.json)
         return seed_walk_in()
     return 2
 

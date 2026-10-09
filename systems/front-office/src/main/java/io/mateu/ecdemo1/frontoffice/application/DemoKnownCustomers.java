@@ -32,7 +32,7 @@ public class DemoKnownCustomers {
   static final Logger log = LoggerFactory.getLogger(DemoKnownCustomers.class);
 
   public record Seeded(String stayId, String guestName, String customerId, String riuClass, String documentType,
-                       String documentNumber) {}
+                       String documentNumber, java.time.LocalDate birthDate) {}
 
   final StayRepository stays;
   final GuestRepository guests;
@@ -85,7 +85,8 @@ public class DemoKnownCustomers {
       log.info("Known customer for the demo: {} ({}) — document {} {}, Riu Class {} {}: MDM {}/{}, loyalty {}, history {}",
           guest.name(), code, document.documentType(), document.documentNumber(), member, tier, documented, xref,
           enrolled, stayed);
-      seeded.add(new Seeded(stay.id(), guest.name(), code, member, document.documentType(), document.documentNumber()));
+      seeded.add(new Seeded(stay.id(), guest.name(), code, member, document.documentType(), document.documentNumber(),
+          document.birthDate()));
     }
     return seeded;
   }
