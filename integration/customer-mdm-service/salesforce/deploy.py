@@ -138,6 +138,10 @@ CONTACT_SECTIONS = {
         ("MDM_Id__c", "Readonly")],
     # Every document the MDM knows of the customer (HLA CM-F15); the main one is also in its own fields.
     "Documentos de identidad (MDM)": [("Documentos__c", "Readonly")],
+    # What the guest declared at a hotel's desk (the kárdex), set by the MDM; the address is the standard
+    # Mailing one, Fax and Email Opt Out are standard too.
+    "Kárdex (MDM)": [("Sexo__c", "Readonly"), ("Idioma__c", "Readonly"), ("Lugar_Nacimiento__c", "Readonly"),
+                     ("Provincia__c", "Readonly"), ("Riu_Class__c", "Readonly")],
 }
 
 

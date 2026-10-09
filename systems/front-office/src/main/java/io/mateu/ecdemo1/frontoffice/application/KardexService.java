@@ -189,6 +189,62 @@ public class KardexService {
     }, ok -> "Datos de registro del pax " + pax + " guardados");
   }
 
+  /** Where each pax's desk kárdex is kept; none in a test that does not wire it. */
+  io.mateu.ecdemo1.frontoffice.domain.guest.PaxKardexes paxKardexes;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setPaxKardexes(io.mateu.ecdemo1.frontoffice.domain.guest.PaxKardexes paxKardexes) {
+    this.paxKardexes = paxKardexes;
+  }
+
+  /** The desk's kárdex of a pax, if it was filled in; empty: a provisional kárdex. */
+  public Optional<io.mateu.ecdemo1.frontoffice.domain.guest.PaxKardexes.PaxKardex> kardexOf(String stayId, int pax) {
+    return paxKardexes == null ? Optional.empty() : paxKardexes.of(stayId, pax);
+  }
+
+  /**
+   * The kárdex the desk filled in with the guest: kept, and — with the registration data the desk just
+   * wrote (sex, address, birth place…) — sent to the chain's MDM as the guest's own declaration
+   * ({@code RecordKardex}), in the same transaction. Audited by the pax, not the values.
+   */
+  public void kardexFilled(String stayId, int pax, io.mateu.ecdemo1.frontoffice.domain.guest.PaxKardexes.PaxKardex k,
+                           String by) {
+    audit.run("Kardex filled", stayId, null, StayAudit.params("pax", pax), () -> {
+      transaction.executeWithoutResult(status -> {
+        var stay = stay(stayId);
+        var filled = new io.mateu.ecdemo1.frontoffice.domain.guest.PaxKardexes.PaxKardex(stayId, pax, k.firstName(),
+            k.lastName(), k.riuClass(), k.documentIssueDate(), k.language(), k.province(), k.fax(),
+            k.marketingConsent(), java.time.Instant.now(), by);
+        if (paxKardexes != null) {
+          paxKardexes.save(filled);
+        }
+        var data = registrationData == null ? java.util.Map.<Field, String>of() : registrationData.of(stayId, pax);
+        var customerId = pax <= 1 ? stay.guestId()
+            : java.util.Optional.ofNullable(stay.companionAt(pax)).map(Companion::companionId).orElse(null);
+        var document = data.get(Field.DOCUMENT_NUMBER) != null ? data.get(Field.DOCUMENT_NUMBER)
+            : pax <= 1 ? guests.findById(stay.guestId()).map(g -> g.document()).orElse(null)
+            : java.util.Optional.ofNullable(stay.companionAt(pax)).map(Companion::document).orElse(null);
+        var command = new CustomerCommand.RecordKardex("KARDEX-" + UUID.randomUUID(), hotel, locatorOf(stayId), stayId,
+            pax, customerId != null && customerId.startsWith("C-") ? customerId : null, k.firstName(), k.lastName(),
+            data.get(Field.SEX), date(data.get(Field.BIRTH_DATE)), data.get(Field.BIRTH_PLACE), data.get(Field.NATIONALITY),
+            k.language(), data.get(Field.ADDRESS), data.get(Field.CITY), data.get(Field.POSTAL_CODE), k.province(),
+            data.get(Field.COUNTRY_OF_RESIDENCE), k.fax(), data.get(Field.DOCUMENT_TYPE), document,
+            k.documentIssueDate(), date(data.get(Field.DOCUMENT_EXPIRY)), k.riuClass(), k.marketingConsent(), pax > 1,
+            "front office " + hotel + " · " + stayId + " pax " + pax);
+        outbox.append(CommandOutbox.CUSTOMER_COMMANDS, command.key(), command);
+      });
+      return true;
+    }, ok -> "Kárdex del pax " + pax + " completado; va al maestro de clientes");
+  }
+
+  static java.time.LocalDate date(String s) {
+    try {
+      return s == null || s.isBlank() ? null : java.time.LocalDate.parse(s.trim());
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
   /** The pax's contact, as the desk took it down. */
   public void contactUpdated(String stayId, int pax, String email, String phone) {
     audit.run("Contact updated", stayId, null, StayAudit.params("pax", pax), () -> {

@@ -25,6 +25,14 @@ public class FolioService {
   final ReceptionReports reception;
   final StayAudit audit;
 
+  /** The stay's credit — cancelled, nothing is charged to the room; none in a test that does not wire it. */
+  Cashier cashier;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setCashier(Cashier cashier) {
+    this.cashier = cashier;
+  }
+
   public FolioService(FolioRepository folios, ChargeCatalogRepository chargeCatalog, ReceptionReports reception,
                       StayAudit audit) {
     this.folios = folios;
@@ -71,6 +79,9 @@ public class FolioService {
     if (item.isEmpty()) {
       audit.failed("Charge posted", stayId, by, StayAudit.params("code", code), "No hay ningún cargo " + code + " en el catálogo");
       return item;
+    }
+    if (cashier != null) {
+      cashier.checkCharge(stayId, item.get().price());
     }
     return audit.run("Charge posted", stayId, by, StayAudit.params("code", code, "concept", item.get().name(),
         "amount", item.get().price()), () -> {

@@ -15,3 +15,5 @@ routes:
     viewModel: io.mateu.ecdemo1.frontoffice.ui.checkin.CheckInWizard
   - route: walk-in
     viewModel: io.mateu.ecdemo1.frontoffice.ui.walkin.WalkInWizard
+  - route: caja/:id
+    viewModel: io.mateu.ecdemo1.frontoffice.ui.caja.CajaView

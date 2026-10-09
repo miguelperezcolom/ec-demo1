@@ -386,3 +386,55 @@ create table if not exists arrival_briefing (
     prepared_at   timestamp     not null,
     primary key (stay_id, pax)
 );
+
+-- The rest of each pax's kárdex as the desk filled it in with the guest — what the registration data
+-- (pax_registration_data) does not hold: the name split, the Riu Class number, the document's issue date,
+-- language, province, fax, advertising consent. A row means the desk filled it in: no row, a provisional kárdex.
+create table if not exists pax_kardex (
+    stay_id            varchar(64)  not null,
+    pax                int          not null,
+    first_name         varchar(100),
+    last_name          varchar(200),
+    riu_class          varchar(40),
+    document_issue_date date,
+    language           varchar(10),
+    province           varchar(100),
+    fax                varchar(40),
+    marketing_consent  boolean,
+    filled_at          timestamp,
+    filled_by          varchar(200),
+    primary key (stay_id, pax)
+);
+
+-- The desk's cashiering on a stay's account: each payment or advance (anticipo) taken — cash, the
+-- card terminal (pinpad), a payment link sent by email, a transfer, a manual entry —, its state and
+-- its receipt number. The balance still due is the folio's charges less what was captured.
+create table if not exists folio_payment (
+    id           varchar(64)    not null primary key,
+    stay_id      varchar(64)    not null,
+    kind         varchar(20)    not null,
+    method       varchar(20)    not null,
+    amount       decimal(12, 2) not null,
+    currency     varchar(3)     not null,
+    status       varchar(20)    not null,
+    reference    varchar(200),
+    link_token   varchar(64),
+    email        varchar(200),
+    receipt_no   int,
+    created_at   timestamp      not null,
+    created_by   varchar(200),
+    captured_at  timestamp
+);
+create index if not exists folio_payment_stay on folio_payment (stay_id);
+
+-- A stay's credit at the desk: its limit (none set: the check-in's pre-authorization) and whether it was
+-- cancelled — «crédito cancelado»: the limit is zero, nothing goes on the room's account without paying.
+create table if not exists folio_credit (
+    stay_id      varchar(64)    not null primary key,
+    credit_limit decimal(12, 2),
+    cancelled    boolean        not null,
+    reason       varchar(500),
+    changed_by   varchar(200),
+    changed_at   timestamp      not null
+);
+

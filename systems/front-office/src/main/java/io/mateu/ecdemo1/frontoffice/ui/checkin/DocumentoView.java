@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.frontoffice.ui.checkin;
 
+import io.mateu.ecdemo1.frontoffice.domain.guest.PaxKardexes;
+
 import io.mateu.core.infra.declarative.orchestrators.editableview.EditableView;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Companion;
 import io.mateu.ecdemo1.frontoffice.application.KardexService;
@@ -68,8 +70,12 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
   /** A prototype bean: Mateu takes the island from Spring; the Identidad step asks Mateu for one too. */
   @Getter(AccessLevel.NONE) final io.mateu.ecdemo1.frontoffice.application.Recognition recognition;
 
+  @Getter(AccessLevel.NONE) final io.mateu.ecdemo1.frontoffice.domain.customer.PaxRecognitions recognitions;
+
   public DocumentoView(StayQueries queries, KardexService kardex, RegistrationRequirementsService registration,
-                       io.mateu.ecdemo1.frontoffice.application.Recognition recognition) {
+                       io.mateu.ecdemo1.frontoffice.application.Recognition recognition,
+                       io.mateu.ecdemo1.frontoffice.domain.customer.PaxRecognitions recognitions) {
+    this.recognitions = recognitions;
     this.recognition = recognition;
     this.queries = queries;
     this.kardex = kardex;
@@ -129,6 +135,22 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     @Label("Registro de viajeros")
     String registro;
 
+    /** «Titular · kárdex completado en recepción» or «Acompañante · kárdex provisional». */
+    @Label("Kárdex")
+    String ficha;
+
+    @Label("Dirección")
+    String direccion;
+
+    @Label("Idioma")
+    String idioma;
+
+    @Label("Nº Riu Class")
+    String riuClass;
+
+    @Label("Publicidad")
+    String publicidad;
+
     // demo: re-scan the pax as if they handed over a new passport (see DocumentoPendiente)
     @Label("")
     Button pasaporteNuevo = new Button("Simular pasaporte nuevo", "escanearPasaporteNuevo");
@@ -153,11 +175,17 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     @Label("Nombre")
     String nombre;
 
+    @Label("Apellidos")
+    String apellidos;
+
     @Label("Email")
     String email;
 
     @Label("Teléfono")
     String telefono;
+
+    @Label("Fax")
+    String fax;
 
     @Section("Registro de viajeros")
     @Label("Tipo de documento")
@@ -165,6 +193,9 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
 
     @Label("País de expedición")
     String paisExpedicion;
+
+    @Label("Fecha de expedición")
+    java.time.LocalDate fechaExpedicion;
 
     @Label("Caducidad del documento")
     java.time.LocalDate caducidad;
@@ -190,11 +221,24 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     @Label("Código postal")
     String codigoPostal;
 
+    @Label("Provincia")
+    String provincia;
+
     @Label("País de residencia")
     String paisResidencia;
 
     @Label("Adulto responsable y parentesco")
     String tutor;
+
+    @Section("Kárdex")
+    @Label("Idioma")
+    String idioma;
+
+    @Label("Nº Riu Class")
+    String riuClass;
+
+    @Label("Acepta publicidad")
+    Boolean aceptaPublicidad;
 
     /** The rules' required fields for this pax, comma separated (RegistrationRuleChanged.Field names). */
     @Hidden String requeridos;
@@ -235,7 +279,46 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     datos.setEmail(pax.email());
     datos.setTelefono(pax.phone());
     datos.setRegistro(registro());
+    var k = kardexOf();
+    datos.setFicha((paxIndex() == 1 ? "Titular" : "Acompañante") + " · "
+        + (k.isPresent() ? "kárdex completado en recepción" : "kárdex provisional — complétalo con el huésped"));
+    if (stayId != null && !stayId.isBlank()) {
+      var values = registration.values(queries.view(stayId).stay(), paxIndex());
+      datos.setDireccion(address(values.get(Field.ADDRESS), values.get(Field.POSTAL_CODE), values.get(Field.CITY),
+          k.map(PaxKardexes.PaxKardex::province).orElse(null), values.get(Field.COUNTRY_OF_RESIDENCE)));
+    }
+    k.ifPresent(x -> {
+      datos.setIdioma(x.language());
+      datos.setRiuClass(x.riuClass());
+      datos.setPublicidad(x.marketingConsent() == null ? null : x.marketingConsent() ? "Acepta" : "No acepta");
+    });
     return datos;
+  }
+
+  /** «Calle Mayor 1, 07001 Palma (Illes Balears) · ES», or null with nothing. */
+  static String address(String street, String postalCode, String city, String province, String country) {
+    var place = String.join(" ", java.util.stream.Stream.of(postalCode, city).filter(v -> !blank(v)).toList());
+    var parts = new ArrayList<String>();
+    if (!blank(street)) parts.add(street);
+    if (!place.isBlank()) parts.add(place + (blank(province) ? "" : " (" + province + ")"));
+    else if (!blank(province)) parts.add(province);
+    var text = String.join(", ", parts);
+    if (!blank(country)) text = text.isEmpty() ? country : text + " · " + country;
+    return text.isEmpty() ? null : text;
+  }
+
+  java.util.Optional<PaxKardexes.PaxKardex> kardexOf() {
+    return stayId == null || stayId.isBlank() ? java.util.Optional.empty() : kardex.kardexOf(stayId, paxIndex());
+  }
+
+  /** «Ana María» and «García López» from «Ana María García López»: the first word is the name, by default. */
+  static String[] split(String name) {
+    if (blank(name)) {
+      return new String[] {null, null};
+    }
+    var n = name.trim();
+    var space = n.indexOf(' ');
+    return space < 0 ? new String[] {n, null} : new String[] {n.substring(0, space), n.substring(space + 1).trim()};
   }
 
   /** «Exige: nacionalidad ✓, fecha de nacimiento ✓, dirección — falta · RD 933/2021», or null with no rule. */
@@ -261,13 +344,26 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     var editor = new DocumentoEditor();
     if (pax.complete()) {
       editor.setDocumento(pax.document());
-      editor.setNombre(pax.name());
       editor.setEmail(pax.email());
       editor.setTelefono(pax.phone());
-    } else {
-      // rellenado manual: solo el nombre provisional del hueco como punto de partida
-      editor.setNombre(pax.name());
     }
+    // the name as the kárdex split it; else as the scanned document did; else the first word is the name
+    // (manual filling: the slot's provisional name as a starting point)
+    var k = kardexOf();
+    var scanned = stayId == null || stayId.isBlank() ? null : recognitions.scanOf(stayId, paxIndex()).orElse(null);
+    var parts = split(pax.name());
+    editor.setNombre(k.map(PaxKardexes.PaxKardex::firstName).filter(v -> !blank(v))
+        .orElse(scanned != null && !blank(scanned.firstName()) ? scanned.firstName() : parts[0]));
+    editor.setApellidos(k.map(PaxKardexes.PaxKardex::lastName).filter(v -> !blank(v))
+        .orElse(scanned != null && !blank(scanned.lastName()) ? scanned.lastName() : parts[1]));
+    k.ifPresent(x -> {
+      editor.setRiuClass(x.riuClass());
+      editor.setFechaExpedicion(x.documentIssueDate());
+      editor.setIdioma(x.language());
+      editor.setProvincia(x.province());
+      editor.setFax(x.fax());
+      editor.setAceptaPublicidad(x.marketingConsent());
+    });
     if (stayId != null && !stayId.isBlank()) {
       var stay = queries.view(stayId).stay();
       var values = registration.values(stay, paxIndex());
@@ -310,6 +406,10 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     return values;
   }
 
+  static String trim(String s) {
+    return blank(s) ? null : s.trim();
+  }
+
   static String upper(String s) {
     return s == null ? null : s.trim().toUpperCase(java.util.Locale.ROOT);
   }
@@ -335,13 +435,19 @@ public class DocumentoView extends EditableView<Object, DocumentoView.DocumentoE
     if (stayId == null || stayId.isBlank()) {
       return;
     }
+    var name = String.join(" ", java.util.stream.Stream.of(edited.getNombre(), edited.getApellidos())
+        .filter(v -> !blank(v)).map(String::trim).toList());
     if (pax().complete()) {
       kardex.contactUpdated(stayId, paxIndex(), edited.getEmail(), edited.getTelefono());
     } else {
-      kardex.registered(stayId, paxIndex(), edited.getDocumento(), edited.getNombre(), edited.getEmail(),
-          edited.getTelefono());
+      kardex.registered(stayId, paxIndex(), edited.getDocumento(), name, edited.getEmail(), edited.getTelefono());
     }
     kardex.registrationData(stayId, paxIndex(), registrationData(edited));
+    kardex.kardexFilled(stayId, paxIndex(), new PaxKardexes.PaxKardex(stayId, paxIndex(), trim(edited.getNombre()),
+        trim(edited.getApellidos()), upper(edited.getRiuClass()), edited.getFechaExpedicion(),
+        blank(edited.getIdioma()) ? null : edited.getIdioma().trim().toLowerCase(java.util.Locale.ROOT),
+        trim(edited.getProvincia()), trim(edited.getFax()), edited.getAceptaPublicidad(), null, null),
+        io.mateu.ecdemo1.frontoffice.infra.security.DeskUser.name());
   }
 
   /** No Edit button while there is no data — the empty state only offers the scan. */

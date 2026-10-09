@@ -58,6 +58,8 @@ public class Survivorship {
                 () -> survivor.birthDate == null ? null : survivor.birthDate.toString(),
                 () -> absorbed.birthDate == null ? null : absorbed.birthDate.toString(),
                 v -> survivor.birthDate = v == null ? null : LocalDate.parse(v));
+        // The kárdex: what the survivor lacks, the absorbed one's.
+        io.mateu.ecdemo1.mdm.kardex.Kardexes.fillFrom(survivor, absorbed, notes);
         // The document is one thing — type and number travel together.
         var stewardNumber = Consolidations.text(steward, "Document_Number__c");
         if (stewardNumber != null) {

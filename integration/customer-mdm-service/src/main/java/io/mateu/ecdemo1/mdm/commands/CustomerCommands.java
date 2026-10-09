@@ -28,6 +28,7 @@ public class CustomerCommands {
     final Inbox inbox;
     final ChangeRequests changeRequests;
     final ScannedIdentities scans;
+    final io.mateu.ecdemo1.mdm.kardex.Kardexes kardexes;
     final CustomerEvents events;
     final CustomerRepository customers;
 
@@ -44,6 +45,7 @@ public class CustomerCommands {
         switch (command) {
             case CustomerCommand.ProposeChange c -> propose(c);
             case CustomerCommand.RecordScannedIdentity c -> scans.record(c);
+            case CustomerCommand.RecordKardex c -> kardexes.record(c);
         }
         return true;
     }

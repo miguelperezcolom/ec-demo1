@@ -95,6 +95,7 @@ export default defineConfig({
 						{ label: 'Un sistema propio', slug: 'front-office/sistema-propio' },
 						{ label: 'Reglas de registro del kárdex', slug: 'front-office/reglas-de-registro' },
 						{ label: 'Reconocer al cliente en el check-in', slug: 'front-office/reconocer-al-cliente' },
+						{ label: 'Kárdex, caja y tableta', slug: 'front-office/kardex-caja-tableta' },
 					],
 				},
 				{

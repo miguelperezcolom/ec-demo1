@@ -27,7 +27,7 @@ public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/demo/**", "/mateu/**", "/sse", "/mcp/**"))
+    http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/demo/**", "/pagar/**", "/mateu/**", "/sse", "/mcp/**"))
         // The SSE stream is written from async dispatches of the request that opened it — already
         // authorized; Spring Security would otherwise judge each dispatch again, with no token.
         .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()

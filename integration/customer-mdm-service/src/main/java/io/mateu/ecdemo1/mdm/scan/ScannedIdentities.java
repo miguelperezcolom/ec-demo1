@@ -229,23 +229,29 @@ public class ScannedIdentities {
      * document's name — or in the pax's place, the holder left out, as the front office lists them.
      */
     Customer paxCustomer(RecordScannedIdentity scan) {
-        if (scan.customerId() != null && !scan.customerId().isBlank() && customers.existsById(scan.customerId())) {
-            return resolution.survivorOf(scan.customerId());
+        return paxCustomer(scan.customerId(), scan.hotelCode(), scan.locator(), scan.pax(), scan.firstName(), scan.lastName());
+    }
+
+    /** The same, by its parts: also whose a kárdex filled in at the desk is. */
+    public Customer paxCustomer(String customerId, String hotelCode, String locator, int pax, String firstName,
+                                String lastName) {
+        if (customerId != null && !customerId.isBlank() && customers.existsById(customerId)) {
+            return resolution.survivorOf(customerId);
         }
-        if (scan.locator() == null || scan.locator().isBlank()) {
+        if (locator == null || locator.isBlank()) {
             return null;
         }
-        var scanned = sources.findById(Source.key(scan.hotelCode(), scan.locator(), SCANNED_PAX + scan.pax()));
+        var scanned = sources.findById(Source.key(hotelCode, locator, SCANNED_PAX + pax));
         if (scanned.isPresent()) {
             return resolution.survivorOf(scanned.get().customerId);
         }
-        var passengers = sources.findByHotelCodeAndLocatorOrderByPassengerAsc(scan.hotelCode(), scan.locator());
+        var passengers = sources.findByHotelCodeAndLocatorOrderByPassengerAsc(hotelCode, locator);
         if (passengers.isEmpty()) {
             return null;
         }
         var holder = passengers.stream().filter(s -> s.passenger == 0).findFirst()
                 .map(s -> resolution.survivorOf(s.customerId)).orElse(null);
-        if (scan.pax() <= 1) {
+        if (pax <= 1) {
             return holder;
         }
         var companions = new LinkedHashMap<String, Customer>();
@@ -253,7 +259,7 @@ public class ScannedIdentities {
                 .map(s -> resolution.survivorOf(s.customerId))
                 .filter(c -> holder == null || !c.id.equals(holder.id))
                 .forEach(c -> companions.putIfAbsent(c.id, c));
-        var name = Normalizer.name(scan.firstName(), scan.lastName());
+        var name = Normalizer.name(firstName, lastName);
         var byName = companions.values().stream()
                 .filter(c -> name != null && name.equals(Normalizer.name(c.firstName, c.lastName)))
                 .findFirst();
@@ -261,7 +267,7 @@ public class ScannedIdentities {
             return byName.get();
         }
         var inPlace = new ArrayList<>(companions.values());
-        return scan.pax() - 2 < inPlace.size() ? inPlace.get(scan.pax() - 2) : null;
+        return pax - 2 < inPlace.size() ? inPlace.get(pax - 2) : null;
     }
 
     /** A pax the reservation did not list, scanned at the desk: its lineage, so a rescan finds it. */

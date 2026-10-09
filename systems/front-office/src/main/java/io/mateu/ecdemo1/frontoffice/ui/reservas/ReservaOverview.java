@@ -141,7 +141,8 @@ public class ReservaOverview
     return List.of(
         Action.builder().id("*").build(),
         Action.builder().id("opFirma").sse(true).build(),
-        Action.builder().id("escanearPax").sse(true).build());
+        Action.builder().id("escanearPax").sse(true).build(),
+        Action.builder().id("enviarTableta").sse(true).build());
   }
 
   @Hidden String stayId;
@@ -359,12 +360,16 @@ public class ReservaOverview
           Button.builder().label(llegada().listo(stay) ? "Confirmar check-in" : "Completar check-in")
               .actionId("iniciarCheckin")
               .buttonStyle(ButtonStyle.primary)
-              .build());
+              .build(),
+          // the guest does it themselves on the lobby tablet (Civitfun, simulated)
+          Button.builder().label("Check-in en tableta").actionId("enviarTableta").build(),
+          Button.builder().label("Caja").actionId("abrirCaja").build());
       case IN_HOUSE -> List.of(
           Button.builder().label("Check-out").actionId("irCheckout").buttonStyle(ButtonStyle.primary).build(),
           Button.builder().label("Añadir cargo").actionId("opCargos").build(),
           Button.builder().label("Cambiar habitación").actionId("opHabitacion").build(),
           Button.builder().label("Gestionar folio").actionId("gestionFolio").build(),
+          Button.builder().label("Caja").actionId("abrirCaja").build(),
           Button.builder().label("Mensaje huésped").actionId("mensajeHuesped").build(),
           Button.builder().label("Registrar petición").actionId("opPeticion").build(),
           Button.builder().label("Nueva incidencia").actionId("opIncidencia").build());
@@ -387,7 +392,7 @@ public class ReservaOverview
             "anularCargo", "comprobarHabitacion", "completarCheckin",
             // Mateu 392 refuses an action a component does not declare here («not an action»)
             "noShowPax", "confirmarNoShowPax", "cancelarNoShowPax", "guardarExtras",
-            "clientePax", "confirmarCliente", "buscarClientePorNombre")
+            "clientePax", "confirmarCliente", "buscarClientePorNombre", "abrirCaja", "enviarTableta")
         .contains(actionId);
   }
 
@@ -397,6 +402,24 @@ public class ReservaOverview
       case "iniciarCheckin" -> iniciarCheckin();
       case "siguienteReserva" -> URI.create("/reservas/" + param(httpRequest, "_item"));
       case "volverListado" -> URI.create("/reservas?vista=LLEGADAS_HOY");
+      // cobros, anticipos, recibos, proforma y crédito de la estancia
+      case "abrirCaja" -> URI.create("/caja/" + stayId);
+      case "enviarTableta" -> {
+        if (tablet == null) {
+          yield new Message("La tableta del lobby no está disponible");
+        }
+        // simulated, as the scanner: the guest does each step on the tablet; the progress says what they did
+        var id = stayId;
+        var pasos = io.mateu.ecdemo1.frontoffice.application.TabletCheckIn.STEPS;
+        yield LongTask.create("Check-in en tableta (Civitfun)")
+            .withProgressBar()
+            .done("Check-in en tableta completado", "El huésped lo ha hecho todo en la tableta: entrega la llave")
+            .closeAfter(2)
+            .withCommand(UICommand.dispatchEvent("documento-escaneado"))
+            .run(progress -> Flux.range(1, pasos.size())
+                .delayElements(Duration.ofMillis(1100))
+                .map(i -> progress.step(tablet.step(id, i), i / (double) pasos.size())));
+      }
       case "irCheckout" -> {
         // un check-in forzado aún incompleto no sale: primero «Completar» (el servidor lo niega igual)
         var incompleto = io.mateu.ecdemo1.frontoffice.ui.common.FrontOffice.checkInStatus(stayId);
@@ -538,6 +561,10 @@ public class ReservaOverview
             UICommand.closeModal());
       }
       case "postearCargo" -> {
+        var refused = creditRefused(httpRequest);
+        if (refused != null) {
+          yield List.of(this, new Message(refused), UICommand.closeModal());
+        }
         var item = folios.postCharge(stayId, param(httpRequest, "_item"), DeskUser.name()).orElse(null);
         if (item == null) {
           yield new Message("Cargo no encontrado: " + param(httpRequest, "_item"));
@@ -640,6 +667,10 @@ public class ReservaOverview
         yield this;
       }
       case "seleccionarCargo" -> {
+        var refused = creditRefused(httpRequest);
+        if (refused != null) {
+          yield List.of(this, new Message(refused), UICommand.closeModal());
+        }
         var item = folios.postCharge(stayId, param(httpRequest, "_item"), DeskUser.name()).orElse(null);
         if (item == null) {
           yield new Message("Cargo no encontrado: " + param(httpRequest, "_item"));
@@ -781,7 +812,22 @@ public class ReservaOverview
       default -> "Tarjeta";
     };
     var view = view();
-    var total = GuestHeaders.euros(GuestHeaders.balance(view.folio()));
+    var due = porCobrar();
+    var total = GuestHeaders.euros(due);
+    // what is still owed is taken at the till, with its receipt — the advances and payments already taken
+    // during the stay are not asked again
+    if (cashier != null && due.signum() > 0) {
+      var payment = cashier.take(stayId, io.mateu.ecdemo1.frontoffice.domain.cashier.Payment.Kind.PAYMENT,
+          switch (method) {
+            case "cash" -> io.mateu.ecdemo1.frontoffice.domain.cashier.Payment.Method.CASH;
+            case "points" -> io.mateu.ecdemo1.frontoffice.domain.cashier.Payment.Method.MANUAL;
+            default -> io.mateu.ecdemo1.frontoffice.domain.cashier.Payment.Method.CARD_PINPAD;
+          }, due, null, "points".equals(method) ? "Puntos Riu Class" : "Check-out", DeskUser.name());
+      if (payment.status() == io.mateu.ecdemo1.frontoffice.domain.cashier.Payment.Status.DECLINED) {
+        return List.of(this, new Message("⛔ Tarjeta denegada por el datáfono: " + total
+            + " sin cobrar. Prueba otra tarjeta u otra forma de pago (o «Caja»)."));
+      }
+    }
     try {
       checkOut.checkOut(stayId, DeskUser.name());
     } catch (GuestNotices.NotAcknowledged e) {
@@ -858,6 +904,46 @@ public class ReservaOverview
   /** El pax de la fila pulsada ({_item} numérico de la lista de huéspedes). */
   private static int paxDe(HttpRequest httpRequest) {
     return (int) Double.parseDouble(param(httpRequest, "_item"));
+  }
+
+  /** The lobby tablet's self check-in; none in a test that does not wire it. */
+  @Getter(AccessLevel.NONE) @com.fasterxml.jackson.annotation.JsonIgnore
+  transient io.mateu.ecdemo1.frontoffice.application.TabletCheckIn tablet;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setTablet(io.mateu.ecdemo1.frontoffice.application.TabletCheckIn tablet) {
+    this.tablet = tablet;
+  }
+
+  /** What the check-out still has to take: the account's balance due (the folio's, without the cashier). */
+  java.math.BigDecimal porCobrar() {
+    if (cashier != null) {
+      var due = cashier.account(stayId).due();
+      return due.signum() > 0 ? due : java.math.BigDecimal.ZERO;
+    }
+    return GuestHeaders.balance(view().folio());
+  }
+
+  /** «⛔ Crédito cancelado…» when the stay's credit was cancelled: nothing goes on the room's account. */
+  private String creditRefused(HttpRequest httpRequest) {
+    if (cashier == null) {
+      return null;
+    }
+    try {
+      cashier.checkCharge(stayId, null);
+      return null;
+    } catch (io.mateu.ecdemo1.frontoffice.application.Cashier.Refused e) {
+      return "⛔ " + e.getMessage();
+    }
+  }
+
+  /** The stay's cashiering; none in a test that does not wire it. */
+  @Getter(AccessLevel.NONE) @com.fasterxml.jackson.annotation.JsonIgnore
+  transient io.mateu.ecdemo1.frontoffice.application.Cashier cashier;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setCashier(io.mateu.ecdemo1.frontoffice.application.Cashier cashier) {
+    this.cashier = cashier;
   }
 
   private static String param(HttpRequest httpRequest, String name) {

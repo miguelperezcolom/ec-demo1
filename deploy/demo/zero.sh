@@ -48,7 +48,7 @@ wipe integrations integration backfill_run fo_integration fo_backfill_run outbox
 wipe mapping cause mapping_entry partner_profile waiter waiter_cause outbox_message
 wipe communication inbox_item inbox_seen notification resolution
 wipe customer_mdm customer customer_source customer_xref customer_document consolidation change_request customer_notice inbox_entry outbox_message
-wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line pms_catalogue pms_catalogue_sync command_inbox walk_in check_in_ops forced_check_in stay_invoice folio_line_pms pax_registration_data customer_nationality customer_notice stay_notice_ack pax_recognition pax_scan arrival_briefing
+wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_companion stay_incident folio folio_line pms_catalogue pms_catalogue_sync command_inbox walk_in check_in_ops forced_check_in stay_invoice folio_line_pms pax_registration_data customer_nationality customer_notice stay_notice_ack pax_recognition pax_scan arrival_briefing pax_kardex folio_payment folio_credit
 echo "update room set occupancy = 'FREE';" | psql_in front_office
 wipe notices notice outbox_message
 wipe customer_history customer_stay customer_alias
