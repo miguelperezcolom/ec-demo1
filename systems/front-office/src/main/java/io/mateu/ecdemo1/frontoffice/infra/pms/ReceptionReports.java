@@ -115,13 +115,27 @@ public class ReceptionReports {
    * not Opera's; the stay's references are then simply null.
    */
   public void closed(Stay stay, String by) {
+    closed(stay, by, java.util.Map.of());
+  }
+
+  /**
+   * As {@link #closed(Stay, String)}, with the customers the desk recognised for certain, by pax (1 the holder,
+   * 2… the companions): the stay is theirs in the history and in Riu Class, not the reservation's code —
+   * a provisional one, most of the time, that nothing may have consolidated yet (a guest confirmed by their
+   * Riu Class number, with no document scanned, tells the MDM nothing).
+   */
+  public void closed(Stay stay, String by, java.util.Map<Integer, String> recognised) {
     var refs = refs(stay.id());
     var guests = new java.util.ArrayList<FrontOfficeEvent.StayGuest>();
-    guests.add(new FrontOfficeEvent.StayGuest(stay.guestId(), true));
-    stay.companions().stream().map(io.mateu.ecdemo1.frontoffice.domain.stay.Companion::companionId)
-        // a slot nobody registered ("pax-2") is nobody: the same id in every stay, it would gather strangers' stays
-        .filter(id -> id != null && !id.isBlank() && !id.matches("pax-\\d+"))
-        .forEach(id -> guests.add(new FrontOfficeEvent.StayGuest(id, false)));
+    guests.add(new FrontOfficeEvent.StayGuest(recognised.getOrDefault(1, stay.guestId()), true));
+    var companions = stay.companions();
+    for (int i = 0; i < companions.size(); i++) {
+      var id = recognised.getOrDefault(i + 2, companions.get(i).companionId());
+      // a slot nobody registered ("pax-2") is nobody: the same id in every stay, it would gather strangers' stays
+      if (id != null && !id.isBlank() && !id.matches("pax-\\d+")) {
+        guests.add(new FrontOfficeEvent.StayGuest(id, false));
+      }
+    }
     // what the folio says was spent, by kind — the accommodation is the PMS's, and not a spend here
     var byKind = new java.util.EnumMap<FrontOfficeEvent.ChargeKind, java.math.BigDecimal>(FrontOfficeEvent.ChargeKind.class);
     folios.findByStayId(stay.id()).ifPresent(folio -> folio.lines().stream()

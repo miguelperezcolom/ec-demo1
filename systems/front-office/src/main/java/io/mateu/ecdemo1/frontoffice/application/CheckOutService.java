@@ -19,9 +19,12 @@ public class CheckOutService {
   final ReceptionReports reception;
   final IncompleteCheckIns incomplete;
   final StayAudit audit;
+  final io.mateu.ecdemo1.frontoffice.domain.customer.PaxRecognitions recognitions;
 
   public CheckOutService(StayRepository stays, RoomRepository rooms, GuestNotices notices, ReceptionReports reception,
-                         IncompleteCheckIns incomplete, StayAudit audit) {
+                         IncompleteCheckIns incomplete, StayAudit audit,
+                         io.mateu.ecdemo1.frontoffice.domain.customer.PaxRecognitions recognitions) {
+    this.recognitions = recognitions;
     this.stays = stays;
     this.rooms = rooms;
     this.notices = notices;
@@ -61,7 +64,24 @@ public class CheckOutService {
     // transaction; its invoice comes back to the stay.
     reception.checkedOut(departed, by);
     // and the stay is closed for the chain: its customer history learns of it, in this transaction too
-    reception.closed(departed, by);
+    reception.closed(departed, by, recognised(departed));
     return departed;
+  }
+
+  /** The customers the desk recognised for certain, by pax — whom the closed stay belongs to. */
+  java.util.Map<Integer, String> recognised(Stay stay) {
+    var byPax = new java.util.HashMap<Integer, String>();
+    for (int pax = 1; pax <= 1 + stay.companions().size(); pax++) {
+      try {
+        var row = recognitions.of(stay.id(), pax).orElse(null);
+        if (row != null && row.certainty() == io.mateu.ecdemo1.frontoffice.domain.customer.PaxRecognitions.Certainty.KNOWN
+            && row.customerId() != null) {
+          byPax.put(pax, row.customerId());
+        }
+      } catch (RuntimeException e) {
+        // the history is no reason to stop a check-out: the reservation's code goes, as before
+      }
+    }
+    return byPax;
   }
 }

@@ -141,6 +141,26 @@ class FrontOfficeProducedContractsTest {
                 .contains("\"total\":92.50").contains("\"currency\":\"MUR\"");
     }
 
+    /** A guest the desk recognised for certain closes the stay as that customer, not as the reservation's code. */
+    @Test
+    void aRecognisedGuestClosesTheStayAsTheRecognisedCustomer() {
+        var walkIns = mock(WalkIns.class);
+        when(walkIns.of("OP-78")).thenReturn(Optional.empty());
+        var links = mock(io.mateu.ecdemo1.frontoffice.infra.pms.PmsLinks.class);
+        when(links.ofStay("OP-78")).thenReturn(Optional.empty());
+        var folios = mock(io.mateu.ecdemo1.frontoffice.domain.folio.FolioRepository.class);
+        when(folios.findByStayId("OP-78")).thenReturn(Optional.empty());
+        var reports = new io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports("MRU01", "XMAR", "MUR", walkIns, links,
+                new CommandOutbox(outbox), mock(io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings.class), folios);
+
+        reports.closed(departed("OP-78"), "ana", java.util.Map.of(1, "C-KNOWN"));
+
+        var json = written(CommandOutbox.FRONT_OFFICE_EVENTS);
+        Contracts.topic("front-office-events").assertValid(json);
+        org.assertj.core.api.Assertions.assertThat(json).contains("{\"customerId\":\"C-KNOWN\",\"holder\":true}")
+                .doesNotContain("C-00042");
+    }
+
     /** A stay the PMS never had — a walk-in nobody booked yet — is closed for the history all the same. */
     @Test
     void aStayNotInThePmsIsClosedAllTheSame() {
