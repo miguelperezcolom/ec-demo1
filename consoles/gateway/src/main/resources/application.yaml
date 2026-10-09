@@ -177,6 +177,15 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_history/**
 
+        # Riu Class: the loyalty programme's members, tiers, points and accruals (a demo service) — the
+        # business's, so on the data plane's hosts only. Only its screens: its REST API (/members, which the
+        # front office reads) and its MCP server stay inside the cluster.
+        - id: loyalty
+          uri: ${LOYALTY_URL:http://loyalty:8134}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_loyalty/**
+
         # Registro de huéspedes: the registration rules — governance, so on the control hosts only, and
         # only its screens: its REST API (/rules) and its MCP server stay inside the cluster.
         - id: registration-rules

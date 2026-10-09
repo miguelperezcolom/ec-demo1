@@ -163,6 +163,8 @@ public class SecurityConfig {
                         // Historial de clientes: where a customer stayed and what they spent —
                         // personal data, so signed in like Clientes.
                         .pathMatchers("/_history/**").authenticated()
+                        // Riu Class: a member's tier and points — personal data, signed in.
+                        .pathMatchers("/_loyalty/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the

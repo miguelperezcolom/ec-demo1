@@ -316,6 +316,9 @@ kubectl apply -f deploy/manifests/84-registration-rules.yaml
 # A customer's stays in the chain (data plane): kept from the front office's closed stays, by the MDM's
 # customer code; the front office shows its summary at the check-in.
 kubectl apply -f deploy/manifests/85-customer-history.yaml
+# Riu Class, the loyalty programme — a demo of it (data plane): members, tier and points, which accrue from the
+# front office's closed stays; the front office asks it at the check-in.
+kubectl apply -f deploy/manifests/86-loyalty.yaml
 # The documentation site (doc/), behind basic auth.
 kubectl apply -f deploy/manifests/81-docs.yaml
 # The control console: its database first, then the service, then its shell.

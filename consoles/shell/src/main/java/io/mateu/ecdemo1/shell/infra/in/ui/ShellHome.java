@@ -143,6 +143,13 @@ public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu historial = new RemoteMenu("/_history").withLabel("Historial de clientes");
 
+    /**
+     * Riu Class, the loyalty programme: members, their tier and points, and what each stay added. A demo
+     * service standing in for the chain's real one; the front office asks it at the check-in.
+     */
+    @Menu
+    RemoteMenu riuClass = new RemoteMenu("/_loyalty").withLabel("Riu Class");
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

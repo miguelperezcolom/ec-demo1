@@ -52,6 +52,7 @@ wipe front_office guest guest_kardex guest_preference stay stay_add_on stay_comp
 echo "update room set occupancy = 'FREE';" | psql_in front_office
 wipe notices notice outbox_message
 wipe customer_history customer_stay customer_alias
+wipe loyalty member accrual
 wipe audit audit_record
 wipe $ENGINE_DB $ENGINE_TABLES log_message_entity outbox_message_entity received_task sync_invocation
 
