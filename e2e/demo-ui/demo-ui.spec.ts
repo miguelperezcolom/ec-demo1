@@ -660,12 +660,16 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
             return /Opera: (pendiente|rechazado)/.test(await ui.text())
         }, { message: 'the advance never went to Opera', timeout: 3 * 60_000, intervals: [15_000] }).toBe(true)
 
-        // the desk's check-in: a room Opera has ready, every pax's document, confirm
+        // the desk's check-in: a room Opera has ready, every pax's document, the signature, confirm
         await ui.go(`${FO}/reservas/${opera}`, /Huéspedes|Reserva/)
         await ui.click(ui.button('Cambiar').first(), 3_000)
         await ui.click(ui.page.getByText(rooms[rooms.length - 1], { exact: true }).first(), 6_000)
         await ui.go(`${FO}/checkin/${opera}`, /Check-In/)
-        for (let i = 0; i < 10; i++) {
+        // each pax's scan (a recognised one keeps the wizard on it a turn), the extras, the confirmation
+        let signed = false
+        for (let i = 0; i < 16; i++) {
+            const sign = ui.button('Enviar a tablet')
+            if (!signed && await sign.isVisible().catch(() => false)) { await ui.click(sign, 9_000); signed = true; continue }
             const confirm = ui.button('Confirmar check-in')
             if (await confirm.isVisible().catch(() => false)) { await ui.click(confirm, 12_000); break }
             const scan = ui.button('Escanear documento')
