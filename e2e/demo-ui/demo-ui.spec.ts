@@ -510,6 +510,12 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         const [byDocument, byPassport, byHand] = bookings
         const [known1, known2, known3] = seeded
         const panel = async () => (await ui.text()).match(/(Cliente conocido — [^|]{0,40}|Posible cliente conocido: [^|]{0,60})/)?.[0] ?? ''
+        // «¿es usted X?» with one candidate, «¿es usted uno de estos clientes?» and their names with several
+        // (an environment where two customers share the name and the birth date): either way, X is offered
+        const offered = (name: string) => async () => {
+            const t = await ui.text()
+            return /Posible cliente conocido/.test(t) && t.includes(name) && !/Cliente conocido — /.test(t)
+        }
         const checkIn = async (locator: string) => {
             await ui.go(`${FO}/checkin/${locator}`, /Check-In/)
             await ui.waitText(/Documento|Habitación/, `the check-in of ${locator} never opened`)
@@ -527,8 +533,8 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         // their Riu Class number. The MDM then consolidates the provisional code into them (DESK_CONFIRMED).
         await checkIn(byPassport)
         await ui.click(ui.button('Simular pasaporte nuevo'), 9_000)
-        await expect.poll(panel, { message: 'a new passport did not ask «¿es usted…?»', timeout: 60_000 })
-            .toContain(`Posible cliente conocido: ¿es usted ${known2.guestName}`)
+        await expect.poll(offered(known2.guestName), { message: 'a new passport did not ask «¿es usted…?»', timeout: 60_000 })
+            .toBe(true)
         await ui.checkpoint('f9-possible-by-passport')
         await ui.page.getByLabel('Nº Riu Class o email').first().fill(known2.riuClass)
         await ui.click(ui.button('Confirmar cliente'), 6_000)
@@ -549,8 +555,8 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         await birth.fill(`${d}/${m}/${y}`)
         await birth.press('Enter')
         await ui.click(ui.button('Buscar por nombre'), 6_000)
-        await expect.poll(panel, { message: 'the search by name and birth date found nobody', timeout: 60_000 })
-            .toContain(`Posible cliente conocido: ¿es usted ${known3.guestName}`)
+        await expect.poll(offered(known3.guestName), { message: 'the search by name and birth date found nobody', timeout: 60_000 })
+            .toBe(true)
         await ui.page.getByLabel('Nº Riu Class o email').first().fill(known3.riuClass)
         await ui.click(ui.button('Confirmar cliente'), 6_000)
         await expect.poll(panel, { message: 'the Riu Class number did not confirm the customer', timeout: 60_000 })

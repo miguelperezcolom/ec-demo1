@@ -61,15 +61,30 @@ public class DemoKnownCustomers {
         .filter(s -> s.guestId().startsWith("C-"))
         .forEach(s -> picked.putIfAbsent(s.id(), s));
     var seeded = new ArrayList<Seeded>();
-    for (var stay : picked.values().stream().limit(Math.max(0, count)).toList()) {
+    var codes = new java.util.HashSet<String>();
+    for (var stay : picked.values()) {
+      if (seeded.size() >= Math.max(0, count)) {
+        break;
+      }
       var guest = guests.findById(stay.guestId()).orElse(null);
-      if (guest == null) {
+      if (guest == null || !codes.add(guest.id())) {
         continue;
       }
       var code = guest.id();
       // the very document the demo scanner reads of the holder: scanning it, the desk finds them
       var locator = walkIns.of(stay.id()).map(w -> w.locator() == null ? stay.id() : w.locator()).orElse(stay.id());
       var document = scanner.scan(new DemoScanner.Pax(locator, 1, guest.name(), guest.document(), code, stay.checkIn()));
+      // The demo's document comes from the name: a holder whose document is already another customer's —
+      // the same person, known under another code (a returning guest's new booking) — or several's is
+      // left alone. Seeding them would give one document to two customers, and nobody would be recognised.
+      var owner = directory.lookup(CustomerDirectory.LookupQuery.byDocument(document.documentNumber(),
+          document.issuingCountry()));
+      if (owner.outcome() == CustomerDirectory.Outcome.AMBIGUOUS
+          || (owner.outcome() == CustomerDirectory.Outcome.FOUND && !code.equals(owner.customer().customerId()))) {
+        log.info("Known customer for the demo: {} ({}) skipped — their document is {}'s", guest.name(), code,
+            owner.outcome() == CustomerDirectory.Outcome.AMBIGUOUS ? "several customers" : owner.customer().customerId());
+        continue;
+      }
       var member = memberNumber(code);
       var seed = DemoDocuments.hash("loyalty:" + code);
       var tier = Math.floorMod(seed, 2L) == 0 ? GuestTier.GOLD : GuestTier.PLATINUM;
