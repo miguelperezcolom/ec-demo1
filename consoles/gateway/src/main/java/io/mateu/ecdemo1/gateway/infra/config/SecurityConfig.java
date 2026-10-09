@@ -160,6 +160,9 @@ public class SecurityConfig {
                         // Avisos (the notices service): what the desk must know of a guest, a
                         // reservation or an agency — signed in, and written as who did it.
                         .pathMatchers("/_notices/**").authenticated()
+                        // Historial de clientes: where a customer stayed and what they spent —
+                        // personal data, so signed in like Clientes.
+                        .pathMatchers("/_history/**").authenticated()
                         // The chat agent. Every prompt costs Anthropic tokens against this
                         // deployment's key, so leaving it open is not a UI question, it is a
                         // bill. It can be required because Mateu's chat client does send the

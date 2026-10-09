@@ -135,6 +135,14 @@ public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu avisos = new RemoteMenu("/_notices").withLabel("Avisos");
 
+    /**
+     * A customer's stays in the chain — hotels, dates, rooms and what they spent — by the MDM's
+     * customer code, for the head office. Served by customer-history; the front desk sees only its
+     * summary, at the check-in.
+     */
+    @Menu
+    RemoteMenu historial = new RemoteMenu("/_history").withLabel("Historial de clientes");
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

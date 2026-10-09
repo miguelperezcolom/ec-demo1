@@ -62,6 +62,9 @@ spec:
               value: "http://crs-integration-service:8121"
             - name: MDM_URL
               value: "http://customer-mdm-service:8127"
+            # The customer's stay history, shown at the check-in when the guest is recognised.
+            - name: HISTORY_URL
+              value: "http://customer-history:8133"
             # A reservation's «Historial»: who did what on it, as the audit service keeps it (GET /audit).
             - name: AUDIT_URL
               value: "http://audit-service:8129"

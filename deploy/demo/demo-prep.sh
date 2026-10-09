@@ -16,6 +16,8 @@
 #                                                  #   business date (XMAR's does not follow the calendar;
 #                                                  #   Opera checks in nothing else), and its clean rooms
 #   deploy/demo/demo-prep.sh seed walk-in          # flow 5: nothing to create; the data to type
+#   deploy/demo/demo-prep.sh seed known-customers [--count N]   # check-in: guests recognised as known
+#                                                customers (document, Riu Class number, stay history)
 #
 # Without --zero nothing is reset. --zero runs zero.sh first (ec1 and Salesforce's contacts to zero, a
 # new Opera context: ~3 min) — flow 1 starts there, with no integration. Every seed is safe to run

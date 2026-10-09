@@ -41,6 +41,11 @@ public class ReceptionEvents {
 
     /** The process key started for it, or null when there is none to start. */
     public String on(FrontOfficeEvent event) {
+        if (event instanceof FrontOfficeEvent.StayClosed) {
+            // The stay's summary for the customer's history (customer-history): the PMS already heard of the
+            // check-out from GuestCheckedOut, and there is nothing in it for the PMS to record.
+            return null;
+        }
         var pmsHotel = event.pmsHotelCode();
         if (pmsHotel == null) {
             log.warn("{} of stay {}/{} names no PMS property: nothing to record", event.getClass().getSimpleName(),
@@ -71,6 +76,7 @@ public class ReceptionEvents {
             case FrontOfficeEvent.NoShowReported ignored -> Definitions.REGISTER_NO_SHOW_PMS;
             case FrontOfficeEvent.ChargePosted ignored -> Definitions.REGISTER_CHARGE;
             case FrontOfficeEvent.ChargeVoided ignored -> Definitions.REVERSE_CHARGE;
+            case FrontOfficeEvent.StayClosed ignored -> throw new IllegalStateException("taken above: not the PMS's");
         };
         // One check-in per room: the desk that picks another room after Opera refused one starts it again
         // with the new room (and the one that waits on the refusal is resolved when this one gets in). One
@@ -115,6 +121,7 @@ public class ReceptionEvents {
             case FrontOfficeEvent.NoShowReported ignored -> "no-show";
             case FrontOfficeEvent.ChargePosted ignored -> "charge";
             case FrontOfficeEvent.ChargeVoided ignored -> "charge-void";
+            case FrontOfficeEvent.StayClosed ignored -> "stay-closed";
         });
         span.setAttribute("eventconductor.business-key", key);
         writes.write(() -> {

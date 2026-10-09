@@ -17,6 +17,7 @@ credential is printed.
   ec1.py ask-agent HOTEL [--wait SECONDS]   # the mapping agent proposes the hotel's pending codes
   ec1.py proposal HOTEL CODE [--approve]    # the agent's proposal for one code; --approve approves only it
   ec1.py seed returning-customer [--create] | arriving-today | arriving-opera-today | walk-in
+  ec1.py seed known-customers [--count N]   # recognised at the check-in: a document, a Riu Class number, a stay history
 
 Every date is ISO (YYYY-MM-DD). Hotel MRU01 unless --hotel says otherwise.
 """
@@ -537,6 +538,24 @@ def seed_walk_in():
     return 0
 
 
+def seed_known_customers(count):
+    """A few guests of today's and the coming arrivals, recognised at the check-in as known customers.
+
+    Their customer codes are random on every reset, so this runs after the onboarding: the front office
+    picks holders with an MDM code (C-…) and, for each, gives the MDM their demo document (the one the
+    scanner reads) and a Riu Class number, has customer-history seed past stays, and sets their tier and
+    points. Run it again and it does the same to the same guests."""
+    status, seeded = http("POST", "front-office", f"/demo/known-customers?count={count}")
+    if not seeded:
+        print("No arriving or in-house guest with an MDM code: walk the onboarding first.")
+        return 1
+    print(f"{len(seeded)} known customer(s) — scan their document, or search by the Riu Class number:")
+    for k in seeded:
+        print(f"  {k.get('guestName', '?'):28} {k.get('customerId', '?'):16} Riu Class {k.get('riuClass', '?'):12} "
+              f"{k.get('documentType', '?')} {k.get('documentNumber', '?')}  (stay {k.get('stayId', '?')})")
+    return 0
+
+
 # ---------------------------------------------------------------------------------------------- main
 
 def main(argv):
@@ -582,8 +601,10 @@ def main(argv):
     p.add_argument("--approve", action="store_true")
     p.add_argument("--by", default="demo")
     p = sub.add_parser("seed")
-    p.add_argument("what", choices=["returning-customer", "arriving-today", "arriving-opera-today", "walk-in"])
+    p.add_argument("what", choices=["returning-customer", "arriving-today", "arriving-opera-today", "walk-in",
+                                    "known-customers"])
     p.add_argument("--create", action="store_true")
+    p.add_argument("--count", type=int, default=3)
     a = ap.parse_args(argv)
 
     if a.cmd == "health":
@@ -676,6 +697,8 @@ def main(argv):
             return seed_arriving_today()
         if a.what == "arriving-opera-today":
             return seed_arriving_opera_today()
+        if a.what == "known-customers":
+            return seed_known_customers(a.count)
         return seed_walk_in()
     return 2
 

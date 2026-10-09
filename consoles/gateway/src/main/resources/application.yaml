@@ -168,6 +168,15 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_notices/**
 
+        # Historial de clientes: a customer's stays in the chain, for the head office — the business's,
+        # so on the data plane's hosts only. Only its screens: its REST API (/customers/{code}/summary, which
+        # the front office reads) and its MCP server stay inside the cluster.
+        - id: customer-history
+          uri: ${CUSTOMER_HISTORY_URL:http://customer-history:8133}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_history/**
+
         # Registro de huéspedes: the registration rules — governance, so on the control hosts only, and
         # only its screens: its REST API (/rules) and its MCP server stay inside the cluster.
         - id: registration-rules
