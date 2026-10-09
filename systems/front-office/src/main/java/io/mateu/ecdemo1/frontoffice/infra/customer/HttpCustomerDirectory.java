@@ -105,7 +105,7 @@ public class HttpCustomerDirectory implements CustomerDirectory {
 
   @Override
   public boolean addDocument(String customerId, String type, String number, String issuingCountry, LocalDate expiry,
-                             String origin) {
+                             String origin, LocalDate birthDate, String nationality) {
     if (writes == null) {
       return false;
     }
@@ -115,6 +115,8 @@ public class HttpCustomerDirectory implements CustomerDirectory {
     body.put("issuingCountry", issuingCountry);
     body.put("expiry", expiry == null ? null : expiry.toString());
     body.put("origin", origin);
+    body.put("birthDate", birthDate == null ? null : birthDate.toString());
+    body.put("nationality", nationality);
     try {
       writes.post().uri("/customers/{id}/documents", customerId).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(body).retrieve().toBodilessEntity();
       return true;

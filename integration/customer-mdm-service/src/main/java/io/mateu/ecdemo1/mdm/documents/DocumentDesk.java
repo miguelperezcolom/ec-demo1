@@ -30,8 +30,13 @@ public class DocumentDesk {
     final CustomerEvents events;
     final Clock clock;
 
-    /** @param origin SCAN, RESERVATION or CUSTOMER; CUSTOMER if none is said */
-    public record NewDocument(String type, String number, String issuingCountry, LocalDate expiry, String origin) {
+    /**
+     * @param origin      SCAN, RESERVATION or CUSTOMER; CUSTOMER if none is said
+     * @param birthDate   the holder's, as the document says it; fills the customer's only if they have none
+     * @param nationality likewise
+     */
+    public record NewDocument(String type, String number, String issuingCountry, LocalDate expiry, String origin,
+                              LocalDate birthDate, String nationality) {
     }
 
     @Transactional
@@ -48,18 +53,30 @@ public class DocumentDesk {
         var country = d.issuingCountry() == null || d.issuingCountry().isBlank() ? c.nationality : d.issuingCountry();
         var added = !documents.holds(c.id, d.number(), country);
         documents.add(c.id, d.type(), d.number(), country, d.expiry(), origin);
+        // What the document says of its holder, where the customer has nothing: a customer made from a
+        // reservation has no birth date, and without one nobody finds them as a candidate by name.
+        var filled = false;
+        if (c.birthDate == null && d.birthDate() != null) {
+            c.birthDate = d.birthDate();
+            filled = true;
+        }
+        if ((c.nationality == null || c.nationality.isBlank()) && d.nationality() != null && !d.nationality().isBlank()) {
+            c.nationality = d.nationality();
+            filled = true;
+        }
         var main = c.documentNumber == null || c.documentNumber.isBlank();
         if (main) {
             c.documentType = d.type();
             c.documentNumber = d.number();
             c.documentKey = Normalizer.document(c.documentType, c.documentNumber);
-            if (c.salesforceState != SalesforceState.REMOVED && c.salesforceState != SalesforceState.ANONYMIZED
-                    && c.status != CustomerStatus.MERGED) {
-                // The main document is the contact's: to Salesforce, as a scan's would.
-                c.salesforceState = SalesforceState.PENDING;
-            }
         }
-        if (main || added) {
+        if ((main || filled) && c.salesforceState != SalesforceState.REMOVED
+                && c.salesforceState != SalesforceState.ANONYMIZED && c.status != CustomerStatus.MERGED) {
+            // The main document, the birth date and the nationality are the contact's: to Salesforce, as a
+            // scan's would.
+            c.salesforceState = SalesforceState.PENDING;
+        }
+        if (main || added || filled) {
             c.version++;
             c.updatedAt = clock.instant();
             customers.save(c);

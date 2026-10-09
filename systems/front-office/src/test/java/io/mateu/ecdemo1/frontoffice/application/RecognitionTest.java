@@ -250,6 +250,36 @@ class RecognitionTest {
     assertThat(view.stays()).isPresent();
   }
 
+  /** The MDM gives every holder a code — provisional for most —: a code with no stays is nobody the desk knows. */
+  @Test
+  void aProvisionalChainCodeWithNoStaysIsNotAKnownCustomer() {
+    var stayId = arrival("C-R12", "Pablo Ruiz");
+
+    assertThat(recognition.view(stayId, 1).certainty()).isNull();
+  }
+
+  /**
+   * The case the recognition is for: an unidentified booking (a provisional C-… of its own) of a customer
+   * we know, who shows a passport we never saw — asked about, not assumed; their own code is no candidate.
+   */
+  @Test
+  void aProvisionalCodeWithANewPassportIsAskedAboutTheKnownCustomerWithTheSameNameAndBirthDate() {
+    var stayId = arrival("C-R13", "Lucía Gómez");
+    var doc = documentOf(stayId, "Lucía Gómez", false);
+    mdm.candidate("Gómez", new Candidate("C-R13", "PROVISIONAL", "Lucía", "Gómez", doc.birthDate(), "ES",
+        List.of("NAME", "BIRTH_DATE")));
+    mdm.candidate("Gómez", new Candidate("C-KNOWN", "CONSOLIDATED", "Lucía", "Gómez", doc.birthDate(), "ES",
+        List.of("NAME", "BIRTH_DATE")));
+    history.summaries.put("C-KNOWN", fiveStays("C-KNOWN"));
+
+    kardex.scanned(stayId, 1);
+
+    var view = recognition.view(stayId, 1);
+    assertThat(view.certainty()).isEqualTo(Certainty.POSSIBLE);
+    assertThat(view.candidates()).extracting(c -> c.customerId()).containsExactly("C-KNOWN");
+    assertThat(view.stays()).isEmpty();
+  }
+
   @Autowired DemoKnownCustomers known;
 
   /** The demo's seeding: the holder's scanned document, a Riu Class number, past stays, a membership — the same every time. */

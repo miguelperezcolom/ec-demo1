@@ -84,7 +84,7 @@ public interface CustomerDirectory {
 
   /** Demo seeding: a document of the customer. Whether the MDM took it. */
   boolean addDocument(String customerId, String type, String number, String issuingCountry, LocalDate expiry,
-                      String origin);
+                      String origin, LocalDate birthDate, String nationality);
 
   /** Demo seeding: the customer's Riu Class member number. Whether the MDM took it. */
   boolean setRiuClass(String customerId, String memberNumber);

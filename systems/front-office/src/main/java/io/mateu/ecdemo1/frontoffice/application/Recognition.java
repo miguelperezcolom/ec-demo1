@@ -125,13 +125,15 @@ public class Recognition {
       if (row != null && row.certainty() == Certainty.KNOWN) {
         return known(row.customerId(), row.customerName(), row.matchedBy(), row.riuClass());
       }
-      if (chain(paxId)) {
-        // the reservation already names them by the chain's code: known without a scan
-        return known(paxId, paxName(stay, pax), MatchedBy.CHAIN_CODE, null);
-      }
       if (row != null) {
+        // what the last scan or search said wins over the reservation's code: a provisional C-… whose
+        // passport points at another customer is exactly the case to ask about
         return new View(Certainty.POSSIBLE, row.matchedBy(), row.customerId(), row.customerName(), row.candidates(),
             Optional.empty(), Optional.empty());
+      }
+      if (chainKnown(paxId)) {
+        // the reservation names them by a chain customer who has stayed with us: known without a scan
+        return known(paxId, paxName(stay, pax), MatchedBy.CHAIN_CODE, null);
       }
       return View.none();
     } catch (RuntimeException e) {
@@ -192,7 +194,7 @@ public class Recognition {
           if (sameName(scanned.firstName(), scanned.lastName(), found.firstName(), found.lastName())) {
             recognitions.save(new PaxRecognition(stayId, pax, found.customerId(), found.name(), Certainty.KNOWN,
                 MatchedBy.DOCUMENT, List.of(), null, null, null));
-          } else if (keptConfirmed(before) || chain(paxId)) {
+          } else if (keptConfirmed(before) || chainKnown(paxId)) {
             // someone else's document, but the desk already knows who this pax is
             if (!keptConfirmed(before)) recognitions.clear(stayId, pax);
           } else {
@@ -203,7 +205,7 @@ public class Recognition {
         }
         case AMBIGUOUS -> {
           if (!keptConfirmed(before)) {
-            if (chain(paxId)) {
+            if (chainKnown(paxId)) {
               recognitions.clear(stayId, pax);
             } else {
               recognitions.save(new PaxRecognition(stayId, pax, null, null, Certainty.POSSIBLE, MatchedBy.DOCUMENT,
@@ -215,12 +217,13 @@ public class Recognition {
           if (keptConfirmed(before)) {
             // a new document of a pax the desk confirmed: it joins that customer, no more questions
             sendConfirmed(stay, pax, paxId, recognitions.scanOf(stayId, pax).orElseThrow(), before.customerId());
-          } else if (chain(paxId)) {
-            // a C-… pax: the MDM adds the document to them by the scan's own command
-            recognitions.clear(stayId, pax);
           } else {
+            // a document the chain does not know: whoever the reservation names (a provisional C-…, most
+            // of the time), someone else with the same name and birth date may be them — asked, never
+            // assumed. With nobody else, a C-… pax keeps their code and the MDM adds the document to them
+            // by the scan's own command.
             possibleByName(stayId, pax, scanned.firstName(), scanned.lastName(), scanned.birthDate(),
-                scanned.nationality());
+                scanned.nationality(), paxId);
           }
         }
       }
@@ -235,7 +238,14 @@ public class Recognition {
 
   /** Candidates by name and birth date: possible; none, nothing (and nothing left from before). */
   boolean possibleByName(String stayId, int pax, String first, String last, LocalDate birthDate, String nationality) {
-    var candidates = directory.candidates(first, last, birthDate, nationality);
+    return possibleByName(stayId, pax, first, last, birthDate, nationality, null);
+  }
+
+  /** The same, leaving out the customer the pax already is (their own C-… code is no news). */
+  boolean possibleByName(String stayId, int pax, String first, String last, LocalDate birthDate, String nationality,
+                         String self) {
+    var candidates = directory.candidates(first, last, birthDate, nationality).stream()
+        .filter(c -> self == null || !self.equals(c.customerId())).toList();
     if (candidates.isEmpty()) {
       recognitions.clear(stayId, pax);
       return false;
@@ -406,6 +416,15 @@ public class Recognition {
   static boolean chain(String id) {
     return id != null && id.startsWith("C-");
   }
+  /**
+   * A chain code that names a customer who has stayed with us — not just a code: the MDM gives one to every
+   * holder, provisional for the 70 % that arrive unidentified, and a provisional with no stays is nobody the
+   * desk knows yet.
+   */
+  boolean chainKnown(String id) {
+    return chain(id) && history.summary(id).filter(HistorySummary::any).isPresent();
+  }
+
 
   String locatorOf(String stayId) {
     return walkIns.of(stayId).map(w -> w.locator() == null ? stayId : w.locator()).orElse(stayId);

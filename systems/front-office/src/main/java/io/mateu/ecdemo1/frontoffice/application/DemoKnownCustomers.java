@@ -76,7 +76,7 @@ public class DemoKnownCustomers {
       var points = 2_000 + 50 * (int) Math.floorMod(seed >>> 3, 760L);
       var since = LocalDate.of(2012 + (int) Math.floorMod(seed >>> 13, 12L), 1 + (int) Math.floorMod(seed >>> 17, 12L), 1);
       var documented = directory.addDocument(code, document.documentType(), document.documentNumber(),
-          document.issuingCountry(), document.expiry(), "RESERVATION");
+          document.issuingCountry(), document.expiry(), "RESERVATION", document.birthDate(), document.nationality());
       var xref = directory.setRiuClass(code, member);
       var enrolled = loyalty.enroll(member, code, tier.name(), points, since);
       var stayed = history.seedDemo(code, 4 + (int) Math.floorMod(seed >>> 29, 3L));

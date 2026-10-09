@@ -68,7 +68,7 @@ final class InMemoryCustomers {
 
     @Override
     public boolean addDocument(String customerId, String type, String number, String issuingCountry, LocalDate expiry,
-                               String origin) {
+                               String origin, LocalDate birthDate, String nationality) {
       writes.add("document " + customerId + " " + type + " " + number + " " + issuingCountry + " " + origin);
       return true;
     }
