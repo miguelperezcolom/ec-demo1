@@ -42,11 +42,32 @@ public sealed interface CustomerCommand {
      * A pax's identity document, as the desk's scanner read it: trusted data. {@code customerId} is the
      * customer the hotel knows the pax by, if any; otherwise the MDM finds it by the reservation
      * ({@code hotelCode}, {@code locator}) and the pax (1 is the holder, 2… the companions in the room).
+     *
+     * <p>A document the customer did not have is added to theirs, not put in place of the one they had: the
+     * same person shows a DNI on one trip and a passport on the next.
+     *
+     * @param issuingCountry      the country that issued the document (ISO 3166-1 alpha-2); null if the
+     *                            scanner did not say — the MDM then takes the nationality
+     * @param documentExpiry      null if the scanner did not say
+     * @param confirmedCustomerId the known customer the desk confirmed this pax is — by their Riu Class
+     *                            number or their email — when the hotel knew them by another code (a
+     *                            provisional one): the MDM consolidates that code into this customer and
+     *                            the document joins theirs. Null when nobody confirmed anything
      */
     record RecordScannedIdentity(String commandId, String hotelCode, String locator, String stayId, int pax,
                                  String customerId, String firstName, String lastName, String documentType,
-                                 String documentNumber, LocalDate birthDate, String nationality, String origin)
+                                 String documentNumber, LocalDate birthDate, String nationality, String origin,
+                                 String issuingCountry, LocalDate documentExpiry, String confirmedCustomerId)
             implements CustomerCommand {
+
+        /** Without issuing country, expiry or a confirmed customer. */
+        public RecordScannedIdentity(String commandId, String hotelCode, String locator, String stayId, int pax,
+                                     String customerId, String firstName, String lastName, String documentType,
+                                     String documentNumber, LocalDate birthDate, String nationality, String origin) {
+            this(commandId, hotelCode, locator, stayId, pax, customerId, firstName, lastName, documentType,
+                    documentNumber, birthDate, nationality, origin, null, null, null);
+        }
+
         @Override
         public String key() {
             return customerId != null && !customerId.isBlank() ? customerId : hotelCode + "/" + locator;

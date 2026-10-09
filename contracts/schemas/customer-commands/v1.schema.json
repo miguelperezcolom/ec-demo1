@@ -94,9 +94,19 @@
         },
         "origin" : {
           "type" : [ "string", "null" ]
+        },
+        "issuingCountry" : {
+          "type" : [ "string", "null" ]
+        },
+        "documentExpiry" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "confirmedCustomerId" : {
+          "type" : [ "string", "null" ]
         }
       },
-      "required" : [ "type", "commandId", "hotelCode", "locator", "stayId", "pax", "customerId", "firstName", "lastName", "documentType", "documentNumber", "birthDate", "nationality", "origin" ],
+      "required" : [ "type", "commandId", "hotelCode", "locator", "stayId", "pax", "customerId", "firstName", "lastName", "documentType", "documentNumber", "birthDate", "nationality", "origin", "issuingCountry", "documentExpiry", "confirmedCustomerId" ],
       "additionalProperties" : false
     }
   },
@@ -123,6 +133,9 @@
     "documentNumber" : "X1234567",
     "birthDate" : "1990-05-17",
     "nationality" : "ES",
-    "origin" : "front-office"
+    "origin" : "front-office",
+    "issuingCountry" : "ES",
+    "documentExpiry" : "2031-03-01",
+    "confirmedCustomerId" : "C-00042"
   } ]
 }

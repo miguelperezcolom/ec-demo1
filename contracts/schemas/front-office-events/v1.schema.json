@@ -8,7 +8,7 @@
   "x-owner" : "front-office",
   "x-key" : "hotelCode/stayId",
   "x-producers" : [ "front-office" ],
-  "x-consumers" : [ "integrations-service" ],
+  "x-consumers" : [ "integrations-service", "customer-history" ],
   "x-java-type" : "io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent",
   "x-discriminator" : "type",
   "oneOf" : [ {
@@ -21,6 +21,8 @@
     "$ref" : "#/$defs/FrontOfficeEvent.ChargePosted"
   }, {
     "$ref" : "#/$defs/FrontOfficeEvent.ChargeVoided"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeEvent.StayClosed"
   } ],
   "$defs" : {
     "FrontOfficeEvent.ChargeKind" : {
@@ -85,6 +87,19 @@
         }
       },
       "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "lineId", "kind", "code", "description", "amount", "currency", "by" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeEvent.ChargeTotal" : {
+      "type" : "object",
+      "properties" : {
+        "kind" : {
+          "$ref" : "#/$defs/FrontOfficeEvent.ChargeKind-nullable"
+        },
+        "amount" : {
+          "type" : [ "number", "null" ]
+        }
+      },
+      "required" : [ "kind", "amount" ],
       "additionalProperties" : false
     },
     "FrontOfficeEvent.ChargeVoided" : {
@@ -258,6 +273,90 @@
       },
       "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "pax", "by" ],
       "additionalProperties" : false
+    },
+    "FrontOfficeEvent.StayClosed" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "stay-closed"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "arrival" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "departure" : {
+          "type" : [ "string", "null" ],
+          "format" : "date"
+        },
+        "nights" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "roomNumber" : {
+          "type" : [ "string", "null" ]
+        },
+        "roomType" : {
+          "type" : [ "string", "null" ]
+        },
+        "board" : {
+          "type" : [ "string", "null" ]
+        },
+        "guests" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/FrontOfficeEvent.StayGuest"
+          }
+        },
+        "charges" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/FrontOfficeEvent.ChargeTotal"
+          }
+        },
+        "total" : {
+          "type" : [ "number", "null" ]
+        },
+        "currency" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "arrival", "departure", "nights", "roomNumber", "roomType", "board", "guests", "charges", "total", "currency" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeEvent.StayGuest" : {
+      "type" : "object",
+      "properties" : {
+        "customerId" : {
+          "type" : [ "string", "null" ]
+        },
+        "holder" : {
+          "type" : "boolean"
+        }
+      },
+      "required" : [ "customerId", "holder" ],
+      "additionalProperties" : false
     }
   },
   "examples" : [ {
@@ -326,5 +425,36 @@
     "amount" : 12.5,
     "currency" : "MUR",
     "by" : "ana"
+  }, {
+    "type" : "stay-closed",
+    "eventId" : "E-9",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "arrival" : "2026-11-08",
+    "departure" : "2026-11-12",
+    "nights" : 4,
+    "roomNumber" : "205",
+    "roomType" : "JS-SEA",
+    "board" : "TODO-INCLUIDO",
+    "guests" : [ {
+      "customerId" : "C-00042",
+      "holder" : true
+    }, {
+      "customerId" : "pax-2",
+      "holder" : false
+    } ],
+    "charges" : [ {
+      "kind" : "ADD_ON",
+      "amount" : 120.0
+    }, {
+      "kind" : "LATE_CHECK_OUT",
+      "amount" : 50.0
+    } ],
+    "total" : 170.0,
+    "currency" : "MUR"
   } ]
 }
