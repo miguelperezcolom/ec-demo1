@@ -509,9 +509,10 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         }
         const [byDocument, byPassport, byHand] = bookings
         const [known1, known2, known3] = seeded
-        const panel = async () => (await ui.text()).match(/(Cliente conocido — [^|]{0,40}|Posible cliente conocido: [^|]{0,60})/)?.[0] ?? ''
         // «¿es usted X?» with one candidate, «¿es usted uno de estos clientes?» and their names with several
         // (an environment where two customers share the name and the birth date): either way, X is offered
+        // the panel, not a message toast that may still be on screen: «Cliente conocido — Name»
+        const recognised = (name: string) => async () => (await ui.text()).includes(`Cliente conocido — ${name}`)
         const offered = (name: string) => async () => {
             const t = await ui.text()
             return /Posible cliente conocido/.test(t) && t.includes(name) && !/Cliente conocido — /.test(t)
@@ -524,8 +525,8 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         // 1 · The document we already know: certainty, with their history and their Riu Class tier.
         await checkIn(byDocument)
         await ui.click(ui.button('Escanear documento'), 9_000)
-        await expect.poll(panel, { message: 'a known document did not recognise the customer', timeout: 60_000 })
-            .toContain(`Cliente conocido — ${known1.guestName}`)
+        await expect.poll(recognised(known1.guestName), { message: 'a known document did not recognise the customer', timeout: 60_000 })
+            .toBe(true)
         await ui.waitText(/\d+ estancias · \d+ noches/, 'the known customer showed no stay history')
         await ui.checkpoint('f9-known-by-document')
 
@@ -538,8 +539,8 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         await ui.checkpoint('f9-possible-by-passport')
         await ui.page.getByLabel('Nº Riu Class o email').first().fill(known2.riuClass)
         await ui.click(ui.button('Confirmar cliente'), 6_000)
-        await expect.poll(panel, { message: 'the Riu Class number did not confirm the customer', timeout: 60_000 })
-            .toContain(`Cliente conocido — ${known2.guestName}`)
+        await expect.poll(recognised(known2.guestName), { message: 'the Riu Class number did not confirm the customer', timeout: 60_000 })
+            .toBe(true)
         await ui.checkpoint('f9-confirmed-by-riu-class')
         await ui.pollPage(`${C}/customers/consolidations`, /Survivor|Absorbed|Via/i,
             t => new RegExp(`${known2.customerId}[^]{0,300}DESK_CONFIRMED|DESK_CONFIRMED[^]{0,300}${known2.customerId}`).test(t),
@@ -559,8 +560,8 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
             .toBe(true)
         await ui.page.getByLabel('Nº Riu Class o email').first().fill(known3.riuClass)
         await ui.click(ui.button('Confirmar cliente'), 6_000)
-        await expect.poll(panel, { message: 'the Riu Class number did not confirm the customer', timeout: 60_000 })
-            .toContain(`Cliente conocido — ${known3.guestName}`)
+        await expect.poll(recognised(known3.guestName), { message: 'the Riu Class number did not confirm the customer', timeout: 60_000 })
+            .toBe(true)
         await ui.checkpoint('f9-known-by-hand')
 
         // The stay of the customer found by hand, to the end: the check-in (document, room, signature) and

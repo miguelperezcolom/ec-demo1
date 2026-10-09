@@ -57,7 +57,12 @@ baseline_dump() {
 # The script that puts back the engine's state tables: empties them and loads the baseline's rows. One
 # script, so that it runs as one transaction (psql_file): the processes never come back without their steps.
 engine_restore_sql() { # engine_restore_sql <baseline dump>
-  echo "truncate $(echo $ENGINE_TABLES | tr ' ' ',');"
+  # Only the state tables this engine has: a fresh install of the orchestrator has no task_override (ec1's
+  # came with an older version), and truncating a table that is not there fails the whole restore.
+  local wanted existing
+  wanted=$(printf "'%s'," $ENGINE_TABLES); wanted=${wanted%,}
+  existing=$(psql_value "$ENGINE_DB" "select string_agg(table_name, ',') from information_schema.tables where table_schema = current_schema() and table_name in ($wanted)")
+  echo "truncate ${existing:-$(echo $ENGINE_TABLES | tr ' ' ',')};"
   gzip -dcf "$1"
 }
 
