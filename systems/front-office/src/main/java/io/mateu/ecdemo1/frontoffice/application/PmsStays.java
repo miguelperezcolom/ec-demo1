@@ -120,10 +120,12 @@ public class PmsStays {
       log.info("PMS reservation {}: a charge for a stay this front office does not have", c.pmsReservationId());
       return Outcome.UNKNOWN_STAY;
     }
-    var what = c.reversal() ? "anulación" : "cargo";
+    // the till's payments come back on the line PAY:<payment>
+    var payment = c.lineId() != null && c.lineId().startsWith("PAY:");
+    var what = payment ? (c.reversal() ? "devolución" : "cobro") : c.reversal() ? "anulación" : "cargo";
     var state = c.refused()
         ? "Opera: rechazado (" + what + ") — " + (c.detail() == null ? "sin motivo" : c.detail())
-        : c.reversal() ? "Opera: anulado" + (c.pmsPostingId() == null ? "" : " · " + c.pmsPostingId())
+        : c.reversal() ? (payment ? "Opera: devuelto" : "Opera: anulado") + (c.pmsPostingId() == null ? "" : " · " + c.pmsPostingId())
         : "Opera: en el folio" + (c.pmsPostingId() == null ? "" : " · " + c.pmsPostingId());
     chargePostings.posted(stayId.get(), c.lineId(), c.reversal(), c.refused() ? null : c.pmsPostingId(), state,
         clock.instant());

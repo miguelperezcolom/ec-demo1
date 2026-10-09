@@ -228,6 +228,41 @@ public class ReceptionReports {
         refs.crsLocator(), refs.pmsReservationId());
   }
 
+  /**
+   * The till captured a payment or an advance: in its transaction, the PMS is asked to post it on its folio
+   * («registrar-cobro»). Its answer comes back on the line {@code PAY:<paymentId>}.
+   */
+  public void paymentTaken(String stayId, io.mateu.ecdemo1.frontoffice.domain.cashier.Payment p, String by) {
+    var line = "PAY:" + p.id();
+    var refs = refs(stayId);
+    if (refs.none()) {
+      postings.pending(stayId, line, "Opera: pendiente — la reserva aún no ha llegado a Opera", clock.instant());
+      return;
+    }
+    outbox.appendEvent(new FrontOfficeEvent.PaymentTaken("PY-" + UUID.randomUUID(), clock.instant(), hotel, stayId,
+        refs.crsLocator(), pmsHotel, refs.pmsReservationId(), p.id(), p.kind().name(), p.method().name(), p.amount(),
+        currency, p.reference(), by));
+    postings.pending(stayId, line, "Opera: pendiente — cobro enviado", clock.instant());
+    log.info("{}: payment {} of {} ({}) — to the PMS's folio ({} / {})", stayId, p.id(), p.amount(), p.method(),
+        refs.crsLocator(), refs.pmsReservationId());
+  }
+
+  /** The till gave a captured payment back: in its transaction, the PMS is asked to refund it on its folio. */
+  public void paymentRefunded(String stayId, io.mateu.ecdemo1.frontoffice.domain.cashier.Payment p, String by) {
+    var line = "PAY:" + p.id();
+    var refs = refs(stayId);
+    if (refs.none()) {
+      postings.pending(stayId, line, "Devuelto — la reserva aún no ha llegado a Opera", clock.instant());
+      return;
+    }
+    outbox.appendEvent(new FrontOfficeEvent.PaymentRefunded("PR-" + UUID.randomUUID(), clock.instant(), hotel, stayId,
+        refs.crsLocator(), pmsHotel, refs.pmsReservationId(), p.id(), p.kind().name(), p.method().name(), p.amount(),
+        currency, p.reference(), by));
+    postings.pending(stayId, line, "Opera: pendiente — devolución enviada", clock.instant());
+    log.info("{}: payment {} refunded — to the PMS's folio ({} / {})", stayId, p.id(), refs.crsLocator(),
+        refs.pmsReservationId());
+  }
+
   static FrontOfficeEvent.ChargeKind kind(ChargeKind kind) {
     return switch (kind) {
       case ADD_ON -> FrontOfficeEvent.ChargeKind.ADD_ON;

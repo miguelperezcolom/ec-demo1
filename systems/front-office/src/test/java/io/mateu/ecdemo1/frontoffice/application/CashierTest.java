@@ -36,6 +36,9 @@ class CashierTest {
   @Autowired FolioRepository folios;
   @Autowired GuestRepository guests;
   @Autowired StayRepository stays;
+  @Autowired io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox outbox;
+  @Autowired PmsStays pms;
+  @Autowired io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings postings;
 
   /** A stay in the house with 300 of accommodation and 45.50 of minibar on its folio. */
   String inHouse() {
@@ -118,6 +121,32 @@ class CashierTest {
     cashier.restoreCredit(stayId, "ana");
     assertThat(cashier.account(stayId).creditLimit()).isEqualByComparingTo("500.00");
     assertThat(folioService.postCharge(stayId, "MB-02", "ana")).isPresent();
+  }
+
+  List<String> events(String stayId) {
+    return outbox.all(io.mateu.ecdemo1.frontoffice.infra.outbox.CommandOutbox.FRONT_OFFICE_EVENTS).stream()
+        .filter(e -> e.key().equals("MRU01/" + stayId)).map(io.mateu.ecdemo1.messaging.OutboxMessage::payload).toList();
+  }
+
+  @Test
+  void whatTheTillCapturesGoesToOperasFolio_aRefundToo_andOperasAnswerIsShown() {
+    var stayId = inHouse();
+
+    var cash = cashier.take(stayId, Payment.Kind.DEPOSIT, Payment.Method.CASH, new BigDecimal("80"), null, null, "ana");
+    cashier.take(stayId, Payment.Kind.PAYMENT, Payment.Method.CARD_PINPAD, new BigDecimal("10.99"), null, null, "ana");
+    cashier.take(stayId, Payment.Kind.PAYMENT, Payment.Method.PAY_LINK, new BigDecimal("50"), null, null, "ana");
+
+    // only what was captured: not the declined card, not the link nobody paid yet
+    assertThat(events(stayId)).singleElement().satisfies(e -> assertThat(e).contains("\"payment-taken\"")
+        .contains("\"paymentId\":\"" + cash.id() + "\"").contains("\"method\":\"CASH\"").contains("\"kind\":\"DEPOSIT\""));
+    assertThat(postings.of("PAY:" + cash.id())).get().satisfies(p -> assertThat(p.state()).contains("cobro enviado"));
+
+    pms.take(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeCommand.RecordCharge("RC-" + cash.id(), "XMAR",
+        "39480001", stayId, "PAY:" + cash.id(), false, false, "En el folio de Opera", "88776655"));
+    assertThat(postings.of("PAY:" + cash.id())).get().satisfies(p -> assertThat(p.state()).isEqualTo("Opera: en el folio · 88776655"));
+
+    cashier.cancel(cash.id(), "ana");
+    assertThat(events(stayId)).hasSize(2).last().satisfies(e -> assertThat(e).contains("\"payment-refunded\""));
   }
 
   @Test

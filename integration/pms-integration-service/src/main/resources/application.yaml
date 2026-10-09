@@ -110,6 +110,16 @@ ohip:
       "[CONSUMPTION:RS-01]": "1403"
       "[ADD_ON:cena]": "1403"
       "[CONSUMPTION:LAU-04]": "1516"
+  # The Opera payment method of each payment the front office's till posts (registrar-cobro), by how
+  # the guest paid (config/PaymentMethods). XMAR's: CASH, BT (bank transfer), VI, MC, VI/OL (Visa manual).
+  payments:
+    default-method: ${OPERA_PAYMENT_DEFAULT_METHOD:CASH}
+    methods:
+      CASH: CASH
+      MANUAL: CASH
+      TRANSFER: BT
+      CARD_PINPAD: ${OPERA_PAYMENT_CARD_METHOD:VI}
+      PAY_LINK: ${OPERA_PAYMENT_LINK_METHOD:VI/OL}
 
 pms-integration:
   crs-integration-url: ${CRS_INTEGRATION_URL:http://localhost:8121}

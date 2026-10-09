@@ -414,6 +414,41 @@ public class OperaFrontDesk {
         ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/charges", body, hotelId, reservationId);
     }
 
+    /**
+     * Posts a payment to the reservation's folio (window 1) with the integration's cashier ({@code POST
+     * /csh/v1/hotels/{h}/reservations/{id}/payments}, action {@code Billing}): the payment method, the
+     * amount (negative: a refund, with the original's transaction number), and the reference the posting
+     * is found by again — what makes posting it idempotent. Opera's answer carries no transaction number:
+     * it is read back by the reference.
+     */
+    public void postPayment(String hotelId, String reservationId, String method, BigDecimal amount, String currency,
+                            String reference, String remark, String originalTransactionNo) {
+        var body = objectMapper.createObjectNode();
+        var criteria = body.putObject("criteria");
+        criteria.put("hotelId", hotelId);
+        criteria.putObject("reservationId").put("id", reservationId).put("type", "Reservation");
+        criteria.putObject("paymentMethod").put("paymentMethod", method);
+        var posting = criteria.putObject("postingAmount").put("amount", amount);
+        if (currency != null && !currency.isBlank()) {
+            posting.put("currencyCode", currency);
+        }
+        criteria.put("postingReference", reference);
+        if (remark != null) {
+            criteria.put("postingRemark", remark.length() > 200 ? remark.substring(0, 200) : remark);
+        }
+        criteria.put("folioWindowNo", 1);
+        criteria.put("action", "Billing");
+        if (originalTransactionNo != null && !originalTransactionNo.isBlank()) {
+            try {
+                criteria.put("originalTransactionNo", Long.parseLong(originalTransactionNo.trim()));
+            } catch (NumberFormatException e) {
+                // not a number Opera would know: the refund goes without it
+            }
+        }
+        cashier(criteria);
+        ohip.post(hotelId, "/csh/v1/hotels/{h}/reservations/{id}/payments", body, hotelId, reservationId);
+    }
+
     /** A room of the property, as Opera's housekeeping has it now. */
     public record RoomState(String roomId, String roomType, String housekeeping, String frontOffice) {
     }

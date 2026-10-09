@@ -10,6 +10,8 @@ public enum Kind {
     CHECK_OUT("Check-out"),
     CHARGE("Cargo en recepción"),
     CHARGE_VOID("Cargo anulado en recepción"),
+    PAYMENT("Cobro en recepción"),
+    PAYMENT_REFUND("Cobro devuelto en recepción"),
     WALK_IN("Walk-in"),
     BACKFILL("Reproyectada (backfill)"),
     RELAUNCH("Reanudada tras resolver sus causas"),
@@ -39,6 +41,8 @@ public enum Kind {
             case "check-out" -> CHECK_OUT;
             case "charge" -> CHARGE;
             case "charge-void" -> CHARGE_VOID;
+            case "payment" -> PAYMENT;
+            case "payment-refund" -> PAYMENT_REFUND;
             case "backfill" -> BACKFILL;
             case "relaunch" -> RELAUNCH;
             default -> null;

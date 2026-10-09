@@ -52,6 +52,30 @@ public class Cashier {
   final SecureRandom random = new SecureRandom();
   final Clock clock = Clock.systemUTC();
 
+  /**
+   * Where the PMS hears of the till's payments; none in a test that does not wire it. A final holder, set
+   * once: pages hold this service, and Mateu walks a page's non-final fields when it writes its state.
+   */
+  private final java.util.concurrent.atomic.AtomicReference<io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports> reports =
+      new java.util.concurrent.atomic.AtomicReference<>();
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setReports(io.mateu.ecdemo1.frontoffice.infra.pms.ReceptionReports reports) {
+    this.reports.set(reports);
+  }
+
+  void toThePms(Payment p, boolean refund, String by) {
+    var r = reports.get();
+    if (r == null) {
+      return;
+    }
+    if (refund) {
+      r.paymentRefunded(p.stayId(), p, by);
+    } else {
+      r.paymentTaken(p.stayId(), p, by);
+    }
+  }
+
   public Cashier(StayRepository stays, GuestRepository guests, FolioRepository folios, Payments payments,
                  CreditTerms.Repository credit, StayAudit audit, @Value("${frontoffice.currency:}") String currency,
                  PlatformTransactionManager transactions) {
@@ -145,7 +169,11 @@ public class Cashier {
                 : payment.withStatus(Payment.Status.CAPTURED, "Aut. " + authorization(), payments.nextReceiptNo(), now);
             default -> payment.withStatus(Payment.Status.CAPTURED, null, payments.nextReceiptNo(), now);
           };
-          return payments.save(payment);
+          var saved = payments.save(payment);
+          if (saved.captured()) {
+            toThePms(saved, false, by);
+          }
+          return saved;
         }), Cashier::said);
   }
 
@@ -157,8 +185,12 @@ public class Cashier {
     }
     var p = payment.get();
     return Optional.of(audit.run("Payment link paid", p.stayId(), "huésped (link)", StayAudit.params("amount", p.amount()),
-        () -> transaction.execute(s -> payments.save(p.withStatus(Payment.Status.CAPTURED, "Pagado por link · aut. "
-            + authorization(), payments.nextReceiptNo(), clock.instant()))), Cashier::said));
+        () -> transaction.execute(s -> {
+          var paid = payments.save(p.withStatus(Payment.Status.CAPTURED, "Pagado por link · aut. " + authorization(),
+              payments.nextReceiptNo(), clock.instant()));
+          toThePms(paid, false, "huésped (link)");
+          return paid;
+        }), Cashier::said));
   }
 
   public Optional<Payment> byLinkToken(String token) {
@@ -176,7 +208,13 @@ public class Cashier {
       return p;
     }
     return audit.run("Payment cancelled", p.stayId(), by, StayAudit.params("payment", p.id(), "amount", p.amount()),
-        () -> transaction.execute(s -> payments.save(p.withStatus(Payment.Status.CANCELLED, null, null, null))),
+        () -> transaction.execute(s -> {
+          var cancelled = payments.save(p.withStatus(Payment.Status.CANCELLED, null, null, null));
+          if (p.captured()) {
+            toThePms(cancelled, true, by);
+          }
+          return cancelled;
+        }),
         x -> (p.captured() ? "Cobro devuelto: " : "Link anulado: ") + x.amount() + " " + x.currency());
   }
 

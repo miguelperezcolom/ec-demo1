@@ -8,7 +8,9 @@ ensure-partner-profile@1 pms-integration
 fetch-invoice@1 pms-integration
 new-opera-context@1 pms-integration
 post-charge@1 pms-integration
+post-payment@1 pms-integration
 project-stay@1 pms-integration
 record-no-show@1 pms-integration
+refund-payment@1 pms-integration
 reverse-charge@1 pms-integration
 upsert-reservation@1 pms-integration

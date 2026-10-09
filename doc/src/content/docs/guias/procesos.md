@@ -94,6 +94,25 @@ Así, lo que Opera salda y factura en el check-out cubre los cargos de recepció
 factura coincide con el del folio del front office (el alojamiento, si Opera lo factura igual). Cada
 línea muestra en el front office dónde está en Opera («Opera: en el folio · 88731245»).
 
+## Los cobros de la caja, al folio del PMS: `registrar-cobro`, `devolver-cobro`
+
+Lo que la caja del front office cobra durante la estancia —un pago, un anticipo— sale como
+`payment-taken` en `front-office-events`, con su cobro (`paymentId`), su tipo (`PAYMENT`, `DEPOSIT`), su
+forma de pago, importe y referencia; devolverlo, como `payment-refunded`. Un proceso por cobro y
+operación, clave `registrar-cobro:<hotel>/<localizador>:<cobro>` (o `devolver-cobro:…`), dentro del
+candado `reservation`, como los cargos.
+
+- **`registrar-cobro`**: `post-payment` postea el pago en el folio de Opera (`POST …/payments`, acción
+  `Billing`, ventana 1, con el cajero de la integración) con la forma de pago que corresponde
+  (`ohip.payments`) y la referencia `FO:PAY:<cobro>`: si Opera ya tiene un posteo con esa referencia, no
+  escribe. Si Opera aún no tiene a los huéspedes en casa, espera (causa `PMS_REJECTED …:post-payment`) y
+  el check-in en Opera la resuelve.
+- **`devolver-cobro`**: `refund-payment` postea el mismo pago en negativo, con el número de transacción
+  del original y la referencia `FO:PAY:<cobro>:R`. Si Opera aún no tiene el cobro, espera a que llegue.
+
+La respuesta vuelve al front office como un `record-charge` de la línea `PAY:<cobro>`: la caja lo enseña
+debajo de cada cobro.
+
 ## `registrar-no-show` — Registrar no-show
 
 El CRS, maestro de la venta, cancela la reserva como no-show con su cargo. Un solo paso:

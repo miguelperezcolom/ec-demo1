@@ -442,6 +442,14 @@ public final class JourneyMapper {
                 if (what == Kind.CHARGE) {
                     return hop(Lane.FRONT_OFFICE, span, "Cargo en recepción", "Va al folio del PMS, el maestro del folio", Tone.OK, null);
                 }
+                if (what == Kind.PAYMENT) {
+                    return hop(Lane.FRONT_OFFICE, span, "Cobro en recepción", "Va al folio del PMS: su saldo es lo que queda por cobrar",
+                            Tone.OK, null);
+                }
+                if (what == Kind.PAYMENT_REFUND) {
+                    return hop(Lane.FRONT_OFFICE, span, "Cobro devuelto en recepción", "Se devuelve también en el folio del PMS",
+                            Tone.OK, null);
+                }
                 if (what == Kind.CHARGE_VOID) {
                     return hop(Lane.FRONT_OFFICE, span, "Cargo anulado en recepción", "Se anula también en el folio del PMS",
                             Tone.OK, null);
@@ -555,6 +563,13 @@ public final class JourneyMapper {
                         : "charge-already-posted".equals(task.get("opera.action")) ? "Opera ya tenía el cargo en su folio: no se escribe"
                         : "Cargo en el folio de Opera" + (task.containsKey("opera.transaction.code")
                                 ? " (código " + task.get("opera.transaction.code") + ")" : ""), calls);
+                case "post-payment" -> join(task.containsKey("opera.refused") ? "Opera no admite el cobro: " + task.get("opera.refused")
+                        : "payment-already-posted".equals(task.get("opera.action")) ? "Opera ya tenía el cobro en su folio: no se escribe"
+                        : "Cobro en el folio de Opera" + (task.containsKey("opera.payment.method")
+                                ? " (forma de pago " + task.get("opera.payment.method") + ")" : ""), calls);
+                case "refund-payment" -> join(task.containsKey("opera.refused") ? "Opera no admite la devolución: " + task.get("opera.refused")
+                        : "payment-already-refunded".equals(task.get("opera.action")) ? "Opera ya lo tenía devuelto: no se escribe"
+                        : "Cobro devuelto en el folio de Opera (el mismo importe, en negativo)", calls);
                 case "reverse-charge" -> join(task.containsKey("opera.refused") ? "Opera no admite la anulación: " + task.get("opera.refused")
                         : "charge-already-reversed".equals(task.get("opera.action")) ? "Opera ya lo tenía anulado: no se escribe"
                         : "Cargo anulado en el folio de Opera (el mismo importe, en negativo)", calls);
@@ -663,7 +678,7 @@ public final class JourneyMapper {
             var kind = kind();
             var toOpera = operaWrittenAt > 0 ? Duration.ofNanos(operaWrittenAt - start) : stepEnd(start, "upsert-reservation", "cancel-reservation",
                     "check-in-reservation", "check-out-reservation", "record-no-show",
-                    "post-charge", "reverse-charge");
+                    "post-charge", "reverse-charge", "post-payment", "refund-payment");
             var toFrontOffice = frontOfficeAt > 0 ? Duration.ofNanos(frontOfficeAt - start) : null;
             Outcome outcome;
             String detail;
@@ -721,6 +736,12 @@ public final class JourneyMapper {
             }
             if (processes.values().stream().anyMatch(p -> "anular-cargo".equals(p.workflowId()))) {
                 return Kind.CHARGE_VOID;
+            }
+            if (processes.values().stream().anyMatch(p -> "registrar-cobro".equals(p.workflowId()))) {
+                return Kind.PAYMENT;
+            }
+            if (processes.values().stream().anyMatch(p -> "devolver-cobro".equals(p.workflowId()))) {
+                return Kind.PAYMENT_REFUND;
             }
             if (walkIn) {
                 return Kind.WALK_IN;
@@ -867,6 +888,8 @@ public final class JourneyMapper {
             case "registrar-no-show-pms" -> "Registrar no-show en el PMS";
             case "registrar-cargo" -> "Registrar cargo";
             case "anular-cargo" -> "Anular cargo";
+            case "registrar-cobro" -> "Registrar cobro";
+            case "devolver-cobro" -> "Devolver cobro";
             default -> workflowId;
         };
     }
