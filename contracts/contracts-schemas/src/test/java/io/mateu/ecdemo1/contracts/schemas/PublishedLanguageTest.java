@@ -52,7 +52,9 @@ class PublishedLanguageTest {
                                         new GoldenRecord("Ana", "García", "ana@example.com", "+34600000000", "ES",
                                                 LocalDate.of(1990, 5, 17), "PASSPORT", "X1234567",
                                                 List.of(new GoldenRecord.IdentityDocument("PASSPORT", "X1234567", "ES"),
-                                                        new GoldenRecord.IdentityDocument("DNI", "12345678Z", "ES"))),
+                                                        new GoldenRecord.IdentityDocument("DNI", "12345678Z", "ES")),
+                                                new GoldenRecord.Profile("F", "es", "Sevilla", "Calle Mayor 1", "Palma",
+                                                        "07001", "Illes Balears", "ES", null, "RC00000042", true)),
                                         true, "CR-7", "APPROVED", null, List.of("MRU01/12E45")),
                                 new CustomersMerged("E-2", AT, "C-00042", 4,
                                         new GoldenRecord("Ana", "García", "ana@example.com", null, "ES", null, null, null),
@@ -123,7 +125,7 @@ class PublishedLanguageTest {
                                         List.of(RegistrationRuleChanged.Moment.CHECK_IN), "Ejemplo", null, null, false)),
                 TopicSpec.topic("customer-commands")
                         .describedAs("What the MDM is asked without waiting: a change to a customer proposed, an "
-                                + "identity scanned at check-in recorded.")
+                                + "identity scanned at check-in recorded, a kárdex filled in at the desk recorded.")
                         .ownedBy("customer-mdm-service").keyedBy("customerId, or hotelCode/locator for a scan with no customer")
                         .producedBy("front-office").consumedBy("customer-mdm-service")
                         .messages(CustomerCommand.class)
@@ -131,7 +133,12 @@ class PublishedLanguageTest {
                                         "+34600000000", "X1234567", "front-office"),
                                 new CustomerCommand.RecordScannedIdentity("CMD-2", "MRU01", "12E45", "ST-9", 1, null,
                                         "Ana", "García", "PASSPORT", "X1234567", LocalDate.of(1990, 5, 17), "ES",
-                                        "front-office", "ES", LocalDate.of(2031, 3, 1), "C-00042")),
+                                        "front-office", "ES", LocalDate.of(2031, 3, 1), "C-00042"),
+                                new CustomerCommand.RecordKardex("CMD-5", "MRU01", "12E45", "ST-9", 1, "C-00042",
+                                        "Ana", "García", "F", LocalDate.of(1990, 5, 17), "Sevilla", "ES", "es",
+                                        "Calle Mayor 1", "Palma", "07001", "Illes Balears", "ES", null, "PASSPORT",
+                                        "X1234567", LocalDate.of(2021, 3, 1), LocalDate.of(2031, 3, 1), "RC00000042",
+                                        true, false, "front-office")),
                 TopicSpec.topic("projection-requests")
                         .describedAs("A reservation to project again by the same path a change in the CRS takes — "
                                 + "a backfill's, once per reservation.")

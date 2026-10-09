@@ -15,6 +15,7 @@ import java.time.LocalDate;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = CustomerCommand.ProposeChange.class, name = "propose-change"),
         @JsonSubTypes.Type(value = CustomerCommand.RecordScannedIdentity.class, name = "record-scanned-identity"),
+        @JsonSubTypes.Type(value = CustomerCommand.RecordKardex.class, name = "record-kardex"),
 })
 public sealed interface CustomerCommand {
 
@@ -67,6 +68,35 @@ public sealed interface CustomerCommand {
             this(commandId, hotelCode, locator, stayId, pax, customerId, firstName, lastName, documentType,
                     documentNumber, birthDate, nationality, origin, null, null, null);
         }
+
+        @Override
+        public String key() {
+            return customerId != null && !customerId.isBlank() ? customerId : hotelCode + "/" + locator;
+        }
+    }
+
+    /**
+     * A pax's kárdex as the desk filled it in with the guest at the counter: what the guest declares of
+     * themselves — sex, language, address, place of birth, fax, the document's issue date, their Riu Class
+     * number, whether they accept advertising. The MDM keeps it on the customer the hotel knows the pax by
+     * ({@code customerId}), or finds by the reservation and the pax as for a scan. A null field says
+     * nothing; the name, email and phone still go as a {@link ProposeChange} (Salesforce decides them).
+     *
+     * @param sex                M, F or X
+     * @param language           ISO 639-1 (es, en, de…)
+     * @param countryOfResidence ISO 3166-1 alpha-2
+     * @param documentIssueDate  the issue date of {@code documentNumber}, when the desk read it
+     * @param riuClass           the guest's Riu Class member number, as they gave it
+     * @param marketingConsent   whether they accept advertising; null when not asked
+     * @param companion          whether the pax is a companion (pax 2…), not the holder
+     */
+    record RecordKardex(String commandId, String hotelCode, String locator, String stayId, int pax,
+                        String customerId, String firstName, String lastName, String sex, LocalDate birthDate,
+                        String birthPlace, String nationality, String language, String address, String city,
+                        String postalCode, String province, String countryOfResidence, String fax,
+                        String documentType, String documentNumber, LocalDate documentIssueDate,
+                        LocalDate documentExpiry, String riuClass, Boolean marketingConsent, boolean companion,
+                        String origin) implements CustomerCommand {
 
         @Override
         public String key() {

@@ -43,7 +43,16 @@ public class CustomerEvents {
                 .map(d -> new GoldenRecord.IdentityDocument(d.type, d.number, d.issuingCountry))
                 .toList();
         return new GoldenRecord(c.firstName, c.lastName, c.email, c.phone, c.nationality, c.birthDate, c.documentType,
-                c.documentNumber, known);
+                c.documentNumber, known, profile(c));
+    }
+
+    /** The kárdex, if the customer has any of it; null otherwise. */
+    static GoldenRecord.Profile profile(Customer c) {
+        var p = new GoldenRecord.Profile(c.sex, c.language, c.birthPlace, c.address, c.city, c.postalCode, c.province,
+                c.countryOfResidence, c.fax, c.riuClass, c.marketingConsent);
+        return java.util.stream.Stream.of(c.sex, c.language, c.birthPlace, c.address, c.city, c.postalCode, c.province,
+                c.countryOfResidence, c.fax, c.riuClass).allMatch(java.util.Objects::isNull) && c.marketingConsent == null
+                ? null : p;
     }
 
     List<String> reservations(String customerId) {

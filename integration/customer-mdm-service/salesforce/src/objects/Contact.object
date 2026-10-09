@@ -33,6 +33,46 @@
         <required>false</required>
     </fields>
     <fields>
+        <fullName>Sexo__c</fullName>
+        <label>Sexo</label>
+        <description>Set by the MDM from the kárdex filled in at a hotel's desk: M, F or X.</description>
+        <type>Text</type>
+        <length>10</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Idioma__c</fullName>
+        <label>Idioma</label>
+        <description>Set by the MDM from the kárdex: the guest's language, ISO 639-1.</description>
+        <type>Text</type>
+        <length>10</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Lugar_Nacimiento__c</fullName>
+        <label>Lugar de nacimiento</label>
+        <description>Set by the MDM from the kárdex.</description>
+        <type>Text</type>
+        <length>80</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Provincia__c</fullName>
+        <label>Provincia</label>
+        <description>Set by the MDM from the kárdex: the province of the guest's address (free text; the org's state picklist would refuse most).</description>
+        <type>Text</type>
+        <length>80</length>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Riu_Class__c</fullName>
+        <label>Nº Riu Class</label>
+        <description>Set by the MDM: the guest's Riu Class member number, as they gave it at a desk.</description>
+        <type>Text</type>
+        <length>20</length>
+        <required>false</required>
+    </fields>
+    <fields>
         <fullName>Documentos__c</fullName>
         <label>Documentos de identidad</label>
         <description>Set by the MDM, not by hand: every identity document the chain knows of the customer, one per line (type, issuing country, number, expiry). The main one is also in Document type and Document number (HLA CM-F15).</description>

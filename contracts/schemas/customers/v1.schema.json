@@ -131,9 +131,12 @@
           "items" : {
             "$ref" : "#/$defs/GoldenRecord.IdentityDocument"
           }
+        },
+        "profile" : {
+          "$ref" : "#/$defs/GoldenRecord.Profile-nullable"
         }
       },
-      "required" : [ "firstName", "lastName", "email", "phone", "nationality", "birthDate", "documentType", "documentNumber", "documents" ],
+      "required" : [ "firstName", "lastName", "email", "phone", "nationality", "birthDate", "documentType", "documentNumber", "documents", "profile" ],
       "additionalProperties" : false
     },
     "GoldenRecord-nullable" : {
@@ -158,6 +161,53 @@
       },
       "required" : [ "type", "number", "issuingCountry" ],
       "additionalProperties" : false
+    },
+    "GoldenRecord.Profile" : {
+      "type" : "object",
+      "properties" : {
+        "sex" : {
+          "type" : [ "string", "null" ]
+        },
+        "language" : {
+          "type" : [ "string", "null" ]
+        },
+        "birthPlace" : {
+          "type" : [ "string", "null" ]
+        },
+        "address" : {
+          "type" : [ "string", "null" ]
+        },
+        "city" : {
+          "type" : [ "string", "null" ]
+        },
+        "postalCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "province" : {
+          "type" : [ "string", "null" ]
+        },
+        "countryOfResidence" : {
+          "type" : [ "string", "null" ]
+        },
+        "fax" : {
+          "type" : [ "string", "null" ]
+        },
+        "riuClass" : {
+          "type" : [ "string", "null" ]
+        },
+        "marketingConsent" : {
+          "type" : [ "boolean", "null" ]
+        }
+      },
+      "required" : [ "sex", "language", "birthPlace", "address", "city", "postalCode", "province", "countryOfResidence", "fax", "riuClass", "marketingConsent" ],
+      "additionalProperties" : false
+    },
+    "GoldenRecord.Profile-nullable" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "$ref" : "#/$defs/GoldenRecord.Profile"
+      } ]
     }
   },
   "examples" : [ {
@@ -183,7 +233,20 @@
         "type" : "DNI",
         "number" : "12345678Z",
         "issuingCountry" : "ES"
-      } ]
+      } ],
+      "profile" : {
+        "sex" : "F",
+        "language" : "es",
+        "birthPlace" : "Sevilla",
+        "address" : "Calle Mayor 1",
+        "city" : "Palma",
+        "postalCode" : "07001",
+        "province" : "Illes Balears",
+        "countryOfResidence" : "ES",
+        "fax" : null,
+        "riuClass" : "RC00000042",
+        "marketingConsent" : true
+      }
     },
     "dataChanged" : true,
     "changeRequestId" : "CR-7",
@@ -205,7 +268,8 @@
       "birthDate" : null,
       "documentType" : null,
       "documentNumber" : null,
-      "documents" : null
+      "documents" : null,
+      "profile" : null
     },
     "absorbedId" : "C-00051",
     "reservations" : [ "MRU01/12E45", "MRU01/0099" ]

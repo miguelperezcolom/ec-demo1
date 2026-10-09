@@ -30,6 +30,8 @@ import org.springframework.stereotype.Service;
  * pax's last briefing as it was. The stays no longer arriving lose theirs.
  */
 @Service
+// a service, never part of a page's state (Mateu serialises the pages, and the services some of them hold)
+@com.fasterxml.jackson.annotation.JsonIgnoreType
 public class ArrivalsBriefing {
 
   static final Logger log = LoggerFactory.getLogger(ArrivalsBriefing.class);
@@ -44,7 +46,7 @@ public class ArrivalsBriefing {
   final ArrivalBriefings briefings;
   final io.mateu.ecdemo1.frontoffice.domain.customer.CustomerDirectory directory;
   final boolean enabled;
-  Clock clock = Clock.systemDefaultZone();
+  final Clock clock = Clock.systemDefaultZone();
 
   public ArrivalsBriefing(StayRepository stays, GuestRepository guests, StayHistory history, LoyaltyStatus loyalty,
                           ArrivalBriefings briefings,

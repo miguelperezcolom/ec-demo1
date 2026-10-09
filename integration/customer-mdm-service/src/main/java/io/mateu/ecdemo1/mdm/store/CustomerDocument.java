@@ -41,6 +41,8 @@ public class CustomerDocument {
     /** ISO 3166-1 alpha-2; null only when nothing said it — neither the document nor the customer's nationality. */
     public String issuingCountry;
     public LocalDate expiry;
+    /** Its issue date, when the desk read it (the kárdex). */
+    public LocalDate issued;
     /** One of {@link Origin}: where it was seen first. */
     public String origin;
     public Instant firstSeenAt;

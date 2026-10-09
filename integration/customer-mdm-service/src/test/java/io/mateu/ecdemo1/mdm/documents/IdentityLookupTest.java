@@ -340,6 +340,65 @@ class IdentityLookupTest {
                 .asString().contains("principal").contains("Pasaporte · ESP · PAX555");
     }
 
+    static io.mateu.ecdemo1.integration.model.command.CustomerCommand.RecordKardex kardex(String customerId, String locator,
+                                                                                          int pax, String riuClass) {
+        return new io.mateu.ecdemo1.integration.model.command.CustomerCommand.RecordKardex(UUID.randomUUID().toString(),
+                "PMI01", locator, "ST-1", pax, customerId, "Leo", "Vidal", "m", LocalDate.of(1980, 2, 3), "Sevilla", "ES",
+                "ES", "Calle Mayor 1", "Palma", "07001", "Illes Balears", "ESP", "+34971000000", "PASSPORT", "PKX777",
+                LocalDate.of(2020, 1, 15), LocalDate.of(2030, 1, 14), "rc12345678", true, pax > 1, "front office PMI01");
+    }
+
+    @Test
+    void theKardexTheDeskFilledInIsTheCustomersProfile_toSalesforceAndTheHotels() throws Exception {
+        var leo = resolve("K1", person("Leo", "Vidal", "leo.k@example.com", "ES", null, null, null)).get(0).customerId();
+        db.update("update customer set salesforce_state = 'PROJECTED' where id = ?", leo);
+
+        commands.handle(kardex(leo, "K1", 1, "rc12345678"));
+
+        var c = customers.findById(leo).orElseThrow();
+        assertThat(c.sex).isEqualTo("M");
+        assertThat(c.language).isEqualTo("es");
+        assertThat(c.address).isEqualTo("Calle Mayor 1");
+        assertThat(c.province).isEqualTo("Illes Balears");
+        assertThat(c.countryOfResidence).isEqualTo("ESP");
+        assertThat(c.riuClass).isEqualTo("RC12345678");
+        assertThat(c.marketingConsent).isTrue();
+        assertThat(c.birthDate).isEqualTo(LocalDate.of(1980, 2, 3));
+        assertThat(c.documentNumber).isEqualTo("PKX777");
+        assertThat(c.salesforceState).isEqualTo(SalesforceState.PENDING);
+        assertThat(documents.of(leo)).singleElement().satisfies(d -> {
+            assertThat(d.issued).isEqualTo(LocalDate.of(2020, 1, 15));
+            assertThat(d.expiry).isEqualTo(LocalDate.of(2030, 1, 14));
+        });
+        found("riuClass", "RC12345678").andExpect(jsonPath("$.customerId").value(leo));
+        var fields = io.mateu.ecdemo1.mdm.salesforce.SalesforceClientFields.contact(c);
+        assertThat(fields).containsEntry("MailingCountryCode", "ES").containsEntry("Provincia__c", "Illes Balears")
+                .containsEntry("Sexo__c", "M").containsEntry("HasOptedOutOfEmail", false)
+                .containsEntry("Riu_Class__c", "RC12345678");
+        // the hotels learn it: the golden record carries the profile
+        var event = db.queryForObject("select payload from outbox_message order by seq desc limit 1", String.class);
+        assertThat(event).contains("\"profile\"").contains("Illes Balears");
+    }
+
+    @Test
+    void aKardexOfAPaxWithoutCodeIsTheReservationsPassenger_andOneTheMdmDoesNotKnowIsLeft() {
+        var leo = resolveQuietly("K2");
+
+        commands.handle(kardex(null, "K2", 1, null));
+        assertThat(customers.findById(leo).orElseThrow().city).isEqualTo("Palma");
+
+        commands.handle(kardex(null, "NOPE", 1, null));
+        assertThat(customers.findAll()).filteredOn(c -> "Palma".equals(c.city)).hasSize(1);
+    }
+
+    String resolveQuietly(String locator) {
+        try {
+            return resolve(locator, person("Leo", "Vidal", null, "ES", null, null, null)).get(0).customerId();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     org.springframework.test.web.servlet.ResultActions found(String param, String value) throws Exception {
         return mvc.perform(get("/identities/lookup").param(param, value)).andExpect(status().isOk());
     }

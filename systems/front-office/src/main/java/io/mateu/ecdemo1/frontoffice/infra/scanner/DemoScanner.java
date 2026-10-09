@@ -78,7 +78,11 @@ public class DemoScanner {
     if (current != null && !current.isBlank() && !Guest.placeholderDocument(current)) {
       var type = booked != null && current.equals(booked.documentNumber()) && booked.documentType() != null
           ? booked.documentType() : DemoDocuments.typeOf(current);
-      return new Scanned(first, last, type, current, birthOr(booked, made), made.nationality());
+      // the same paper the chain already has: the nationality it has of it, not one made up again — else
+      // the same passport would come back issued by another country, and be another document
+      var holder = knownByName(first, last).filter(k -> current.equals(text(k, "documentNumber")));
+      return new Scanned(first, last, type, current, birthOr(booked, made),
+          holder.map(k -> orElse(text(k, "nationality"), made.nationality())).orElse(made.nationality()));
     }
     var known = knownByName(first, last);
     if (known.isPresent()) {

@@ -11,12 +11,19 @@ import java.util.List;
  */
 public record GoldenRecord(String firstName, String lastName, String email, String phone, String nationality,
                            LocalDate birthDate, String documentType, String documentNumber,
-                           List<IdentityDocument> documents) {
+                           List<IdentityDocument> documents, Profile profile) {
 
     /** Without the list of documents: only the main one is said. */
     public GoldenRecord(String firstName, String lastName, String email, String phone, String nationality,
                         LocalDate birthDate, String documentType, String documentNumber) {
-        this(firstName, lastName, email, phone, nationality, birthDate, documentType, documentNumber, null);
+        this(firstName, lastName, email, phone, nationality, birthDate, documentType, documentNumber, null, null);
+    }
+
+    /** Without the kárdex profile. */
+    public GoldenRecord(String firstName, String lastName, String email, String phone, String nationality,
+                        LocalDate birthDate, String documentType, String documentNumber,
+                        List<IdentityDocument> documents) {
+        this(firstName, lastName, email, phone, nationality, birthDate, documentType, documentNumber, documents, null);
     }
 
     public String fullName() {
@@ -31,5 +38,14 @@ public record GoldenRecord(String firstName, String lastName, String email, Stri
      * @param issuingCountry ISO 3166-1 alpha-2; null when unknown
      */
     public record IdentityDocument(String type, String number, String issuingCountry) {
+    }
+
+    /**
+     * What the guest declared of themselves at a hotel's desk (their kárdex), as the MDM keeps it; null
+     * fields are unknown. {@code marketingConsent} null: never asked.
+     */
+    public record Profile(String sex, String language, String birthPlace, String address, String city,
+                          String postalCode, String province, String countryOfResidence, String fax,
+                          String riuClass, Boolean marketingConsent) {
     }
 }

@@ -217,6 +217,9 @@ public class SalesforceClient {
         fields.put("Document_Type__c", null);
         fields.put("Document_Number__c", null);
         fields.put("Documentos__c", null);
+        for (var f : KARDEX_FIELDS) {
+            fields.put(f, null);
+        }
         fields.putAll(io.mateu.ecdemo1.mdm.marking.Marking.of(c).fields());
         return fields;
     }
@@ -311,6 +314,7 @@ public class SalesforceClient {
         if (c.documents != null) {
             fields.put("Documentos__c", documentsField(c));
         }
+        kardexFields(c, fields);
         // How far it can be trusted: marked on every projection, so a new contact is born marked.
         fields.putAll(io.mateu.ecdemo1.mdm.marking.Marking.of(c).fields());
         return fields;
@@ -333,6 +337,56 @@ public class SalesforceClient {
                         d.numberKey.equals(main) ? "principal" : null).filter(java.util.Objects::nonNull).toList()))
                 .collect(java.util.stream.Collectors.joining("\n"));
         return text.length() <= 4000 ? text : text.substring(0, 3999) + "…";
+    }
+
+    /** The contact's fields the kárdex fills (RecordKardex). */
+    static final List<String> KARDEX_FIELDS = List.of("MailingStreet", "MailingCity", "MailingPostalCode",
+            "MailingCountryCode", "Provincia__c", "Fax", "Sexo__c", "Idioma__c", "Lugar_Nacimiento__c", "Riu_Class__c");
+
+    /**
+     * What the guest declared at a desk: only what the MDM has — the steward's own data on the contact
+     * is not emptied by a customer who never filled in a kárdex. The country of residence as the org's
+     * country picklist wants it (ISO alpha-2); advertising as Email Opt Out, its opposite.
+     */
+    static void kardexFields(Customer c, Map<String, Object> fields) {
+        putIf(fields, "MailingStreet", c.address);
+        putIf(fields, "MailingCity", c.city);
+        putIf(fields, "MailingPostalCode", c.postalCode);
+        putIf(fields, "MailingCountryCode", iso2(c.countryOfResidence));
+        putIf(fields, "Provincia__c", c.province);
+        putIf(fields, "Fax", c.fax);
+        putIf(fields, "Sexo__c", c.sex);
+        putIf(fields, "Idioma__c", c.language);
+        putIf(fields, "Lugar_Nacimiento__c", c.birthPlace);
+        putIf(fields, "Riu_Class__c", c.riuClass);
+        if (c.marketingConsent != null) {
+            fields.put("HasOptedOutOfEmail", !c.marketingConsent);
+        }
+    }
+
+    static void putIf(Map<String, Object> fields, String name, String value) {
+        if (value != null && !value.isBlank()) {
+            fields.put(name, value);
+        }
+    }
+
+    /** ES from ES or ESP; null for anything else (the picklist would refuse the whole contact). */
+    static String iso2(String country) {
+        if (country == null) {
+            return null;
+        }
+        var c = country.trim().toUpperCase(java.util.Locale.ROOT);
+        if (c.matches("[A-Z]{2}")) {
+            return java.util.Arrays.asList(java.util.Locale.getISOCountries()).contains(c) ? c : null;
+        }
+        if (c.matches("[A-Z]{3}")) {
+            for (var iso : java.util.Locale.getISOCountries()) {
+                if (c.equals(java.util.Locale.of("", iso).getISO3Country())) {
+                    return iso;
+                }
+            }
+        }
+        return null;
     }
 
     static String documentType(String type) {

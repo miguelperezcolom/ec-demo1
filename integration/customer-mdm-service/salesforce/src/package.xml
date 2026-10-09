@@ -6,6 +6,11 @@
         <members>Contact.Document_Type__c</members>
         <members>Contact.Document_Number__c</members>
         <members>Contact.Documentos__c</members>
+        <members>Contact.Sexo__c</members>
+        <members>Contact.Idioma__c</members>
+        <members>Contact.Lugar_Nacimiento__c</members>
+        <members>Contact.Provincia__c</members>
+        <members>Contact.Riu_Class__c</members>
         <members>Contact.Estado_MDM__c</members>
         <members>Contact.Calidad_Dato__c</members>
         <members>Contact.Origen__c</members>

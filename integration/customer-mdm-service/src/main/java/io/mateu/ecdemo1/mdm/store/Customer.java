@@ -89,6 +89,28 @@ public class Customer {
     @Column(length = 500)
     public String anonymizedReason;
 
+    // ── the kárdex: what the guest declared of themselves at a hotel's desk (RecordKardex) ──
+    /** M, F or X. */
+    public String sex;
+    /** ISO 639-1. */
+    public String language;
+    public String birthPlace;
+    @Column(length = 300)
+    public String address;
+    public String city;
+    public String postalCode;
+    public String province;
+    /** ISO 3166-1 alpha-2. */
+    public String countryOfResidence;
+    public String fax;
+    /** Their Riu Class member number, as they gave it (also a RIU_CLASS cross reference). */
+    public String riuClass;
+    /** Whether they accept advertising; null: never asked. */
+    public Boolean marketingConsent;
+    /** When and where the kárdex was last filled in: «MRU01 · 2026-10-09T…». */
+    public Instant kardexAt;
+    public String kardexHotel;
+
     /** Which value won each field in the last merge, and why: to audit it, and to undo it. */
     @Column(length = 2000)
     public String survivorship;

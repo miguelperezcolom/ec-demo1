@@ -604,6 +604,41 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
             .toBeGreaterThan(pointsBefore)
         await ui.checkpoint('f9-riu-class-points')
     })
+
+    test('10 · the guest checks in on the lobby tablet (simulated), and the till takes an advance', async ({}, info) => {
+        test.setTimeout(30 * 60_000)
+        const ui = new Ui(page, info)
+        const locator = await createBooking(ui, {
+            arrival: day(0), departure: day(2),
+            holder: { first: 'Tablet', last: `Guest ${RUN}`, email: `tablet.${RUN}.f10@example.org`, phone: '', nationality: '' },
+            room: ROOM_TYPES[1], rate: 'DIRECTA', board: 'DESAYUNO', adults: 1, guests: [['Tablet', `Guest ${RUN}`]],
+            channel: 'CALLCENTER',
+        }, 'f10')
+        await ensureInOpera(ui, locator)
+
+        // «Check-in en tableta» (the toolbar's overflow in Redwood): the guest's five steps, simulated
+        await openStay(ui, locator)
+        let tablet = ui.button('Check-in en tableta')
+        if (!(await tablet.isVisible().catch(() => false))) {
+            await ui.click(ui.page.getByRole('button', { name: 'Más acciones' }).first(), 1_000)
+            tablet = ui.page.getByText('Check-in en tableta', { exact: true }).first()
+        }
+        await ui.click(tablet, 1_000)
+        await ui.waitText(/Check-in en tableta completado|Registro firmado en la tableta/, 'the tablet check-in never finished')
+        await expect.poll(async () => {
+            await openStay(ui, locator)
+            const t = await ui.text()
+            return /Firmada por el huésped/.test(t) && /Preautorización completada/.test(t)
+        }, { message: 'the stay does not show the tablet\'s signature and guarantee', timeout: 90_000 }).toBe(true)
+
+        // the till: an advance of 100, with its receipt
+        await ui.go(`${FO}/caja/${locator}`, /Saldo pendiente/)
+        await ui.page.getByLabel('Importe').first().fill('100')
+        await ui.page.getByLabel('Importe').first().press('Tab')
+        await ui.click(ui.button('Cobrar'), 3_000)
+        await ui.waitText(/recibo nº \d+/, 'the till took no payment')
+        await ui.waitText(/Cobrado [1-9][\d.]*,\d\d/, 'the account does not show what was paid')
+    })
 })
 
 /** What the demo's seeding made known (POST /demo/known-customers, through ec1.py --json). */

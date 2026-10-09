@@ -353,7 +353,7 @@ final class EstanciaPanel {
                 .selected(r.metodoPago)
                 .contextLabel("PREAUTORIZADO")
                 .contextValue(GuestHeaders.euros(f == null ? null : f.preauthorized()))
-                .confirmLabel("Confirmar — " + GuestHeaders.euros(GuestHeaders.balance(f)))
+                .confirmLabel("Confirmar — " + GuestHeaders.euros(r.porCobrar()))
                 .build()))
         .build();
   }
