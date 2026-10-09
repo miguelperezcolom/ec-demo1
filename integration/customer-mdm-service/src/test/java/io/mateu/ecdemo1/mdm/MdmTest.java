@@ -534,6 +534,7 @@ class MdmTest {
         outboxTable.update("delete from outbox_message");
         consolidationRecords.deleteAll();
         sources.deleteAll();
+        outboxTable.update("delete from customer_document");
         customers.deleteAll();
         calls.clear();
         contacts.clear();

@@ -40,6 +40,7 @@ public class Survivorship {
     final ConsolidationRepository consolidations;
     final io.mateu.ecdemo1.mdm.outbox.CustomerEvents events;
     final io.mateu.ecdemo1.mdm.notice.CustomerNotices notices;
+    final io.mateu.ecdemo1.mdm.documents.CustomerDocuments documents;
     final Clock clock;
 
     @Transactional
@@ -68,6 +69,10 @@ public class Survivorship {
             survivor.documentNumber = absorbed.documentNumber;
             notes.add("document: " + absorbedId);
         }
+        // Every document the absorbed customer had is the survivor's — the main one is only one of them.
+        documents.moveTo(absorbedId, survivorId);
+        documents.add(survivorId, survivor.documentType, survivor.documentNumber, survivor.nationality, null,
+                io.mateu.ecdemo1.mdm.store.CustomerDocument.Origin.CUSTOMER.name());
         survivor.emailKey = Normalizer.email(survivor.email);
         survivor.documentKey = Normalizer.document(survivor.documentType, survivor.documentNumber);
         survivor.status = CustomerStatus.CONSOLIDATED;

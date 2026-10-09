@@ -22,7 +22,8 @@ import java.time.LocalDate;
 @Table(name = "customer", indexes = {
         @Index(name = "customer_email_key", columnList = "emailKey"),
         @Index(name = "customer_document_key", columnList = "documentKey"),
-        @Index(name = "customer_alias_of", columnList = "aliasOf")})
+        @Index(name = "customer_alias_of", columnList = "aliasOf"),
+        @Index(name = "customer_birth_date", columnList = "birthDate")})
 @NoArgsConstructor
 public class Customer {
 

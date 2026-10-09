@@ -15,6 +15,9 @@ public interface CustomerRepository extends JpaRepository<Customer, String>, Jpa
 
     List<Customer> findByAliasOf(String survivorId);
 
+    /** Who was born that day: the desk's candidates, before the name is compared. */
+    List<Customer> findByBirthDateAndStatusIn(java.time.LocalDate birthDate, Collection<CustomerStatus> statuses);
+
     List<Customer> findTop200BySalesforceStateOrderByUpdatedAtAsc(SalesforceState state);
 
     List<Customer> findBySalesforceStateAndProjectionErrorContaining(SalesforceState state, String error);

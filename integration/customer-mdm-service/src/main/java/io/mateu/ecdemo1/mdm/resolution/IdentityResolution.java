@@ -4,7 +4,9 @@ import io.mateu.ecdemo1.integration.model.customer.CustomerStatus;
 import io.mateu.ecdemo1.integration.model.customer.IdentityRequest;
 import io.mateu.ecdemo1.integration.model.customer.ResolvedIdentity;
 import io.mateu.ecdemo1.integration.model.reservation.Person;
+import io.mateu.ecdemo1.mdm.documents.CustomerDocuments;
 import io.mateu.ecdemo1.mdm.store.Customer;
+import io.mateu.ecdemo1.mdm.store.CustomerDocument;
 import io.mateu.ecdemo1.mdm.store.CustomerRepository;
 import io.mateu.ecdemo1.mdm.store.SalesforceState;
 import io.mateu.ecdemo1.mdm.store.Source;
@@ -38,6 +40,7 @@ public class IdentityResolution {
 
     final CustomerRepository customers;
     final SourceRepository sources;
+    final CustomerDocuments documents;
     final Clock clock;
 
     @Transactional
@@ -55,7 +58,7 @@ public class IdentityResolution {
                 customer = survivorOf(source.customerId);
                 matchedBy = "SOURCE";
             } else {
-                var byDocument = unique(byDocument(Normalizer.document(person.documentType(), person.documentNumber())));
+                var byDocument = unique(byDocument(person.documentNumber(), person.nationality()));
                 var name = Normalizer.name(person.firstName(), person.lastName());
                 var byEmail = unique(byEmail(Normalizer.email(person.email())).stream()
                         .filter(c -> name != null && name.equals(Normalizer.name(c.firstName, c.lastName)))
@@ -130,6 +133,9 @@ public class IdentityResolution {
         if (c.documentNumber == null && p.documentNumber() != null) {
             c.documentType = p.documentType();
             c.documentNumber = p.documentNumber();
+            // A reservation does not say who issued it: the nationality is the best guess there is.
+            documents.add(c.id, p.documentType(), p.documentNumber(), p.nationality() != null ? p.nationality() : c.nationality,
+                    null, CustomerDocument.Origin.RESERVATION.name());
             changed = true;
         }
         if (changed || c.updatedAt == null) {
@@ -151,14 +157,21 @@ public class IdentityResolution {
             return false;
         }
         var email = Normalizer.email(p.email());
-        var document = Normalizer.document(p.documentType(), p.documentNumber());
+        // The number, not the type: "DOC" and "PASSPORT" with the same number are one document.
+        var document = Normalizer.documentNumber(p.documentNumber());
+        var known = Normalizer.documentNumber(c.documentNumber);
         return (email == null || c.emailKey == null || email.equals(c.emailKey))
-                && (document == null || c.documentKey == null || document.equals(c.documentKey));
+                && (document == null || known == null || document.equals(known));
     }
 
-    // A null key would be a query for every customer without one.
-    List<Customer> byDocument(String documentKey) {
-        return documentKey == null ? List.of() : customers.findByDocumentKeyAndStatusIn(documentKey, LIVE);
+    /**
+     * Who holds the document, among all the documents customers have — not only their main one. A
+     * reservation does not say which country issued it, so the person's nationality stands for it; without
+     * one, the number alone.
+     */
+    List<Customer> byDocument(String number, String nationality) {
+        var owners = documents.owners(number, nationality);
+        return owners.isEmpty() && nationality != null ? documents.owners(number, null) : owners;
     }
 
     List<Customer> byEmail(String emailKey) {
