@@ -66,9 +66,26 @@ Botón **Caja** en la reserva (por llegar y en casa): la cuenta de la estancia e
 En el **check-out** se cobra solo el **saldo pendiente**, ya descontados los anticipos y cobros de la
 estancia, y queda como un cobro más con su recibo. Si el datáfono deniega, el check-out no sigue.
 
-Los cobros **no se postean aún en Opera** durante la estancia: Opera liquida su folio en el check-out,
-como antes. Postearlos en vivo pide un proceso nuevo en el motor (`registrar-cobro`) y su tarea en
-`pms-integration-service`.
+**Cada cobro va al folio de Opera**, el maestro del folio, en cuanto se cobra: así el saldo de Opera es lo
+que queda por cobrar y su check-out liquida solo eso. Sale `payment-taken` en `front-office-events` y
+arranca **`registrar-cobro`** (una devolución, `payment-refunded` → **`devolver-cobro`**); ver
+[Procesos](/guias/procesos/#los-cobros-de-la-caja-al-folio-del-pms-registrar-cobro-devolver-cobro). En la
+caja, debajo de cada cobro, su estado en Opera: «pendiente — cobro enviado», «en el folio · nº de
+transacción», «devuelto» o «rechazado — por qué».
+
+- Solo lo **cobrado**: un link de pago pendiente o una tarjeta denegada no van; el link, cuando se paga.
+- Un cobro de una reserva que Opera aún **no tiene en casa** (un anticipo antes del check-in) **espera**, y
+  el check-in en Opera lo suelta.
+
+| Forma de pago (front office) | En Opera (XMAR) |
+| :-- | :-- |
+| Efectivo, manual | `CASH` (Pago Efectivo) |
+| Transferencia | `BT` (Bank Transfer) |
+| Tarjeta (datáfono) | `VI` (Visa), `OPERA_PAYMENT_CARD_METHOD` |
+| Link de pago | `VI/OL` (Visa Manual), `OPERA_PAYMENT_LINK_METHOD` |
+
+Configurable en `ohip.payments` de `pms-integration-service`. Las formas de pago de XMAR salen de
+`GET /lov/v1/listOfValues/hotels/XMAR/paymentMethods`.
 
 ## Check-in en la tableta (Civitfun, simulado)
 

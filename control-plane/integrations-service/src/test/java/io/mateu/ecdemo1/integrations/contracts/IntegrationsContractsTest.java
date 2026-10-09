@@ -122,14 +122,14 @@ class IntegrationsContractsTest {
 
         var read = ArgumentCaptor.forClass(io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.class);
         verify(reception, times(examples.size())).on(read.capture());
-        assertThat(read.getAllValues()).hasSize(6).allSatisfy(e -> {
+        assertThat(read.getAllValues()).hasSize(8).allSatisfy(e -> {
             assertThat(e.eventId()).isNotBlank();
             assertThat(e.stayId()).isNotBlank();
             assertThat(e.pmsHotelCode()).isNotBlank();
         });
         assertThat(read.getAllValues()).extracting(e -> e.getClass().getSimpleName())
                 .containsExactly("GuestCheckedIn", "GuestCheckedOut", "NoShowReported", "ChargePosted", "ChargeVoided",
-                        "StayClosed");
+                        "PaymentTaken", "PaymentRefunded", "StayClosed");
     }
 
     @Test

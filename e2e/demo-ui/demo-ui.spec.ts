@@ -638,6 +638,62 @@ test.describe.serial(`demo, UI only (${RENDERER})`, () => {
         await ui.click(ui.button('Cobrar'), 3_000)
         await ui.waitText(/recibo nº \d+/, 'the till took no payment')
         await ui.waitText(/Cobrado [1-9][\d.]*,\d\d/, 'the account does not show what was paid')
+        // Into Opera's folio. Opera checks in only arrivals on its business date (XMAR's does not follow the
+        // calendar): the demo's seeding books one, with the rooms Opera has ready.
+        const seeded = execFileSync('bash', [`${__dirname}/../../deploy/demo/demo-prep.sh`, 'seed', 'arriving-opera-today'],
+            { encoding: 'utf8', timeout: 600_000 })
+        const opera = seeded.match(/Created: (\w+)/)?.[1] ?? seeded.match(/Already there: (\w+)/)?.[1]
+        const rooms = seeded.match(/inspected and vacant: ([\d, ]+)/)?.[1]?.split(',').map(r => r.trim()).filter(Boolean) ?? []
+        expect(opera, 'the seeding gave no booking on Opera\'s business date').toBeTruthy()
+        expect(rooms.length, 'Opera has no room ready for it').toBeGreaterThan(0)
+
+        // an advance before the check-in: it waits until Opera has the guests in the house
+        await ui.go(`${FO}/caja/${opera}`, /Saldo pendiente/)
+        await ui.page.getByLabel('Forma de pago').first().click()
+        await ui.page.getByRole('option', { name: 'Efectivo' }).first().click()
+        await ui.page.getByLabel('Importe').first().fill('50')
+        await ui.page.getByLabel('Importe').first().press('Tab')
+        await ui.click(ui.button('Cobrar'), 3_000)
+        await ui.waitText(/recibo nº \d+/, 'the till took no advance')
+        await expect.poll(async () => {
+            await ui.go(`${FO}/caja/${opera}`, /Saldo pendiente/)
+            return /Opera: (pendiente|rechazado)/.test(await ui.text())
+        }, { message: 'the advance never went to Opera', timeout: 3 * 60_000, intervals: [15_000] }).toBe(true)
+
+        // the desk's check-in: a room Opera has ready, every pax's document, the signature, confirm
+        await ui.go(`${FO}/reservas/${opera}`, /Huéspedes|Reserva/)
+        await ui.click(ui.button('Cambiar').first(), 3_000)
+        await ui.click(ui.page.getByText(rooms[rooms.length - 1], { exact: true }).first(), 6_000)
+        await ui.go(`${FO}/checkin/${opera}`, /Check-In/)
+        // each pax's scan (a recognised one keeps the wizard on it a turn), the extras, the confirmation
+        let signed = false
+        for (let i = 0; i < 16; i++) {
+            const sign = ui.button('Enviar a tablet')
+            if (!signed && await sign.isVisible().catch(() => false)) { await ui.click(sign, 9_000); signed = true; continue }
+            const confirm = ui.button('Confirmar check-in')
+            if (await confirm.isVisible().catch(() => false)) { await ui.click(confirm, 12_000); break }
+            const scan = ui.button('Escanear documento')
+            if (await scan.isVisible().catch(() => false)) { await ui.click(scan, 9_000); continue }
+            const next = ui.page.getByRole('button', { name: /^\d\/\d$/ }).filter({ hasNotText: '1/' }).first()
+            if (/pendiente de escaneo/.test(await ui.text()) && await next.isVisible().catch(() => false)) {
+                await ui.click(next, 3_000)
+                continue
+            }
+            await ui.click(ui.button('Siguiente'), 3_500)
+        }
+        // in the house in Opera, the advance that waited goes on its folio
+        await expect.poll(async () => {
+            await ui.go(`${FO}/caja/${opera}`, /Saldo pendiente/)
+            return /Opera: en el folio/.test(await ui.text())
+        }, { message: 'the advance never reached Opera\'s folio', timeout: 6 * 60_000, intervals: [20_000] }).toBe(true)
+        await ui.checkpoint('f10-advance-in-operas-folio')
+
+        // and a refund goes back the same way
+        await ui.click(ui.button('Devolver'), 3_000)
+        await expect.poll(async () => {
+            await ui.go(`${FO}/caja/${opera}`, /Saldo pendiente/)
+            return /Opera: devuelto/.test(await ui.text())
+        }, { message: 'the refund never reached Opera\'s folio', timeout: 4 * 60_000, intervals: [20_000] }).toBe(true)
     })
 })
 

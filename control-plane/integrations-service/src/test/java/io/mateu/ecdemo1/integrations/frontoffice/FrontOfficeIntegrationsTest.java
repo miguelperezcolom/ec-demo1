@@ -450,6 +450,19 @@ class FrontOfficeIntegrationsTest {
                 io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.ChargeKind.LATE_CHECK_OUT, null,
                 "Late check-out (salida 15:00)", new java.math.BigDecimal("50.00"), "MUR", "ana")))
                 .isEqualTo("anular-cargo:MRU01/GSX4AK:L-1");
+        // The desk's payments: one process per payment — its posting, and its refund.
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.PaymentTaken("E-7", at,
+                "MRU01", "GSX4AK", "GSX4AK", "XMAR", "39486034", "P-1", "DEPOSIT", "CASH",
+                new java.math.BigDecimal("100.00"), "MUR", null, "ana"))).isEqualTo("registrar-cobro:MRU01/GSX4AK:P-1");
+        assertThat(outbox("outboxUpstream")).filteredOn(p -> p.contains("registrar-cobro:MRU01/GSX4AK:P-1"))
+                .singleElement().satisfies(p -> assertThat(p)
+                        .contains("{\"name\":\"paymentId\",\"value\":\"P-1\"}")
+                        .contains("{\"name\":\"paymentMethod\",\"value\":\"CASH\"}")
+                        .contains("{\"name\":\"paymentKind\",\"value\":\"DEPOSIT\"}")
+                        .contains("{\"name\":\"amount\",\"value\":\"100.00\"}"));
+        assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.PaymentRefunded("E-8", at,
+                "MRU01", "GSX4AK", "GSX4AK", "XMAR", "39486034", "P-1", "DEPOSIT", "CASH",
+                new java.math.BigDecimal("100.00"), "MUR", null, "ana"))).isEqualTo("devolver-cobro:MRU01/GSX4AK:P-1");
         // A walk-in neither the CRS nor Opera has yet: nothing to record now.
         assertThat(reception.on(new io.mateu.ecdemo1.integration.model.frontoffice.FrontOfficeEvent.GuestCheckedIn("E-4", at,
                 "MRU01", "FO-6XDAWR", null, "XMAR", null, "205", 1, "ana"))).isNull();

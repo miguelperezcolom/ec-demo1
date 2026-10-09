@@ -30,6 +30,8 @@ import java.util.List;
         @JsonSubTypes.Type(value = FrontOfficeEvent.ChargePosted.class, name = "charge-posted"),
         @JsonSubTypes.Type(value = FrontOfficeEvent.ChargeVoided.class, name = "charge-voided"),
         @JsonSubTypes.Type(value = FrontOfficeEvent.StayClosed.class, name = "stay-closed"),
+        @JsonSubTypes.Type(value = FrontOfficeEvent.PaymentTaken.class, name = "payment-taken"),
+        @JsonSubTypes.Type(value = FrontOfficeEvent.PaymentRefunded.class, name = "payment-refunded"),
 })
 public sealed interface FrontOfficeEvent {
 
@@ -125,6 +127,34 @@ public sealed interface FrontOfficeEvent {
                         String pmsHotelCode, String pmsReservationId, String lineId, ChargeKind kind, String code,
                         String description, BigDecimal amount, String currency, String by)
             implements FrontOfficeEvent {
+    }
+
+    /**
+     * The desk took a payment on the stay's account — of what is owed, or an advance — and it was
+     * captured. The PMS is the master of the folio: the pms-fo integration posts it to the reservation's
+     * folio in the PMS («registrar-cobro»), once per payment: {@code paymentId} is the idempotency key, the
+     * PMS keeps it in the posting's reference. Only captured payments: a pending pay link or a declined card
+     * is not one.
+     *
+     * @param paymentId the front office's payment: unique, and what a refund names
+     * @param kind      PAYMENT or DEPOSIT (an advance)
+     * @param method    how the guest paid: CASH, CARD_PINPAD, PAY_LINK, TRANSFER, MANUAL
+     * @param amount    what was paid, positive
+     * @param currency  ISO 4217; null for the PMS property's own
+     * @param reference the desk's reference of it (the terminal's authorization…); may be null
+     */
+    record PaymentTaken(String eventId, Instant at, String hotelCode, String stayId, String crsLocator,
+                        String pmsHotelCode, String pmsReservationId, String paymentId, String kind, String method,
+                        BigDecimal amount, String currency, String reference, String by) implements FrontOfficeEvent {
+    }
+
+    /**
+     * The desk gave back a captured payment: the PMS posts the same payment, negative, against the
+     * original («devolver-cobro»). It names the payment as its {@link PaymentTaken} did, with the same figures.
+     */
+    record PaymentRefunded(String eventId, Instant at, String hotelCode, String stayId, String crsLocator,
+                           String pmsHotelCode, String pmsReservationId, String paymentId, String kind, String method,
+                           BigDecimal amount, String currency, String reference, String by) implements FrontOfficeEvent {
     }
 
     /**

@@ -55,8 +55,12 @@ public class CajaView implements PostHydrationHandler, ToolbarSupplier, ActionHa
   @Getter(AccessLevel.NONE) @com.fasterxml.jackson.annotation.JsonIgnore final transient Cashier cashier;
   @Getter(AccessLevel.NONE) @com.fasterxml.jackson.annotation.JsonIgnore final transient Receipts receipts;
   @Getter(AccessLevel.NONE) @com.fasterxml.jackson.annotation.JsonIgnore final transient StayQueries queries;
+  @Getter(AccessLevel.NONE) @com.fasterxml.jackson.annotation.JsonIgnore final transient
+      io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings opera;
 
-  public CajaView(Cashier cashier, Receipts receipts, StayQueries queries) {
+  public CajaView(Cashier cashier, Receipts receipts, StayQueries queries,
+                  io.mateu.ecdemo1.frontoffice.infra.pms.ChargePostings opera) {
+    this.opera = opera;
     this.cashier = cashier;
     this.receipts = receipts;
     this.queries = queries;
@@ -170,6 +174,8 @@ public class CajaView implements PostHydrationHandler, ToolbarSupplier, ActionHa
       html.append("<p style=\"margin: 0;\">Sin cobros todavía</p>");
       return Element.html("div", Map.of("style", "width: 100%;"), html.toString());
     }
+    // where each payment is in Opera's folio (registrar-cobro answers on the line PAY:<payment>)
+    var enOpera = opera.ofStay(stayId);
     html.append("<table style=\"width: 100%; border-collapse: collapse; font-size: .875rem;\"><tbody>");
     for (var p : list.reversed()) {
       html.append("<tr><td style=\"").append(CELL).append("\">").append(OtherSystems.escape(p.kind().label + " · "
@@ -183,6 +189,10 @@ public class CajaView implements PostHydrationHandler, ToolbarSupplier, ActionHa
       if (p.receiptNo() != null) {
         html.append(" · <a href=\"").append(OtherSystems.escape(receipts.receiptLink(p.id())))
             .append("\" target=\"_blank\" rel=\"noopener\">recibo nº ").append(p.receiptNo()).append("</a>");
+      }
+      var posting = enOpera.get("PAY:" + p.id());
+      if (posting != null) {
+        html.append("<br><span style=\"opacity: .75;\">").append(OtherSystems.escape(posting.state())).append("</span>");
       }
       html.append("</td></tr>");
     }

@@ -55,6 +55,16 @@ public final class ProcessVariables {
     /** The folio line's concept. */
     public static final String DESCRIPTION = "description";
     public static final String CHARGE_OUTCOME = "chargeOutcome";
+    /** The front office's payment a payment process is about (registrar-cobro, devolver-cobro): its idempotency key. */
+    public static final String PAYMENT_ID = "paymentId";
+    /** PAYMENT or DEPOSIT. */
+    public static final String PAYMENT_KIND = "paymentKind";
+    /** How the guest paid, in the front office's words: CASH, CARD_PINPAD, PAY_LINK, TRANSFER, MANUAL. */
+    public static final String PAYMENT_METHOD = "paymentMethod";
+    /** The desk's reference of the payment (the terminal's authorization…). */
+    public static final String PAYMENT_REFERENCE = "paymentReference";
+    public static final String PAYMENT_OUTCOME = "paymentOutcome";
+    public static final String REFUND_OUTCOME = "refundOutcome";
     public static final String REVERSAL_OUTCOME = "reversalOutcome";
     /** The PMS's posting of the charge, and of its reversal (their transaction numbers). */
     public static final String PMS_POSTING_ID = "pmsPostingId";

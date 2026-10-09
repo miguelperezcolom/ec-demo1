@@ -22,7 +22,8 @@ import java.util.List;
  * did ({@code front-office-events}); if the property feeds that front office and its integration is
  * active, the process that records it in the PMS starts: «registrar-checkin», «registrar-checkout»,
  * «registrar-no-show-pms» (which goes on to the CRS, the master of the sale, for its fee), and, for the
- * desk's charges, «registrar-cargo» and «anular-cargo» (onto the PMS's folio, per folio line).
+ * desk's charges, «registrar-cargo» and «anular-cargo» (onto the PMS's folio, per folio line), and its
+ * payments, «registrar-cobro» and «devolver-cobro» (per payment).
  *
  * <p>One process per reservation and operation — a check-in, per room: its business key names them, and
  * the engine ignores a key it already has — the dedup, so an event taken twice records once. The key
@@ -76,6 +77,8 @@ public class ReceptionEvents {
             case FrontOfficeEvent.NoShowReported ignored -> Definitions.REGISTER_NO_SHOW_PMS;
             case FrontOfficeEvent.ChargePosted ignored -> Definitions.REGISTER_CHARGE;
             case FrontOfficeEvent.ChargeVoided ignored -> Definitions.REVERSE_CHARGE;
+            case FrontOfficeEvent.PaymentTaken ignored -> Definitions.REGISTER_PAYMENT;
+            case FrontOfficeEvent.PaymentRefunded ignored -> Definitions.REFUND_PAYMENT;
             case FrontOfficeEvent.StayClosed ignored -> throw new IllegalStateException("taken above: not the PMS's");
         };
         // One check-in per room: the desk that picks another room after Opera refused one starts it again
@@ -85,6 +88,8 @@ public class ReceptionEvents {
             case FrontOfficeEvent.GuestCheckedIn in -> ":" + (blank(in.roomNumber()) ? "-" : in.roomNumber());
             case FrontOfficeEvent.ChargePosted charge -> ":" + charge.lineId();
             case FrontOfficeEvent.ChargeVoided voided -> ":" + voided.lineId();
+            case FrontOfficeEvent.PaymentTaken p -> ":" + p.paymentId();
+            case FrontOfficeEvent.PaymentRefunded p -> ":" + p.paymentId();
             default -> "";
         };
         var variables = new ArrayList<Variable>(List.of(
@@ -108,6 +113,10 @@ public class ReceptionEvents {
                     c.amount(), c.currency());
             case FrontOfficeEvent.ChargeVoided v -> charge(variables, v.lineId(), v.kind(), v.code(), v.description(),
                     v.amount(), v.currency());
+            case FrontOfficeEvent.PaymentTaken p -> payment(variables, p.paymentId(), p.kind(), p.method(), p.amount(),
+                    p.currency(), p.reference());
+            case FrontOfficeEvent.PaymentRefunded p -> payment(variables, p.paymentId(), p.kind(), p.method(), p.amount(),
+                    p.currency(), p.reference());
             default -> {
             }
         }
@@ -121,6 +130,8 @@ public class ReceptionEvents {
             case FrontOfficeEvent.NoShowReported ignored -> "no-show";
             case FrontOfficeEvent.ChargePosted ignored -> "charge";
             case FrontOfficeEvent.ChargeVoided ignored -> "charge-void";
+            case FrontOfficeEvent.PaymentTaken ignored -> "payment";
+            case FrontOfficeEvent.PaymentRefunded ignored -> "payment-refund";
             case FrontOfficeEvent.StayClosed ignored -> "stay-closed";
         });
         span.setAttribute("eventconductor.business-key", key);
@@ -151,6 +162,26 @@ public class ReceptionEvents {
         }
         if (!blank(currency)) {
             variables.add(new Variable(ProcessVariables.CURRENCY, currency));
+        }
+    }
+
+    static void payment(List<Variable> variables, String paymentId, String kind, String method, java.math.BigDecimal amount,
+                        String currency, String reference) {
+        variables.add(new Variable(ProcessVariables.PAYMENT_ID, paymentId));
+        if (!blank(kind)) {
+            variables.add(new Variable(ProcessVariables.PAYMENT_KIND, kind));
+        }
+        if (!blank(method)) {
+            variables.add(new Variable(ProcessVariables.PAYMENT_METHOD, method));
+        }
+        if (amount != null) {
+            variables.add(new Variable(ProcessVariables.AMOUNT, amount.toPlainString()));
+        }
+        if (!blank(currency)) {
+            variables.add(new Variable(ProcessVariables.CURRENCY, currency));
+        }
+        if (!blank(reference)) {
+            variables.add(new Variable(ProcessVariables.PAYMENT_REFERENCE, reference));
         }
     }
 

@@ -218,9 +218,10 @@ public class ReceptionHandlers {
             TaskHandlers.tag("opera.action", "checked-in");
             outcomes.done(hotel, id, input.stayId(), ReceptionOperation.CHECK_IN, "En casa en Opera", room, null);
             supersede(input, "checked in in Opera, room " + room, ASSIGN_ROOM, CHECK_IN);
-            // The desk's charges that waited for the guests to be in the house in Opera go on its folio now.
+            // The desk's charges and payments that waited for the guests to be in the house in Opera go on its
+            // folio now.
             supersede(input, "in house in Opera: its folio takes charges", ChargeHandlers.POST_CHARGE,
-                    ChargeHandlers.REVERSE_CHARGE);
+                    ChargeHandlers.REVERSE_CHARGE, PaymentHandlers.POST_PAYMENT, PaymentHandlers.REFUND_PAYMENT);
             events.written(hotel, id, input.hotelCode(), input.locator(), task.workflowDefinitionId());
             return new CheckedIn(Outcome.DONE.name(), id);
         } catch (PmsRejectedException e) {

@@ -502,7 +502,9 @@ def seed_arriving_opera_today():
     tag = f"{TAG}:arriving-opera-today"
     # JS-SEA is SJMB in XMAR, which has inspected rooms: XMAR assigns no room that is only clean
     # (FOF00081), and its STDK rooms are all «Clean».
-    ready = [b for b in tagged(tag) if b["arrival"] == business and b["rooms"][0]["roomTypeCode"] == "JS-SEA"]
+    # reused only while it is still to arrive: one the desk checked in or out is spent
+    ready = [b for b in tagged(tag) if b["arrival"] == business and b["rooms"][0]["roomTypeCode"] == "JS-SEA"
+             and (stay(b["id"]) is None or stay(b["id"])[1] == "ARRIVING")]
     if ready:
         locator = ready[0]["id"]
         print(f"Already there: {locator}, arriving on Opera's business date {business}")

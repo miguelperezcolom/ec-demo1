@@ -39,6 +39,8 @@ public class PmsTasks {
     public static final String RECORD_NO_SHOW = "record-no-show";
     public static final String POST_CHARGE = "post-charge";
     public static final String REVERSE_CHARGE = "reverse-charge";
+    public static final String POST_PAYMENT = "post-payment";
+    public static final String REFUND_PAYMENT = "refund-payment";
     public static final String NEW_OPERA_CONTEXT = "new-opera-context";
 
     /** new-opera-context's input: the reset-demo process asking. */
@@ -142,6 +144,24 @@ public class PmsTasks {
         return new TaskRegistration<>(REVERSE_CHARGE, 1, TOPIC, ChargeHandlers.ChargeTask.class,
                 ChargeHandlers.ChargeReversed.class, watched(watch, handlers::reverseCharge,
                         ChargeHandlers.ChargeTask::pmsHotelCode, input -> input.stayId() + "/" + input.lineId()));
+    }
+
+    // ── the desk's payments, onto Opera's folio (pms-fo) ───────────────────────────────────────────
+
+    @Bean
+    public TaskRegistration<PaymentHandlers.PaymentTask, PaymentHandlers.PaymentPosted> postPaymentTask(
+            PaymentHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(POST_PAYMENT, 1, TOPIC, PaymentHandlers.PaymentTask.class,
+                PaymentHandlers.PaymentPosted.class, watched(watch, handlers::postPayment,
+                        PaymentHandlers.PaymentTask::pmsHotelCode, input -> input.stayId() + "/" + input.paymentId()));
+    }
+
+    @Bean
+    public TaskRegistration<PaymentHandlers.PaymentTask, PaymentHandlers.PaymentRefunded> refundPaymentTask(
+            PaymentHandlers handlers, RetryWatch watch) {
+        return new TaskRegistration<>(REFUND_PAYMENT, 1, TOPIC, PaymentHandlers.PaymentTask.class,
+                PaymentHandlers.PaymentRefunded.class, watched(watch, handlers::refundPayment,
+                        PaymentHandlers.PaymentTask::pmsHotelCode, input -> input.stayId() + "/" + input.paymentId()));
     }
 
     // ── the demo's reset (reset-demo) ───────────────────────────────────────────────────────────────

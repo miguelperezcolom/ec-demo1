@@ -38,6 +38,14 @@ public final class Definitions {
     public static final String REGISTER_CHARGE = "registrar-cargo";
     public static final String REVERSE_CHARGE = "anular-cargo";
 
+    /**
+     * The desk's payments, onto the PMS's folio (pms-fo): a payment or advance captured at the till is
+     * posted to the reservation's folio in the PMS; its refund is posted back there. One process per
+     * payment and operation.
+     */
+    public static final String REGISTER_PAYMENT = "registrar-cobro";
+    public static final String REFUND_PAYMENT = "devolver-cobro";
+
     /** The message a waiting process is resumed with once its last cause is resolved. */
     public static final String CAUSES_RESOLVED_MESSAGE = "causes-resolved";
 

@@ -23,6 +23,10 @@
     "$ref" : "#/$defs/FrontOfficeEvent.ChargeVoided"
   }, {
     "$ref" : "#/$defs/FrontOfficeEvent.StayClosed"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeEvent.PaymentTaken"
+  }, {
+    "$ref" : "#/$defs/FrontOfficeEvent.PaymentRefunded"
   } ],
   "$defs" : {
     "FrontOfficeEvent.ChargeKind" : {
@@ -274,6 +278,112 @@
       "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "pax", "by" ],
       "additionalProperties" : false
     },
+    "FrontOfficeEvent.PaymentRefunded" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "payment-refunded"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "paymentId" : {
+          "type" : [ "string", "null" ]
+        },
+        "kind" : {
+          "type" : [ "string", "null" ]
+        },
+        "method" : {
+          "type" : [ "string", "null" ]
+        },
+        "amount" : {
+          "type" : [ "number", "null" ]
+        },
+        "currency" : {
+          "type" : [ "string", "null" ]
+        },
+        "reference" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "paymentId", "kind", "method", "amount", "currency", "reference", "by" ],
+      "additionalProperties" : false
+    },
+    "FrontOfficeEvent.PaymentTaken" : {
+      "type" : "object",
+      "properties" : {
+        "type" : {
+          "const" : "payment-taken"
+        },
+        "eventId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "hotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "stayId" : {
+          "type" : [ "string", "null" ]
+        },
+        "crsLocator" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsHotelCode" : {
+          "type" : [ "string", "null" ]
+        },
+        "pmsReservationId" : {
+          "type" : [ "string", "null" ]
+        },
+        "paymentId" : {
+          "type" : [ "string", "null" ]
+        },
+        "kind" : {
+          "type" : [ "string", "null" ]
+        },
+        "method" : {
+          "type" : [ "string", "null" ]
+        },
+        "amount" : {
+          "type" : [ "number", "null" ]
+        },
+        "currency" : {
+          "type" : [ "string", "null" ]
+        },
+        "reference" : {
+          "type" : [ "string", "null" ]
+        },
+        "by" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "type", "eventId", "at", "hotelCode", "stayId", "crsLocator", "pmsHotelCode", "pmsReservationId", "paymentId", "kind", "method", "amount", "currency", "reference", "by" ],
+      "additionalProperties" : false
+    },
     "FrontOfficeEvent.StayClosed" : {
       "type" : "object",
       "properties" : {
@@ -424,6 +534,38 @@
     "description" : "Minibar",
     "amount" : 12.5,
     "currency" : "MUR",
+    "by" : "ana"
+  }, {
+    "type" : "payment-taken",
+    "eventId" : "E-10",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "paymentId" : "P-5C2E",
+    "kind" : "DEPOSIT",
+    "method" : "CASH",
+    "amount" : 100.0,
+    "currency" : "MUR",
+    "reference" : null,
+    "by" : "ana"
+  }, {
+    "type" : "payment-refunded",
+    "eventId" : "E-11",
+    "at" : "2026-11-12T09:30:00Z",
+    "hotelCode" : "MRU01",
+    "stayId" : "12E45",
+    "crsLocator" : "12E45",
+    "pmsHotelCode" : "XMAR",
+    "pmsReservationId" : "123456",
+    "paymentId" : "P-5C2E",
+    "kind" : "DEPOSIT",
+    "method" : "CASH",
+    "amount" : 100.0,
+    "currency" : "MUR",
+    "reference" : null,
     "by" : "ana"
   }, {
     "type" : "stay-closed",
