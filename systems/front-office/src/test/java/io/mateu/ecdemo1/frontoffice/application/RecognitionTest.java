@@ -280,6 +280,22 @@ class RecognitionTest {
     assertThat(view.stays()).isEmpty();
   }
 
+  /** Without a document: the desk searches a provisional C-… pax by name and birth date — only possible. */
+  @Test
+  void aProvisionalCodeCanBeSearchedByNameAndBirthDate() {
+    var stayId = arrival("C-R14", "Iris Bauer");
+    var birth = java.time.LocalDate.of(1968, 8, 4);
+    mdm.candidate("Bauer", new Candidate("C-KNOWN2", "CONSOLIDATED", "Iris", "Bauer", birth, "DE",
+        List.of("NAME", "BIRTH_DATE")));
+
+    var answer = recognition.searchByName(stayId, 1, "Iris", "Bauer", birth);
+
+    assertThat(answer.done()).isTrue();
+    var view = recognition.view(stayId, 1);
+    assertThat(view.certainty()).isEqualTo(Certainty.POSSIBLE);
+    assertThat(view.candidates()).extracting(c -> c.customerId()).containsExactly("C-KNOWN2");
+  }
+
   @Autowired DemoKnownCustomers known;
 
   /** The demo's seeding: the holder's scanned document, a Riu Class number, past stays, a membership — the same every time. */

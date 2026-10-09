@@ -356,11 +356,13 @@ public class Recognition {
       if (stay == null) {
         return new Answer(false, "Reserva " + stayId + " no encontrada");
       }
-      if (chain(paxId(stay, pax)) || keptConfirmed(recognitions.of(stayId, pax).orElse(null))) {
+      var paxId = paxId(stay, pax);
+      if (chainKnown(paxId) || keptConfirmed(recognitions.of(stayId, pax).orElse(null))) {
         return new Answer(false, "Este huésped ya es un cliente conocido");
       }
+      // their own code (a provisional C-…, most of the time) is no candidate
       var found = Boolean.TRUE.equals(transaction.execute(status ->
-          possibleByName(stayId, pax, trim(firstName), trim(lastName), birthDate, null)));
+          possibleByName(stayId, pax, trim(firstName), trim(lastName), birthDate, null, paxId)));
       return found ? new Answer(true, "Posible cliente conocido: pregúntale al huésped y confirma con su número Riu Class o su email")
           : new Answer(false, "Ningún cliente de la cadena con ese nombre y esa fecha de nacimiento");
     } catch (RuntimeException e) {
