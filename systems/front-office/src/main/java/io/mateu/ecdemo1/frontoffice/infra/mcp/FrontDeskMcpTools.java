@@ -20,6 +20,7 @@ import io.mateu.ecdemo1.frontoffice.domain.room.Room;
 import io.mateu.ecdemo1.frontoffice.domain.room.RoomRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.CheckInChecklist;
 import io.mateu.ecdemo1.frontoffice.domain.stay.Stay;
+import io.mateu.ecdemo1.frontoffice.domain.stay.StayReadModel;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayRepository;
 import io.mateu.ecdemo1.frontoffice.domain.stay.StayStatus;
 import io.mateu.ecdemo1.frontoffice.domain.stay.WalkIn;
@@ -29,11 +30,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -50,6 +53,7 @@ public class FrontDeskMcpTools {
 
   final StayQueries queries;
   final StayRepository stays;
+  final StayReadModel readModel;
   final GuestRepository guests;
   final FolioRepository folios;
   final RoomRepository rooms;
@@ -72,8 +76,10 @@ public class FrontDeskMcpTools {
                            CheckInService checkIn, CheckOutService checkOut, NoShowService noShows,
                            RoomChangeService roomChange, FolioService folioService, KardexService kardex,
                            WalkInService walkInService, PendingConfirmations confirmations, GuestNotices notices,
-                           McpCaller caller, io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete) {
+                           McpCaller caller, io.mateu.ecdemo1.frontoffice.application.IncompleteCheckIns incomplete,
+                           StayReadModel readModel) {
     this.incomplete = incomplete;
+    this.readModel = readModel;
     this.queries = queries;
     this.stays = stays;
     this.guests = guests;
@@ -100,8 +106,13 @@ public class FrontDeskMcpTools {
         - Una estancia se identifica por su id del front office (FO-… en los walk-in) o por el localizador del
           CRS; las herramientas aceptan cualquiera de los dos.
         - Lecturas: listArrivals (llegadas de hoy y atrasadas), listDepartures (salidas de hoy), listInHouse,
+          searchStays (busca estancias por estado, fechas, tipo de habitación, régimen, agencia, nacionalidad o
+          texto, en UNA llamada: úsala para cualquier pregunta que filtre estancias en vez de leerlas una a una),
           getStay, getGuest (con el estado de su kárdex), getFolio, listAvailableRooms, listAddOns,
           getWalkInOffer y quoteWalkIn (precio del CRS; no reserva nada).
+        - Preguntas que ninguna lectura responde (cuántos, sumas, agrupaciones, cruces): describeFrontOfficeData
+          da las vistas de datos y sus columnas, y queryFrontOfficeData ejecuta una SELECT de solo lectura sobre
+          ellas. Agrega en SQL (count, group by) en vez de traer filas.
         - Operaciones: check-in, check-out, no show, walk-in, cambio de habitación, late check-out y edición del
           kárdex. Ninguna se hace directamente: la herramienta prepare… la comprueba y devuelve un resumen con un
           token. Enséñale el resumen a la persona y pregúntale si lo confirma; solo cuando responda que sí, en su
@@ -130,7 +141,8 @@ public class FrontDeskMcpTools {
 
   // ── lecturas ───────────────────────────────────────────────────────────────────
 
-  public record StaySummary(String stayId, String crsLocator, String guestName, String status, String room,
+  public record StaySummary(String stayId, String crsLocator, String guestName, String nationality, String status,
+                            String room,
                             String roomType, String board, LocalDate checkIn, LocalDate checkOut, int pax,
                             String agency, BigDecimal total, Integer paxPendingIdentity, Boolean readyForCheckIn) {}
 
@@ -139,25 +151,83 @@ public class FrontDeskMcpTools {
       + "with nothing left to ask")
   public List<StaySummary> listArrivals() {
     var today = LocalDate.now();
-    return stays.findArrivals().stream()
-        .filter(s -> s.status() == StayStatus.ARRIVING && !s.checkIn().isAfter(today))
-        .map(this::arrivalSummary).toList();
+    return arrivalSummaries(stays.findArrivals().stream()
+        .filter(s -> s.status() == StayStatus.ARRIVING && !s.checkIn().isAfter(today)).toList());
   }
 
   @Tool(description = "Today's departures: the stays leaving today, in house or already checked out")
   public List<StaySummary> listDepartures() {
     var today = LocalDate.now();
-    return stays.findAll().stream()
+    var leaving = stays.findAll().stream()
         .filter(s -> (s.status() == StayStatus.IN_HOUSE || s.status() == StayStatus.DEPARTED)
             && s.checkOut().isEqual(today))
         .sorted(Comparator.comparing(Stay::status).thenComparing(Stay::id))
-        .map(s -> summary(s, null, null)).toList();
+        .toList();
+    return summaries(leaving);
   }
 
   @Tool(description = "The guests in house: every checked-in stay, earliest departure first")
   public List<StaySummary> listInHouse() {
-    return stays.findInHouse().stream().map(s -> summary(s, null, null)).toList();
+    return summaries(stays.findInHouse());
   }
+
+  static final int SEARCH_LIMIT = 50;
+  static final int SEARCH_MAX = 200;
+
+  @Tool(description = "Search the hotel's stays — reservations arriving, guests in house, past stays — in ONE call, "
+      + "with whatever filters the question has; every filter is optional and they all apply. Each result carries "
+      + "the summary (guest, holder's nationality, status, room, room type, board, dates, pax, agency, total), so "
+      + "there is no need to read the stays one by one to filter them. E.g. «dobles de españoles que entran hoy»: "
+      + "statuses=ARRIVING, arrivalFrom=arrivalTo=today, roomType=doble, nationality=ES. Earliest arrival first; "
+      + "at most 50 unless limit says otherwise (max 200)")
+  public List<StaySummary> searchStays(
+      @ToolParam(description = "Statuses, any of ARRIVING (still to check in), IN_HOUSE, DEPARTED, CANCELLED, "
+          + "NO_SHOW; empty for all", required = false) List<String> statuses,
+      @ToolParam(description = "Arrival (check-in) on or after this date, ISO yyyy-MM-dd", required = false)
+      LocalDate arrivalFrom,
+      @ToolParam(description = "Arrival (check-in) on or before this date, ISO", required = false) LocalDate arrivalTo,
+      @ToolParam(description = "Departure (check-out) on or after this date, ISO", required = false)
+      LocalDate departureFrom,
+      @ToolParam(description = "Departure (check-out) on or before this date, ISO", required = false)
+      LocalDate departureTo,
+      @ToolParam(description = "A night the stay is in the hotel for (check-in on or before, check-out after), ISO",
+          required = false) LocalDate occupyingOn,
+      @ToolParam(description = "Part of the room type, any case (doble, suite…)", required = false) String roomType,
+      @ToolParam(description = "Part of the board, any case (TI, MP, desayuno…)", required = false) String board,
+      @ToolParam(description = "Part of the agency's name, any case", required = false) String agency,
+      @ToolParam(description = "Nationality, ISO-2 (ES, DE, GB…): stays with a pax of it — the holder or any "
+          + "companion — unless holderOnly", required = false) String nationality,
+      @ToolParam(description = "true: the nationality must be the holder's", required = false) Boolean holderOnly,
+      @ToolParam(description = "Part of the stay's id or locator, the guest's name or the room number",
+          required = false) String text,
+      @ToolParam(description = "How many at most; 50 if empty, 200 at most", required = false) Integer limit) {
+    var wanted = statuses == null || statuses.isEmpty() ? Set.<StayStatus>of()
+        : EnumSet.copyOf(statuses.stream().map(st -> StayStatus.valueOf(st.trim().toUpperCase())).toList());
+    var max = limit == null || limit < 1 ? SEARCH_LIMIT : Math.min(limit, SEARCH_MAX);
+    var rows = readModel.search(new StayReadModel.StaySearch(wanted, arrivalFrom, arrivalTo, departureFrom,
+        departureTo, occupyingOn, roomType, board, agency, nationality, Boolean.TRUE.equals(holderOnly), text, max));
+    var found = new ArrayList<StaySummary>();
+    for (var row : rows) {
+      stays.findById(row.id()).ifPresent(stay -> found.add(stay.status() == StayStatus.ARRIVING
+          ? summary(stay, queries.pendingPax(stay), queries.readyForDirectCheckIn(stay), row.guestNationality())
+          : summary(stay, null, null, row.guestNationality())));
+    }
+    return found;
+  }
+
+  /** Summaries of these stays, with their holders' nationality in one query. */
+  List<StaySummary> summaries(List<Stay> list) {
+    var nationalities = readModel.holderNationalities(list.stream().map(Stay::id).toList());
+    return list.stream().map(s -> summary(s, null, null, nationalities.get(s.id()))).toList();
+  }
+
+  /** The same for arrivals, with how many pax still lack a verified identity and whether they can check in. */
+  List<StaySummary> arrivalSummaries(List<Stay> list) {
+    var nationalities = readModel.holderNationalities(list.stream().map(Stay::id).toList());
+    return list.stream().map(s -> summary(s, queries.pendingPax(s), queries.readyForDirectCheckIn(s),
+        nationalities.get(s.id()))).toList();
+  }
+
 
   public record CompanionView(int pax, String name, String document, boolean identityVerified, String email,
                               String phone) {}
@@ -239,7 +309,7 @@ public class FrontDeskMcpTools {
     tasks.put("extras", ops.extras());
     var folio = folios.findByStayId(stay.id());
     return new StayDetail(
-        stay.status() == StayStatus.ARRIVING ? arrivalSummary(stay) : summary(stay, null, null),
+        stay.status() == StayStatus.ARRIVING ? arrivalSummary(stay) : summary(stay),
         stay.guestId(), companions,
         stay.addOns().stream().map(a -> addOns.findById(a.addOnId()).map(AddOnCatalogItem::title).orElse(a.addOnId()))
             .sorted().toList(),
@@ -758,13 +828,17 @@ public class FrontDeskMcpTools {
   }
 
   StaySummary arrivalSummary(Stay s) {
-    return summary(s, queries.pendingPax(s), queries.readyForDirectCheckIn(s));
+    return arrivalSummaries(List.of(s)).get(0);
   }
 
-  StaySummary summary(Stay s, Integer pendingPax, Boolean ready) {
+  StaySummary summary(Stay s) {
+    return summaries(List.of(s)).get(0);
+  }
+
+  StaySummary summary(Stay s, Integer pendingPax, Boolean ready, String nationality) {
     var guest = guests.findById(s.guestId()).map(Guest::name).orElse(null);
     var locator = walkIns.of(s.id()).map(WalkIn::locator).orElse(s.id().startsWith("FO-") ? null : s.id());
-    return new StaySummary(s.id(), locator, guest, s.status().name(), s.hasRoom() ? s.roomNumber() : null,
+    return new StaySummary(s.id(), locator, guest, nationality, s.status().name(), s.hasRoom() ? s.roomNumber() : null,
         s.roomType(), s.board(), s.checkIn(), s.checkOut(), s.pax(), s.agency(), s.total(), pendingPax, ready);
   }
 

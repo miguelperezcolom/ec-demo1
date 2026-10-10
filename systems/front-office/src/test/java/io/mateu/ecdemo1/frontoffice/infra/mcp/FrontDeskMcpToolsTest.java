@@ -121,6 +121,116 @@ class FrontDeskMcpToolsTest {
   }
 
   @Test
+  void oneSearchAnswersWhichDoublesOfSpaniardsArriveToday() {
+    var n = SEQ.incrementAndGet();
+    var today = LocalDate.now();
+    var spanishDouble = reservation("S" + n + "A", "Doble Superior", today, "ES");
+    var germanDouble = reservation("S" + n + "B", "Doble", today, "DE");
+    var spanishSuite = reservation("S" + n + "C", "Junior Suite", today, "ES");
+    var spanishTomorrow = reservation("S" + n + "D", "Doble", today.plusDays(1), "ES");
+    // The holder scanned at the desk as Spanish, whatever the customer master said.
+    var scannedSpanish = reservation("S" + n + "E", "doble", today, "FR");
+    jdbc.update("insert into pax_registration_data (stay_id, pax, field, field_value) values (?, 1, 'NATIONALITY', 'ES')",
+        scannedSpanish);
+
+    var found = tools.searchStays(List.of("ARRIVING"), today, today, null, null, null, "DOBLE", null, null, "es",
+        null, null, null);
+
+    assertThat(found).extracting(FrontDeskMcpTools.StaySummary::stayId)
+        .contains(spanishDouble, scannedSpanish)
+        .doesNotContain(germanDouble, spanishSuite, spanishTomorrow);
+    assertThat(found).filteredOn(s -> s.stayId().equals(spanishDouble)).singleElement()
+        .satisfies(s -> {
+          assertThat(s.nationality()).isEqualTo("ES");
+          assertThat(s.paxPendingIdentity()).isEqualTo(1);
+        });
+  }
+
+  @Test
+  void aCompanionsNationalityCountsUnlessOnlyTheHoldersIsAskedFor() {
+    var n = SEQ.incrementAndGet();
+    var holder = "C-MCP-H" + n;
+    var companion = "C-MCP-K" + n;
+    guests.save(Guest.fromReservation(holder, "Hans Search " + n, null, null, null));
+    jdbc.update("insert into customer_nationality (customer_id, nationality, source) values (?, 'DE', 'TEST')", holder);
+    jdbc.update("insert into customer_nationality (customer_id, nationality, source) values (?, 'IT', 'TEST')", companion);
+    stays.save(Stay.fromReservation("MCP-K" + n, holder, "Doble", "SA", LocalDate.now(), LocalDate.now().plusDays(3),
+        2, null, BigDecimal.TEN, List.of(new io.mateu.ecdemo1.frontoffice.domain.stay.Companion(companion,
+            "Giulia Search " + n, null))));
+
+    assertThat(tools.searchStays(null, null, null, null, null, null, null, null, null, "IT", null, "search " + n, null))
+        .extracting(FrontDeskMcpTools.StaySummary::stayId).containsExactly("MCP-K" + n);
+    assertThat(tools.searchStays(null, null, null, null, null, null, null, null, null, "IT", true, "search " + n, null))
+        .isEmpty();
+  }
+
+  @Test
+  void theGuestsInTheHotelOnANight() {
+    var leavingToday = inHouse(LocalDate.now());
+    var stayingOn = inHouse(LocalDate.now().plusDays(2));
+
+    assertThat(tools.searchStays(List.of("in_house"), null, null, null, null, LocalDate.now().plusDays(1), null, null,
+        null, null, null, null, 200)).extracting(FrontDeskMcpTools.StaySummary::stayId)
+        .contains(stayingOn).doesNotContain(leavingToday);
+  }
+
+  String reservation(String id, String roomType, LocalDate arrival, String nationality) {
+    var guestId = "C-MCP-" + id;
+    guests.save(Guest.fromReservation(guestId, "Pax " + id, null, null, null));
+    jdbc.update("insert into customer_nationality (customer_id, nationality, source) values (?, ?, 'TEST')", guestId,
+        nationality);
+    stays.save(Stay.fromReservation("MCP-" + id, guestId, roomType, "SA", arrival, arrival.plusDays(2), 1, null,
+        BigDecimal.TEN, List.of()));
+    return "MCP-" + id;
+  }
+
+  // ── SQL de solo lectura ───────────────────────────────────────────────────────
+
+  @Autowired io.mateu.ecdemo1.agentsql.AgentSql agentSql;
+
+  @Test
+  void theDataViewsSayWhatTheyAre() {
+    var data = new FrontOfficeDataTools(agentSql);
+
+    assertThat(data.describeFrontOfficeData(null)).extracting(io.mateu.ecdemo1.agentsql.AgentSql.View::name)
+        .contains("stays", "stay_pax", "guests", "rooms", "incidents", "folio_lines", "payments");
+    var stays = data.describeFrontOfficeData("stays").get(0);
+    assertThat(stays.description()).contains("One row per stay");
+    assertThat(stays.columns()).anySatisfy(c -> {
+      assertThat(c.name()).isEqualTo("holder_nationality");
+      assertThat(c.description()).contains("ISO-2");
+    });
+    assertThat(data.describeFrontOfficeData("guests").get(0).columns())
+        .extracting(io.mateu.ecdemo1.agentsql.AgentSql.Column::name).doesNotContain("document", "email", "phone");
+  }
+
+  @Test
+  void aCountByNationalityInOneQuery() {
+    var n = SEQ.incrementAndGet();
+    var today = LocalDate.now();
+    reservation("Q" + n + "A", "Doble", today, "PT");
+    reservation("Q" + n + "B", "Doble", today, "PT");
+    reservation("Q" + n + "C", "Suite", today, "PT");
+    var data = new FrontOfficeDataTools(agentSql);
+
+    var result = data.queryFrontOfficeData("select room_type, count(*) as n from agent.stays"
+        + " where holder_nationality = 'PT' and stay_id like 'MCP-Q" + n + "%' group by room_type order by room_type");
+
+    assertThat(result.columns()).containsExactly("room_type", "n");
+    assertThat(result.rows()).containsExactly(List.of("Doble", 2L), List.of("Suite", 1L));
+  }
+
+  @Test
+  void theTablesAndWritingAreOutOfReach() {
+    var data = new FrontOfficeDataTools(agentSql);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> data.queryFrontOfficeData("select document from guest"))
+        .hasMessageContaining("Only the views of agent");
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> data.queryFrontOfficeData("delete from agent.stays"))
+        .hasMessageContaining("Only SELECT");
+  }
+
+  @Test
   void aStayIsFoundByItsIdOrByTheCrsLocatorOfItsWalkIn() {
     var stayId = arrival(1);
     walkIns.save(WalkIn.pending(stayId, "{}", BigDecimal.TEN, Instant.now()).booked("LOC-" + stayId, Instant.now()));

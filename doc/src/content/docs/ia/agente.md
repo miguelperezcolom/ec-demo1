@@ -87,5 +87,8 @@ en Tempo durante su retención, legibles para quien entre en Grafana. Con datos 
 
 - **Métricas** en `/actuator/prometheus`: `ia_agent_prompt_seconds`, `gen_ai_client_operation_seconds`,
   `gen_ai_client_token_usage_total` y `spring_ai_tool_seconds`, con la etiqueta `gen_ai_agent_id`.
+  Además, por prompt, `ia_agent_prompt_tool_calls` e `ia_agent_prompt_tokens`, y en ellas y en
+  `ia_agent_prompt_seconds` la etiqueta `ia_data_path`: cómo llegó el prompt a los datos (búsqueda, SQL,
+  otras herramientas). Lo explica [Cómo lee los datos el agente](/ia/datos-del-agente/).
 - **El consumo** se informa al plano de control por agente (`UsageReporter`), que es contra lo que se
   comprueban los presupuestos.

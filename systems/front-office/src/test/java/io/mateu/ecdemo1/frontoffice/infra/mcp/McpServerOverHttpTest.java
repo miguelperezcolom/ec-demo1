@@ -115,7 +115,8 @@ class McpServerOverHttpTest {
     String token;
     try (var firstPrompt = client("ana-token")) {
       assertThat(firstPrompt.listTools().tools()).extracting(McpSchema.Tool::name)
-          .contains("listArrivals", "getStay", "prepareLateCheckOut", "confirmAction");
+          .contains("listArrivals", "searchStays", "getStay", "prepareLateCheckOut", "confirmAction",
+              "describeFrontOfficeData", "queryFrontOfficeData");
       var prepared = text(firstPrompt.callTool(new McpSchema.CallToolRequest("prepareLateCheckOut",
           Map.of("stayRef", "HTTP-1"))));
       token = FrontDeskMcpToolsTest.token(prepared);

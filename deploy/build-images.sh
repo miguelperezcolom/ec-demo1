@@ -43,6 +43,9 @@ echo "── installing the contracts (the language the services speak) ──"
 # messaging likewise: the outbox, its relay and the inbox every service with a database shares.
 echo "── installing messaging (the shared outbox and inbox) ──"
 ( cd supporting/messaging && mvn -B -ntp -DskipTests install )
+# agent-sql: the read-only SQL over each service's agent views (doc/src/content/docs/ia/datos-del-agente.md).
+echo "── installing agent-sql (the agents' read-only SQL) ──"
+( cd supporting/agent-sql && mvn -B -ntp -DskipTests install )
 
 # demo-reset likewise: the reset@1 task every service serves for the demo's reset (process reset-demo).
 echo "── installing demo-reset (each service's own reset) ──"
