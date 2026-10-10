@@ -446,12 +446,136 @@
     },
     {
       "type": "row",
-      "title": "Tokens",
+      "title": "Data path (ia.data.path — how each prompt reached the data: search…, SQL over the agent views, both, other tools)",
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 51
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Prompts in selected range by data path: how many, and what each cost on average",
+      "description": "search = a search… tool; sql = query…Data / describe…Data (agent-sql); search+sql = both; other = only other tools (e.g. one getStay per stay); none = no tool. doc/src/content/docs/ia/datos-del-agente.md",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "prompts"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg latency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "sum by (ia_data_path) (round(increase(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\"}[$__range])))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (ia_data_path) (increase(ia_agent_prompt_tool_calls_sum{gen_ai_agent_id=~\"$agent\"}[$__range])) / sum by (ia_data_path) (increase(ia_agent_prompt_tool_calls_count{gen_ai_agent_id=~\"$agent\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (ia_data_path) (increase(ia_agent_prompt_tokens_sum{gen_ai_agent_id=~\"$agent\"}[$__range])) / sum by (ia_data_path) (increase(ia_agent_prompt_tokens_count{gen_ai_agent_id=~\"$agent\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        },
+        {
+          "expr": "sum by (ia_data_path) (increase(ia_agent_prompt_seconds_sum{gen_ai_agent_id=~\"$agent\"}[$__range])) / sum by (ia_data_path) (increase(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "D"
+        },
+        {
+          "expr": "sum by (ia_data_path) (increase(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\",ia_outcome!=\"success\"}[$__range])) / sum by (ia_data_path) (increase(ia_agent_prompt_seconds_count{gen_ai_agent_id=~\"$agent\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "E"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "ia_data_path": "data path",
+              "Value #A": "prompts",
+              "Value #B": "avg tool calls",
+              "Value #C": "avg tokens",
+              "Value #D": "avg latency",
+              "Value #E": "failed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Tokens",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 60
       }
     },
     {
@@ -461,7 +585,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 52
+        "y": 61
       },
       "fieldConfig": {
         "defaults": {
@@ -485,7 +609,7 @@
         "h": 8,
         "w": 9,
         "x": 6,
-        "y": 52
+        "y": 61
       },
       "fieldConfig": {
         "defaults": {
@@ -515,7 +639,7 @@
         "h": 8,
         "w": 9,
         "x": 15,
-        "y": 52
+        "y": 61
       },
       "fieldConfig": {
         "defaults": {
@@ -546,7 +670,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 69
       }
     },
     {
@@ -560,7 +684,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 70
       },
       "description": "One row per prompt: the invoke_agent span. Duration is the whole prompt; tokens are the sum of every model round trip under it; tools is how many tool calls it made and which. The span ID links to the full trace — each chat <model> span (gen_ai.input.messages / gen_ai.output.messages) and each execute_tool span (arguments, result, MCP server). The prompt and answer columns are filled only when ia-agent runs with IA_CAPTURE_CONTENT=redacted or full; with none they are empty. The cells show the start of the text; hover or inspect a cell for all of it (up to 16 KB).",
       "targets": [
@@ -666,7 +790,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 82
       },
       "description": "One row per tool call: the execute_tool span, with its duration, its outcome (and the span status), the agent that called it and where the tool lives — the MCP server (ia.mcp.server, the host) or the RAG source (ia.rag.id). The span ID links to the full trace. Arguments and result appear only with IA_CAPTURE_CONTENT=redacted or full.",
       "targets": [

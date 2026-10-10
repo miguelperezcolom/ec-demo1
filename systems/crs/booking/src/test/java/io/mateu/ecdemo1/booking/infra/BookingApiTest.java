@@ -293,6 +293,43 @@ class BookingApiTest {
         assertThat(read(id).get("rooms").get(0).get("ratePlanCode").asText()).isEqualTo("STAFF-27");
     }
 
+    @Autowired
+    io.mateu.ecdemo1.agentsql.AgentSql agentSql;
+
+    @Test
+    void theAgentsViewsLayTheBookingsJsonOutInRows() throws Exception {
+        var id = create(REQUEST);
+        mvc.perform(post("/bookings/{id}/payments", id).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"Deposit","methodCode":"VISA","amount":100}"""))
+                .andExpect(status().isCreated());
+        var booking = read(id);
+
+        var bookings = agentSql.query("select holder_nationality, nights, rooms, total, status from bookings"
+                + " where booking_id = '" + id + "'");
+        assertThat(bookings.rows()).singleElement().satisfies(row -> {
+            assertThat(row.get(0)).isEqualTo("ES");
+            assertThat(row.get(1)).isEqualTo(3);
+            assertThat(row.get(2)).isEqualTo(1);
+            assertThat(new java.math.BigDecimal(row.get(3).toString()))
+                    .isEqualByComparingTo(booking.get("totalAmount").decimalValue());
+            assertThat(row.get(4)).isEqualTo("Confirmed");
+        });
+        var rooms = agentSql.query("select line, room_type_code, board_code, adults, children from agent.booking_rooms"
+                + " where booking_id = '" + id + "'");
+        assertThat(rooms.rows()).containsExactly(List.of(1, "DBL", "AD", 2, 0));
+        var guests = agentSql.query("select first_name, type from booking_guests where booking_id = '" + id + "'");
+        assertThat(guests.rows()).containsExactly(List.of("Ana", "Adult"));
+        var payments = agentSql.query("select type, method_code, amount, date from booking_payments"
+                + " where booking_id = '" + id + "'");
+        assertThat(payments.rows()).singleElement().satisfies(row -> {
+            assertThat(row.subList(0, 2)).containsExactly("Deposit", "VISA");
+            assertThat(row.get(3).toString()).matches("\\d{4}-\\d{2}-\\d{2}");
+        });
+        assertThatThrownBy(() -> agentSql.query("select holder from crs_booking"))
+                .hasMessageContaining("Only the views of agent");
+    }
+
     String create(String request) throws Exception {
         var body = mvc.perform(post("/bookings").contentType(MediaType.APPLICATION_JSON).content(command(request)))
                 .andExpect(status().isCreated())

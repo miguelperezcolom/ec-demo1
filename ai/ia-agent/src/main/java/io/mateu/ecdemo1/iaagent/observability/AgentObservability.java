@@ -1,11 +1,15 @@
 package io.mateu.ecdemo1.iaagent.observability;
 
 import io.micrometer.common.KeyValue;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationFilter;
 import io.micrometer.observation.ObservationView;
 import org.springframework.ai.chat.observation.ChatModelObservationContext;
 import org.springframework.ai.tool.observation.ToolCallingObservationContext;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -59,6 +63,16 @@ public class AgentObservability {
     public static final String MODEL_CALLS = "ia.model.calls";
     public static final String TOOL_CALLS = "ia.tool.calls";
     public static final String TOOLS_CALLED = "ia.tools.called";
+    /**
+     * How the prompt reached the data, from the names of the tools it called — a label of the prompt's
+     * metrics: {@code search} (a search… tool), {@code sql} (a query…Data or describe…Data tool, the
+     * read-only SQL of agent-sql), {@code search+sql}, {@code other} (only other tools, e.g. reading
+     * records one by one) or {@code none}. What compares the two ways of answering (doc/src/content/docs/ia/datos-del-agente.md).
+     */
+    public static final String DATA_PATH = "ia.data.path";
+    /** Per prompt, by agent and data path: how many tool calls, and how many tokens, it took. */
+    public static final String PROMPT_TOOL_CALLS = "ia.agent.prompt.tool.calls";
+    public static final String PROMPT_TOKENS = "ia.agent.prompt.tokens";
     /** Content on {@code invoke_agent}: what the user wrote and what the agent answered, as text. */
     public static final String USER_MESSAGE = "ia.user.message";
     public static final String AGENT_RESPONSE = "ia.agent.response";
@@ -107,6 +121,11 @@ public class AgentObservability {
         public int modelCalls() { return modelCalls.get(); }
         public int toolCalls() { return toolCalls.get(); }
         public Set<String> toolsCalled() { return Set.copyOf(toolsCalled); }
+
+        void toolCalled(String name) {
+            toolCalls.incrementAndGet();
+            toolsCalled.add(name);
+        }
     }
 
     /** Called by the controller on the prompt observation before it starts. */
@@ -117,23 +136,33 @@ public class AgentObservability {
     }
 
     @Bean
-    ObservationFilter promptSpans(ContentCapture content) {
+    ObservationFilter promptSpans(ContentCapture content, ObjectProvider<MeterRegistry> meters) {
         return context -> {
             if (context instanceof ChatModelObservationContext chat) {
                 onModelCall(chat, content);
             } else if (context instanceof ToolCallingObservationContext tool) {
                 onToolCall(tool, content);
             } else if (PROMPT.equals(context.getName())) {
-                onPrompt(context);
+                onPrompt(context, meters.getIfAvailable());
             }
             return context;
         };
     }
 
-    private static void onPrompt(Observation.Context context) {
+    static void onPrompt(Observation.Context context, MeterRegistry meters) {
         PromptStats stats = context.get(PromptStats.class);
+        // Always set: a Prometheus meter must carry the same label names on every sample.
+        var path = dataPath(stats == null ? Set.of() : stats.toolsCalled());
+        context.addLowCardinalityKeyValue(KeyValue.of(DATA_PATH, path));
         if (stats == null) {
             return;
+        }
+        if (meters != null) {
+            var agent = context.getLowCardinalityKeyValue(AGENT_ID);
+            var tags = Tags.of(AGENT_ID, agent != null ? agent.getValue() : UNRESOLVED, DATA_PATH, path);
+            DistributionSummary.builder(PROMPT_TOOL_CALLS).tags(tags).register(meters).record(stats.toolCalls());
+            DistributionSummary.builder(PROMPT_TOKENS).tags(tags).register(meters)
+                    .record(stats.inputTokens() + stats.outputTokens());
         }
         context.addHighCardinalityKeyValue(KeyValue.of(INPUT_TOKENS, String.valueOf(stats.inputTokens())));
         context.addHighCardinalityKeyValue(KeyValue.of(OUTPUT_TOKENS, String.valueOf(stats.outputTokens())));
@@ -166,8 +195,7 @@ public class AgentObservability {
         String name = tool.getToolDefinition().name();
         var stats = statsAbove(tool);
         if (stats != null) {
-            stats.toolCalls.incrementAndGet();
-            stats.toolsCalled.add(name);
+            stats.toolCalled(name);
         }
         put(tool, OPERATION, "execute_tool");
         put(tool, TOOL_NAME, name);
@@ -177,6 +205,22 @@ public class AgentObservability {
             put(tool, TOOL_ARGUMENTS, content.prepare(tool.getToolCallArguments()));
             put(tool, TOOL_RESULT, content.prepare(tool.getToolCallResult()));
         }
+    }
+
+    /** The {@link #DATA_PATH} of a prompt that called these tools. */
+    static String dataPath(Set<String> tools) {
+        var sql = tools.stream().anyMatch(t -> t.matches("(query|describe)\\w*Data"));
+        var search = tools.stream().anyMatch(t -> t.startsWith("search"));
+        if (sql && search) {
+            return "search+sql";
+        }
+        if (sql) {
+            return "sql";
+        }
+        if (search) {
+            return "search";
+        }
+        return tools.isEmpty() ? "none" : "other";
     }
 
     /** High cardinality: on the span only, never a metric label. Skipped when there is no value. */

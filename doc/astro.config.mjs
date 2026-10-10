@@ -105,6 +105,7 @@ export default defineConfig({
 						{ label: 'GitOps del catálogo', slug: 'ia/gitops' },
 						{ label: 'El agente (ia-agent)', slug: 'ia/agente' },
 						{ label: 'A2A y guardarraíles', slug: 'ia/a2a-y-guardarrailes' },
+						{ label: 'Cómo lee los datos el agente', slug: 'ia/datos-del-agente' },
 						{ label: 'APIs como servidores MCP', slug: 'ia/api-mcp' },
 					],
 				},

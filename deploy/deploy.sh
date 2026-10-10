@@ -115,6 +115,9 @@ append_if_missing DOCS_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head 
 # here later does not change it in a running Keycloak — use kcadm.sh set-password for that.
 append_if_missing DEMO_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
 append_if_missing DOCS_ORACLE_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+# The AI agents' read-only login (agent_reader): it reads each service's agent views and nothing
+# else (supporting/agent-sql, doc/src/content/docs/ia/datos-del-agente.md). Rotating it only needs the db-init Job re-run.
+append_if_missing AGENT_DB_PASSWORD "$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
 
 # shellcheck disable=SC1090
 set -a; . "$SECRETS"; set +a
@@ -123,6 +126,10 @@ kubectl create secret generic ec-postgres -n "$NS" \
   --from-literal=POSTGRES_DB=workflow \
   --from-literal=POSTGRES_USER=workflow \
   --from-literal=POSTGRES_PASSWORD="$EC_POSTGRES_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic ec-agent-reader -n "$NS" \
+  --from-literal=AGENT_DB_USERNAME=agent_reader \
+  --from-literal=AGENT_DB_PASSWORD="$AGENT_DB_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic keycloak-admin -n "$NS" \
   --from-literal=password="$KEYCLOAK_ADMIN_PASSWORD" \

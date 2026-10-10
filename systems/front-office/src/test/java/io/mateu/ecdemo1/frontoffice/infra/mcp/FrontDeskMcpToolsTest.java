@@ -184,6 +184,52 @@ class FrontDeskMcpToolsTest {
     return "MCP-" + id;
   }
 
+  // ── SQL de solo lectura ───────────────────────────────────────────────────────
+
+  @Autowired io.mateu.ecdemo1.agentsql.AgentSql agentSql;
+
+  @Test
+  void theDataViewsSayWhatTheyAre() {
+    var data = new FrontOfficeDataTools(agentSql);
+
+    assertThat(data.describeFrontOfficeData(null)).extracting(io.mateu.ecdemo1.agentsql.AgentSql.View::name)
+        .contains("stays", "stay_pax", "guests", "rooms", "incidents", "folio_lines", "payments");
+    var stays = data.describeFrontOfficeData("stays").get(0);
+    assertThat(stays.description()).contains("One row per stay");
+    assertThat(stays.columns()).anySatisfy(c -> {
+      assertThat(c.name()).isEqualTo("holder_nationality");
+      assertThat(c.description()).contains("ISO-2");
+    });
+    assertThat(data.describeFrontOfficeData("guests").get(0).columns())
+        .extracting(io.mateu.ecdemo1.agentsql.AgentSql.Column::name).doesNotContain("document", "email", "phone");
+  }
+
+  @Test
+  void aCountByNationalityInOneQuery() {
+    var n = SEQ.incrementAndGet();
+    var today = LocalDate.now();
+    reservation("Q" + n + "A", "Doble", today, "PT");
+    reservation("Q" + n + "B", "Doble", today, "PT");
+    reservation("Q" + n + "C", "Suite", today, "PT");
+    var data = new FrontOfficeDataTools(agentSql);
+
+    var result = data.queryFrontOfficeData("select room_type, count(*) as n from agent.stays"
+        + " where holder_nationality = 'PT' and stay_id like 'MCP-Q" + n + "%' group by room_type order by room_type");
+
+    assertThat(result.columns()).containsExactly("room_type", "n");
+    assertThat(result.rows()).containsExactly(List.of("Doble", 2L), List.of("Suite", 1L));
+  }
+
+  @Test
+  void theTablesAndWritingAreOutOfReach() {
+    var data = new FrontOfficeDataTools(agentSql);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> data.queryFrontOfficeData("select document from guest"))
+        .hasMessageContaining("Only the views of agent");
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> data.queryFrontOfficeData("delete from agent.stays"))
+        .hasMessageContaining("Only SELECT");
+  }
+
   @Test
   void aStayIsFoundByItsIdOrByTheCrsLocatorOfItsWalkIn() {
     var stayId = arrival(1);

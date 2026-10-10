@@ -55,6 +55,7 @@
         <module>supporting/content</module>
         <module>supporting/ui-commons</module>
         <module>supporting/messaging</module>
+        <module>supporting/agent-sql</module>
         <module>supporting/demo-reset</module>
     </modules>
 </project>

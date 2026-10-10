@@ -103,6 +103,11 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_USER } }
             - name: DB_PASSWORD
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
+            # The AI agents' read-only SQL runs as this login, which reads only the agent views.
+            - name: AGENT_DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-agent-reader, key: AGENT_DB_USERNAME } }
+            - name: AGENT_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-agent-reader, key: AGENT_DB_PASSWORD } }
             - name: DB_POOL_SIZE
               value: "6"
             # The reception agent's actions are audited: to the `audit` topic, from an outbox. And it

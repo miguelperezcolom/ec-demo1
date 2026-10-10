@@ -90,6 +90,13 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- Read-only SQL over this service's agent views, for the AI agents (doc/src/content/docs/ia/datos-del-agente.md).
+             Installed from ../../../supporting/agent-sql first. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>agent-sql</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <!-- The demo's reset (process reset-demo): reset@1, this service emptying its own tables with its
              consumers paused. Installed from supporting/demo-reset first. -->
         <dependency>

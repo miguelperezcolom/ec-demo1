@@ -110,6 +110,9 @@ public class FrontDeskMcpTools {
           texto, en UNA llamada: úsala para cualquier pregunta que filtre estancias en vez de leerlas una a una),
           getStay, getGuest (con el estado de su kárdex), getFolio, listAvailableRooms, listAddOns,
           getWalkInOffer y quoteWalkIn (precio del CRS; no reserva nada).
+        - Preguntas que ninguna lectura responde (cuántos, sumas, agrupaciones, cruces): describeFrontOfficeData
+          da las vistas de datos y sus columnas, y queryFrontOfficeData ejecuta una SELECT de solo lectura sobre
+          ellas. Agrega en SQL (count, group by) en vez de traer filas.
         - Operaciones: check-in, check-out, no show, walk-in, cambio de habitación, late check-out y edición del
           kárdex. Ninguna se hace directamente: la herramienta prepare… la comprueba y devuelve un resumen con un
           token. Enséñale el resumen a la persona y pregúntale si lo confirma; solo cuando responda que sí, en su

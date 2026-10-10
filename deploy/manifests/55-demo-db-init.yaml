@@ -46,6 +46,8 @@ spec:
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_PASSWORD } }
             - name: PGDATABASE
               valueFrom: { secretKeyRef: { name: ec-postgres, key: POSTGRES_DB } }
+            - name: AGENT_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-agent-reader, key: AGENT_DB_PASSWORD } }
           command:
             - sh
             - -c
@@ -62,6 +64,14 @@ spec:
                   echo "database $db created"
                 fi
               done
+              # The AI agents' read-only login: no rights of its own beyond connecting. Each service
+              # grants it SELECT on the views of its `agent` schema when it starts (agent-sql), and
+              # those views are all it can read — no table, no file, no setting.
+              # Through stdin, not -c: psql only interpolates :'pw' (quoted, so any password is safe) there.
+              if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='agent_reader'" | grep -q 1; then verb=ALTER; else verb=CREATE; fi
+              echo "$verb ROLE agent_reader WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'pw'" \
+                | psql -v ON_ERROR_STOP=1 -v pw="$AGENT_DB_PASSWORD"
+              echo "role agent_reader ready"
           resources:
             requests: { memory: "64Mi", cpu: "50m" }
             limits:   { memory: "128Mi" }

@@ -64,6 +64,9 @@ public class BookingMcpTools implements McpSystemContext {
                   tipo de habitación, régimen, tarifa, nacionalidad o texto) usa searchBookings: una sola
                   llamada, y cada resultado ya trae sus habitaciones y nacionalidades. No leas las reservas
                   una a una con getBooking para filtrarlas.
+                - Para preguntas que ninguna lectura responde (cuántas, sumas, agrupaciones, cruces):
+                  describeCrsData da las vistas de datos y sus columnas, y queryCrsData ejecuta una SELECT
+                  de solo lectura sobre ellas. Agrega en SQL (count, group by) en vez de traer filas.
                 """;
     }
 

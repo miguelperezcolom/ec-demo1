@@ -160,3 +160,9 @@ logging:
     org.hibernate.orm.jdbc.bind: error
     org.springframework.kafka: error
     org.springframework.cloud.stream: error
+
+# The agents' read-only SQL (supporting/agent-sql, doc/src/content/docs/ia/datos-del-agente.md): the views of
+# agent-sql/views-postgresql.sql, read as a login that can read only those.
+agent-sql:
+  username: ${AGENT_DB_USERNAME:}
+  password: ${AGENT_DB_PASSWORD:}
