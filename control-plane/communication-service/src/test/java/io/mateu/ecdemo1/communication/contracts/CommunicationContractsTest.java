@@ -44,14 +44,20 @@ class CommunicationContractsTest {
 
     @Test
     void theSchemaOfHumanTasksIsTheFormsEnginesRecord() {
-        SchemaFiles.publish(TopicSpec.topic("human-tasks")
-                .describedAs("A human task opened, completed or cancelled in EventConductor's forms engine "
-                        + "(HumanTaskChanged, engine 2.19+). Best effort: an inbox may lag, a task never fails for it.")
+        // v2: engine 2.31 added assignment and escalation (event, candidates, priority, due date, escalation
+        // level, business key) and a claimed task is ASSIGNED, no longer PENDING with a holder. All nullable:
+        // a v1 message still reads.
+        SchemaFiles.publish(TopicSpec.topic("human-tasks").version(2)
+                .describedAs("A human task opened, assigned, escalated, completed or cancelled in EventConductor's "
+                        + "forms engine (HumanTaskChanged, engine 2.31+). Best effort: an inbox may lag, a task never "
+                        + "fails for it.")
                 .ownedBy("eventconductor-forms").keyedBy("taskId")
                 .producedBy("eventconductor-forms").consumedBy("communication-service")
                 .messages(HumanTaskChanged.class)
                 .example(new HumanTaskChanged("T-1", "approve-mapping", "Aprobar equivalencias", "P-1", "approve",
-                        "PENDING", List.of("mapping-approver"), null, Instant.parse("2026-11-12T09:30:00Z"))));
+                        "PENDING", List.of("mapping-approver"), null, Instant.parse("2026-11-12T09:30:00Z"),
+                        HumanTaskChanged.CREATED, List.of(), List.of("mapping-approver"), 50,
+                        Instant.parse("2026-11-13T09:30:00Z"), 0, "ECDEMO1-10201600")));
     }
 
     @Test

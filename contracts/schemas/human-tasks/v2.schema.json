@@ -1,0 +1,102 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "urn:ec-demo1:topic:human-tasks:v2",
+  "title" : "human-tasks v2",
+  "description" : "A human task opened, assigned, escalated, completed or cancelled in EventConductor's forms engine (HumanTaskChanged, engine 2.31+). Best effort: an inbox may lag, a task never fails for it.",
+  "x-topic" : "human-tasks",
+  "x-version" : 2,
+  "x-owner" : "eventconductor-forms",
+  "x-key" : "taskId",
+  "x-producers" : [ "eventconductor-forms" ],
+  "x-consumers" : [ "communication-service" ],
+  "x-java-type" : "io.mateu.workflow.dtos.events.integration.HumanTaskChanged",
+  "$ref" : "#/$defs/HumanTaskChanged",
+  "$defs" : {
+    "HumanTaskChanged" : {
+      "type" : "object",
+      "properties" : {
+        "taskId" : {
+          "type" : [ "string", "null" ]
+        },
+        "formId" : {
+          "type" : [ "string", "null" ]
+        },
+        "formName" : {
+          "type" : [ "string", "null" ]
+        },
+        "processId" : {
+          "type" : [ "string", "null" ]
+        },
+        "stepId" : {
+          "type" : [ "string", "null" ]
+        },
+        "status" : {
+          "type" : [ "string", "null" ]
+        },
+        "requiredRoles" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "userId" : {
+          "type" : [ "string", "null" ]
+        },
+        "at" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "event" : {
+          "type" : [ "string", "null" ]
+        },
+        "candidateUsers" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "candidateGroups" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "priority" : {
+          "type" : [ "integer", "null" ],
+          "format" : "int32"
+        },
+        "dueDate" : {
+          "type" : [ "string", "null" ],
+          "format" : "date-time"
+        },
+        "escalationLevel" : {
+          "type" : [ "integer", "null" ],
+          "format" : "int32"
+        },
+        "businessKey" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "taskId", "formId", "formName", "processId", "stepId", "status", "requiredRoles", "userId", "at", "event", "candidateUsers", "candidateGroups", "priority", "dueDate", "escalationLevel", "businessKey" ],
+      "additionalProperties" : false
+    }
+  },
+  "examples" : [ {
+    "taskId" : "T-1",
+    "formId" : "approve-mapping",
+    "formName" : "Aprobar equivalencias",
+    "processId" : "P-1",
+    "stepId" : "approve",
+    "status" : "PENDING",
+    "requiredRoles" : [ "mapping-approver" ],
+    "userId" : null,
+    "at" : "2026-11-12T09:30:00Z",
+    "event" : "created",
+    "candidateUsers" : [ ],
+    "candidateGroups" : [ "mapping-approver" ],
+    "priority" : 50,
+    "dueDate" : "2026-11-13T09:30:00Z",
+    "escalationLevel" : 0,
+    "businessKey" : "ECDEMO1-10201600"
+  } ]
+}

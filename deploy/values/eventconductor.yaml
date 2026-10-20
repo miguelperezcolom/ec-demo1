@@ -80,7 +80,7 @@ orchestrator:
   # 2.27.1: event triggers and onEvent (2.26.0, V39–V41); secure defaults, LOCK release however a
   # process ends, ordered outbox with several relays (2.27.0, V42–V44). The standalone app keeps its
   # REST API open behind its own filter chain.
-  imageTag: "2.27.1"
+  imageTag: "2.34.0"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -222,7 +222,7 @@ forms:
   # signed-in user, only the assignee completes (eventconductor#451).
   # 2.23.8: Claim hidden once claimed, Release for the assignee (eventconductor#452).
   # 2.27.1: the same release as the orchestrator.
-  imageTag: "2.27.1"
+  imageTag: "2.34.0"
   replicas: 1
   servicePort: 8106
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -274,7 +274,7 @@ forms:
 rules:
   image: miguelperezcolom/rule-standalone-app
   # 2.27.1: starts with gRPC on again (2.26.0/2.27.0 did not); off here anyway.
-  imageTag: "2.27.1"
+  imageTag: "2.34.0"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false
