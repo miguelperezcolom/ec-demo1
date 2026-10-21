@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -56,7 +57,8 @@ public class CrsIntake {
         if (current.paused() && processKey != null && processKey.equals(current.processKey())) {
             return current.until();
         }
-        var until = clock.instant().plus(maxPause);
+        // To the microsecond, as Postgres keeps it: a retry reads it back and must return the same end.
+        var until = clock.instant().plus(maxPause).truncatedTo(ChronoUnit.MICROS);
         pauses.save(new IntakePauses.Pause(until, by, processKey));
         log.info("CRS intake paused until {} by {} ({})", until, by, processKey);
         return until;
