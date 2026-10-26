@@ -68,6 +68,13 @@ class OperaContextTest {
     }
 
     @Test
+    void onDeployLocalTheNewContextIsAnEclocalOne() {
+        var out = new NewOperaContext(context, runConfig, CLOCK, "ECLOCAL").renew("reset-demo:1");
+
+        assertThat(out).isEqualTo(new NewOperaContext.Output("ECLOCAL-10031742", "ECLOCAL-10031742"));
+    }
+
+    @Test
     void theSameProcessGetsTheSameContextBackFromMemory() {
         var first = renew.renew("reset-demo:1");
         var again = new NewOperaContext(context, runConfig, Clock.offset(CLOCK, java.time.Duration.ofHours(2))).renew("reset-demo:1");

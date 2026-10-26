@@ -117,6 +117,9 @@ find "$TREE/deploy" -type f \( -name '*.yaml' -o -name '*.json' -o -name '*.sh' 
   -e 's#([a-z0-9-]+)\.ec1\.mateu\.io#\1.localhost#g' \
   -e 's#ec1\.mateu\.io#ec1.localhost#g' \
   -e '/cert-manager\.io\/cluster-issuer/d'
+# reset-demo's new Opera context here is ECLOCAL-…, not ec1's ECDEMO1-… (it still cancels both).
+"$SED" -i -E 's#^(\s*)- name: OPERA_CLEANUP_PROPERTIES$#\1- name: OPERA_RUN_PREFIX\n\1  value: "ECLOCAL"\n&#' \
+  "$TREE/deploy/manifests/67-pms-integration.yaml"
 # The backends see the host without the port, as on ec1.
 python3 - "$TREE/deploy/manifests/40-ingress.yaml" "$TREE/deploy/manifests/81-docs.yaml" "$TREE/deploy/manifests/50-kafka-console.yaml" <<'PY'
 import re, sys

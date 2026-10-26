@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Task new-opera-context (process reset-demo): a context of its own for the demo's next run,
- * {@code ECDEMO1-<MMddHHmm>} (UTC), taken at once — no restart — and kept in the run's ConfigMap for
+ * {@code ECDEMO1-<MMddHHmm>} (UTC; {@code ECLOCAL-…} on deploy/local), taken at once — no restart — and kept in the run's ConfigMap for
  * the next startup and the scripts. What earlier runs wrote stays in Opera under their own contexts —
  * cancelled by cancel-earlier-runs ({@link EarlierRuns}), not deleted.
  *
@@ -28,8 +28,14 @@ public class NewOperaContext {
     private final OperaContext context;
     private final RunConfig runConfig;
     private final Clock clock;
+    private final String prefix;
 
     public NewOperaContext(OperaContext context, RunConfig runConfig, Clock clock) {
+        this(context, runConfig, clock, OperaContext.LEGACY);
+    }
+
+    public NewOperaContext(OperaContext context, RunConfig runConfig, Clock clock, String prefix) {
+        this.prefix = prefix;
         this.context = context;
         this.runConfig = runConfig;
         this.clock = clock;
@@ -48,7 +54,7 @@ public class NewOperaContext {
             take(stored.get());
             return new Output(stored.get().externalSystemCode(), stored.get().customReference());
         }
-        var fresh = OperaContext.LEGACY + "-" + STAMP.format(clock.instant());
+        var fresh = prefix + "-" + STAMP.format(clock.instant());
         var next = new RunConfig.Stored(fresh, OperaContext.customReferenceFor(fresh), processKey);
         runConfig.write(next);
         take(next);

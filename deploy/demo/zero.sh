@@ -24,12 +24,11 @@ cd "$(dirname "$0")"
 . ./common.sh
 salesforce_env
 
-# On deploy/local (up.sh) the reservations go under ECLOCAL-…: only those are cancelled and the new
-# context is one of them, so a local run never cancels ec1's reservations nor writes under its contexts.
+# On deploy/local (up.sh) the new context is ECLOCAL-…, not ec1's ECDEMO1-…; the cancelling is the same.
 if [ "$(kubectl config current-context 2>/dev/null)" = kind-ec-demo1-local ]; then
-  RUN_PREFIX=ECLOCAL CANCEL_ONLY="--only ECLOCAL"
+  RUN_PREFIX=ECLOCAL
 else
-  RUN_PREFIX=ECDEMO1 CANCEL_ONLY=""
+  RUN_PREFIX=ECDEMO1
 fi
 
 echo "Stopping the services and the engine"
@@ -38,7 +37,7 @@ for d in $SERVICES; do kubectl -n $NS wait --for=delete pod -l app=$d --timeout=
 sleep 5
 
 echo "Cancelling in Opera the reservations of the demo's runs"
-python3 ./opera-cancel-ours.py XMAR $CANCEL_ONLY --yes || echo "  (some were not cancelled: see above)"
+python3 ./opera-cancel-ours.py XMAR --yes || echo "  (some were not cancelled: see above)"
 
 echo "A new Opera context for this run"
 set_opera_context "$RUN_PREFIX-$(date -u +%m%d%H%M)"
