@@ -204,7 +204,7 @@ externa, los perfiles de interlocutor por su `CorporateId`, los cobros por su re
 En la 2.18.0 el `LOCK` no funcionaba sobre PostgreSQL (la clave llevaba un separador NUL) y el conector
 serializaba las escrituras en memoria. La corrección de la 2.23.4 evita que dos procesos que toman a la
 vez una clave de `LOCK` libre manden el paso del perdedor al topic de mensajes muertos. Los values
-actuales fijan el orquestador, formularios y reglas en **2.27.1**, que además suelta los `LOCK` de un
+actuales fijan el orquestador, formularios y reglas en **2.36.0**; desde la 2.27.1 el motor suelta los `LOCK` de un
 proceso termine como termine (error, cancelación, compensación); las definiciones usan el `LOCK` del
 motor.
 :::

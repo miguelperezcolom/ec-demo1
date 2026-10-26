@@ -31,7 +31,7 @@ plugin version does not refresh Keycloak sessions automatically.
 
 1. Build and publish an explicitly tagged orchestrator image from the engine checkout containing
    `WorkflowExecutionController` and `V58__ide_test_runs.sql` (`feat/vscode-workflow-execution`).
-   The repository's ec1 values currently name `2.27.1`; changing a flag on that old image does
+   The repository's ec1 values currently name `2.36.0`; changing a flag on that old image does
    not add the API. Validate the upgrade against the deployed Flyway history and preserve the
    existing database and volumes. The local test database is not a source for ec1's data.
 2. Build and publish a tagged gateway image from this branch. It routes `/workflow/api/**` to

@@ -85,8 +85,8 @@ brew install kind gnu-sed
   las carga en el nodo (`kind load`) en lugar de descargarlas:
 
   ```sh
-  img=miguelperezcolom/orchestrator-standalone-app:2.27.1   # y forms-, rule-
-  c=$(docker create --platform linux/amd64 $img); docker cp $c:/opt/app/app.jar <app>/target/<app>-2.27.1.jar
+  img=miguelperezcolom/orchestrator-standalone-app:2.36.0   # y forms-, rule-
+  c=$(docker create --platform linux/amd64 $img); docker cp $c:/opt/app/app.jar <app>/target/<app>-2.36.0.jar
   docker buildx build --builder desktop-linux --platform linux/arm64 -f <app>/Dockerfile.ci -t $img --load <app>
   ```
 

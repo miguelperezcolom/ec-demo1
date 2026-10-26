@@ -12,11 +12,11 @@ consultado el clúster ni ha ejecutado llamadas a Opera, Salesforce o los LLM.
 
 | Componente | Versión | Fuente |
 | :--------- | :------ | :----- |
-| Mateu | `3.0-alpha.430` | `mateu.version` en los POM con interfaz |
-| Librerías de EventConductor | `2.27.1` | `eventconductor.version` en los módulos que las usan |
-| Orquestador | `2.27.1` | `orchestrator.imageTag` en `deploy/values/eventconductor.yaml` |
-| Formularios | `2.27.1` | `forms.imageTag` en el mismo fichero |
-| Reglas | `2.27.1` | `rules.imageTag` en el mismo fichero |
+| Mateu | `3.0-beta.15` | `mateu.version` en los POM con interfaz |
+| Librerías de EventConductor | `2.36.0` | `eventconductor.version` en los módulos que las usan |
+| Orquestador | `2.36.0` | `orchestrator.imageTag` en `deploy/values/eventconductor.yaml` |
+| Formularios | `2.36.0` | `forms.imageTag` en el mismo fichero |
+| Reglas | `2.36.0` | `rules.imageTag` en el mismo fichero |
 | Aplicaciones con Mateu | `0.76.0` | Imágenes en `deploy/manifests/` |
 | Gateway, `ia-agent`, `api-mcp` | `0.76.0` | `35-gateway.yaml`, `63-ia-agent.yaml`, `74-api-mcp.yaml` |
 | Sitio de documentación | `0.4.18` | `81-docs.yaml` |

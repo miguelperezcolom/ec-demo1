@@ -80,7 +80,12 @@ orchestrator:
   # 2.27.1: event triggers and onEvent (2.26.0, V39–V41); secure defaults, LOCK release however a
   # process ends, ordered outbox with several relays (2.27.0, V42–V44). The standalone app keeps its
   # REST API open behind its own filter chain.
-  imageTag: "2.27.1"
+  # 2.36.0: loops and forEach runs (2.29.0, V47), batch operations and search attributes (2.30.0,
+  # V48–V50), task escalation (2.31.0), sensitive variables (2.32.0, V53), CONTINUE_AS_NEW and flow
+  # control (2.33.0, V55–V56.1), AGENT steps (2.34.0, V57). Since 2.35.0 HTTP_CALL, LLM_CALL and
+  # PUBLISH_EVENT are tasks served by built-in workers inside the orchestrator, on the auto-created
+  # topics http-calls, llm-calls and event-publications.
+  imageTag: "2.36.0"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -221,8 +226,8 @@ forms:
   # 2.23.7: a task page by its own route (/forms/task/{id}) — the inbox links to it; claim takes the
   # signed-in user, only the assignee completes (eventconductor#451).
   # 2.23.8: Claim hidden once claimed, Release for the assignee (eventconductor#452).
-  # 2.27.1: the same release as the orchestrator.
-  imageTag: "2.27.1"
+  # 2.36.0: the same release as the orchestrator; forms migration V8 (assignment, candidates, 2.31.0).
+  imageTag: "2.36.0"
   replicas: 1
   servicePort: 8106
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -274,7 +279,8 @@ forms:
 rules:
   image: miguelperezcolom/rule-standalone-app
   # 2.27.1: starts with gRPC on again (2.26.0/2.27.0 did not); off here anyway.
-  imageTag: "2.27.1"
+  # 2.36.0: the same release as the orchestrator.
+  imageTag: "2.36.0"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false
