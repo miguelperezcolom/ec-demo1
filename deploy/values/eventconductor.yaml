@@ -257,6 +257,11 @@ forms:
     OTLP_TRACING_ENDPOINT: "http://tempo.observability.svc.cluster.local:4318/v1/traces"
     TRACING_SAMPLING: "1.0"
     OTEL_SERVICE_NAME: "forms"
+    # Who claims and completes a task: the forwarded token's preferred_username. Since Mateu
+    # 3.0-alpha.409 (forms ≥ 2.30) nothing else tells the task pages who is signed in — security is
+    # off here, the gateway is what verifies the token (/_forms/** is authenticated() there) — and
+    # every Claim failed with "Claiming a task needs a signed-in user".
+    WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN: "true"
     XDG_CONFIG_HOME: "/tmp"
     # A topic of its own. On the default `downstream` the forms engine and the test worker both
     # receive every task — different consumer groups — and the worker answers the human ones
