@@ -8,6 +8,7 @@ ECLOCAL-<MMddHHmm> (deploy/local) and EC1-… (probes) — which only Reservatio
 
   opera-cancel-ours.py [XMAR]          # lists them (nothing is written)
   opera-cancel-ours.py [XMAR] --yes    # cancels the Reserved / Requested ones (reason OTROS)
+  opera-cancel-ours.py [XMAR] --only ECLOCAL --yes   # only the contexts starting so (zero.sh on deploy/local)
 
 In-house reservations cannot be cancelled: they are listed, to be checked out by hand. The connection
 is the cluster's ec-opera Secret, or OPERA_* in the environment (deploy/.secrets/credentials.env).
@@ -35,7 +36,7 @@ def months():
         d = nxt
 
 
-def ours(hotel, access):
+def ours(hotel, access, only=""):
     """Every reservation of the property with one of our contexts, by arrival month (a search answers
     at most 1000 rows, however it is paged)."""
     found = {}
@@ -47,7 +48,7 @@ def ours(hotel, access):
             infos = page.get("reservationInfo") or []
             for info in infos:
                 contexts = [e.get("idContext", "") for e in info.get("externalReferences") or []]
-                mine = [c for c in contexts if OURS.match(c)]
+                mine = [c for c in contexts if OURS.match(c) and c.startswith(only)]
                 if mine:
                     rid = next(i["id"] for i in info["reservationIdList"] if i.get("type") == "Reservation")
                     locator = next((e.get("id") for e in info["externalReferences"] if e.get("idContext") == mine[0]), None)
@@ -76,9 +77,14 @@ def cancel(hotel, rid, access):
 def main(argv):
     yes = "--yes" in argv
     args = [a for a in argv if a != "--yes"]
+    only = ""
+    if "--only" in args:
+        i = args.index("--only")
+        only = args[i + 1]
+        del args[i:i + 2]
     hotel = args[0] if args else "XMAR"
     access = opera.token()["access_token"]
-    found = ours(hotel, access)
+    found = ours(hotel, access, only)
     by = {}
     for r in found:
         by.setdefault(r["status"], []).append(r)
