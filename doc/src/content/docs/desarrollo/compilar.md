@@ -39,8 +39,8 @@ mvn -B -ntp -pl integration/pms-integration-service -am test
 
 | Propiedad | Valor | Dónde |
 | :-------- | :---- | :---- |
-| `mateu.version` | `3.0-beta.15` | En **todos** los módulos con interfaz: una sola versión, porque las consolas pintan las pantallas de los demás pods |
-| `eventconductor.version` | `2.36.0` | Los módulos que hablan con el motor (`shared`, `worker-kafka`) |
+| `mateu.version` | `3.0-beta.17` | En **todos** los módulos con interfaz: una sola versión, porque las consolas pintan las pantallas de los demás pods |
+| `eventconductor.version` | `2.37.0` | Los módulos que hablan con el motor (`shared`, `worker-kafka`) |
 | `testcontainers.version` | `1.21.4` | En los módulos Boot 3.4 que usan Testcontainers, por Docker 29 |
 
 Subir Mateu: ver [Mateu](/desarrollo/mateu/).

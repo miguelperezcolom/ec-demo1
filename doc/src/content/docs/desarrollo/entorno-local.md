@@ -76,7 +76,7 @@ brew install kind gnu-sed
 
   ```sh
   deploy/local/load-images.sh            # todas, con la etiqueta de los manifiestos
-  deploy/local/load-images.sh 0.78.0 systems/front-office   # solo un módulo
+  deploy/local/load-images.sh 0.79.0 systems/front-office   # solo un módulo
   kubectl -n ec-demo1 rollout restart deploy/front-office
   ```
 
@@ -85,8 +85,8 @@ brew install kind gnu-sed
   las carga en el nodo (`kind load`) en lugar de descargarlas:
 
   ```sh
-  img=miguelperezcolom/orchestrator-standalone-app:2.36.0   # y forms-, rule-
-  c=$(docker create --platform linux/amd64 $img); docker cp $c:/opt/app/app.jar <app>/target/<app>-2.36.0.jar
+  img=miguelperezcolom/orchestrator-standalone-app:2.37.0   # y forms-, rule-
+  c=$(docker create --platform linux/amd64 $img); docker cp $c:/opt/app/app.jar <app>/target/<app>-2.37.0.jar
   docker buildx build --builder desktop-linux --platform linux/arm64 -f <app>/Dockerfile.ci -t $img --load <app>
   ```
 
