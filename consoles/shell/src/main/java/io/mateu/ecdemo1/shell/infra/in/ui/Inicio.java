@@ -13,7 +13,8 @@ import java.util.List;
 /**
  * The data plane's home ({@link ShellHome#homeRoute()}): the welcome archetype — a hero, and under it
  * the external APIs' tiles: Salesforce's calls left of the org's daily allowance, our pace, and
- * Opera's calls today — what to look at before a meeting or a demo. Each opens the usage page.
+ * Opera's calls today — what to look at before a meeting or a demo, each opening the usage page — and
+ * the room types Opera runs out of in the next two weeks, opening the free rooms by night.
  *
  * <p>A welcome page, and not a landing template with a micro frontend under it, because a welcome's
  * {@code @Panel} tiles are what both renderers draw as KPIs; Redwood draws no micro frontend in a
@@ -34,6 +35,10 @@ public class Inicio extends Welcome {
     @Panel(title = "")
     MetricCard opera = usage.get(2);
 
+    /** Opera's room types that run out in the next two weeks: what a booking there cannot get. */
+    @Panel(title = "")
+    MetricCard operaRooms = OperaRooms.kpi(OperaRooms.read(), "verCupoOpera");
+
     @Override
     protected String heroTitle() {
         return "EventConductor demo";
@@ -47,6 +52,12 @@ public class Inicio extends Welcome {
     @Override
     protected String heroImage() {
         return "/images/redwood-header-texture.png";
+    }
+
+    /** The free rooms, room type by night. */
+    @Action
+    Object verCupoOpera() {
+        return URI.create("/opera/cupo");
     }
 
     /** A tile opens the usage page: the breakdown by purpose, ours against others, the pause. */

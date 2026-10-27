@@ -36,6 +36,11 @@ class OperaAvailabilityTest {
 
     OperaAvailabilityTest() {
         when(ohip.get(anyString(), anyString(), any(Object[].class))).thenAnswer(call -> {
+            if (call.getArgument(1, String.class).startsWith("/rm/config")) {
+                return new OhipClient.Response(JSON.readTree("""
+                        {"roomTypesSummary": [{"roomTypeSummary": [{"roomType": "DBPB"}, {"roomType": "SJLB"}, {"roomType": "STDK"},
+                         {"roomType": "PM", "pseudo": true}]}]}"""), null);
+            }
             searches.incrementAndGet();
             int quantity = (Integer) call.getArgument(5);
             var rates = FREE.entrySet().stream().filter(e -> e.getValue() >= quantity)
@@ -66,6 +71,8 @@ class OperaAvailabilityTest {
         var calendar = availability.calendar("XMAR", 2);
         assertThat(calendar.from()).isEqualTo(LocalDate.of(2026, 11, 15));
         assertThat(calendar.cap()).isEqualTo(5);
+        assertThat(calendar.roomTypes()).as("a type with no room any night is there too; a pseudo one is not")
+                .containsExactly("DBPB", "SJLB", "STDK");
         assertThat(calendar.nights()).hasSize(2).allSatisfy(n -> assertThat(n.free())
                 .containsEntry("SJLB", 2).containsEntry("STDK", 5).doesNotContainKey("DBPB"));
         var read = searches.get();

@@ -6,3 +6,5 @@ type: Routes
 routes:
   - route: inicio
     viewModel: io.mateu.ecdemo1.shell.infra.in.ui.Inicio
+  - route: opera/cupo
+    viewModel: io.mateu.ecdemo1.shell.infra.in.ui.CupoOpera

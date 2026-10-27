@@ -48,6 +48,14 @@ public class AvailabilityController {
         return availability.calendar(hotelId, Math.max(1, Math.min(days, 31)));
     }
 
+    /** The same, for the property the integrations have in service (404 when none is). */
+    @GetMapping("/availability/calendar")
+    public org.springframework.http.ResponseEntity<OperaAvailability.Calendar> calendar(@RequestParam(defaultValue = "14") int days) {
+        var hotelId = availability.propertyInService();
+        return hotelId == null ? org.springframework.http.ResponseEntity.notFound().build()
+                : org.springframework.http.ResponseEntity.ok(calendar(hotelId, days));
+    }
+
     @ExceptionHandler(PmsTransientException.class)
     ProblemDetail unavailable(PmsTransientException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());

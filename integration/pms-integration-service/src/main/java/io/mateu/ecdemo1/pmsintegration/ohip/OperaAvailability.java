@@ -78,29 +78,69 @@ public class OperaAvailability {
     public record Night(LocalDate date, Map<String, Integer> free) {
     }
 
-    /** The nights from {@code from}, as read at {@code readAt}. */
-    public record Calendar(String hotelId, LocalDate from, int cap, List<Night> nights, Instant readAt) {
+    /**
+     * The nights from {@code from}, as read at {@code readAt}. {@code roomTypes}: every room type the
+     * property sells — one with no room any night is in no night's {@code free}.
+     */
+    public record Calendar(String hotelId, LocalDate from, int cap, List<String> roomTypes, List<Night> nights,
+                           Instant readAt) {
     }
 
     /**
-     * The free rooms of each type for the next {@code days} nights from today — read once every ten
-     * minutes at most: a reading is a few searches a night.
+     * The free rooms of each type for the next {@code days} nights from today — read again at most every
+     * fifteen minutes (kept read by {@link #keepRead}): a reading is a few searches a night.
      */
     public Calendar calendar(String hotelId, int days) {
-        var from = LocalDate.now(clock);
-        var key = hotelId + "|" + from + "|" + days;
-        var cached = calendars.get(key);
+        var cached = calendars.get(key(hotelId, days));
         if (cached != null && cached.readAt().plus(FRESH).isAfter(clock.instant())) {
             return cached;
         }
+        return read(hotelId, days);
+    }
+
+    /** The property the integrations have in service — the first, if several — or null if none. */
+    public String propertyInService() {
+        return connections.integrations().stream()
+                .filter(i -> i.status() != io.mateu.ecdemo1.integration.model.integration.IntegrationStatus.DECOMMISSIONED)
+                .map(i -> i.pmsHotelCode()).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+    }
+
+    String key(String hotelId, int days) {
+        return hotelId + "|" + LocalDate.now(clock) + "|" + days;
+    }
+
+    /** Read now; the reading in use is replaced only once this one is whole. */
+    Calendar read(String hotelId, int days) {
+        var from = LocalDate.now(clock);
         var nights = new ArrayList<Night>();
         for (var night = from; night.isBefore(from.plusDays(days)); night = night.plusDays(1)) {
             nights.add(new Night(night, free(hotelId, night)));
         }
-        var fresh = new Calendar(hotelId, from, CAP, List.copyOf(nights), clock.instant());
+        var types = new TreeSet<String>(roomTypes(hotelId));
+        nights.forEach(n -> types.addAll(n.free().keySet()));
+        var fresh = new Calendar(hotelId, from, CAP, List.copyOf(types), List.copyOf(nights), clock.instant());
+        var key = key(hotelId, days);
         calendars.keySet().removeIf(k -> k.startsWith(hotelId + "|") && !k.equals(key));
         calendars.put(key, fresh);
         return fresh;
+    }
+
+    /** The room types the property sells: not the pseudo ones (posting master…), nor the inactive. */
+    List<String> roomTypes(String hotelId) {
+        var types = new ArrayList<String>();
+        try {
+            var body = ohip.get(hotelId, "/rm/config/v1/hotels/{h}/roomTypes", hotelId).body();
+            for (var group : body == null ? List.<JsonNode>of() : iterable(body.path("roomTypesSummary"))) {
+                for (var r : group.path("roomTypeSummary")) {
+                    if (!r.path("pseudo").asBoolean(false) && !r.path("inactive").asBoolean(false)) {
+                        types.add(r.path("roomType").asText());
+                    }
+                }
+            }
+        } catch (RuntimeException e) {
+            log.debug("The room types of {} not read: {}", hotelId, e.getMessage());
+        }
+        return types;
     }
 
     /**
@@ -114,8 +154,7 @@ public class OperaAvailability {
                 .filter(i -> i.status() != io.mateu.ecdemo1.integration.model.integration.IntegrationStatus.DECOMMISSIONED)
                 .map(i -> i.pmsHotelCode()).filter(java.util.Objects::nonNull).distinct().toList()) {
             try {
-                calendars.remove(hotelId + "|" + LocalDate.now(clock) + "|" + DAYS);
-                calendar(hotelId, DAYS);
+                read(hotelId, DAYS);
             } catch (RuntimeException e) {
                 log.debug("Opera's free rooms of {} not read: {}", hotelId, e.getMessage());
             }
