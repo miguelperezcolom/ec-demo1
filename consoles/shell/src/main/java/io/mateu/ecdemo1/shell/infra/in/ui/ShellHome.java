@@ -60,7 +60,8 @@ import java.util.List;
 // Served by this app from src/main/resources/static, so it arrives through the gateway's
 // catch-all like the rest of the shell — no route of its own, and no token: the browser loads a
 // logo with an <img> tag, which sends no Authorization header.
-@Logo("/images/riu.svg")
+// The brand, and which console this is: each console its own pill (Data plane, Control plane, Front office)
+@Logo("/images/riu-data-plane.svg")
 @FavIcon("/images/riu.svg")
 // Edge-to-edge: the pages behind these menus are listings and workflow graphs, and capping the
 // content at the default ~900px container squeezes them into cards for lack of horizontal room.

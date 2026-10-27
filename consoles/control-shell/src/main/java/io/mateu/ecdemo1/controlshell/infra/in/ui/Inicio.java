@@ -53,4 +53,10 @@ public class Inicio extends Welcome {
     Object verApisExternas() {
         return URI.create("/usage/apis");
     }
+
+    /** Each console's own colour (its logo's pill), so the home says where one is. */
+    @Override
+    protected io.mateu.uidl.data.HeroTone heroTone() {
+        return io.mateu.uidl.data.HeroTone.plum;
+    }
 }

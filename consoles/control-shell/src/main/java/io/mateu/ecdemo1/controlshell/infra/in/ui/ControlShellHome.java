@@ -50,7 +50,8 @@ import java.util.List;
 // Its own colours, so it does not look like the data plane: indigo (Redwood's GBU line) as the
 // accent in Vaadin, and the top bar and colour strip in Redwood (static/theme/console-theme.js).
 @Script(src = "/theme/console-theme.js")
-@Logo("/images/riu.svg")
+// The brand, and which console this is: each console its own pill (Data plane, Control plane, Front office)
+@Logo("/images/riu-control-plane.svg")
 @FavIcon("/images/riu.svg")
 // The catalogues are listings with long ids and long URLs in them; the default ~900px container
 // wraps those into unreadable columns.
@@ -79,7 +80,7 @@ import java.util.List;
 // never means "clickable".
 // The strip under the band is Mateu's, drawn from the accent (Vaadin only, seed 11); Redwood's is in
 // static/theme/console-theme.js.
-@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#464c68", accentStripSeed = 11)
+@App(value = AppVariant.HAMBURGER_SECTIONS, themeToggle = true, accentColor = "#4B2E83", accentStripSeed = 11)
 public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     /**

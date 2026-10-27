@@ -175,4 +175,10 @@ public class Bienvenida extends Welcome {
   Object abrirAutomatizaciones() {
     return URI.create("/automatizaciones");
   }
+
+    /** Each console's own colour (its logo's pill), so the home says where one is. */
+    @Override
+    protected io.mateu.uidl.data.HeroTone heroTone() {
+        return io.mateu.uidl.data.HeroTone.teal;
+    }
 }

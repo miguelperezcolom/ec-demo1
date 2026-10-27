@@ -65,4 +65,5 @@ public class Inicio extends Welcome {
     Object verApisExternas() {
         return URI.create("/usage/apis");
     }
+
 }
