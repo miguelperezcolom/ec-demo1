@@ -38,9 +38,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * The dictionary, every version of every equivalence — and, once an integration is chosen in the
- * filters, what is still unmapped for its hotel. What waits for someone comes first: the codes
- * nobody has mapped, then the proposals. An entry is never edited in place — saving one approves a
+ * The dictionary, every version of every equivalence — and what is still unmapped: for the hotel of
+ * the integration chosen in the filters, or for every hotel in service when none is. What waits for
+ * someone comes first: the codes nobody has mapped, then the proposals. An entry is never edited in place — saving one approves a
  * new version of it; an unmapped code is mapped by editing its row and saving it.
  *
  * <p>The agent is asked from here too, and approving, rejecting and withdrawing work on the selected
@@ -65,8 +65,8 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
     /**
      * Entries are filtered, ordered and paged by the database ({@link DictionaryQueries}). The
      * unmapped codes are not entries: they are the CRS catalog (a remote API) minus what the
-     * dictionary resolves, so they are built and filtered in memory — deliberately, and only once an
-     * integration is chosen — and they go first, before the entries. A page that starts among them
+     * dictionary resolves, so they are built and filtered in memory — for the chosen integration's
+     * hotel, or every hotel in service — and they go first, before the entries. A page that starts among them
      * takes the rest of its rows from the database, from where they end.
      */
     @Override
@@ -113,10 +113,12 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
     /**
      * The hotel's CRS codes with no approved equivalent and no proposal waiting — a proposal is
      * already a row of its own. The full catalog contrast, noisy by nature; the causes are the short list.
+     * With no hotel chosen, those of every hotel in service that has any: an unfiltered dictionary
+     * showed only the approved entries, and right after an onboarding it looked as if nothing waited.
      */
     Stream<EntryRow> unmapped(String hotel) {
         if (hotel == null) {
-            return Stream.empty();
+            return pending.hotelsWithPending().stream().flatMap(this::unmapped);
         }
         try {
             return pending.pendingCodes(hotel).stream()
