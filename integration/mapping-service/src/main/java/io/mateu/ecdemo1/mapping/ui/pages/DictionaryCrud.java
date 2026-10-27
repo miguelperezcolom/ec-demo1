@@ -16,18 +16,24 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.data.ButtonStyle;
 import io.mateu.uidl.data.ListingData;
+import io.mateu.uidl.data.LongTask;
 import io.mateu.uidl.data.Message;
 import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.data.Status;
 import io.mateu.uidl.data.StatusType;
+import io.mateu.uidl.data.UICommand;
 import io.mateu.uidl.interfaces.HttpRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -162,10 +168,13 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
     /**
      * Asks the agent for a proposal: for the integration chosen in the filters; else for the hotels of
      * the selected rows; else, with nothing chosen, for every hotel with something unmapped — whatever
-     * its integration.
+     * its integration. The agent takes from seconds to minutes per hotel, so a dialog shows how it goes
+     * (a LongTask over SSE: the button only pulsed), one stretch of its bar per hotel; on closing, the
+     * listing searches again and shows the proposals.
      */
     @ListToolbarButton(rowsSelectedRequired = false)
     @Toolbar(buttonStyle = ButtonStyle.primary, order = 0)
+    @Action(sse = true)
     public Object askTheAgent(List<EntryRow> selection, HttpRequest httpRequest) {
         var chosen = httpRequest.runActionRq().componentState().get("integration");
         var hotels = chosen != null && !blank(chosen.toString()) ? List.of(chosen.toString())
@@ -180,14 +189,36 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
         if (hotels.isEmpty()) {
             return refreshed(httpRequest, "The selected rows are the chain's: choose an integration in the filters to ask the agent");
         }
-        if (hotels.size() > 1) {
-            hotels.forEach(agent::requestProposalInBackground);
-            return refreshed(httpRequest, "The agent is proposing the mapping of " + String.join(", ", hotels)
-                    + "; its proposals will appear here, waiting for review");
-        }
-        var answer = agent.requestProposal(hotels.getFirst(), httpRequest.getHeaderValue("Authorization"));
-        return refreshed(httpRequest, "The agent answered; its proposals are here, waiting for review. "
-                + (answer == null ? "" : answer.lines().findFirst().orElse("")));
+        var asked = List.copyOf(hotels);
+        var authorization = httpRequest.getHeaderValue("Authorization");
+        return LongTask.create("Asking the mapping agent")
+                .withProgressBar()
+                .startingText("Asking the agent about " + String.join(", ", asked) + "…")
+                .done("The agent has answered", "Its proposals are in the dictionary, waiting for review")
+                .closeAfter(3)
+                .withCommand(UICommand.runAction("search", listOf(httpRequest)))
+                .run(progress -> Flux.range(0, asked.size())
+                        .concatMap(i -> asking(progress, asked.get(i), i, asked.size(), authorization)));
+    }
+
+    /**
+     * One hotel's stretch of the bar: while the agent thinks — it answers all at once, at the end — the
+     * seconds it has been at it, and the bar closing in on the end of the stretch; then its answer.
+     */
+    Flux<Object> asking(io.mateu.uidl.data.ProgressReporter progress, String hotel, int index, int total,
+                        String authorization) {
+        var answer = Mono.fromCallable(() -> agent.requestProposal(hotel, authorization))
+                .subscribeOn(Schedulers.boundedElastic())
+                .defaultIfEmpty("")
+                .onErrorResume(e -> Mono.just("it could not answer: " + e.getMessage()))
+                .cache();
+        var waiting = Flux.interval(Duration.ZERO, Duration.ofSeconds(1))
+                .map(seconds -> progress.step("The agent is proposing the mapping of %s… %d s".formatted(hotel, seconds),
+                        (index + 0.9 * (1 - Math.exp(-seconds / 40.0))) / total))
+                .takeUntilOther(answer);
+        Flux<Object> answered = answer.map(a -> progress.step(hotel + ": " + a.lines().findFirst().orElse("answered"),
+                (index + 1.0) / total)).flux();
+        return Flux.concat(waiting, answered);
     }
 
     /**
@@ -262,12 +293,18 @@ public class DictionaryCrud extends Crud<EntryViewModel, EntryViewModel, EntryVi
 
     /** The message, and the listing searched again so the rows show what was just decided. */
     static CrudActionResult refreshed(HttpRequest httpRequest, String message) {
-        var initiator = httpRequest.runActionRq().initiatorComponentId();
         return CrudActionResult.of("refresh")
                 .withRoute("/list")
                 .withActionToRun("search")
-                .withTargetComponentId("ux_" + initiator.substring(0, initiator.length() - "_app".length()) + "_cs_list")
+                .withTargetComponentId(listOf(httpRequest))
                 .withMessage(new Message(message));
+    }
+
+    /** The listing's component id on Vaadin, from the crud's (Redwood runs `search` on the crud itself). */
+    static String listOf(HttpRequest httpRequest) {
+        var initiator = httpRequest.runActionRq().initiatorComponentId();
+        var crud = initiator.endsWith("_app") ? initiator.substring(0, initiator.length() - "_app".length()) : initiator;
+        return "ux_" + crud + "_cs_list";
     }
 
     @Override
