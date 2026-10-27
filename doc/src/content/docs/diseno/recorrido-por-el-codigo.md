@@ -319,7 +319,12 @@ return new PmsRejectedException(status.value(), errorCode(e), detail);
 - `PmsTransientException` (5xx, 429, 401 tras renovar, `ResourceAccessException` por timeout o red)
   **se propaga**: el paso falla y el motor lo reintenta.
 - `PmsRejectedException` (cualquier otro 4xx) lo captura el handler: causa
-  `PMS_REJECTED:<hotel>:<localizador>:upsert-reservation` con el código de error de Opera, y `WAIT`.
+  `PMS_REJECTED:<hotel>:upsert-reservation:<código de Opera>` (p. ej. `RSV00138`, sin cupo del tipo de
+  habitación) y `WAIT`. Todas las reservas que Opera rechaza igual esperan en esa misma causa: un incidente
+  con N reservas detrás, no N. Sin código de error, la causa es de la reserva
+  (`PMS_REJECTED:<hotel>:<localizador>:upsert-reservation`), como los rechazos de recepción y de folio. Cuando
+  una versión más nueva de la reserva entra en Opera, `/causes/release-refusal` saca solo a esa reserva de la
+  causa compartida, y la causa se resuelve cuando ya no espera nadie.
 
 ### Lo que avisa el conector
 

@@ -172,6 +172,17 @@ public class IntegrationClients {
                 .retrieve().toBodilessEntity();
     }
 
+    /**
+     * A reservation's refusal of a step has nothing left to wait for (a newer version is in Opera, or the
+     * step went through): its own refusal is resolved and it is taken off the shared ones, which other
+     * reservations refused the same way keep waiting on.
+     */
+    public void releaseRefusal(String hotelCode, String locator, String step, String by) {
+        mapping.post().uri(b -> b.path("/causes/release-refusal").queryParam("hotelCode", hotelCode)
+                .queryParam("locator", locator).queryParam("step", step).queryParam("by", by).build())
+                .retrieve().toBodilessEntity();
+    }
+
     record ResolveRequest(String hotelCode, List<CodeRef> codes) {
     }
 

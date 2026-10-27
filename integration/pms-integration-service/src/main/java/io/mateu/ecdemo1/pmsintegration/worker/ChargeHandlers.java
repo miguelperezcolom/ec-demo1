@@ -228,8 +228,7 @@ public class ChargeHandlers {
 
     void resolve(ChargeTask input, String step, String why) {
         try {
-            integration.resolveCauseIfOpen(Cause.pmsRejectedReservation(input.hotelCode(), input.locator(), step, "").key(),
-                    "pms-integration: " + why);
+            integration.releaseRefusal(input.hotelCode(), input.locator(), step, "pms-integration: " + why);
         } catch (RuntimeException e) {
             log.warn("{}: a wait of its {} could not be resolved: {}", input.locator(), step, e.getMessage());
         }

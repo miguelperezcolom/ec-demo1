@@ -40,9 +40,49 @@ public record Cause(String key, CauseType type, String description) {
                 "The PMS refused partner %s: %s".formatted(partnerCode, reason));
     }
 
+    /**
+     * Opera refused a step of a reservation. Writing the reservation into Opera, with Opera's error code
+     * in the reason, the cause is that refusal at that hotel — {@code
+     * PMS_REJECTED:MRU01:upsert-reservation:RSV00138}, no rooms of the type left — and every reservation
+     * it refuses the same way waits on it: one incident with N reservations behind it, not N. The
+     * desk's and the folio's steps (a check-in, a charge) stay the reservation's own: each is fixed on
+     * that stay — another room, another amount — and resolving one must not relaunch the others.
+     */
     public static Cause pmsRejectedReservation(String hotelCode, String locator, String step, String reason) {
+        var code = SHARED_REFUSAL_STEPS.contains(step) ? pmsErrorCode(reason) : null;
+        if (code != null) {
+            return new Cause(key(CauseType.PMS_REJECTED, hotelCode, step, code), CauseType.PMS_REJECTED,
+                    "The PMS refused %s of reservations of hotel %s: %s".formatted(step, hotelCode, reason));
+        }
         return new Cause(key(CauseType.PMS_REJECTED, hotelCode, locator, step), CauseType.PMS_REJECTED,
                 "The PMS refused %s of reservation %s of hotel %s: %s".formatted(step, locator, hotelCode, reason));
+    }
+
+    /** The key a reservation's own refusal has: the one a refusal with no error code waits on. */
+    public static String pmsRejectedReservationKey(String hotelCode, String locator, String step) {
+        return key(CauseType.PMS_REJECTED, hotelCode, locator, step);
+    }
+
+    /** What the keys of the shared refusals of a step at a hotel start with — one per Opera error code. */
+    public static String pmsRejectedStepPrefix(String hotelCode, String step) {
+        return key(CauseType.PMS_REJECTED, hotelCode, step) + SEPARATOR;
+    }
+
+    /** The steps whose refusals with the same Opera code share one cause. */
+    public static final java.util.Set<String> SHARED_REFUSAL_STEPS = java.util.Set.of("upsert-reservation");
+
+    static final java.util.regex.Pattern PMS_ERROR_CODE = java.util.regex.Pattern.compile("\\b([A-Z]{2,6}\\d{3,6})\\b");
+
+    /** Opera's error code in a refusal's reason («… on Room Type level — RSV00138»): the last one; null if none. */
+    static String pmsErrorCode(String reason) {
+        if (reason == null) {
+            return null;
+        }
+        String code = null;
+        for (var m = PMS_ERROR_CODE.matcher(reason); m.find(); ) {
+            code = m.group(1);
+        }
+        return code;
     }
 
     public static Cause integrationInactive(String hotelCode) {

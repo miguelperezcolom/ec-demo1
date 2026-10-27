@@ -190,6 +190,43 @@ public class Causes {
     }
 
     /**
+     * A reservation's refusal of {@code step} has nothing left to wait for — a newer version of it is in
+     * Opera, or what it was refused went through after all. Its own refusal (one with no error code) is
+     * resolved; from the shared ones of that step at that hotel (one per Opera error code, with other
+     * reservations behind them) only its processes are taken off: they resume once nothing else holds
+     * them, and the others keep waiting. A shared refusal nobody waits on any more is resolved.
+     */
+    @Transactional
+    public void releaseRefusal(String hotelCode, String locator, String step, String releasedBy) {
+        resolveIfOpen(Cause.pmsRejectedReservationKey(hotelCode, locator, step), releasedBy);
+        var shared = causes.findByCauseKeyStartingWithAndStatus(Cause.pmsRejectedStepPrefix(hotelCode, step), CauseStatus.OPEN)
+                .stream().map(c -> c.causeKey).sorted().toList();
+        for (var causeKey : shared) {
+            causes.lock(causeKey);
+            var released = 0;
+            for (var waiter : waiters.waitingOn(causeKey).stream()
+                    .filter(w -> locator.equals(w.getSubject()) && hotelCode.equals(w.getHotelCode()))
+                    .sorted(java.util.Comparator.comparing(Waiter::getProcessKey)).toList()) {
+                if (!waiters.lockStatus(waiter.getProcessKey()).map(WaiterStatus.WAITING.name()::equals).orElse(false)) {
+                    continue;
+                }
+                links.deleteById(new WaiterCause.Key(waiter.getProcessKey(), causeKey));
+                links.flush();
+                if (links.openCausesOf(waiter.getProcessKey()) == 0) {
+                    waiter.setStatus(WaiterStatus.RELEASED);
+                    waiter.setReleasedAt(clock.instant());
+                    signal(waiter);
+                    released++;
+                }
+            }
+            if (waiters.countWaitingOn(causeKey) == 0) {
+                resolve(causeKey, releasedBy);
+            }
+            log.info("{}'s refusal under {} released by {}: {} process(es) resume", locator, causeKey, releasedBy, released);
+        }
+    }
+
+    /**
      * The resumed process asks for its successor. Idempotent: the successor's business key is
      * derived from the waiting process's, so asking twice starts it once.
      */

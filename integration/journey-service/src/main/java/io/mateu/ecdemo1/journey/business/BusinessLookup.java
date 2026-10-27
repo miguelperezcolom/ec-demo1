@@ -86,10 +86,19 @@ public class BusinessLookup {
         var codes = codes(bookingNode);
         var causes = new ArrayList<BusinessData.CauseInfo>();
         var all = get(mapping, "Mapeado", unavailable, "/causes?openOnly=false");
+        // A refusal Opera gave several reservations alike is one cause that does not name them: the ones
+        // this booking's processes wait or waited on are asked for by its locator.
+        var waitedOn = new java.util.HashSet<String>();
+        var own = all == null ? null : get(mapping, "Mapeado", unavailable, "/causes?openOnly=false&subject={locator}", locator);
+        if (own != null) {
+            for (var c : own) {
+                waitedOn.add(text(c, "key"));
+            }
+        }
         if (all != null) {
             for (var c : all) {
                 var key = text(c, "key");
-                if (key != null && concerns(key, hotel, locator, codes)) {
+                if (key != null && (waitedOn.contains(key) || concerns(key, hotel, locator, codes))) {
                     causes.add(new BusinessData.CauseInfo(key, text(c, "type"), text(c, "description"), text(c, "status"),
                             text(c, "openedAt"), text(c, "resolvedAt"), text(c, "resolvedBy")));
                 }
