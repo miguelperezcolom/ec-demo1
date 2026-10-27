@@ -56,7 +56,8 @@ public class CrsIntake {
         if (current.paused() && processKey != null && processKey.equals(current.processKey())) {
             return current.until();
         }
-        var until = clock.instant().plus(maxPause);
+        // To the microsecond, as the database keeps it: the first answer and a retry's (read back) are the same
+        var until = clock.instant().plus(maxPause).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         pauses.save(new IntakePauses.Pause(until, by, processKey));
         log.info("CRS intake paused until {} by {} ({})", until, by, processKey);
         return until;
