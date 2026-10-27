@@ -112,6 +112,24 @@ final class DemoBookingGenerator {
         return this;
     }
 
+    /** Whether a booking's rooms (a room type once per room) would get into the PMS for the stay. */
+    interface Fit {
+        boolean fits(String hotelCode, LocalDate arrival, LocalDate departure, List<String> roomTypes);
+    }
+
+    /** How many tries a booking gets to fit before it is taken as it is. */
+    static final int FIT_ATTEMPTS = 25;
+
+    /** Asked of each booking; by default everything fits (no PMS to ask). */
+    Fit fit = (hotel, arrival, departure, roomTypes) -> true;
+    /** The bookings of the last batch that were taken without fitting. */
+    int unfitted;
+
+    DemoBookingGenerator guarded(Fit fit) {
+        this.fit = fit;
+        return this;
+    }
+
     DemoBookingGenerator(CrsCatalog catalog, RoomPricing pricing, List<TradingPartner> partners, Random random,
                          LocalDate today, String batch) {
         this.catalog = catalog;
@@ -133,12 +151,37 @@ final class DemoBookingGenerator {
         Collections.shuffle(families, random);
         var bookings = new ArrayList<DemoBooking>();
         var paidOne = false;
+        unfitted = 0;
         for (int i = 0; i < count; i++) {
-            var booking = booking(i, channels.get(i), families.get(i), !paidOne);
+            // Another draw until the PMS would take it — counting the rooms of the same type this batch
+            // already took on those nights: two that want the last double do not both get it.
+            DemoBooking booking = null;
+            for (int attempt = 0; attempt < FIT_ATTEMPTS && booking == null; attempt++) {
+                var candidate = booking(i, channels.get(i), families.get(i), !paidOne);
+                if (fitsAlongside(candidate, bookings)) {
+                    booking = candidate;
+                } else if (attempt == FIT_ATTEMPTS - 1) {
+                    booking = candidate;
+                    unfitted++;
+                }
+            }
             paidOne |= !booking.payments().isEmpty();
             bookings.add(booking);
         }
         return bookings;
+    }
+
+    /** Whether the booking's rooms, and those of the batch's bookings sharing a night with it, fit. */
+    boolean fitsAlongside(DemoBooking candidate, List<DemoBooking> taken) {
+        var request = candidate.request();
+        var types = new ArrayList<String>(request.rooms().stream().map(r -> r.roomTypeCode()).toList());
+        for (var other : taken) {
+            var o = other.request();
+            if (o.arrival().isBefore(request.departure()) && request.arrival().isBefore(o.departure())) {
+                o.rooms().stream().map(r -> r.roomTypeCode()).filter(types::contains).forEach(types::add);
+            }
+        }
+        return fit.fits(candidate.hotelCode(), request.arrival(), request.departure(), types);
     }
 
     /** {@code mustPay}: no booking of the batch is paid yet, so a direct one is. */

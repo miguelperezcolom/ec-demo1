@@ -43,6 +43,41 @@ class DemoBookingGeneratorTest {
     }
 
     @Test
+    void theBookingsAreDrawnUntilThePmsWouldTakeThemCountingWhatTheBatchTook() {
+        for (long seed = 0; seed < 30; seed++) {
+            // Opera has no DBL-POOL at all, and one SUITE-SWIMUP a night
+            var generator = generator(seed, PARTNERS).guarded((hotel, arrival, departure, roomTypes) ->
+                    !roomTypes.contains("DBL-POOL") && roomTypes.stream().filter("SUITE-SWIMUP"::equals).count() <= 1);
+            var bookings = generator.generate(10);
+
+            assertThat(bookings).hasSize(10);
+            assertThat(generator.unfitted).isZero();
+            for (var booking : bookings) {
+                assertThat(booking.request().rooms()).noneMatch(r -> r.roomTypeCode().equals("DBL-POOL"));
+            }
+            for (var a : bookings) {
+                for (var b : bookings) {
+                    var x = a.request();
+                    var y = b.request();
+                    var shareANight = x.arrival().isBefore(y.departure()) && y.arrival().isBefore(x.departure());
+                    var suites = java.util.stream.Stream.concat(x.rooms().stream(), a == b ? java.util.stream.Stream.empty() : y.rooms().stream())
+                            .filter(r -> r.roomTypeCode().equals("SUITE-SWIMUP")).count();
+                    if (shareANight) {
+                        assertThat(suites).as("seed %d: one swim-up suite a night", seed).isLessThanOrEqualTo(1);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void aBookingNoStayFitsIsTakenAsItIsAndCounted() {
+        var generator = generator(7, PARTNERS).guarded((hotel, arrival, departure, roomTypes) -> false);
+        assertThat(generator.generate(3)).hasSize(3);
+        assertThat(generator.unfitted).isEqualTo(3);
+    }
+
+    @Test
     void tenBookingsTheCrsAcceptsForMru01() {
         for (long seed = 0; seed < 50; seed++) {
             var bookings = generator(seed, PARTNERS).generate(10);
@@ -134,7 +169,7 @@ class DemoBookingGeneratorTest {
         };
         PartnerDirectory directory = () -> PARTNERS;
         var form = new DemoBookingsForm(create, catalog, pricing, directory,
-                Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-09-27T10:00:00Z"), ZoneOffset.UTC), new io.mateu.ecdemo1.booking.infra.out.pms.OperaFit(""));
 
         var outcome = form.create(1L);
 
@@ -158,7 +193,8 @@ class DemoBookingGeneratorTest {
         PartnerDirectory directory = () -> {
             throw new IllegalStateException("connection refused");
         };
-        var form = new DemoBookingsForm(create, catalog, pricing, directory, Clock.systemUTC());
+        var form = new DemoBookingsForm(create, catalog, pricing, directory, Clock.systemUTC(),
+                new io.mateu.ecdemo1.booking.infra.out.pms.OperaFit(""));
 
         var outcome = form.create();
 
