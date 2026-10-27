@@ -44,14 +44,23 @@ class CommunicationContractsTest {
 
     @Test
     void theSchemaOfHumanTasksIsTheFormsEnginesRecord() {
-        SchemaFiles.publish(TopicSpec.topic("human-tasks")
-                .describedAs("A human task opened, completed or cancelled in EventConductor's forms engine "
-                        + "(HumanTaskChanged, engine 2.19+). Best effort: an inbox may lag, a task never fails for it.")
+        // v2: since engine 2.31 the record also carries the lifecycle event and the assignment (event,
+        // candidates, priority, due date, escalations, business key) — v1, closed, cannot hold them.
+        SchemaFiles.publish(TopicSpec.topic("human-tasks").version(2)
+                .describedAs("A human task created, assigned, claimed, released, completed, cancelled or escalated in "
+                        + "EventConductor's forms engine (HumanTaskChanged, engine 2.31+: with the lifecycle event and the "
+                        + "assignment). Best effort: an inbox may lag, a task never fails for it.")
                 .ownedBy("eventconductor-forms").keyedBy("taskId")
                 .producedBy("eventconductor-forms").consumedBy("communication-service")
                 .messages(HumanTaskChanged.class)
                 .example(new HumanTaskChanged("T-1", "approve-mapping", "Aprobar equivalencias", "P-1", "approve",
-                        "PENDING", List.of("mapping-approver"), null, Instant.parse("2026-11-12T09:30:00Z"))));
+                        "PENDING", List.of("mapping-approver"), null, Instant.parse("2026-11-12T09:30:00Z"),
+                        HumanTaskChanged.CREATED, List.of(), List.of("mapping-approver"), 50, null, 0,
+                        "alta-integracion:52e45d18-00d1-48b9-b792-4f2e723e6efb"))
+                .example(new HumanTaskChanged("T-1", "approve-mapping", "Aprobar equivalencias", "P-1", "approve",
+                        "COMPLETED", List.of("mapping-approver"), "demo", Instant.parse("2026-11-12T09:41:00Z"),
+                        HumanTaskChanged.COMPLETED, List.of(), List.of("mapping-approver"), 50,
+                        Instant.parse("2026-11-13T09:30:00Z"), 0, "alta-integracion:52e45d18-00d1-48b9-b792-4f2e723e6efb")));
     }
 
     @Test
@@ -97,7 +106,9 @@ class CommunicationContractsTest {
         assertThat(read.getAllValues()).allSatisfy(t -> {
             assertThat(t.taskId()).isNotBlank();
             assertThat(t.requiredRoles()).isNotEmpty();
-            assertThat(t.open()).isTrue();
+            // a pending task opens in the inbox, a completed one closes it there
+            assertThat(t.open()).isEqualTo("PENDING".equals(t.status()) || "ASSIGNED".equals(t.status()));
         });
+        assertThat(read.getAllValues()).extracting(HumanTask::open).contains(true, false);
     }
 }
