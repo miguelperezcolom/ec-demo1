@@ -20,7 +20,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <mateu.version>3.0-beta.17</mateu.version>
+        <mateu.version>3.0-beta.18</mateu.version>
         <eventconductor.version>2.37.0</eventconductor.version>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
         <spring-ai.version>1.0.0</spring-ai.version>

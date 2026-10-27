@@ -76,7 +76,7 @@ brew install kind gnu-sed
 
   ```sh
   deploy/local/load-images.sh            # todas, con la etiqueta de los manifiestos
-  deploy/local/load-images.sh 0.79.0 systems/front-office   # solo un módulo
+  deploy/local/load-images.sh 0.80.0 systems/front-office   # solo un módulo
   kubectl -n ec-demo1 rollout restart deploy/front-office
   ```
 
