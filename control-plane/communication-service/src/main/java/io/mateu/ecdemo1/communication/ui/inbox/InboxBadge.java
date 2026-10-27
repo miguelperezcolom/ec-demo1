@@ -72,8 +72,9 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
      * {@code <vaadin-icon>} (so no {@code <vaadin-button>} any more) and every handler, and keeps
      * {@code data-*}; the Redwood shell keeps only {@code class}, {@code title}, {@code aria-hidden}
      * and a filtered {@code style}, and its {@code <vaadin-icon>} becomes the Redwood bell. The colours
-     * fall back to the header's own there (the {@code --lumo-*} ones are not defined, except the
-     * urgent red, which the Redwood header sets to its light danger tone).
+     * fall back to fixed ones there (the {@code --lumo-*} ones are not defined), as a pill with white
+     * ink — and next to the bell rather than over it: that shell drops {@code position} and
+     * {@code background} (only {@code background-color} is kept).
      *
      * <p>So it is an {@code <a>} that says where it goes twice, once for each shell. Its
      * {@code onclick} is never run by either: the Redwood renderer reads the {@code navigation-requested}
@@ -91,9 +92,12 @@ public class InboxBadge implements Hydratable, ComponentTreeSupplier {
                 + " inset-inline-end: 0.0625rem; box-sizing: border-box; min-width: 1.15em; height: 1.15em;"
                 + " padding: 0 0.3em; border-radius: 1em; font-size: var(--lumo-font-size-xxs, 0.6875rem);"
                 + " font-weight: 600; line-height: 1.15em; text-align: center; pointer-events: none;"
+                // background-color, not background, and a light ink: the Redwood shell keeps only the
+                // former, and its header is dark — the count read as dark ink on no pill at all there
+                + " margin-inline-start: 0.125rem;"
                 + (urgent > 0
-                        ? " background: var(--lumo-error-color, #c62828); color: var(--lumo-error-contrast-color, #161513);"
-                        : " background: var(--lumo-primary-color, currentColor); color: var(--lumo-primary-contrast-color, #161513);")
+                        ? " background-color: var(--lumo-error-color, #d63b25); color: var(--lumo-error-contrast-color, #ffffff);"
+                        : " background-color: var(--lumo-primary-color, #227e9e); color: var(--lumo-primary-contrast-color, #ffffff);")
                 + "\">" + (waiting > 99 ? "99+" : String.valueOf(waiting)) + "</span>";
         return "<a href=\"" + ROUTE + "\""
                 + " onclick=\"this.dispatchEvent(new CustomEvent('navigation-requested', {detail: {route: '" + ROUTE

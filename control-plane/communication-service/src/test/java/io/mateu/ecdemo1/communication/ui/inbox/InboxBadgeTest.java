@@ -63,6 +63,16 @@ class InboxBadgeTest {
     }
 
     @Test
+    void thePillShowsOnTheRedwoodHeaderToo() {
+        // the Redwood shell keeps background-color (not background) and drops position: a pill with white ink
+        var urgent = InboxBadge.html(4, 2);
+        assertThat(urgent).contains("background-color: var(--lumo-error-color, #d63b25)", "color: var(--lumo-error-contrast-color, #ffffff)")
+                .doesNotContain(" background: ");
+        assertThat(InboxBadge.html(4, 0)).contains("background-color: var(--lumo-primary-color, #227e9e)",
+                "color: var(--lumo-primary-contrast-color, #ffffff)");
+    }
+
+    @Test
     void nothingWaitingIsJustTheBell() {
         assertThat(InboxBadge.html(0, 0)).doesNotContain("<span");
     }
