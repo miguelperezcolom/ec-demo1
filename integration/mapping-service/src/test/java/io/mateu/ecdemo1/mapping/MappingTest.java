@@ -399,6 +399,39 @@ class MappingTest {
     }
 
     @Test
+    void aRefusalForWantOfRoomCanBeLetInOnRequestAndItStaysSoThroughAReopening() throws Exception {
+        var refusal = io.mateu.ecdemo1.integration.model.mapping.Cause.pmsRejectedReservation("MRU03", "Q1", "upsert-reservation",
+                "There are not enough rooms available on Room Type level — RSV00138");
+        causesService.await("proyectar-reserva:MRU03/Q1", "proyectar-reserva", "MRU03", "Q1",
+                List.of(new Variable("definitionId", "proyectar-reserva")), List.of(refusal));
+
+        mvc.perform(post("/causes/on-request").param("key", refusal.key()).param("by", "ana")).andExpect(status().isOk());
+        mvc.perform(get("/causes")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.key == '" + refusal.key() + "')].onRequestBy").value(org.hamcrest.Matchers.hasItem("ana")));
+        mvc.perform(get("/causes/waiting").param("key", refusal.key())).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].subject").value("Q1")).andExpect(jsonPath("$[0].hotelCode").value("MRU03"));
+
+        // let in, and refused again: the cause comes back still on request — it is the person's answer
+        causesService.releaseRefusal("MRU03", "Q1", "upsert-reservation", "on request: Opera has room now");
+        causesService.await("proyectar-reserva:MRU03/Q1>r", "proyectar-reserva", "MRU03", "Q1",
+                List.of(new Variable("definitionId", "proyectar-reserva")), List.of(refusal));
+        var again = causes.findById(refusal.key()).orElseThrow();
+        assertThat(again.status).isEqualTo(CauseStatus.OPEN);
+        assertThat(again.onRequestBy).isEqualTo("ana");
+
+        mvc.perform(post("/causes/on-request").param("key", refusal.key()).param("on", "false").param("by", "ana"))
+                .andExpect(status().isOk());
+        assertThat(causes.findById(refusal.key()).orElseThrow().onRequestSince).isNull();
+
+        // a missing equivalence is not let in on request: nothing in Opera to wait for
+        var missing = io.mateu.ecdemo1.integration.model.mapping.Cause.missingMapping("MRU03", CodeType.BOARD, "XX");
+        causesService.await("proyectar-reserva:MRU03/Q2", "proyectar-reserva", "MRU03", "Q2",
+                List.of(new Variable("definitionId", "proyectar-reserva")), List.of(missing));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> causesService.letInOnRequest(missing.key(), "ana"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void aReceptionProcessIsRelaunchedWithItsStay() throws Exception {
         var key = "registrar-checkin:MRU01/GSX4AK";
         var cause = "PMS_REJECTED:MRU01:GSX4AK:check-in-reservation";

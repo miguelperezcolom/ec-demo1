@@ -55,8 +55,9 @@ public class CausesPage implements Listing<CauseRow>, Searchable, Navigable<Caus
         return DbPaging.page(request, p -> causes.page(request.searchText(), p), c -> new CauseRow(c.causeKey,
                 c.type.name(), c.hotelCode, CauseRow.reason(c.type, c.description), causes.waitingOn(c.causeKey),
                 c.openedAt == null ? "" : WHEN.format(c.openedAt), c.openings,
-                c.status == CauseStatus.OPEN ? new Status(StatusType.WARNING, "Open")
-                        : new Status(StatusType.SUCCESS, "Resolved")));
+                c.status != CauseStatus.OPEN ? new Status(StatusType.SUCCESS, "Resolved")
+                        : c.onRequestSince != null ? new Status(StatusType.INFO, "On request")
+                        : new Status(StatusType.WARNING, "Open")));
     }
 
     @Override

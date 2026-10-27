@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Clock;
 
 @Configuration
+// The scheduled readings: what is on request letting itself in (OnRequestWatcher), the free-room calendar
+@org.springframework.scheduling.annotation.EnableScheduling
 public class PmsConfig {
 
     @Bean

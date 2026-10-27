@@ -227,6 +227,50 @@ public class Causes {
     }
 
     /**
+     * A person lets the reservations Opera refused for want of room in «on request»: they keep
+     * waiting, and pms-integration lets each in by itself once Opera has room for its stay.
+     */
+    @Audited("Let in on request")
+    @Transactional
+    public void letInOnRequest(String causeKey, String by) {
+        causes.lock(causeKey);
+        var record = causes.findById(causeKey).orElseThrow(() -> new NoSuchElementException("No cause " + causeKey));
+        if (!record.onRequestable()) {
+            throw new IllegalArgumentException("Only a reservation Opera refused to write can wait on request: " + causeKey);
+        }
+        if (record.onRequestSince == null) {
+            record.onRequestSince = clock.instant();
+            record.onRequestBy = by;
+            causes.save(record);
+            log.info("Cause {} on request, by {}", causeKey, by);
+        }
+    }
+
+    /** A person takes it back: what waits on it waits for a person again. */
+    @Audited("Withdraw on request")
+    @Transactional
+    public void withdrawOnRequest(String causeKey, String by) {
+        causes.lock(causeKey);
+        causes.findById(causeKey).filter(c -> c.onRequestSince != null).ifPresent(record -> {
+            record.onRequestSince = null;
+            record.onRequestBy = null;
+            causes.save(record);
+            log.info("Cause {} no longer on request, by {}", causeKey, by);
+        });
+    }
+
+    /** A process waiting on a cause, and what it is about. */
+    public record WaitingProcess(String processKey, String hotelCode, String subject) {
+    }
+
+    /** The processes waiting on a cause now. */
+    @Transactional(readOnly = true)
+    public List<WaitingProcess> waitingOn(String causeKey) {
+        return waiters.waitingOn(causeKey).stream()
+                .map(w -> new WaitingProcess(w.getProcessKey(), w.getHotelCode(), w.getSubject())).toList();
+    }
+
+    /**
      * The resumed process asks for its successor. Idempotent: the successor's business key is
      * derived from the waiting process's, so asking twice starts it once.
      */

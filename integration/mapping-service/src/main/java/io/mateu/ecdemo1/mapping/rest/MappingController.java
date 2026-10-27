@@ -72,11 +72,14 @@ public class MappingController {
                               List<Variable> variables, List<Cause> causes, String engineProcessId) {
     }
 
+    /** @param onRequestSince since when a person lets what waits on it in on request; null if nobody did */
     public record CauseView(String key, String type, String description, String hotelCode, String status,
-                            long waiting, int openings, String openedAt, String resolvedAt, String resolvedBy) {
+                            long waiting, int openings, String openedAt, String resolvedAt, String resolvedBy,
+                            String onRequestSince, String onRequestBy) {
         static CauseView of(CauseRecord c, long waiting) {
             return new CauseView(c.causeKey, c.type.name(), c.description, c.hotelCode, c.status.name(), waiting,
-                    c.openings, String.valueOf(c.openedAt), String.valueOf(c.resolvedAt), c.resolvedBy);
+                    c.openings, String.valueOf(c.openedAt), String.valueOf(c.resolvedAt), c.resolvedBy,
+                    c.onRequestSince == null ? null : c.onRequestSince.toString(), c.onRequestBy);
         }
     }
 
@@ -140,6 +143,24 @@ public class MappingController {
     /** Every cause, or the open ones (the MCP tools' view). */
     public List<CauseView> causes(boolean openOnly) {
         return causes(openOnly, null);
+    }
+
+    @PostMapping("/causes/on-request")
+    @Operation(summary = "Let the reservations Opera refused for want of room in on request (on=true), or withdraw it: on "
+            + "request, each goes in by itself once Opera has room for its stay")
+    public void onRequest(@RequestParam String key, @RequestParam(defaultValue = "true") boolean on,
+                          @RequestParam(defaultValue = "admin") String by) {
+        if (on) {
+            causes.letInOnRequest(key, by);
+        } else {
+            causes.withdrawOnRequest(key, by);
+        }
+    }
+
+    @GetMapping("/causes/waiting")
+    @Operation(summary = "The processes waiting on a cause now, with the hotel and the subject (a reservation's locator)")
+    public List<Causes.WaitingProcess> waitingOn(@RequestParam String key) {
+        return causes.waitingOn(key);
     }
 
     @PostMapping("/causes/release-refusal")

@@ -183,6 +183,29 @@ public class IntegrationClients {
                 .retrieve().toBodilessEntity();
     }
 
+    /** An open cause a person let in on request: Opera had no room for what waits on it. */
+    public record OnRequestCause(String key, String hotelCode, String onRequestSince) {
+    }
+
+    /** The open causes a person let in on request. */
+    public List<OnRequestCause> onRequestCauses() {
+        List<OnRequestCause> all = mapping.get().uri("/causes?openOnly=true").retrieve()
+                .body(new org.springframework.core.ParameterizedTypeReference<List<OnRequestCause>>() {
+                });
+        return all == null ? List.of() : all.stream().filter(c -> c.onRequestSince() != null).toList();
+    }
+
+    /** A process waiting on a cause: its hotel and its subject (a reservation's locator). */
+    public record WaitingProcess(String processKey, String hotelCode, String subject) {
+    }
+
+    public List<WaitingProcess> waitingOn(String causeKey) {
+        List<WaitingProcess> all = mapping.get().uri(b -> b.path("/causes/waiting").queryParam("key", causeKey).build())
+                .retrieve().body(new org.springframework.core.ParameterizedTypeReference<List<WaitingProcess>>() {
+                });
+        return all == null ? List.of() : all;
+    }
+
     record ResolveRequest(String hotelCode, List<CodeRef> codes) {
     }
 
