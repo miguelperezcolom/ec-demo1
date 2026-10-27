@@ -4,7 +4,7 @@
 # from a home connection took 18 minutes for one image; this takes minutes for all of them.
 #
 #   deploy/local/load-images.sh                 # the tag the manifests pull (deploy/manifests/30-shell.yaml)
-#   deploy/local/load-images.sh 0.80.0 [module…] # a tag, and only these modules (paths, as in build-images.sh)
+#   deploy/local/load-images.sh 0.81.0 [module…] # a tag, and only these modules (paths, as in build-images.sh)
 #
 # One reactor build for every module — the root pom orders the shared libraries — then each image from
 # its jar, and the two shells once more with -Predwood, cleaned first: see build-images.sh on why a
