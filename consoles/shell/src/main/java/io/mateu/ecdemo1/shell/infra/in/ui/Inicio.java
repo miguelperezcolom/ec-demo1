@@ -54,6 +54,12 @@ public class Inicio extends Welcome {
         return "/images/redwood-header-texture.png";
     }
 
+    /** Each console's own colour (its logo's pill), so the home says where one is. */
+    @Override
+    protected io.mateu.uidl.data.HeroTone heroTone() {
+        return io.mateu.uidl.data.HeroTone.rose;
+    }
+
     /** The free rooms, room type by night. */
     @Action
     Object verCupoOpera() {
