@@ -91,7 +91,7 @@ spec:
               value: "XMAR"
             # The data plane's console: a stay links to its CRS booking and its customers (Clientes) there.
             - name: CONSOLE_URL
-              value: "https://ec1.mateu.io"
+              value: "https://rw.ec1.mateu.io"
             # Its own URL: the inbox notice of a forced check-in overdue (CHECK_IN_INCOMPLETE) links to the stay.
             - name: FRONT_OFFICE_URL
               value: "https://front.ec1.mateu.io"

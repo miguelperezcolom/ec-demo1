@@ -130,8 +130,9 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
      *
      * <p>Each console is served twice, by the Vaadin shell and by the Redwood one, under the same paths:
      * ec1 and rw.ec1 are the data plane, console.ec1 and rw-console.ec1 the control plane. A notice keeps
-     * the link it was written with (the Vaadin host), so a link into either twin of the console the
-     * person is in opens here too — they stay in the shell they chose.
+     * the link it was written with (older ones, the Vaadin host), so a link into either twin of the
+     * console the person is in opens here too — they stay in the shell they chose. From a Redwood
+     * console, a link into the other console's Vaadin shell goes to its Redwood twin instead.
      */
     static String destination(String link, String origin) {
         if (origin == null || origin.isBlank()) {
@@ -140,16 +141,46 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
         try {
             var target = java.net.URI.create(link);
             var here = java.net.URI.create(origin);
-            if (target.getHost() == null || here.getHost() == null
-                    || !console(target.getHost()).equals(console(here.getHost()))) {
+            if (target.getHost() == null || here.getHost() == null) {
                 return link;
+            }
+            if (!console(target.getHost()).equals(console(here.getHost()))) {
+                var twin = redwoodTwin(target.getHost(), here.getHost());
+                return twin == null ? link
+                        : new java.net.URI(target.getScheme(), target.getRawUserInfo(), twin, target.getPort(),
+                                target.getRawPath(), null, null).toString()
+                                + (target.getRawQuery() == null ? "" : "?" + target.getRawQuery())
+                                + (target.getRawFragment() == null ? "" : "#" + target.getRawFragment());
             }
             var path = target.getRawPath() == null || target.getRawPath().isEmpty() ? "/" : target.getRawPath();
             return path + (target.getRawQuery() == null ? "" : "?" + target.getRawQuery())
                     + (target.getRawFragment() == null ? "" : "#" + target.getRawFragment());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | java.net.URISyntaxException e) {
             return link;
         }
+    }
+
+    /**
+     * The Redwood twin of a Vaadin console's host, seen from a Redwood console; null when the person
+     * is not in Redwood or the host is not one of the two consoles (the front office, Grafana…).
+     * ec1… is the data plane's Vaadin shell and rw.ec1… its Redwood one; console.ec1… and rw-console.ec1…
+     * the control plane's (on deploy/local: ec1.localhost, rw.localhost, console.localhost, rw-console.localhost).
+     */
+    static String redwoodTwin(String target, String here) {
+        var h = here.toLowerCase(java.util.Locale.ROOT);
+        if (!h.startsWith("rw.") && !h.startsWith("rw-")) {
+            return null;
+        }
+        var domain = console(h);
+        if (domain.startsWith("console.")) {
+            domain = domain.substring("console.".length());
+        }
+        var t = target.toLowerCase(java.util.Locale.ROOT);
+        // deploy/local: the data plane's Vaadin shell is ec1.localhost, its Redwood one rw.localhost
+        if (t.equals(domain) || t.equals("ec1." + domain)) {
+            return "rw." + domain;
+        }
+        return t.equals("console." + domain) ? "rw-console." + domain : null;
     }
 
     /** A host with its shell's prefix taken off: rw.ec1… and ec1…, rw-console.ec1… and console.ec1… are one console. */

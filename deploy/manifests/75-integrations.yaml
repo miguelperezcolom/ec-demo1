@@ -106,14 +106,14 @@ spec:
             - name: INTEGRATIONS_CRYPTO_KEY
               valueFrom: { secretKeyRef: { name: ec-integrations-crypto, key: INTEGRATIONS_CRYPTO_KEY } }
             - name: CONSOLE_URL
-              value: "https://console.ec1.mateu.io"
+              value: "https://rw-console.ec1.mateu.io"
             # The demo's administration (control console → Demo, /_demo): the reset-demo runs are read from
             # the engine's database, and purge-engine empties it but for the reset that asks; the
             # health check after a reset asks each of these; the process pages are on the data console.
             - name: ENGINE_DB_URL
               value: jdbc:postgresql://postgres:5432/workflow
             - name: DATA_CONSOLE_URL
-              value: "https://ec1.mateu.io"
+              value: "https://rw.ec1.mateu.io"
             - name: BOOKING_URL
               value: "http://booking:8108"
             - name: DEMO_HEALTH

@@ -472,8 +472,9 @@ cat <<EOF
 
 Done.
 
-  Console   https://ec1.mateu.io          demo / \$DEMO_PASSWORD
-  Control   https://console.ec1.mateu.io  demo / \$DEMO_PASSWORD  (needs the realm role \`ai-admin\`)
+  Console   https://rw.ec1.mateu.io          demo / \$DEMO_PASSWORD  (Vaadin: https://ec1.mateu.io)
+  Control   https://rw-console.ec1.mateu.io  demo / \$DEMO_PASSWORD  (needs the realm role \`ai-admin\`; Vaadin: https://console.ec1.mateu.io)
+  Front     https://front.ec1.mateu.io
   Keycloak  https://auth.ec1.mateu.io     admin / \$KEYCLOAK_ADMIN_PASSWORD
   Grafana   https://grafana.ec1.mateu.io  admin / \$GRAFANA_ADMIN_PASSWORD
   Kafka     https://kafka.ec1.mateu.io    admin / \$KAFKA_CONSOLE_PASSWORD

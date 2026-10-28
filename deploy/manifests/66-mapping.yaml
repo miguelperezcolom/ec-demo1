@@ -74,7 +74,9 @@ spec:
             - name: IA_AGENT_URL
               value: "http://ia-agent:8095"
             - name: CONSOLE_URL
-              value: "https://console.ec1.mateu.io"
+              value: "https://rw-console.ec1.mateu.io"
+            - name: DATA_CONSOLE_URL
+              value: "https://rw.ec1.mateu.io"
           ports:
             - { name: http, containerPort: 8122 }
           securityContext:

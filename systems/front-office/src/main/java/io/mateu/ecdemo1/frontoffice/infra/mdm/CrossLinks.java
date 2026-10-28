@@ -32,7 +32,7 @@ public class CrossLinks {
   final String console;
 
   public CrossLinks(@Value("${frontoffice.mdm-url:}") String mdmUrl, @Value("${frontoffice.hotel:MRU01}") String hotel,
-      @Value("${frontoffice.console-url:https://ec1.mateu.io}") String console) {
+      @Value("${frontoffice.console-url:https://rw.ec1.mateu.io}") String console) {
     if (mdmUrl == null || mdmUrl.isBlank()) {
       this.mdm = null;
     } else {
