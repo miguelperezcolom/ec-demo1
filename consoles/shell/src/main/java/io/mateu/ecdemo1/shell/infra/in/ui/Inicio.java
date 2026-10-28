@@ -49,10 +49,18 @@ public class Inicio extends Welcome {
         return "Reservas y workflows, en una sola plataforma.";
     }
 
+    /**
+     * The band's texture. Vaadin draws it on the right of the band. Redwood's welcome banner is
+     * Spectra's, which draws a texture in the band's right half from its top centre, clipped to the
+     * band: there it is one shaped as redwood.oracle.com's (864x250, the shapes on the right).
+     */
     @Override
     protected String heroImage() {
-        return "/images/redwood-header-texture.png";
+        return REDWOOD ? "/images/redwood-banner-texture.png" : "/images/redwood-header-texture.png";
     }
+
+    /** Whether this build renders with Redwood (mateu-redwood on the classpath), not Vaadin. */
+    static final boolean REDWOOD = Inicio.class.getResource("/static/_redwood/bundles/vb-app-bundle.js") != null;
 
     /** Each console's own colour (its logo's pill), so the home says where one is. */
     @Override
