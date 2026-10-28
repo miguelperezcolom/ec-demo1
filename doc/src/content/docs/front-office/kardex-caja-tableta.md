@@ -25,6 +25,16 @@ Lo que exige la normativa del destino sigue en los datos de registro (`pax_regis
 en `pax_kardex`. Al guardar, además del cambio de contacto de siempre (`ProposeChange`, que decide
 Salesforce), sale **`RecordKardex`** al MDM con todo lo que el huésped ha declarado.
 
+**Qué abre una petición de cambio en Salesforce.** Solo los datos que guarda el maestro: **nombre y
+apellidos**, **número de documento** (uno inventado por recepción no cuenta), **email** y **teléfono**
+(`Kardex.fieldsChanged`), y solo de un **cliente de la cadena**, el que tiene código `C-…`. Cambiar
+cualquier otro campo del kárdex (dirección, idioma, Riu Class, publicidad…) no abre un Case: viaja con
+`RecordKardex` y lo último manda. El cambio queda pendiente en pantalla hasta que Salesforce lo aprueba
+o rechaza.
+
+En la ficha de la reserva (check-in y en casa), el panel lateral **«Perfil»** —preferencias, última
+estancia y quejas pendientes del titular— se abre al entrar; se puede plegar.
+
 **En el MDM** (`Kardexes`): el kárdex es la palabra del huésped en el mostrador, así que **lo último manda**
 en sexo, idioma, dirección, lugar de nacimiento, fax, Riu Class y publicidad. La fecha de nacimiento y la
 nacionalidad solo rellenan huecos (un documento escaneado es mejor prueba), y el documento gana su fecha

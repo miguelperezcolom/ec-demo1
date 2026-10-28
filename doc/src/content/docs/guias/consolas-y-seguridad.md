@@ -12,6 +12,21 @@ description: Los hosts, cómo se federan las pantallas de cada servicio, qué co
 
 Y además `front.ec1.mateu.io`, el front office del hotel (Redwood), con su propio agente de chat.
 
+**Los enlaces van a Redwood.** Lo que escriben los servicios —avisos de la bandeja, notificaciones,
+alertas de Prometheus, los enlaces a procesos de la página Demo, los enlaces cruzados del front office—
+apunta a las consolas Redwood: `CONSOLE_URL` es `https://rw-console.ec1.mateu.io` y `DATA_CONSOLE_URL`
+(o el `CONSOLE_URL` del front office) `https://rw.ec1.mateu.io`, en los manifiestos y por defecto. Las
+Vaadin siguen en sus hosts, y la bandeja abre cada enlace en la consola que se esté usando (ver
+[La bandeja](/integracion/causas-y-avisos/#la-bandeja)). El resumen de `deploy.sh` también nombra
+primero las Redwood.
+
+**Cada consola dice cuál es.** El logo es el de RIU con una pastilla blanca con el nombre de la consola
+en su color —**DATA PLANE** (rojo RIU), **CONTROL PLANE** (morado), **FRONT OFFICE** (petróleo)—, que
+se lee en la barra oscura de Redwood y en la clara de Vaadin. La barra superior también es de cada una:
+el carbón de Redwood en el plano de datos, morado (`#4B2E83`) en el de control y petróleo en el front
+office. El banner de bienvenida va en el tono de su consola: rosa en datos, ciruela en control, verde
+azulado en el front office.
+
 Las consolas Redwood son los **mismos módulos** compilados con **`-Predwood`**: ese perfil de Maven
 pone `io.mateu:mateu-redwood` en el classpath donde el build por defecto tiene `io.mateu:mateu-vaadin`, y nada
 más cambia. Un módulo, dos imágenes (`ec-demo1-shell` y `ec-demo1-shell-redwood`, igual para
@@ -29,7 +44,8 @@ Ninguna pantalla se escribe en la consola. Cada servicio declara un `@UI` en su 
 una son esas tres cosas y un manifiesto, y la ruta tiene que coincidir en las tres o el menú sale vacío.
 
 La página de inicio de cada consola es `/inicio`: el banner y los **KPI de consumo de Salesforce y
-Opera** (ver [Consumo de Salesforce y Opera](/operacion/consumo-apis-externas/)). En la cabecera de
+Opera** y, en la de datos, el **cupo de Opera** de las próximas dos semanas (ver
+[Consumo de Salesforce y Opera](/operacion/consumo-apis-externas/)). En la cabecera de
 las cuatro, el aviso de la bandeja («Inbox (n)») y el usuario.
 
 ## El gateway es la frontera

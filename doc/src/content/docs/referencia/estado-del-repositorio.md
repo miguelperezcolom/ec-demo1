@@ -28,7 +28,9 @@ ejecutándose en un clúster: para eso hay que inspeccionar el despliegue.
 
 ## Qué cubre el código actual
 
-- Integración de reservas **CRS → Opera → front office**, con mapeado, causas, reintentos y altas por hotel.
+- Integración de reservas **CRS → Opera → front office**, con mapeado, causas, reintentos y altas por hotel;
+  lectura de la disponibilidad de Opera (cupo en la consola de datos) y reservas rechazadas por falta
+  de habitación que entran solas **on request** cuando hay sitio.
 - Operaciones de recepción hacia Opera: check-in, check-out, no-show, cargos, cobros, devoluciones y
   empresa de facturación.
 - Identidad del cliente, documentos y kárdex en el MDM, con Salesforce como maestro; avisos y reglas de

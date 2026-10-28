@@ -144,8 +144,20 @@ hace distinto de las especificaciones públicas, o aún no tiene configurado:
   cancela en Opera las reservas de la demo, pero no las borra: estrena contexto para que un localizador
   nuevo no encuentre una reserva vieja. Ver [La demo](/operacion/demo/).
 - **Disponibilidad**: Opera revalida y puede rechazar por falta de habitaciones (`RSV00138`). No falla:
-  es una causa `PMS_REJECTED` y la reserva espera. Si después el CRS la cambia a algo que Opera acepta,
-  esa versión entra y resuelve sola la causa de la anterior.
+  es una causa `PMS_REJECTED` y la reserva espera, en una causa **compartida** con las demás reservas
+  que Opera rechaza con el mismo código en ese hotel. Si después el CRS la cambia a algo que Opera
+  acepta, esa versión entra y saca a esa reserva de la causa. Una persona puede además dejarlas entrar
+  **on request**: cada una se escribe sola cuando Opera tiene sitio (ver
+  [Causas, avisos y bandeja](/integracion/causas-y-avisos/#on-request-cuando-opera-no-tiene-habitación)).
+- **Leer la disponibilidad.** El tenant no tiene API de inventario: `OperaAvailability` cuenta lo que
+  Opera vendería con su búsqueda de disponibilidad, pidiendo 1…5 habitaciones hasta que un tipo
+  desaparece (5 significa «5 o más»). El conector lo sirve **solo de lectura y solo dentro del
+  clúster**: `GET /availability/{hotel}/stay` (los tipos que vendería para una estancia),
+  `/availability/{hotel}/fits` (si caben unas habitaciones), `/availability/{hotel}/calendar` (las
+  habitaciones libres por tipo y noche, hasta 31 noches) y `/availability/calendar` (lo mismo para la
+  propiedad en servicio). El calendario de cada propiedad en servicio se relee cada 9 min
+  (`pms-integration.calendar-refresh`). Lo usan el on request, el generador de reservas demo del CRS y
+  la tarjeta de cupo de la consola de datos ([Consumo de Salesforce y Opera](/operacion/consumo-apis-externas/#dónde-se-ve)).
 
 Los interlocutores **no se crean en Opera por la integración de la reserva**: se exportan del ERP con
 su propio proceso (`proyectar-interlocutor`) y el ERP guarda qué perfil de Opera es cada uno, buscado

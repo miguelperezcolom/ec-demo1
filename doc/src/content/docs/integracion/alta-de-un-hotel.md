@@ -32,7 +32,11 @@ Después, `PAUSED` y `DECOMMISSIONED`. Los estados son los de `IntegrationStatus
 - **Cada puerta que necesita a alguien deja un aviso en la bandeja**, con el enlace a la integración
   (`/integrations/registry/<id>`), y se cierra sola cuando la integración la pasa.
 - **El mapeado** se ve en *Mapping → Dictionary* filtrando por la integración (estado *Unmapped*); cada
-  código, al abrirlo, junto a lo que ofrece Opera. Aprobar reanuda todo lo que esperaba.
+  código, al abrirlo, junto a lo que ofrece Opera. Aprobar reanuda todo lo que esperaba. Sin filtrar por
+  integración, el diccionario enseña primero los códigos sin mapear de **todos** los hoteles en servicio
+  que tengan alguno, cada uno con su hotel, y luego las equivalencias aprobadas. *Ask the agent* abre un
+  diálogo con su progreso y, al cerrarlo, refresca el listado (ver
+  [Causas, avisos y bandeja](/integracion/causas-y-avisos/#el-agente-de-mapeado-propone-una-persona-aprueba)).
 - **Los interlocutores**: el que el ERP ya sabe qué perfil es no se toca; si no, se busca en Opera por
   su `CorporateId` y solo si no está se crea; el ERP anota cuál es. *Import partners*, en la
   integración, hace lo contrario y solo para sembrar la demo: crea o pone al día en el ERP las agencias,

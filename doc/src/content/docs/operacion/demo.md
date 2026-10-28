@@ -19,8 +19,9 @@ cambio de datos sobre su titular), nunca lo de la línea base.
 **Poner la demo a cero cancela las reservas de la demo**: el reset de la [página Demo](/operacion/pagina-demo/)
 (paso `cancel-earlier-runs`) y `zero.sh` cancelan en Opera las reservas que escribieron esta pasada y las
 anteriores, reconocidas por el contexto del localizador del CRS en sus referencias externas (`ECDEMO1`,
-`ECDEMO1-…`, `ECLOCAL-…`, `EC1-…`), y nada más. Las que están en casa no se pueden cancelar: se listan
-para hacerles el check-out a mano. A mano, sin reset:
+`ECDEMO1-…`, `ECLOCAL-…`, `EC1-…`), y nada más. Da igual dónde se lance: un reset en el entorno local
+cancela también las de ec1, y al revés (el contexto nuevo sí es de cada sitio). Las que están en casa
+no se pueden cancelar: se listan para hacerles el check-out a mano. A mano, sin reset:
 
 ```sh
 deploy/demo/opera-cancel-ours.py XMAR          # las lista
@@ -128,7 +129,8 @@ Las de `users` y `content` no: un reset no toca usuarios ni contenidos.
 El localizador del CRS va en Opera como referencia externa bajo un **contexto** propio, y por él se busca
 la reserva antes de escribirla. Como una reserva cancelada sigue en Opera con su localizador, tras poner ec1 a cero un localizador nuevo
 (aleatorio) podría repetir uno antiguo y la integración **actualizaría la reserva vieja**. Por eso cada
-`zero.sh` estrena un contexto, `ECDEMO1-<MMddHHmm>` (UTC), y lo deja en el ConfigMap **`ec-demo-run`**
+`zero.sh` (y cada reset de la página Demo) estrena un contexto, `ECDEMO1-<MMddHHmm>` (UTC) en ec1 y
+`ECLOCAL-<MMddHHmm>` en el [entorno local](/desarrollo/entorno-local/), y lo deja en el ConfigMap **`ec-demo-run`**
 (clave `OPERA_EXTERNAL_SYSTEM`), que `pms-integration-service` lee con `envFrom`; sin ConfigMap usa
 `ECDEMO1`. `snapshot.sh` guarda el contexto con la línea base y `reset.sh` lo repone. Las reservas
 llevan además la *Custom Reference* de la ejecución, que es lo que filtra la integración pms-fo con

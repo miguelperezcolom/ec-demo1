@@ -34,7 +34,7 @@ Las bases de datos
 | Despliegue | Módulo | Puerto | Ruta | Base de datos |
 | :--------- | :----- | -----: | :--- | :------------ |
 | `crs-integration-service` | `integration/crs-integration-service` | 8121 | — | `crs_integration` |
-| `pms-integration-service` | `integration/pms-integration-service` | 8123 | — | — (sin estado propio) |
+| `pms-integration-service` | `integration/pms-integration-service` | 8123 | — (su REST, como `/availability/**`, la disponibilidad de Opera de solo lectura, solo dentro del clúster) | — (sin estado propio) |
 | `mapping-service` | `integration/mapping-service` | 8122 | `/_mapping` (control) | `mapping` |
 | `customer-mdm-service` | `integration/customer-mdm-service` | 8127 | `/_customers` (datos), `/_mdm` (control) | `customer_mdm` |
 | `journey-service` | `integration/journey-service` | 8130 | `/_journey` | — (lee Tempo) |

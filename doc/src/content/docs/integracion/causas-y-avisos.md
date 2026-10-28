@@ -17,7 +17,7 @@ Los tipos (`CauseType`, `contracts-mapping`):
 | `MISSING_MAPPING` | Una equivalencia de código (p. ej. `MISSING_MAPPING:MRU01:RATE_PLAN:EMPLEADOS-27`) | Una persona, aprobándola en el diccionario |
 | `MISSING_PARTNER` | El interlocutor aún no está en Opera | `proyectar-interlocutor`, al terminar |
 | `NOT_YET_PROJECTED` | La reserva aún no está en Opera (una cancelación que llegó antes) | `resolve-projection`, cuando llega |
-| `PMS_REJECTED` | Opera rechazó la escritura de forma determinista (p. ej. sin disponibilidad) | Un cambio en el CRS que Opera acepte, o una persona |
+| `PMS_REJECTED` | Opera rechazó la escritura de forma determinista (p. ej. sin disponibilidad) | Un cambio en el CRS que Opera acepte, una persona, o el [on request](#on-request-cuando-opera-no-tiene-habitación) |
 | `INTEGRATION_INACTIVE` | El hotel no tiene integración activa | La activación de la integración |
 
 Un fallo **transitorio** (timeout, 5xx) no es una causa: el motor reintenta el paso. Si dura más que
@@ -25,6 +25,50 @@ Un fallo **transitorio** (timeout, 5xx) no es una causa: el motor reintenta el p
 
 Las causas abiertas se ven en *Mapping → Causes* del plano de control, y cada una en la bandeja de
 quien la resuelve.
+
+### Un rechazo de Opera, una causa para todas las reservas
+
+Cuando Opera rechaza **escribir una reserva** (`upsert-reservation`) con un código de error, la causa
+no es de la reserva sino del incidente: `PMS_REJECTED:<hotel>:upsert-reservation:<código>`, p. ej.
+`PMS_REJECTED:MRU01:upsert-reservation:RSV00138` (no quedan habitaciones del tipo). Todas las reservas
+que Opera rechaza igual esperan en esa misma causa: tres reservas sin cupo son **una** causa con tres
+procesos detrás, no tres. Un rechazo sin código, y los de recepción y del folio (check-in, cargos,
+cobros: cada uno se arregla en su estancia), siguen siendo de la reserva
+(`PMS_REJECTED:<hotel>:<localizador>:<paso>`).
+
+Como la clave compartida no nombra la reserva:
+
+- cuando una versión más nueva de la reserva entra en Opera, o el paso pasa, `pms-integration-service`
+  llama a `POST /causes/release-refusal?hotelCode=…&locator=…&step=…`: resuelve el rechazo propio de la
+  reserva y saca **solo a sus procesos** de las causas compartidas de ese paso en ese hotel; la causa
+  compartida se resuelve cuando ya no espera nadie;
+- `GET /causes?subject=<localizador>` devuelve las causas en que esperan o esperaron los procesos de
+  esa reserva (lo usa el recorrido de negocio de `journey-service`), y `GET /causes/waiting?key=…`, los
+  procesos que esperan ahora en una causa, con su hotel y su localizador.
+
+### On request: cuando Opera no tiene habitación
+
+Un rechazo de Opera a escribir una reserva se puede **dejar entrar «on request»**: en la causa
+(*Mapping → Causes*), **«Dejar entrar on-request»**, con confirmación. Desde ese momento la causa dice
+*On request* —en la lista y en la ficha, con desde cuándo y quién— y **nada se escribe en Opera
+todavía**: cada reserva que espera entra sola **cuando Opera tenga sitio para su estancia**.
+**«Quitar on-request»** lo retira; las reservas vuelven a esperar a una persona o a un cambio del CRS.
+Solo los rechazos de `upsert-reservation` admiten on request (ni recepción ni el folio).
+
+- **Quién lo hace**: `OnRequestWatcher`, en `pms-integration-service`, cada 2 min
+  (`pms-integration.on-request-check`). Por cada causa on request abierta busca la **primera** reserva
+  que espera y a la que Opera ya vendería sus habitaciones (traduce sus tipos de habitación del CRS por
+  el diccionario y pregunta por su estancia); la saca del rechazo (`release-refusal`) y su proceso la
+  escribe. **Una por causa y vuelta**, para que dos reservas que quieren la última habitación no entren
+  las dos.
+- **Cómo sabe si hay sitio**: el tenant no tiene API de inventario, así que `OperaAvailability` usa la
+  búsqueda de disponibilidad pidiendo 1…5 habitaciones hasta que un tipo desaparece; el recuento llega
+  a «5 o más». Ver [De CRS a Opera](/integracion/crs-a-opera/#el-tenant-real).
+- **Dura**: on request es la respuesta de una persona a ese rechazo en ese hotel; sigue aunque la causa
+  se resuelva y se vuelva a abrir, hasta que alguien lo quite.
+
+Por REST: `POST /causes/on-request?key=…&on=true|false&by=…`; `GET /causes` lleva `onRequestSince` y
+`onRequestBy`.
 
 ### Descartar un proceso que espera
 
@@ -59,7 +103,10 @@ por ido. Sigue visible en su causa como `RELEASED`, para descartarlo.
 ## El agente de mapeado propone, una persona aprueba
 
 Cuando falta una equivalencia, el diccionario ofrece **«Ask the agent»** (y el alta lo pide sola al
-llegar a la puerta de mapeado). El agente usa el MCP de `mapping-service`: lee las carencias y los dos
+llegar a la puerta de mapeado). El agente tarda de segundos a minutos por hotel, así que el botón abre
+un **diálogo con una barra de progreso**: un tramo por hotel, los segundos que lleva pensando y, al
+final, su respuesta. Varios hoteles se preguntan uno tras otro. Al cerrar el diálogo, el listado se
+vuelve a buscar con los mismos filtros y la misma página. El agente usa el MCP de `mapping-service`: lee las carencias y los dos
 catálogos y **registra una propuesta** con su confianza y su porqué. La propuesta queda en estado
 *propuesta*: nada entra en vigor sin una persona. Aprobar por MCP exige el nombre del usuario y
 confirmación explícita, porque el MCP no ve la identidad de quien pregunta. **El LLM nunca está en el
@@ -108,11 +155,15 @@ Chat, y los urgentes por email (rechazos de Opera y reintentos que no acaban, a 
 ### La bandeja
 
 «Inbox (n)» en la cabecera de las cuatro consolas es la entrada a la bandeja; con algo urgente dice
-«Inbox (n, m urgent)» y la campana se pone en rojo. `/_inbox` escrito en la barra de direcciones de
+«Inbox (n, m urgent)» y la campana se pone en rojo. La cuenta va en una pastilla (roja con algo urgente,
+verde azulado si no) que se ve también sobre la cabecera oscura de Redwood. `/_inbox` escrito en la barra de direcciones de
 cualquiera de las cuatro consolas también lleva a ella (el gateway lo redirige a `/inbox/pending`).
 Tiene los avisos que son para mí —por nombre o por uno de mis roles— y las **tareas del motor de
 formularios** (una tarea es un aviso más, en la bandeja de los roles que pide su formulario). *Open* lleva a la pantalla
-que lo resuelve y lo marca como **visto**; visto es de cada persona y no resuelve nada: la fila sigue
+que lo resuelve y lo marca como **visto**. Los enlaces de los avisos van a las consolas **Redwood**
+(`CONSOLE_URL`, `DATA_CONSOLE_URL`); un enlace a la misma consola se abre en la que se está usando
+(Vaadin o Redwood), y desde una consola Redwood un enlace a la Vaadin de la otra consola —los avisos
+antiguos— se abre en su gemela Redwood; visto es de cada persona y no resuelve nada: la fila sigue
 hasta que se resuelve, y entonces se va sola.
 
 El Web Push se activa en cada navegador y en cada consola (son orígenes distintos) desde el menú de

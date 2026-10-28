@@ -3,7 +3,7 @@ title: "La página Demo: reset y caída de Opera"
 description: Las dos acciones de administración de la demo en la consola de control — volver a cero con un proceso del motor (reset-demo) y simular que Opera no responde — sin parar nada ni tocar Opera.
 ---
 
-En la consola de control (`console.ec1.mateu.io`), **Demo** reúne las dos cosas que se le hacen a la
+En la consola de control (`rw-console.ec1.mateu.io`, o la Vaadin `console.ec1.mateu.io`), **Demo** reúne las dos cosas que se le hacen a la
 demo misma. Solo para administradores (`ai-admin`: el gateway no deja pasar `/_demo` a nadie más) y
 **todo auditado**, con quién: lo ve **Audit** como «Demo: …».
 
@@ -40,10 +40,10 @@ flowchart LR
 | Cancelar en Opera | pms-integration (`cancel-earlier-runs`) | Cancela (motivo `OTROS`) las reservas que escribió la demo, esta pasada y todas las anteriores —reconocidas por el contexto del localizador del CRS: `ECDEMO1`, `ECDEMO1-…`, `ECLOCAL-…`, `EC1-…`— y nada más. En las propiedades de las integraciones, que aún no se han vaciado, y en las de `OPERA_CLEANUP_PROPERTIES` (XMAR), con la conexión de la cadena si ninguna integración las nombra. Las que están **en casa** no se pueden cancelar: el resumen del paso las nombra para hacerles el check-out a mano. Es lo mismo que `deploy/demo/opera-cancel-ours.py` |
 | Cada servicio a cero | cada uno, tarea `reset` en su topic | Vacía las tablas de **su plan** en una transacción, con sus consumidores de Kafka en pausa mientras tanto (la librería `supporting/demo-reset`): booking, ERP (su outbox), front office (y las habitaciones quedan libres), avisos, historial de clientes, fidelización, crs-integration, mapping, MDM, integraciones, comunicación, auditoría (menos las acciones «Demo: …») |
 | Salesforce | customer-mdm (`clean-salesforce`) | Borra los Cases de petición de cambio y todos los contactos, de 200 en 200, y retoma los eventos de Salesforce desde ahora |
-| Contexto de Opera | pms-integration (`new-opera-context`) | `ECDEMO1-<MMddHHmm>` (UTC): el conector lo usa **al momento, sin reiniciar**, y lo guarda en el ConfigMap `ec-demo-run` (para su próximo arranque y para los scripts). Las reservas canceladas siguen en Opera con su localizador: el contexto nuevo evita que uno repetido las encuentre |
+| Contexto de Opera | pms-integration (`new-opera-context`) | `ECDEMO1-<MMddHHmm>` (UTC) en ec1, `ECLOCAL-<MMddHHmm>` en el [entorno local](/desarrollo/entorno-local/) (`OPERA_RUN_PREFIX`, que pone `up.sh`): el conector lo usa **al momento, sin reiniciar**, y lo guarda en el ConfigMap `ec-demo-run` (para su próximo arranque y para los scripts). Las reservas canceladas siguen en Opera con su localizador: el contexto nuevo evita que uno repetido las encuentre |
 | El motor a cero | integrations-service (`purge-engine`) | Borra procesos, pasos, formularios, candados, recursos, logs e índices **menos los del propio reset**. Es el último paso de datos |
 | Reanudar la entrada | booking (`resume-intake`) | El CRS vuelve a admitir reservas |
-| Sembrar | booking (`seed-demo-bookings`) | Solo si se marcó: las 10 reservas demo de MRU01 (sin integración se quedan en el CRS: el punto de partida del flujo 1) |
+| Sembrar | booking (`seed-demo-bookings`) | Solo si se marcó: las 10 reservas demo de MRU01 (sin integración se quedan en el CRS: el punto de partida del flujo 1), sorteadas para que Opera las acepte (ver [Las reservas demo](#las-reservas-demo-solo-las-que-opera-aceptaría)) |
 | Salud | integrations-service (`check-demo-health`) | La readiness de cada servicio y del motor, que no quede una caída de Opera simulada, y que el conector escriba bajo el contexto nuevo. No falla: lo cuenta |
 | Aviso | integrations-service (`notify-reset-result`) | Un aviso en la bandeja con el resultado —quién lo lanzó, quién lo confirmó, el contexto nuevo, lo borrado— y su registro de auditoría «Demo: reset completado» |
 
@@ -88,8 +88,23 @@ en el código; no se ha ejecutado un reset para validar su efecto en un clúster
 ### Progreso
 
 La página enseña el último reset: su estado, quién lo lanzó y quién lo confirmó, cada paso con su
-estado e intentos, y el enlace al proceso en la consola del motor (`ec1.mateu.io/workflow/processes/…`).
+estado e intentos, y el enlace al proceso en la consola del motor (`rw.ec1.mateu.io/workflow/processes/…`, `DATA_CONSOLE_URL`).
 «Actualizar» lo refresca.
+
+### Las reservas demo: solo las que Opera aceptaría
+
+«+ 10 reservas demo» (en las reservas del CRS) y el paso «Sembrar» usan el mismo generador. Antes
+sorteaba estancias y tipos de habitación a ciegas, y tres de cada diez reservas acababan esperando en
+`RSV00138` (sin cupo del tipo). Ahora, por cada reserva, pregunta a `pms-integration-service`
+(`GET /availability/{hotel}/fits`, solo lectura) si Opera vendería sus habitaciones para su estancia
+—contando las del mismo tipo que ya se llevó el lote esas noches— y vuelve a sortear, hasta 25 veces,
+hasta que cabe. Una que no cabe nunca se crea igual y el resultado lo dice («… found no room in Opera
+… they will wait for it»).
+
+Como las reservas se crean antes de que el alta apruebe ningún mapeado, los tipos de habitación del CRS
+se traducen a los de Opera con las parejas con las que se generó el catálogo de la demo
+(`crs-catalog/MRU01-demo-pms.json`, que escribe `deploy/demo/crs-catalog/generate.py`). Sin
+`PMS_INTEGRATION_URL` en booking, sin parejas o sin respuesta, todo cabe, como antes.
 
 ### Desde la línea de comandos
 

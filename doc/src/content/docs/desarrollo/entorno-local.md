@@ -25,12 +25,12 @@ de `deploy/` con los nombres cambiados. Los pods no se ven en `docker ps`: se ve
 
 | Consola | URL |
 | :-- | :-- |
-| Datos (Vaadin / Redwood) | http://ec1.localhost:8800 · http://rw.localhost:8800 |
-| Control (Vaadin / Redwood) | http://console.localhost:8800 · http://rw-console.localhost:8800 |
+| Datos (Redwood / Vaadin) | http://rw.localhost:8800 · http://ec1.localhost:8800 |
+| Control (Redwood / Vaadin) | http://rw-console.localhost:8800 · http://console.localhost:8800 |
 | Front office | http://front.localhost:8800 |
 | Keycloak · Grafana · Documentación | http://auth.localhost:8800 · http://grafana.localhost:8800 · http://doc.localhost:8800 |
 
-El usuario `demo` y su contraseña son los de ec1 (`DEMO_PASSWORD`). La documentación pide el usuario
+Como en ec1, los enlaces de avisos y alertas llevan a las consolas Redwood. El usuario `demo` y su contraseña son los de ec1 (`DEMO_PASSWORD`). La documentación pide el usuario
 `riu` con `DOCS_PASSWORD`, de `~/.local/share/ec-demo1-local/credentials.env`.
 
 ### Cómo está hecho
@@ -56,7 +56,11 @@ El usuario `demo` y su contraseña son los de ec1 (`DEMO_PASSWORD`). La document
   python3 deploy/demo/ec1.py health
   ```
 - **Su propio contexto de Opera** (`ECLOCAL-<MMddHHmm>`, en el ConfigMap `ec-demo-run`), creado antes de
-  que nada pueda escribir, y **sin el webhook de Google Chat**: sus alertas no llegan al chat de ec1.
+  que nada pueda escribir, y **sin el webhook de Google Chat**: sus alertas no llegan al chat de ec1. Los
+  contextos nuevos también son `ECLOCAL-…`: `up.sh` pone `OPERA_RUN_PREFIX=ECLOCAL` en
+  `pms-integration-service` para el reset de la página Demo, y `zero.sh` lo usa cuando el contexto de
+  `kubectl` es `kind-ec-demo1-local`. Cancelar en Opera sigue alcanzando las reservas de **todas** las
+  ejecuciones, también las `ECDEMO1-…` de ec1 (ver [La demo](/operacion/demo/#la-regla-en-opera-solo-lo-nuestro)).
 
 ### En un Mac (Apple Silicon)
 

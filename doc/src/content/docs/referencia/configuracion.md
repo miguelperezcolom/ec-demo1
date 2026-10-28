@@ -58,6 +58,9 @@ relativos contra el gateway:
 
 `deploy/local/up.sh` adapta los valores al entorno local. Ver [Mateu](/desarrollo/mateu/).
 
+`shell` y `shell-redwood` leen además `PMS_INTEGRATION_URL` (sin poner en el manifiesto:
+`http://pms-integration-service:8123` por defecto) para la tarjeta y la página del cupo de Opera.
+
 ### pms-integration-service
 
 | Variable | Valor | Para qué |
@@ -71,6 +74,7 @@ relativos contra el gateway:
 | `OPERA_CASHIER_ID` | `69721441` | El cajero con el que se hacen los check-outs y los cargos al folio (`registrar-checkout`, `registrar-cargo`): «EC-DEMO1 Integración», un InterfaceCashier creado para la PoC. Sin él Opera usa el del usuario de la integración, que no tiene (FOF00094) |
 | `OPERA_PROPERTIES` | `XMAR,XMU` | Las propiedades que se ofrecen (listar las de la cadena da 403) |
 | `OPERA_EXTERNAL_SYSTEM`, `OPERA_CUSTOM_REFERENCE` | (ConfigMap `ec-demo-run`, opcional; `ECDEMO1` y `EC-DEMO1` por defecto) | El contexto de la ejecución de la demo |
+| `OPERA_RUN_PREFIX` | `ECDEMO1` (sin poner en ec1; `ECLOCAL` en `deploy/local`, lo añade `up.sh`) | El prefijo del contexto nuevo que estrena el reset de la página Demo (`new-opera-context`) |
 
 En `application.yaml`: `OPERA_CHARGE_DEFAULT_CODE` (`1851`, el código de transacción de un cargo sin
 código propio; los demás, por tipo, en `ohip.charges.codes`) y `OPERA_NO_SHOW_CODES` (`NOSHOW`, los
@@ -79,7 +83,10 @@ motivos de cancelación de Opera que son un no-show, para las estancias del fron
 Los cobros de caja usan `ohip.payments`: `OPERA_PAYMENT_DEFAULT_METHOD` (`CASH`),
 `OPERA_PAYMENT_CARD_METHOD` (`VI`) y `OPERA_PAYMENT_LINK_METHOD` (`VI/OL`); efectivo y manual se
 traducen a `CASH`, transferencia a `BT`. `OPERA_OUTAGE_DELAY` (`5s`) es la espera de cada llamada
-durante la caída simulada que controla la página Demo.
+durante la caída simulada que controla la página Demo. `pms-integration.calendar-refresh` (`9m`) es
+cada cuánto se relee el calendario de habitaciones libres de las propiedades en servicio, y
+`pms-integration.on-request-check` (`2m`), cada cuánto se mira si una reserva
+[on request](/integracion/causas-y-avisos/#on-request-cuando-opera-no-tiene-habitación) ya cabe en Opera.
 
 Cómo se llega a cada propiedad no está aquí: es de la integración de cada hotel, en `integrations-service`.
 
@@ -93,7 +100,8 @@ Cómo se llega a cada propiedad no está aquí: es de la integración de cada ho
 | `FO_HORIZON_DAYS` | `60` | La ventana de la integración pms-fo |
 | `FO_POLL` | `60s` | El sondeo de cambios en Opera |
 | `USAGE_SALESFORCE_URLS` | `http://customer-mdm-service:8127` | De dónde lee el consumo de Salesforce |
-| `CONSOLE_URL` | `https://console.ec1.mateu.io` | Los enlaces de los avisos |
+| `CONSOLE_URL` | `https://rw-console.ec1.mateu.io` | Los enlaces de los avisos (a la consola de control Redwood) |
+| `DATA_CONSOLE_URL` | `https://rw.ec1.mateu.io` | Los enlaces a los procesos del motor de la página Demo |
 
 En `application.yaml`: `GATE_CHECK` (`5s`) y `GATE_RECHECK` (`30s`), las puertas del alta;
 `BACKFILL_PER_TICK` (`20`) y `BACKFILL_TICK` (`2s`), el ritmo del backfill; `ACTIVATION_WINDOW_DAYS`
@@ -142,7 +150,7 @@ una tarea de la bandeja) y `HUMAN_TASKS_TOPIC` (`human-tasks`). Las alertas de A
 | `FRONT_OFFICE_CURRENCY` | `MUR` | La moneda de los cargos que sube al folio del PMS |
 | `FORCED_CHECKIN_DOCUMENT_DEADLINE` | `PT24H` | El plazo de los documentos de un check-in forzado; pasado, el aviso `CHECK_IN_INCOMPLETE` |
 | `FRONT_OFFICE_URL` | `https://front.ec1.mateu.io` | Su propia URL, para el enlace de ese aviso |
-| `CONSOLE_URL` | `https://ec1.mateu.io` | Los enlaces a la reserva del CRS y a los clientes |
+| `CONSOLE_URL` | `https://rw.ec1.mateu.io` | Los enlaces a la reserva del CRS y a los clientes (la consola de datos Redwood) |
 | `CRS_INTEGRATION_URL`, `MDM_URL`, `AUDIT_URL`, `PMS_INTEGRATION_URL` | `http://<servicio>:<puerto>` | Los walk-ins y el escáner; las lecturas del MDM; el «Historial» de la reserva; las habitaciones libres y limpias de Opera |
 | `HISTORY_URL` | `http://customer-history:8133` | El historial de estancias del cliente reconocido en el check-in; vacío, no se enseña |
 | `LOYALTY_URL` | `http://loyalty:8134` | El nivel y los puntos Riu Class del cliente reconocido; vacío, no se enseñan |
@@ -157,7 +165,8 @@ dejan de valer al reiniciar) y `FORCED_CHECKIN_CHECK_INTERVAL` (`PT1M`).
 ### booking (el CRS)
 
 `CUSTOMER_MDM_URL` (los enlaces de la ficha), `AUDIT_URL=http://audit-service:8129` (su «History»:
-quién hizo qué con la reserva).
+quién hizo qué con la reserva) y `PMS_INTEGRATION_URL=http://pms-integration-service:8123` (el
+generador de reservas demo pregunta si Opera aceptaría cada una; sin ella, se crean sin preguntar).
 
 ### SQL de los agentes (booking y front-office)
 
@@ -180,7 +189,9 @@ la restricción de permisos que aporta el segundo login. Ver [Cómo lee los dato
 ### mapping-service
 
 `CRS_INTEGRATION_URL`, `PMS_INTEGRATION_URL`, `INTEGRATIONS_URL`, `IA_AGENT_URL` (el agente de
-mapeado, para sus propuestas) y `CONSOLE_URL=https://console.ec1.mateu.io` (los enlaces de los avisos).
+mapeado, para sus propuestas), `CONSOLE_URL=https://rw-console.ec1.mateu.io` (los enlaces de los avisos)
+y `DATA_CONSOLE_URL=https://rw.ec1.mateu.io` (el enlace a *Admin → Workflow → Processes* para cancelar
+a mano un proceso que no se puede descartar).
 En `application.yaml`: `RESEND_FOR` (`6h`), cuánto tiempo tras liberarlo se le vuelve a mandar el
 mensaje de reanudar a un proceso que no contesta; pasado, queda `RELEASED` en su causa para que una
 persona lo descarte.
@@ -249,6 +260,13 @@ de consumo de tokens; `GITOPS_SYNC_ON_STARTUP` (`true`) y `GITOPS_POLL_MS` (`300
 
 `KEYCLOAK_URL=http://keycloak:8080`, `KEYCLOAK_REALM=ec-demo1`, `KEYCLOAK_ADMIN_USERNAME=admin` y
 `KEYCLOAK_ADMIN_PASSWORD` (Secret `keycloak-admin`): la propagación de usuarios a Keycloak.
+
+### Motor de formularios
+
+En `deploy/values/eventconductor.yaml`, `forms` lleva `WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN=true`:
+quién reclama y completa una tarea es el `preferred_username` del token que reenvía el gateway (que es
+quien lo verifica: `/_forms/**` va autenticado). Sin ella, desde forms 2.30 todo *Claim* falla con
+«Claiming a task needs a signed-in user».
 
 ### Terceros
 

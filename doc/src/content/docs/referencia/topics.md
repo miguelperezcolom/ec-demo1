@@ -33,7 +33,7 @@ esquema; el servicio dueño del lenguaje es el `x-owner` del propio esquema.
 | `notifications` | contracts-schemas (communication) | integrations, mapping, customer-mdm, pms-integration, front-office | communication | Un aviso (el del front office: `CHECK_IN_INCOMPLETE`, un check-in forzado al que se le pasó el plazo de los documentos) |
 | `notification-resolutions` | contracts-schemas (communication) | integrations, mapping, customer-mdm, pms-integration, front-office | communication | Lo que causó un aviso se resolvió |
 | `audit` | contracts-schemas (audit) | integrations, mapping, front-office, booking, registration-rules | audit | `AuditedAction` |
-| `human-tasks` | communication (eventconductor-forms; es `HumanTaskChanged` del motor) | forms | communication | Las tareas del motor de formularios, para la bandeja |
+| `human-tasks` | communication (eventconductor-forms; es `HumanTaskChanged` del motor) | forms | communication | Las tareas del motor de formularios, para la bandeja. `v2` es el registro tal como lo publica EventConductor 2.31+ (con el evento del ciclo de vida y la asignación); `v1` sigue mientras algo la lea, y communication lee las dos |
 
 ## Los del motor
 
