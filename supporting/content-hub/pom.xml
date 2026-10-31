@@ -61,6 +61,12 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- UserFacingErrors: the domain's rule violations reach the user as messages, not as
+             "an unexpected error". -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>

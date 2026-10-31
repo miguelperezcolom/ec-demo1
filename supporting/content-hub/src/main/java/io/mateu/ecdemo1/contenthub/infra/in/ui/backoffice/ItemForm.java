@@ -268,6 +268,8 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         }
         return switch (fieldName) {
             case "enviarARevision" -> item.awaitingPublication() || (item.hasVersions() && !item.draftChanged());
+            // nothing new to publish: a published item with no changes since its last version
+            case "publicar" -> item.status() == ItemStatus.PUBLISHED && !item.draftChanged() && !item.awaitingPublication();
             case "rechazar" -> !item.awaitingPublication();
             case "retirar" -> item.status() != ItemStatus.PUBLISHED;
             default -> false;
