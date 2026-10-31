@@ -194,8 +194,9 @@ spec:
 
 # ── The data plane under the names it is moving to, ws.* and workspace.* (and their Redwood twins),
 # beside ec1.mateu.io while both are tried. One Ingress per host, not several hosts in one: the
-# gateway tells the planes apart by the Host header, and deploy/local/up.sh pins each Ingress's
-# upstream-vhost to its first host.
+# gateway tells the planes apart by the Host header, and deploy/local/up.sh pins the Host each
+# Ingress sends upstream to its first host. (Not that annotation's name here: up.sh skips an Ingress
+# whose text already mentions it, and this comment ends the previous one's document.)
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
