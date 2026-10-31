@@ -61,7 +61,7 @@ spec:
               value: http://users:8102
             - name: IA_AGENT_URL
               value: http://ia-agent:8095
-            # content-hub: /_intranet on the data plane, /_content-hub on the control host.
+            # content-hub: /_intranet on the data plane — the portal and the editorial backoffice.
             - name: CONTENT_HUB_URL
               value: http://content-hub:8135
             # The users service's gRPC AuthService, which the gateway asks for each caller's roles

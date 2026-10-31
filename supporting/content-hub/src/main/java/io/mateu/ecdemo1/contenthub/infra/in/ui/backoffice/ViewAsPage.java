@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
 import io.mateu.ecdemo1.contenthub.application.out.EmployeeDirectory;
 import io.mateu.ecdemo1.contenthub.application.out.NamedAudienceRepository;
@@ -40,6 +41,7 @@ import java.util.concurrent.Callable;
 @Service
 @Scope("prototype")
 @Title("Ver como")
+@Editors
 public class ViewAsPage implements OptionsSupplier {
 
     @Section("Perfil")

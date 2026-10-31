@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.ContentIndex;
 import io.mateu.ecdemo1.contenthub.application.out.EmployeeDirectory;
 import io.mateu.ecdemo1.contenthub.application.security.EditorialPermission;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @Title("Visibilidad — estado")
+@ContentAdmins
 public class ProjectionPage {
 
     @ReadOnly

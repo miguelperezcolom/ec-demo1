@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Confirmaciones — resumen")
+@Editors
 public class ConfirmationsListing implements Listing<ConfirmationsListing.Row> {
 
     public record Row(@Label("Item") String item, @Label("Hotel") String hotel, @Label("Departamento") String department,

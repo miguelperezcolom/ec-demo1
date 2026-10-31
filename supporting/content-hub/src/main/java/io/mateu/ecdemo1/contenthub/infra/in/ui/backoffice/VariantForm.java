@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.slot.SlotVariant;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 /** A slot's variant: what it shows, to whom, and with which priority over the others. */
+@ContentAdmins
 public class VariantForm implements OptionsSupplier {
 
     @Label("Prioridad (mayor gana)")

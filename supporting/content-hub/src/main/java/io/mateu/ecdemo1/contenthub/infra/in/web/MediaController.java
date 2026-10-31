@@ -35,7 +35,7 @@ public class MediaController {
     final ContentIndex index;
     final Clock clock;
 
-    @GetMapping({"/_intranet/media/{id}", "/_content-hub/media/{id}"})
+    @GetMapping("/_intranet/media/{id}")
     public ResponseEntity<Resource> media(@PathVariable String id, @RequestParam("h") String hash,
                                           @RequestParam("e") long expires, @RequestParam("s") String signature) {
         if (!urls.valid(id, hash, expires, signature)) {
@@ -58,7 +58,7 @@ public class MediaController {
                 .body(new ByteArrayResource(bytes));
     }
 
-    @GetMapping(value = {"/_intranet/embed.js", "/_content-hub/embed.js"}, produces = "text/javascript")
+    @GetMapping(value = "/_intranet/embed.js", produces = "text/javascript")
     public ResponseEntity<Resource> embedScript() {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/javascript"))

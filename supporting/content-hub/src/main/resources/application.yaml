@@ -61,9 +61,9 @@ spring:
       max-request-size: 30MB
 
 # No security here, and none is missing: this pod is only reachable through the gateway, which
-# requires a Keycloak token on /_intranet/** and /_content-hub/** (ai-admin for the latter) and sets
-# X-User-Scopes from the users service. The media URLs it lets through unauthenticated carry a
-# signature this service checks (MediaUrls).
+# requires a Keycloak token on /_intranet/** and sets X-User-Scopes from the users service — which
+# decides who sees the "Editorial" backoffice (content:* permissions, @EyesOnly + EditorialIdentity).
+# The media URLs it lets through unauthenticated carry a signature this service checks (MediaUrls).
 
 messaging:
   outbox:

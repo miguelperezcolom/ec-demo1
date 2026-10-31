@@ -50,8 +50,6 @@ import java.util.List;
 // Its own colours, so it does not look like the data plane: indigo (Redwood's GBU line) as the
 // accent in Vaadin, and the top bar and colour strip in Redwood (static/theme/console-theme.js).
 @Script(src = "/theme/console-theme.js")
-// The intranet backoffice's media previews (content-hub's embed placeholders → players).
-@Script(src = "/_content-hub/embed.js")
 @Logo("/images/riu.svg")
 @FavIcon("/images/riu.svg")
 // The catalogues are listings with long ids and long URLs in them; the default ~900px container
@@ -113,13 +111,6 @@ public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
      */
     @Menu
     RemoteMenu users = new RemoteMenu("/_users").withLabel("Usuarios");
-
-    /**
-     * The intranet's editorial backoffice — contents, media, sections, audiences, "ver como", slots,
-     * newsletter, confirmations — served by content-hub.
-     */
-    @Menu
-    RemoteMenu intranet = new RemoteMenu("/_content-hub").withLabel("Intranet");
 
     /**
      * Workflow definitions and analytics, served by the orchestrator pod — the same one that

@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.NewsletterService;
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Scope("prototype")
+@ContentAdmins
 public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm {
 
     @Section("Edición")

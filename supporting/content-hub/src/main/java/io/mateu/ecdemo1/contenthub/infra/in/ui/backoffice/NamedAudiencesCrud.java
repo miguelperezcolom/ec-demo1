@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.NamedAudienceRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.visibility.NamedAudiences;
@@ -21,6 +22,7 @@ import java.util.List;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Audiencias con nombre")
+@ContentAdmins
 public class NamedAudiencesCrud extends SimpleCrud<NamedAudienceForm, NamedAudienceForm, NamedAudienceForm, NoFilters,
         NamedAudiencesCrud.Row, String> {
 

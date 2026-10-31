@@ -40,7 +40,7 @@ public class MediaUrls {
         this.clock = clock;
     }
 
-    /** @param base "/_intranet" for the portal, "/_content-hub" for the backoffice */
+    /** @param base the path the gateway routes to this pod: "/_intranet", for the portal and the backoffice alike */
     public String url(String base, String mediaId, String hash) {
         var expires = clock.instant().plus(VALIDITY).getEpochSecond();
         return base + "/media/" + mediaId + "?h=" + hash + "&e=" + expires + "&s=" + sign(mediaId, hash, expires);

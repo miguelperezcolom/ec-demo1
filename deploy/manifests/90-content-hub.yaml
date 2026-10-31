@@ -1,6 +1,6 @@
 # content-hub — the intranet: content with audience-based visibility (docs/specs/servicio-contenido.md).
-# Two Mateu UIs, the portal at /_intranet (data plane's shells) and the editorial backoffice at
-# /_content-hub (control console, behind ai-admin); an MCP server for the chat agent (cluster-internal,
+# One Mateu UI at /_intranet (data plane's shells): the portal, and the editorial backoffice as its
+# "Editorial" entry for holders of a content:* permission; an MCP server for the chat agent (cluster-internal,
 # the user's token verified here); the newsletter through postfix.
 #
 # Its database is on cp-postgres — the server with pgvector, which the chat's RAG needs — created by the

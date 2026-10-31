@@ -46,13 +46,13 @@ seguridad; **el gateway valida el token de Keycloak antes de que ningún backend
   que llega al agente se factura, así que el chat no puede ser un endpoint abierto.
 - **Rol `ai-admin`**, solo en los hosts de control: `/_ia-cp`, `/_users`, `/mateu/**`,
   `/_workflow-admin`, `/_forms-admin`, `/_integrations`, `/_mapping`, `/_communication`, `/_mdm`,
-  `/_registration-rules`, `/_audit`, `/_content-hub` (el backoffice de la intranet) y también **`/ai/**`**: el agente del control plane llega a
+  `/_registration-rules`, `/_audit` y también **`/ai/**`**: el agente del control plane llega a
   aprobaciones de mapeado, decisiones de integración y datos personales del MDM.
 - **Públicos, y por qué**: los webhooks de git del motor (`/workflow/webhooks/**`, `/forms/webhooks/**`,
   verificados por HMAC), el de GitOps del catálogo de IA (`/cp-webhooks/**`, también HMAC, y solo en
   los hosts de control), los scripts de Web Push de la bandeja (`/_inbox/push/push.js` y `sw.js`), los
   recursos estáticos del motor (`/eventconductor/**`), los medios de la intranet y su `embed.js`
-  (`GET /_intranet/media/**`, `/_content-hub/media/**`: URL firmadas que content-hub comprueba) y la salud. Y dos `GET` que solo redirigen a una
+  (`GET /_intranet/media/**`: URL firmadas que content-hub comprueba) y la salud. Y dos `GET` que solo redirigen a una
   pantalla de la consola, que es la que pide el login: `/_inbox` (o `/_inbox/`), tecleado en la barra
   de direcciones, lleva a la bandeja (`/inbox/pending`), y `/_api-usage/apis`, a las APIs externas
 (`/usage/apis`). Lo

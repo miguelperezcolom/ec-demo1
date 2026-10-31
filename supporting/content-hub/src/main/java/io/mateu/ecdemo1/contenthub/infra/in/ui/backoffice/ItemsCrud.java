@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.core.infra.declarative.orchestrators.crud.Crud;
 import io.mateu.ecdemo1.contenthub.application.out.ItemRepository;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemStatus;
@@ -24,6 +25,7 @@ import java.util.List;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Contenidos")
+@Editors
 public class ItemsCrud extends Crud<ItemForm, ItemForm, ItemForm, NoFilters, ItemRow, String> {
 
     final ObjectProvider<ItemForm> forms;

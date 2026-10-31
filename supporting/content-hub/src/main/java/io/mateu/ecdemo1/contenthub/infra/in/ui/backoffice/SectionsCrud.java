@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.NavigationRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.NavigationCommands;
 import io.mateu.ecdemo1.contenthub.infra.in.security.Readers;
@@ -21,6 +22,7 @@ import java.util.List;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Secciones")
+@ContentAdmins
 public class SectionsCrud extends SimpleCrud<SectionForm, SectionForm, SectionForm, NoFilters, SectionsCrud.Row, String> {
 
     public record Row(@Label("Id") String id, @Label("Sección") String name, @Label("Posición") int position) {

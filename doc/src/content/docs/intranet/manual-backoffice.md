@@ -3,10 +3,11 @@ title: Manual del backoffice
 description: La intranet para editores, publicadores y administradores — contenidos, workflow, biblioteca de medios, secciones, audiencias, ver como, slots, newsletter, confirmaciones, directorio y visibilidad.
 ---
 
-El backoffice está en la consola de control, menú **Intranet** (`https://console.ec1.mateu.io`, en local
-`http://console.localhost:8800` → *Intranet*). El gateway exige el rol `ai-admin` para entrar en esa
-consola; dentro, lo que cada uno puede hacer lo deciden sus **permisos editoriales**, que se asignan con
-roles en *Usuarios*:
+El backoffice es el menú **Editorial** de la propia intranet, en la consola de datos
+(`https://ec1.mateu.io`, en local `http://ec1.localhost:8800` → *Editorial*). Solo lo ve quien tiene
+algún **permiso editorial**; quien no, ni ve la entrada ni puede abrir sus pantallas tecleando la URL. Los
+permisos se asignan con roles en *Usuarios* (consola de control) y deciden también qué entradas ve cada
+uno: *Secciones*, *Audiencias*, *Slots*, *Newsletter* y *Visibilidad* son solo para `content:admin`.
 
 | Rol | Permisos | Puede |
 | :-- | :------- | :---- |

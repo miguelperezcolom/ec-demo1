@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
@@ -20,6 +21,7 @@ import java.util.UUID;
  * One block of a page, as the editor fills it in. Its audience can only narrow the page's: whatever is
  * chosen here is ANDed with the page's audience.
  */
+@Editors
 public class BlockForm implements OptionsSupplier {
 
     @Label("Tipo")

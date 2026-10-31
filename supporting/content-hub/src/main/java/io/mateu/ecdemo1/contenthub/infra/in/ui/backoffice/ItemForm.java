@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.application.out.ContentIndex;
 import io.mateu.ecdemo1.contenthub.application.out.ItemRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
@@ -45,6 +46,7 @@ import java.util.List;
  */
 @Service
 @Scope("prototype")
+@Editors
 public class ItemForm extends AudienceForm implements Identifiable, VisibilitySupplier {
 
     @ReadOnly

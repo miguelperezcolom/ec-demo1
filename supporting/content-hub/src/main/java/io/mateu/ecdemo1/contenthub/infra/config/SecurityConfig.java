@@ -9,10 +9,10 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * The screens ({@code /_intranet/**}, {@code /_content-hub/**}, {@code /mateu/**}) are only reachable
- * through the gateway, which verified the token; the media URLs carry their own signature. The MCP
- * server ({@code /sse}, {@code /mcp/**}) is reached by ia-agent inside the cluster, not through the
- * gateway — so here the token it forwards is verified against Keycloak, and a call without one refused.
+ * The screens ({@code /_intranet/**}, {@code /mateu/**}) are only reachable through the gateway,
+ * which verified the token; who may see the editorial ones is {@code @EyesOnly}'s call
+ * (EditorialIdentity). The media URLs carry their own signature. The MCP server ({@code /sse},
+ * {@code /mcp/**}) is reached by ia-agent inside the cluster, not through the gateway — so here the token it forwards is verified against Keycloak, and a call without one refused.
  */
 @Configuration
 @EnableWebSecurity

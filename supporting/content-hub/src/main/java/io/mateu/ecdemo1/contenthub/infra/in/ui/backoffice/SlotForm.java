@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.SlotRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.SlotCommands;
 import io.mateu.ecdemo1.contenthub.domain.slot.Slot;
@@ -24,6 +25,7 @@ import java.util.List;
  */
 @Service
 @Scope("prototype")
+@ContentAdmins
 public class SlotForm implements SimpleCrud.CrudForm {
 
     @NotEmpty

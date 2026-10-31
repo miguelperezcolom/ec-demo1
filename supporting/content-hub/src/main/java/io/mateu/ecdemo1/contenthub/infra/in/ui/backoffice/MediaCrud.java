@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.application.out.MediaRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.MediaCommands;
 import io.mateu.ecdemo1.contenthub.infra.in.security.Readers;
@@ -22,6 +23,7 @@ import java.util.List;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Biblioteca de medios")
+@Editors
 public class MediaCrud extends SimpleCrud<MediaForm, MediaForm, MediaForm, NoFilters, MediaCrud.Row, String> {
 
     public record Row(@Label("Id") String id, @Label("Título") String title, @Label("Tipo") String kind,

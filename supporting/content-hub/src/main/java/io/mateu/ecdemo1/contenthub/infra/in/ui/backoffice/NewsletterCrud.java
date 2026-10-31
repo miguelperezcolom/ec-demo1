@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterRepository;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Label;
@@ -19,6 +20,7 @@ import java.util.List;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Newsletter")
+@ContentAdmins
 public class NewsletterCrud extends SimpleCrud<NewsletterForm, NewsletterForm, NewsletterForm, NoFilters,
         NewsletterCrud.Row, String> {
 

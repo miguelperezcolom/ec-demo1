@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.application.out.MediaRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.MediaCommands;
 import io.mateu.ecdemo1.contenthub.domain.media.MediaAsset;
@@ -31,6 +32,7 @@ import java.util.concurrent.Callable;
  */
 @Service
 @Scope("prototype")
+@Editors
 public class MediaForm implements SimpleCrud.CrudForm, VisibilitySupplier {
 
     @ReadOnly
@@ -91,7 +93,7 @@ public class MediaForm implements SimpleCrud.CrudForm, VisibilitySupplier {
         if (id == null) {
             return Html.block("");
         }
-        return Html.block(media.find(id).map(a -> renderer.medium(a, "/_content-hub", MediaUrls.EDITOR)).orElse(""));
+        return Html.block(media.find(id).map(a -> renderer.medium(a, "/_intranet", MediaUrls.EDITOR)).orElse(""));
     }
 
     @Override

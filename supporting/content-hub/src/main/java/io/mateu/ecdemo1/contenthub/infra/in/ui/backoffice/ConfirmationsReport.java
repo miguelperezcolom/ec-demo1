@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.application.out.AcknowledgementRepository;
 import io.mateu.ecdemo1.contenthub.application.out.EmployeeDirectory;
 import io.mateu.ecdemo1.contenthub.application.out.ItemRepository;
@@ -20,6 +21,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
+@Editors
 public class ConfirmationsReport {
 
     final ItemRepository items;

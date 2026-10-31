@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.visibility.NamedAudiences;
 import io.mateu.ecdemo1.contenthub.domain.audience.NamedAudience;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Scope("prototype")
+@ContentAdmins
 public class NamedAudienceForm extends AudienceForm implements SimpleCrud.CrudForm {
 
     @Section("Audiencia con nombre")

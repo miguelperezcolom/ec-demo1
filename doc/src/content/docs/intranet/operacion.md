@@ -14,8 +14,8 @@ espera a que exista); la imagen es
   de datos **`content_hub`** si no existe, con las credenciales del Secret `ec-cp-postgres`. Las tablas
   (y la extensión `vector`) las crea el servicio al arrancar (`schema.sql`, solo aditivo).
 - **initContainer `wait-for-kafka`**: espera a `redpanda:19092`.
-- Sin ruta para el MCP ni para `/api/**`: solo `/_intranet/**` (hosts de datos) y `/_content-hub/**`
-  (hosts de control) en el gateway.
+- Sin ruta para el MCP: solo `/_intranet/**` (hosts de datos) en el gateway, que sirve el portal y el
+  backoffice.
 - Sondas en `/actuator/health/readiness` y `/liveness`; métricas en `/actuator/prometheus`.
 - Lo usan además: el gateway (rutas, `CONTENT_HUB_URL`, y `AUTH_GRPC_ADDRESS` para los permisos), los dos
   shells (`RemoteMenu` *Intranet* y `@Script` de `embed.js`), el servicio de usuarios (topics del
@@ -35,7 +35,7 @@ espera a que exista); la imagen es
 | `NEWSLETTER_FROM` | — | `intranet@ec1.mateu.io` | Remitente |
 | `NEWSLETTER_REDIRECT_TO` | `newsletter-demo@example.com` | vacío | **Todo** correo de newsletter va aquí, con el grupo y el idioma en el asunto. Vacío: a los empleados de verdad |
 | `EMBEDDINGS_URL`, `EMBEDDINGS_MODEL` | `http://embeddings`, — | `http://embeddings`, `intfloat/multilingual-e5-small` | El RAG (`/v1/embeddings`) |
-| `PORTAL_URL` | `https://ec1.mateu.io/intranet` | `http://console.localhost:8800/intranet` | Los enlaces de la newsletter y el mensaje de «ver como» |
+| `PORTAL_URL` | `https://ec1.mateu.io/intranet` | `http://ec1.localhost:8800/intranet` | Los enlaces de la newsletter y el mensaje de «ver como» |
 | `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWKS_URI` | `https://auth.ec1.mateu.io/realms/ec-demo1`, `http://keycloak:8080/…/certs` | iguales | Verificar el token de las llamadas MCP |
 | `MEDIA_SECRET` | — | vacío | Firma las URL de los medios. Vacío: una clave aleatoria por arranque (las URL ya dibujadas dejan de valer al reiniciar) |
 | `MEDIA_MAX_BYTES` | — | `20971520` (20 MB) | Tamaño máximo de un fichero subido |
@@ -50,7 +50,8 @@ Los trabajos programados se ajustan con `content-hub.jobs.crossings` (`PT30S`), 
 En el clúster local (`deploy/local/up.sh`, ver [Entorno local](/desarrollo/entorno-local/)):
 
 - **Portal**: `http://ec1.localhost:8800` → menú *Intranet* (`/intranet/inicio`).
-- **Backoffice**: `http://console.localhost:8800` → menú *Intranet* (requiere `ai-admin`).
+- **Backoffice**: el mismo host, menú *Editorial* (solo con permisos `content:*`: `editora`,
+  `publicador`, o `demo` como administrador del realm).
 
 Redesplegar tras un cambio en `supporting/content-hub`:
 

@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Confirmaciones — pendientes")
+@Editors
 public class PendingConfirmationsListing implements Listing<PendingConfirmationsListing.Row> {
 
     public record Row(@Label("Item") String item, @Label("Empleado") String employee, @Label("Email") String email,

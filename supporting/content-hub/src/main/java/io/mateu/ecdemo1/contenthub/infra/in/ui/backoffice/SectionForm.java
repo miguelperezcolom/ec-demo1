@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.NavigationRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.NavigationCommands;
 import io.mateu.ecdemo1.contenthub.domain.navigation.Section;
@@ -21,6 +22,7 @@ import java.util.List;
 /** A section of the navigation tree: where it hangs, its position among its siblings and its names. */
 @Service
 @Scope("prototype")
+@ContentAdmins
 public class SectionForm implements SimpleCrud.CrudForm, OptionsSupplier {
 
     @NotEmpty

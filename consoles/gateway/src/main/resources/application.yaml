@@ -227,10 +227,11 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_content/**
 
-        # The intranet portal: content-hub's reader face, on the data plane like /_content —
-        # employees read it where they work. The editorial backoffice of the same service is on the
-        # control host (/_content-hub, below). Only the Mateu UI: its MCP server is for agents
-        # inside the cluster, like registration-rules' and the front office's, and is not routed.
+        # The intranet: content-hub's portal and, as its "Editorial" entry, the editorial backoffice —
+        # on the data plane like /_content: employees read it, and editors write it, where they work.
+        # Who sees the backoffice is content-hub's call (content:* permissions from X-User-Scopes).
+        # Only the Mateu UI: its MCP server is for agents inside the cluster, like
+        # registration-rules' and the front office's, and is not routed.
         - id: intranet
           uri: ${CONTENT_HUB_URL:http://content-hub:8135}
           predicates:
@@ -245,15 +246,6 @@ spring:
           predicates:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_users/**
-
-        # content-hub's editorial backoffice: what the intranet publishes is decided here, so on
-        # the CONTROL host next to users, behind ai-admin — see SecurityConfig. Same pod as the
-        # data plane's /_intranet; the host is what separates writing from reading.
-        - id: content-hub
-          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
-          predicates:
-            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
-            - Path=/_content-hub/**
 
         # The chat agent, at the path Mateu's @AI client posts to. Not a Mateu UI and so not a
         # /_ prefix: the shell's chat panel calls /ai/api/agent/stream directly.

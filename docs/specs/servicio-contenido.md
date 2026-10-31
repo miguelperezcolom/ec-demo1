@@ -231,8 +231,8 @@ App Mateu para editores y responsables de comunicación. Roles mínimos: editor 
 - Base de datos propia `content_hub` en `cp-postgres`, el servidor con pgvector (lo necesita el RAG); la crea el initContainer del despliegue. Librería compartida `supporting/messaging` para outbox e inbox.
 - Puerto 8135. Manifest en `deploy/manifests/`, imagen en `deploy/build-images.sh` y arranque en `deploy/local/up.sh`, como los demás servicios.
 - Dos UIs Mateu en el mismo servicio:
-    - backoffice en `/_content-hub`, en la consola de control (`control-shell`, host de consola, como `/_users`);
-    - portal en `/_intranet`, en el shell principal.
+    - portal en `/_intranet`, en el shell principal;
+    - backoffice como menú *Editorial* de la misma UI, en el plano de datos, donde trabajan los editores: Mateu lo oculta y rechaza sus rutas sin un permiso `content:*` (`@EyesOnly`, con un `PrincipalResolver` que lee `X-User-Scopes`).
 
   Rutas en `consoles/gateway` (`application.yaml`) y autenticación obligatoria en su `SecurityConfig`.
 

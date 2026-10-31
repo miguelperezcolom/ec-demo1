@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.SlotRepository;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
@@ -19,6 +20,7 @@ import java.util.List;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Slots de contenido")
+@ContentAdmins
 public class SlotsCrud extends SimpleCrud<SlotForm, SlotForm, SlotForm, NoFilters, SlotsCrud.Row, String> {
 
     public record Row(@Label("Clave") String id, @Label("Aplicación") String application,
