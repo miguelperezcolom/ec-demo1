@@ -33,6 +33,15 @@ spring:
 
   cloud:
     gateway:
+      # Off because gRPC is on the classpath now (the users-service client behind
+      # UserAuthorityEnrichmentFilter) and Spring Cloud Gateway switches its JSON-to-gRPC filter on
+      # whenever io.grpc.Channel is present — and that filter needs unshaded grpc-netty, which this
+      # app does not carry (it uses grpc-netty-shaded so gRPC's Netty cannot clash with the one the
+      # gateway runs on). No route here transcodes JSON to gRPC; without this the context fails to
+      # start with NoClassDefFoundError: io/grpc/netty/NettyChannelBuilder.
+      filter:
+        json-to-grpc:
+          enabled: false
       routes:
         # The workflow-graph web component is served from an absolute path, so it needs a route
         # of its own or the definition viewer renders an empty box. Public — see SecurityConfig.
@@ -218,6 +227,16 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
             - Path=/_content/**
 
+        # The intranet portal: content-hub's reader face, on the data plane like /_content —
+        # employees read it where they work. The editorial backoffice of the same service is on the
+        # control host (/_content-hub, below). Only the Mateu UI: its MCP server is for agents
+        # inside the cluster, like registration-rules' and the front office's, and is not routed.
+        - id: intranet
+          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Path=/_intranet/**
+
         # Users moved to the control console: on the CONTROL host now, not the demo host, because
         # administering access is a control-plane concern. Behind the ai-admin role, like the IA
         # catalogues — see SecurityConfig.
@@ -226,6 +245,15 @@ spring:
           predicates:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_users/**
+
+        # content-hub's editorial backoffice: what the intranet publishes is decided here, so on
+        # the CONTROL host next to users, behind ai-admin — see SecurityConfig. Same pod as the
+        # data plane's /_intranet; the host is what separates writing from reading.
+        - id: content-hub
+          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_content-hub/**
 
         # The chat agent, at the path Mateu's @AI client posts to. Not a Mateu UI and so not a
         # /_ prefix: the shell's chat panel calls /ai/api/agent/stream directly.

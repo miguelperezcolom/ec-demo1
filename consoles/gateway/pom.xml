@@ -21,6 +21,8 @@
     <properties>
         <java.version>21</java.version>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
+        <!-- The gRPC grpc-interface's stubs were generated with; runtime and codegen must agree. -->
+        <grpc.version>1.77.0</grpc.version>
     </properties>
 
     <dependencyManagement>
@@ -59,9 +61,38 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <!-- The user's roles and scopes, from the users service's gRPC AuthService, stamped on
+             every authenticated request as X-User-Roles / X-User-Scopes — see
+             UserAuthorityEnrichmentFilter. The stubs come from control-plane/grpc-interface, which
+             deploy/build-images.sh installs before any application module is built.
+
+             Plain grpc-java and not a Spring starter: spring-grpc 1.x (what users runs) needs Boot 4
+             and this gateway is on Boot 3.4, and net.devh's starter pins a gRPC far older than the
+             1.77 the stubs were generated with. One channel bean is all a client needs. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>grpc-interface</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <!-- Per-token cache of the AuthService answer; the version is Boot's. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-inprocess</artifactId>
+            <version>${grpc.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -12,7 +12,16 @@ package io.mateu.ecdemo1.users.application.out.identity;
  * <p>{@code firstName} carries the whole display name. This service keeps a person's name as one
  * field, and splitting it on a space to fill Keycloak's two would invent a surname that was never
  * given; the honest mapping is to put what we have where a name goes and leave the other blank.
+ *
+ * <p>{@code skipPasswordSetupEmail} is for users nobody will read mail for — the demo seed's
+ * fictitious employees at example.com: created without the "set your password" email (and without
+ * the required action it pairs with). False by default, which is also what a message appended before
+ * the field existed reads as: everything else keeps the email.
  */
 public record UserIdentity(String userId, String username, String email, String firstName,
-                           boolean enabled) {
+                           boolean enabled, boolean skipPasswordSetupEmail) {
+
+    public UserIdentity(String userId, String username, String email, String firstName, boolean enabled) {
+        this(userId, username, email, firstName, enabled, false);
+    }
 }

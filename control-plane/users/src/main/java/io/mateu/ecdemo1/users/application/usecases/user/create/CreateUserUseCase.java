@@ -1,7 +1,8 @@
 package io.mateu.ecdemo1.users.application.usecases.user.create;
 
 import io.mateu.ecdemo1.users.application.out.UserRepository;
-import io.mateu.ecdemo1.users.application.usecases.user.identity.IdentityOutboxAppender;
+import io.mateu.ecdemo1.users.application.usecases.user.attributes.EmployeeAttributesResolver;
+import io.mateu.ecdemo1.users.application.usecases.user.publish.UserChangePublisher;
 import io.mateu.ecdemo1.users.domain.aggregates.role.vo.RoleId;
 import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Email;
 import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Name;
@@ -17,7 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateUserUseCase {
 
     final UserRepository repository;
-    final IdentityOutboxAppender identityOutboxAppender;
+    final UserChangePublisher publisher;
+    final EmployeeAttributesResolver attributesResolver;
 
     /**
      * Creates a user, and only creates: the id is the caller's (the username), and the entity is not
@@ -37,12 +39,13 @@ public class CreateUserUseCase {
                 new Email(command.email()),
                 // never null: CreateUserCommand turns a missing list into an empty one
                 command.groupIds().stream().map(UserGroupId::new).toList(),
-                command.roleIds().stream().map(RoleId::new).toList()
+                command.roleIds().stream().map(RoleId::new).toList(),
+                attributesResolver.resolve(command.attributes())
         );
         repository.save(user);
-        // Same transaction as the save: the "tell Keycloak" intent commits with the user or not at
-        // all, and the relay delivers it afterwards. See IdentityOutboxAppender.
-        identityOutboxAppender.drain(user);
+        // Same transaction as the save: the "tell Keycloak" and "tell the directory" intents commit
+        // with the user or not at all, and the relay delivers them afterwards. See UserChangePublisher.
+        publisher.publish(user, command.skipPasswordSetupEmail());
     }
 
 }

@@ -160,6 +160,16 @@ public class SecurityConfig {
                         // used to be here too; it moved to the control host, behind ai-admin — see
                         // below — because administering access is a control-plane concern.
                         .pathMatchers("/_booking/**", "/_content/**").authenticated()
+                        // The intranet portal (content-hub's reader face): internal news and
+                        // documents, for whoever is signed in — not for the internet. Its editorial
+                        // backoffice, /_content-hub, is on the control host below, behind ai-admin.
+                        // Except what the browser fetches by itself, with no bearer token: the media
+                        // embedded in its pages (an <img>, a <video>) and the script that turns embed
+                        // placeholders into players. content-hub serves a medium only on a URL it signed
+                        // when it drew the page for someone who may see it, and checks the visibility
+                        // again before answering.
+                        .pathMatchers(HttpMethod.GET, "/_intranet/media/**", "/_intranet/embed.js").permitAll()
+                        .pathMatchers("/_intranet/**").authenticated()
                         // The integration PoC's product-side screen: the partners master. Same
                         // reason as the two above.
                         .pathMatchers("/_erp/**").authenticated()
@@ -194,6 +204,9 @@ public class SecurityConfig {
                         // catch-all would permit it anyway, but silence is the wrong way to make a
                         // public endpoint public.
                         .matchers(onControlHost("/cp-webhooks/**")).permitAll()
+                        // The backoffice's media previews, fetched by the browser with no bearer
+                        // token: signed URLs, checked by content-hub (see /_intranet/media above).
+                        .matchers(onControlHost("/_content-hub/media/**", "/_content-hub/embed.js")).permitAll()
                         // The control console — an admin console whose halves are the IA
                         // catalogues, user and access management, and the two engines'
                         // administration UIs. /_workflow-admin and /_forms-admin are served by the
@@ -204,6 +217,8 @@ public class SecurityConfig {
                         // /_workflow/** rule further up matches on any host, and a path it caught
                         // would be decided as `authenticated` before this line was ever reached.
                         .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**",
+                                // The intranet's editorial backoffice: what every employee reads.
+                                "/_content-hub/**",
                                 "/api/workflow-agents",
                                 "/_workflow-admin/**", "/_forms-admin/**",
                                 // The integration's control plane (PoC ACL): activating a hotel or
