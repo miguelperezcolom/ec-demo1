@@ -232,7 +232,8 @@ App Mateu para editores y responsables de comunicación. Roles mínimos: editor 
 - Puerto 8135. Manifest en `deploy/manifests/`, imagen en `deploy/build-images.sh` y arranque en `deploy/local/up.sh`, como los demás servicios.
 - Dos UIs Mateu en el mismo servicio:
     - portal en `/_intranet`, en el shell principal;
-    - backoffice como menú *Editorial* de la misma UI, en el plano de datos, donde trabajan los editores: Mateu lo oculta y rechaza sus rutas sin un permiso `content:*` (`@EyesOnly`, con un `PrincipalResolver` que lee `X-User-Scopes`).
+    - trabajo editorial (contenidos, medios, contenido de slots, newsletter, ver como, confirmaciones) como menú *Editorial* de la misma UI, en el plano de datos, donde trabajan los editores: Mateu lo oculta y rechaza sus rutas sin un permiso `content:*` (`@EyesOnly`, con un `PrincipalResolver` que lee `X-User-Scopes`);
+    - configuración (secciones, audiencias con nombre, slots, directorio, visibilidad) en `/_content-hub`, en la consola de control (`control-shell`, como `/_users`), con `ai-admin` y `content:admin`. Los slots se parten: el hueco es configuración, sus variantes son trabajo editorial (`content:publish`).
 
   Rutas en `consoles/gateway` (`application.yaml`) y autenticación obligatoria en su `SecurityConfig`.
 

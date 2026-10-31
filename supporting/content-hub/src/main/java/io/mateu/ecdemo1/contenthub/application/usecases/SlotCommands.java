@@ -68,9 +68,10 @@ public class SlotCommands {
         slots.save(slot);
     }
 
+    /** A variant is seen as soon as it is saved: changing one is publishing. */
     @Transactional
     public void putVariant(Reader reader, String key, SlotVariant variant) {
-        reader.require(EditorialPermission.ADMIN);
+        reader.require(EditorialPermission.PUBLISH);
         var slot = slots.find(key).orElseThrow();
         slot.putVariant(variant);
         slots.save(slot);
@@ -79,7 +80,7 @@ public class SlotCommands {
 
     @Transactional
     public void removeVariant(Reader reader, String key, String variantId) {
-        reader.require(EditorialPermission.ADMIN);
+        reader.require(EditorialPermission.PUBLISH);
         var slot = slots.find(key).orElseThrow();
         slot.removeVariant(variantId);
         slots.save(slot);

@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
-import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
+import io.mateu.ecdemo1.contenthub.infra.in.security.Publishers;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.NewsletterService;
@@ -37,7 +38,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Scope("prototype")
-@ContentAdmins
+@Editors
 public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm {
 
     @Section("Edición")
@@ -141,6 +142,7 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
     }
 
     @Toolbar
+    @Publishers
     @Action(confirmationRequired = true, confirmationTitle = "¿Programar el envío?",
             confirmationMessage = "Se enviará en la fecha indicada (o ya, si no hay fecha), un correo por grupo de destinatarios.")
     public Object programar(HttpRequest httpRequest) {

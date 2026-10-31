@@ -1,6 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
-import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
+import io.mateu.ecdemo1.contenthub.infra.in.security.ContentAdmins;
 import io.mateu.ecdemo1.contenthub.application.out.EmployeeDirectory;
 import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.uidl.annotations.Label;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Scope("prototype")
 @RequiredArgsConstructor
 @Title("Directorio de empleados")
-@Editors
+@ContentAdmins
 public class DirectoryListing implements Listing<DirectoryListing.Row> {
 
     public record Row(@Label("Usuario") String id, @Label("Nombre") String name, @Label("Hotel") String hotel,

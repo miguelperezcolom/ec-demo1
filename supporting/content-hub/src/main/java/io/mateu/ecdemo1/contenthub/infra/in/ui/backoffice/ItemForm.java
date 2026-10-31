@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
 import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
+import io.mateu.ecdemo1.contenthub.infra.in.security.Publishers;
 import io.mateu.ecdemo1.contenthub.application.out.ContentIndex;
 import io.mateu.ecdemo1.contenthub.application.out.ItemRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
@@ -231,6 +232,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     }
 
     @Toolbar
+    @Publishers
     @Action(confirmationRequired = true, confirmationTitle = "¿Publicar?",
             confirmationMessage = "Se congela el borrador en una versión nueva y la ven sus lectores desde su fecha de publicación.")
     public Object publicar(HttpRequest httpRequest) {
@@ -239,6 +241,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     }
 
     @Toolbar
+    @Publishers
     @Action
     public Object rechazar(HttpRequest httpRequest) {
         commands.reject(readers.of(httpRequest), id);
@@ -246,6 +249,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     }
 
     @Toolbar
+    @Publishers
     @Action(confirmationRequired = true, confirmationTitle = "¿Retirar?",
             confirmationMessage = "Deja de verse en todos los consumidores: portal, menús, búsqueda, slots, newsletter y chat.")
     public Object retirar(HttpRequest httpRequest) {

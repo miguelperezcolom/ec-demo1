@@ -113,6 +113,14 @@ public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
     RemoteMenu users = new RemoteMenu("/_users").withLabel("Usuarios");
 
     /**
+     * The intranet's configuration — sections, named audiences, slots, the employee directory and the
+     * visibility projection — served by content-hub. Its editorial work (contents, media, slot content,
+     * newsletter) is on the data plane, the intranet's "Editorial" entry.
+     */
+    @Menu
+    RemoteMenu intranet = new RemoteMenu("/_content-hub").withLabel("Intranet");
+
+    /**
      * Workflow definitions and analytics, served by the orchestrator pod — the same one that
      * answers Processes and Steps on the demo console, from a second {@code @UI} of its own.
      *

@@ -3,24 +3,30 @@ title: Manual del backoffice
 description: La intranet para editores, publicadores y administradores — contenidos, workflow, biblioteca de medios, secciones, audiencias, ver como, slots, newsletter, confirmaciones, directorio y visibilidad.
 ---
 
-El backoffice es el menú **Editorial** de la propia intranet, en la consola de datos
-(`https://ec1.mateu.io`, en local `http://ec1.localhost:8800` → *Editorial*). Solo lo ve quien tiene
-algún **permiso editorial**; quien no, ni ve la entrada ni puede abrir sus pantallas tecleando la URL. Los
-permisos se asignan con roles en *Usuarios* (consola de control) y deciden también qué entradas ve cada
-uno: *Secciones*, *Audiencias*, *Slots*, *Newsletter* y *Visibilidad* son solo para `content:admin`.
+El backoffice tiene dos caras, en dos consolas:
+
+- **Editorial**, el trabajo diario —contenidos, medios, contenido de slots, newsletter, ver como y
+  confirmaciones—, es un menú de la propia intranet en la consola de datos (`https://ec1.mateu.io`, en
+  local `http://ec1.localhost:8800` → *Editorial*). Solo lo ve quien tiene algún **permiso editorial**;
+  quien no, ni ve la entrada ni puede abrir sus pantallas tecleando la URL.
+- **Configuración** —secciones, audiencias con nombre, slots, directorio y visibilidad: cómo funciona la
+  intranet, no lo que publica— está en la consola de control (`https://console.ec1.mateu.io`, en local
+  `http://console.localhost:8800` → *Intranet*), con el rol `ai-admin` y además `content:admin`.
+
+Los permisos se asignan con roles en *Usuarios* (consola de control):
 
 | Rol | Permisos | Puede |
 | :-- | :------- | :---- |
-| Editor de contenido (`content-editor`) | `content:edit` | Crear y editar contenidos, subir medios, enviar a revisión |
-| Publicador de contenido (`content-publisher`) | `content:edit`, `content:publish` | Además aprobar, publicar (con o sin revisión), rechazar y retirar |
-| Administrador de contenido (`content-admin`) | los tres | Además secciones, audiencias con nombre, slots, newsletter y recalcular la visibilidad |
+| Editor de contenido (`content-editor`) | `content:edit` | Crear y editar contenidos, subir medios, enviar a revisión, componer newsletters |
+| Publicador de contenido (`content-publisher`) | `content:edit`, `content:publish` | Además aprobar, publicar (con o sin revisión), rechazar, retirar, programar el envío de una newsletter y editar el contenido de los slots |
+| Administrador de contenido (`content-admin`) | los tres | Además, en la consola de control, la configuración: secciones, audiencias con nombre, slots, directorio y visibilidad |
 
 En la demo: `editora` es editora, `publicador` es publicador y `demo` es administrador (ver
 [Operación](/intranet/operacion/#datos-de-demo)).
 
 ## Contenidos
 
-*Intranet → Contenidos* lista todos los items, en cualquier estado, con su tipo, autor y última
+*Editorial → Contenidos* lista todos los items, en cualquier estado, con su tipo, autor y última
 modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 
 ### Crear o editar un contenido
@@ -108,7 +114,7 @@ modifica: se sube uno nuevo. La ficha del medio tiene una vista previa.
 
 ## Secciones
 
-*Intranet → Secciones* (administrador): el árbol de navegación del portal. Cada sección tiene un **id**
+*Consola de control → Intranet → Secciones*: el árbol de navegación del portal. Cada sección tiene un **id**
 (va en la URL), **Dentro de** (su madre, vacío = raíz), su **posición** entre hermanas (0 = primera) y su
 nombre en español, inglés y alemán. Las secciones no tienen audiencia: el portal muestra una sección si
 ella o una descendiente contiene algo visible para el lector. No se puede borrar una sección con
@@ -116,7 +122,7 @@ subsecciones.
 
 ## Audiencias con nombre
 
-*Intranet → Audiencias* (administrador): audiencias reutilizables, con un id, un nombre y el mismo
+*Consola de control → Intranet → Audiencias*: audiencias reutilizables, con un id, un nombre y el mismo
 constructor. La ficha enseña **los perfiles que la cumplen** y cuántos empleados tiene cada uno.
 
 **Redefinir** una cambia lo que ve todo lo que la nombra —items, bloques, variantes de slot—, en cuanto se
@@ -125,7 +131,7 @@ que se edite: nunca se abre el contenido por accidente.
 
 ## Ver como
 
-*Intranet → Ver como* enseña la intranet exactamente como la vería un perfil, con la misma función de
+*Editorial → Ver como* enseña la intranet exactamente como la vería un perfil, con la misma función de
 visibilidad que usa el portal (no es una simulación). Elige uno:
 
 - **Un empleado** del directorio;
@@ -140,21 +146,25 @@ puedes confirmar.
 
 ## Slots
 
-*Intranet → Slots* (administrador): los huecos de contenido editorial en pantallas de otras aplicaciones.
-Cada slot tiene una clave `aplicacion.pantalla.nombre`, una descripción, un **fallback** (lo que pinta la
-aplicación cuando no hay variante visible) y un estado: *Vacío*, *N variante(s)* o *Huérfano* (ya no
-aparece en los descriptores de su aplicación; no se borra, por si vuelve).
+Los huecos de contenido editorial en pantallas de otras aplicaciones. Están partidos en dos:
 
-Cada **variante** tiene prioridad (la mayor gana; dos variantes no pueden tener la misma), título, HTML
-(admite `[[media:id]]`), enlace y audiencia (con nombre, regiones, hoteles, departamentos). El lector ve
-la variante visible de mayor prioridad. Guardar el slot publica sus variantes.
+- **El slot** —el hueco— es configuración: *Consola de control → Intranet → Slots*. Cada slot tiene una
+  clave `aplicacion.pantalla.nombre`, una descripción, un **fallback** (lo que pinta la aplicación cuando
+  no hay variante visible) y un estado: *Vacío*, *N variante(s)* o *Huérfano* (ya no aparece en los
+  descriptores de su aplicación; no se borra, por si vuelve).
+- **Lo que lo llena** —sus variantes— es trabajo editorial: *Editorial → Contenido de slots*
+  (publicador), que lista los slots vivos. Cada **variante** tiene prioridad (la mayor gana; dos
+  variantes no pueden tener la misma), título, HTML (admite `[[media:id]]`), enlace y audiencia (con
+  nombre, regiones, hoteles, departamentos). El lector ve la variante visible de mayor prioridad. Guardar
+  publica las variantes: por eso hace falta `content:publish`.
 
 El de la demo es `front-office.bienvenida.destacado`: una variante general para todos y una de prioridad
 10 para «Recepción Canarias».
 
 ## Newsletter
 
-*Intranet → Newsletter* (administrador). Una edición tiene título, introducción, **items en orden**,
+*Editorial → Newsletter*. Una edición la compone un editor; **programarla** (enviarla) es publicar y
+pide `content:publish`. Una edición tiene título, introducción, **items en orden**,
 audiencia y fecha de envío.
 
 - **Grupos de destinatarios**: los empleados que la recibirían, agrupados por perfil e idioma, con los
@@ -179,10 +189,12 @@ Las dos se **exportan** a CSV o Excel desde el propio listado.
 
 ## Directorio y visibilidad
 
+En la consola de control, *Intranet*:
+
 - **Directorio** (solo lectura): los empleados tal como los manda el servicio de usuarios, con hotel,
   región, departamento, puesto, idioma y **perfil (hash)**. Los atributos se cambian en *Usuarios*, no
   aquí; el cambio llega en segundos.
-- **Visibilidad** (administrador): empleados en el directorio, perfiles materializados, sujetos con
+- **Visibilidad**: empleados en el directorio, perfiles materializados, sujetos con
   audiencia (items, bloques, variantes) y entradas en caché. Dos acciones:
   - **Recalcular** — evalúa cada audiencia para cada perfil desde cero. Debe dar exactamente lo que ya
     había («idéntica a la que había»); si algo cambia, lo dice.

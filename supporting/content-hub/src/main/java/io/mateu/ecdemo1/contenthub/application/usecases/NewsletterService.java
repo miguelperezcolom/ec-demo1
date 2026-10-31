@@ -54,7 +54,7 @@ public class NewsletterService {
 
     @Transactional
     public String compose(Reader reader, String title, String intro, List<String> itemIds, Audience audience) {
-        reader.require(EditorialPermission.ADMIN);
+        reader.require(EditorialPermission.EDIT);
         var id = "n" + UUID.randomUUID().toString().substring(0, 8);
         editions.save(NewsletterEdition.compose(id, title, intro, itemIds, audience));
         return id;
@@ -62,15 +62,16 @@ public class NewsletterService {
 
     @Transactional
     public void edit(Reader reader, String id, String title, String intro, List<String> itemIds, Audience audience) {
-        reader.require(EditorialPermission.ADMIN);
+        reader.require(EditorialPermission.EDIT);
         var e = editions.find(id).orElseThrow();
         e.edit(title, intro, itemIds, audience);
         editions.save(e);
     }
 
+    /** Sending is publishing: it needs the same permission. */
     @Transactional
     public void schedule(Reader reader, String id, Instant at) {
-        reader.require(EditorialPermission.ADMIN);
+        reader.require(EditorialPermission.PUBLISH);
         var e = editions.find(id).orElseThrow();
         e.schedule(at == null ? clock.instant() : at);
         editions.save(e);

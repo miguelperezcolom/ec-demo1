@@ -22,7 +22,8 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | Componente | Dónde | Qué hace |
 | :--------- | :---- | :------- |
 | **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, favoritos, pendientes |
-| **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, secciones, audiencias, ver como, slots, newsletter, confirmaciones, directorio y visibilidad |
+| **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, ver como y confirmaciones |
+| **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, directorio y visibilidad |
 | **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea |
 | **Remoto de slots** | `GET /_intranet/api/slots/{key}` (`SlotController`) | La variante visible de un slot, como JSON (provisional) |
 | **Medios** | `GET /_intranet/media/{id}` (`MediaController`) | Los ficheros de la biblioteca, con URL firmada |
@@ -30,17 +31,20 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **Directorio** | `EmployeeDirectoryListener` | Copia local de los empleados y sus atributos, desde `employee-directory` |
 | **Trabajos** | `ContentJobs` | Cruces de fechas, newsletter, embeddings del RAG y limpieza de perfiles huérfanos |
 
-Portal y backoffice son la misma UI, en `ec1.mateu.io`, donde trabajan los empleados y los editores.
-**Los permisos son lo que separa leer de escribir**: el menú *Editorial* lleva `@EyesOnly` (anotaciones
-`@Editors` y `@ContentAdmins`), y Mateu oculta la entrada y rechaza la ruta, o el tipo enviado por el
-cliente, a quien no los tiene. La identidad se la da `EditorialIdentity`, un `PrincipalResolver` que
+Portal y trabajo editorial son la misma UI, en `ec1.mateu.io`, donde trabajan los empleados y los
+editores; **la configuración** —cómo funciona la intranet, no lo que publica— va en la consola de control,
+`console.ec1.mateu.io`, como el catálogo de atributos de *Usuarios*. **Los permisos separan leer de
+escribir**: las pantallas llevan `@EyesOnly` (anotaciones `@Editors`, `@Publishers` y `@ContentAdmins`), y
+Mateu oculta la entrada y rechaza la ruta, o el tipo enviado por el cliente, a quien no los tiene. Los
+slots están partidos: el hueco es configuración (`SlotsCrud`) y sus variantes, trabajo editorial
+(`SlotContentCrud`, `content:publish` porque se ven en cuanto se guardan). La identidad se la da `EditorialIdentity`, un `PrincipalResolver` que
 traduce a permisos de Mateu los `content:*` de `X-User-Scopes`.
 
 ```mermaid
 flowchart LR
   U["users<br/>(atributos y catálogo)"] -- employee-directory --> CH
   CH -- employee-directory-requests --> U
-  GW["gateway<br/>X-User-Scopes / X-User-Roles"] -- "/_intranet (portal y backoffice)" --> CH["content-hub"]
+  GW["gateway<br/>X-User-Scopes / X-User-Roles"] -- "/_intranet (portal y editorial)<br/>/_content-hub (configuración)" --> CH["content-hub"]
   AG["ia-agent<br/>(console-agent)"] -- "MCP /sse + token" --> CH
   CH -- content-events --> K[("Kafka")]
   CH -- SMTP --> PF["postfix"]
@@ -201,8 +205,8 @@ páginas y contadores solo cuentan lo visible.
 
 ## Seguridad
 
-- **El gateway es la frontera.** `/_intranet/**` exige token en los hosts de datos. Dentro, el
-  backoffice exige un permiso `content:*` (`@EyesOnly`, ver arriba), y cada caso de uso de escritura
+- **El gateway es la frontera.** `/_intranet/**` exige token en los hosts de datos; `/_content-hub/**`,
+  rol `ai-admin` en los de control. Dentro, el backoffice exige un permiso `content:*` (`@EyesOnly`, ver arriba), y cada caso de uso de escritura
   vuelve a comprobar el suyo. El servicio no vuelve a verificar el token de esas rutas: lee sus
   claims (`preferred_username` es el `UserId` del servicio de usuarios) y solo es alcanzable a través del
   gateway.

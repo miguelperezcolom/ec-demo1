@@ -164,6 +164,7 @@ public class SecurityConfig {
                         // documents, for whoever is signed in — not for the internet. Its editorial
                         // backoffice is the same UI's "Editorial" entry: content-hub shows and routes
                         // it only to holders of a content:* permission, from the X-User-Scopes set here.
+                        // The intranet's configuration, /_content-hub, is on the control host below.
                         // Except what the browser fetches by itself, with no bearer token: the media
                         // embedded in its pages (an <img>, a <video>) and the script that turns embed
                         // placeholders into players. content-hub serves a medium only on a URL it signed
@@ -215,6 +216,9 @@ public class SecurityConfig {
                         // /_workflow/** rule further up matches on any host, and a path it caught
                         // would be decided as `authenticated` before this line was ever reached.
                         .matchers(onControlHost("/_ia-cp/**", "/_users/**", "/mateu/**",
+                                // The intranet's configuration: sections, audiences, slots, the
+                                // employee directory (content:admin on top, in content-hub).
+                                "/_content-hub/**",
                                 "/api/workflow-agents",
                                 "/_workflow-admin/**", "/_forms-admin/**",
                                 // The integration's control plane (PoC ACL): activating a hotel or

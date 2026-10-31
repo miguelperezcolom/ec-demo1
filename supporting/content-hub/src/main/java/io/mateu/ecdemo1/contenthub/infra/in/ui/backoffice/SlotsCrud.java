@@ -15,7 +15,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/** The slots registered by application and screen, with their state. Orphans are kept, not deleted. */
+/**
+ * The slots registered by application and screen, with their state — configuration, on the control
+ * console. Orphans are kept, not deleted. Their variants are filled on the data plane (SlotContentCrud).
+ */
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
