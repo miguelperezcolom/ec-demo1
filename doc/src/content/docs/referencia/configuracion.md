@@ -27,8 +27,9 @@ repositorio**.
 
 ### gateway
 
-`CONSOLE_HOST=ec1.mateu.io`, `CONTROL_HOST=console.ec1.mateu.io` (y `RW_CONSOLE_HOST`,
-`RW_CONTROL_HOST`, `FRONT_OFFICE_HOST`, con sus valores por defecto en `application.yaml`), y la URL de
+`CONSOLE_HOST=ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io` (una lista: el plano de datos con
+sus tres nombres), `CONTROL_HOST=console.ec1.mateu.io` (y `RW_CONSOLE_HOST`, `RW_CONTROL_HOST`,
+`FRONT_OFFICE_HOST`, `INTRANET_HOST`, `RW_INTRANET_HOST`, con sus valores por defecto en `application.yaml`), y la URL de
 cada backend que enruta. El manifiesto solo da algunas (`ORCHESTRATOR_URL`, `FORMS_URL`, `SHELL_URL`,
 `BOOKING_URL`, `CONTENT_URL`, `CONTENT_HUB_URL`, `USERS_URL`, `IA_AGENT_URL`, `IA_CONTROL_PLANE_URL`, `CONTROL_SHELL_URL`);
 el resto —`NOTICES_URL`, `REGISTRATION_RULES_URL`, `COMMUNICATION_URL`, `INTEGRATIONS_URL`,

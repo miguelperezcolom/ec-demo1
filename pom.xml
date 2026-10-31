@@ -47,6 +47,7 @@
         <!-- each shell builds its Vaadin image by default and its Redwood one with -Predwood -->
         <module>consoles/shell</module>
         <module>consoles/control-shell</module>
+        <module>consoles/intranet-shell</module>
         <!-- ai: the agents -->
         <module>ai/ia-agent</module>
         <module>ai/ia-control-plane</module>

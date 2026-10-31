@@ -49,7 +49,9 @@ Los trabajos programados se ajustan con `content-hub.jobs.crossings` (`PT30S`), 
 
 En el clúster local (`deploy/local/up.sh`, ver [Entorno local](/desarrollo/entorno-local/)):
 
-- **Portal**: `http://ec1.localhost:8800` → menú *Intranet* (`/intranet/inicio`).
+- **Portal**: `http://ec1.localhost:8800` → menú *Intranet* (`/intranet/inicio`); y solo el portal, en
+  su propio host: `http://intranet.localhost:8800` (Vaadin) y `http://rw-intranet.localhost:8800`
+  (Redwood).
 - **Editorial**: el mismo host, menú *Editorial* (solo con permisos `content:*`: `editora`,
   `publicador`, o `demo` como administrador del realm).
 - **Configuración**: `http://console.localhost:8800` → menú *Intranet* (`ai-admin` y `content:admin`:

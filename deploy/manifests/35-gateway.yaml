@@ -72,8 +72,10 @@ spec:
             # The two consoles. Every route names one of these explicitly, so nothing falls
             # through from one host to the other, and SecurityConfig reads CONTROL_HOST for the
             # ai-admin-role rule — the value has to be the host a browser actually asks for.
+            # The data plane's hosts: ec1 and the names it is moving to, ws and workspace, while
+            # both are tried (comma-separated: the routes' Host predicates take a list).
             - name: CONSOLE_HOST
-              value: ec1.mateu.io
+              value: ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io
             - name: CONTROL_HOST
               value: console.ec1.mateu.io
             - name: IA_CONTROL_PLANE_URL

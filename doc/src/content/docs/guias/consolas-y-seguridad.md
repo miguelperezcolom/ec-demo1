@@ -7,8 +7,13 @@ description: Los hosts, cómo se federan las pantallas de cada servicio, qué co
 
 | | Vaadin | Redwood |
 | :-- | :-- | :-- |
-| **Plano de datos** (el producto) | `ec1.mateu.io` — `shell` | `rw.ec1.mateu.io` — `shell-redwood` |
+| **Plano de datos** (el producto) | `ec1.mateu.io`, `ws.ec1.mateu.io`, `workspace.ec1.mateu.io` — `shell` | `rw.ec1.mateu.io`, `rw-ws.…`, `rw-workspace.…` — `shell-redwood` |
 | **Plano de control** (la plataforma) | `console.ec1.mateu.io` — `control-shell` | `rw-console.ec1.mateu.io` — `control-shell-redwood` |
+| **Intranet** (solo el portal) | `intranet.ec1.mateu.io` — `intranet-shell` | `rw-intranet.ec1.mateu.io` — `intranet-shell-redwood` |
+
+El plano de datos responde con tres nombres mientras se prueba a cuál pasa: `ec1`, `ws` y `workspace`
+son el mismo shell y las mismas rutas (`CONSOLE_HOST` y `RW_CONSOLE_HOST` admiten una lista). La
+intranet aparte monta solo el portal de content-hub (`/_portal`), sin el backoffice editorial.
 
 Y además `front.ec1.mateu.io`, el front office del hotel (Redwood), con su propio agente de chat.
 

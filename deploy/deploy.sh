@@ -343,6 +343,9 @@ kubectl apply -f deploy/manifests/10-keycloak.yaml
 kubectl apply -f deploy/manifests/11-postfix.yaml
 kubectl apply -f deploy/manifests/30-shell.yaml
 kubectl apply -f deploy/manifests/31-shell-redwood.yaml
+# The intranet on its own host (reader portal only), Vaadin and Redwood.
+kubectl apply -f deploy/manifests/32-intranet-shell.yaml
+kubectl apply -f deploy/manifests/33-intranet-shell-redwood.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
 kubectl apply -f deploy/manifests/50-kafka-console.yaml

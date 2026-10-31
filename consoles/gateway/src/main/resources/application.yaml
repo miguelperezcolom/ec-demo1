@@ -56,7 +56,7 @@ spring:
         - id: eventconductor-assets
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/eventconductor/**
 
         # Git webhooks. These are NOT under /_workflow and /_forms — those prefixes are the
@@ -70,13 +70,13 @@ spring:
         - id: workflow-webhooks
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/workflow/webhooks/**
 
         - id: forms-webhooks
           uri: ${FORMS_URL:http://forms:8106}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/forms/webhooks/**
 
         # The IDE uses the REST API, not the Mateu UI namespace below. Preserve the full
@@ -85,19 +85,19 @@ spring:
         - id: workflow-execution-api
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/workflow/api/**
 
         - id: orchestrator
           uri: ${ORCHESTRATOR_URL:http://orchestrator:8105}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_workflow/**
 
         - id: forms
           uri: ${FORMS_URL:http://forms:8106}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_forms/**
 
         # A person's inbox — notifications and tasks — in every shell: the data plane's and the
@@ -110,7 +110,7 @@ spring:
         - id: inbox-page
           uri: no://op
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_inbox,/_inbox/
             - Method=GET
           filters:
@@ -118,7 +118,7 @@ spring:
         - id: inbox
           uri: ${COMMUNICATION_URL:http://communication-service:8125}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_inbox/**
 
         # How much of Salesforce and Opera is spent — the page behind the home pages' tiles, in every shell
@@ -132,7 +132,7 @@ spring:
         - id: api-usage-page
           uri: no://op
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_api-usage/apis
             - Method=GET
           filters:
@@ -140,7 +140,7 @@ spring:
         - id: api-usage
           uri: ${INTEGRATIONS_URL:http://integrations-service:8126}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_api-usage/**
         # The demo's banner, «Simulación: Opera no responde» while the control plane's Demo page has an
         # Opera outage simulated, in every console's header — the front office's too. Signed in; it says
@@ -148,7 +148,7 @@ spring:
         - id: demo-banner
           uri: ${INTEGRATIONS_URL:http://integrations-service:8126}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${FRONT_OFFICE_HOST:front.ec1.mateu.io}
             - Path=/_demo-banner/**
 
         # The four demo services. Each one's Mateu UI is served under the prefix its @UI
@@ -157,7 +157,7 @@ spring:
         - id: booking
           uri: ${BOOKING_URL:http://booking:8108}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_booking/**
 
         # The CRS-PMS integration PoC (docs/poc-acl): the ERP, the master of partners, and the double of
@@ -165,7 +165,7 @@ spring:
         - id: erp
           uri: ${ERP_URL:http://erp:8120}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_erp/**
 
         # Clientes: the customer master's business face — finding a customer, and its data, systems,
@@ -174,7 +174,7 @@ spring:
         - id: customers
           uri: ${CUSTOMER_MDM_URL:http://customer-mdm-service:8127}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_customers/**
 
         # Avisos: the reception notices of a customer, a reservation or a partner — the business's, so on
@@ -183,7 +183,7 @@ spring:
         - id: notices
           uri: ${NOTICES_URL:http://notices:8131}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_notices/**
 
         # Historial de clientes: a customer's stays in the chain, for the head office — the business's,
@@ -192,7 +192,7 @@ spring:
         - id: customer-history
           uri: ${CUSTOMER_HISTORY_URL:http://customer-history:8133}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_history/**
 
         # Riu Class: the loyalty programme's members, tiers, points and accruals (a demo service) — the
@@ -201,7 +201,7 @@ spring:
         - id: loyalty
           uri: ${LOYALTY_URL:http://loyalty:8134}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_loyalty/**
 
         # Registro de huéspedes: the registration rules — governance, so on the control hosts only, and
@@ -218,13 +218,13 @@ spring:
         - id: journey
           uri: ${JOURNEY_URL:http://journey-service:8130}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_journey/**
 
         - id: content
           uri: ${CONTENT_URL:http://content:8104}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_content/**
 
         # The intranet: content-hub's portal and, as its "Editorial" entry, the editorial backoffice —
@@ -236,7 +236,7 @@ spring:
         - id: intranet
           uri: ${CONTENT_HUB_URL:http://content-hub:8135}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_intranet/**
 
         # Users moved to the control console: on the CONTROL host now, not the demo host, because
@@ -269,7 +269,7 @@ spring:
         - id: ia-agent
           uri: ${IA_AGENT_URL:http://ia-agent:8095}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/ai/**
           filters:
             - SetRequestHeader=X-Agent-Channel, data-plane
@@ -291,7 +291,7 @@ spring:
         - id: a2a-not-public
           uri: no://op
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${FRONT_OFFICE_HOST:front.ec1.mateu.io}
             - Path=/a2a/**
           filters:
             - SetStatus=404
@@ -305,13 +305,36 @@ spring:
         - id: shell
           uri: ${SHELL_URL:http://shell:8101}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io}
             - Path=/**
 
         - id: shell-redwood
           uri: ${SHELL_REDWOOD_URL:http://shell-redwood:8102}
           predicates:
-            - Host=${RW_CONSOLE_HOST:rw.ec1.mateu.io}
+            - Host=${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
+            - Path=/**
+
+        # ── The intranet, on a host of its own (intranet.ec1.mateu.io, rw-intranet for Redwood) ──
+        #
+        # The reader portal alone: its shell (consoles/intranet-shell) mounts content-hub's /_portal,
+        # which is the data plane's /_intranet without the editorial backoffice. The media its pages
+        # draw and embed.js keep their /_intranet paths, so those two are routed here as well.
+        - id: intranet-portal
+          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
+          predicates:
+            - Host=${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
+            - Path=/_portal/**,/_intranet/media/**,/_intranet/embed.js
+
+        - id: intranet-shell
+          uri: ${INTRANET_SHELL_URL:http://intranet-shell:8141}
+          predicates:
+            - Host=${INTRANET_HOST:intranet.ec1.mateu.io}
+            - Path=/**
+
+        - id: intranet-shell-redwood
+          uri: ${INTRANET_SHELL_REDWOOD_URL:http://intranet-shell-redwood:8142}
+          predicates:
+            - Host=${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
             - Path=/**
 
         # ── The hotel's front office, on a host of its own (front.ec1.mateu.io) ────────────
