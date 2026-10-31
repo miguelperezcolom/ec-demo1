@@ -26,6 +26,15 @@ public class Bienvenida extends Welcome {
   Button automatizaciones =
       Button.builder().label("Automatizaciones").actionId("abrirAutomatizaciones").build();
 
+  /** El slot de contenido de esta bienvenida (content-hub; lo rellenan los editores en "Editorial"). */
+  static final String SLOT = "front-office.bienvenida.destacado";
+
+  // lo que los editores publican para recepción —turnos, avisos del hotel—: la variante que admite
+  // el perfil de quien entra. Se fija por request en component(), porque el composer del welcome lee
+  // los campos al componer; null —y sin tile— si no aplica nada o content-hub no contesta
+  @Panel(title = "Destacado", colSpan = 3)
+  io.mateu.uidl.fluent.Component destacado;
+
   // los 3 KPIs del día, con los contadores VIVOS del repositorio (la vista se instancia
   // por request, así que los initializers cuentan en cada render)
   @Panel(title = "")
@@ -116,7 +125,8 @@ public class Bienvenida extends Welcome {
 
   /**
    * The figures are the chosen hotel's: a hotel whose stays are not in this front office shows
-   * zeros, not another hotel's day. The subtitle names the hotel.
+   * zeros, not another hotel's day. The subtitle names the hotel. And the content slot, this user's
+   * variant of it.
    */
   @Override
   public io.mateu.uidl.fluent.Component component(io.mateu.uidl.interfaces.HttpRequest httpRequest) {
@@ -130,6 +140,8 @@ public class Bienvenida extends Welcome {
         ocupacion = null;
       }
     }
+    destacado =
+        io.mateu.ecdemo1.uicommons.content.ContentSlots.block(httpRequest, SLOT).orElse(null);
     return super.component(httpRequest);
   }
 

@@ -325,6 +325,15 @@ spring:
             - Host=${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
             - Path=/_portal/**,/_intranet/media/**,/_intranet/embed.js
 
+        # The intranet's content slots are drawn in the other consoles' and the front office's homes
+        # (ui-commons ContentSlots): the media in them keep their /_intranet paths, signed by
+        # content-hub, so those hosts route the two public paths as well.
+        - id: content-slot-media
+          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${FRONT_OFFICE_HOST:front.ec1.mateu.io}
+            - Path=/_intranet/media/**,/_intranet/embed.js
+
         - id: intranet-shell
           uri: ${INTRANET_SHELL_URL:http://intranet-shell:8141}
           predicates:

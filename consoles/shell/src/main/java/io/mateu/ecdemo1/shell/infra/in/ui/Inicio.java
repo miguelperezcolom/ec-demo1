@@ -1,5 +1,8 @@
 package io.mateu.ecdemo1.shell.infra.in.ui;
 
+import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.fluent.Component;
+import io.mateu.ecdemo1.uicommons.content.ContentSlots;
 import io.mateu.core.infra.declarative.orchestrators.welcome.Welcome;
 import io.mateu.ecdemo1.uicommons.user.ApiUsageWidget;
 import io.mateu.uidl.annotations.Action;
@@ -23,6 +26,17 @@ import java.util.List;
 @Title("Data plane")
 public class Inicio extends Welcome {
 
+    /** The content slot this home shows (content-hub; editors fill it from "Editorial"). */
+    static final String SLOT = "data-plane.inicio.novedades";
+
+    /**
+     * What the editors publish for whoever opens the data plane — news and notices for their hotel or department: the intranet's content slot, the variant this user's profile admits. Set per request in
+     * {@link #component}, because the welcome composer reads the fields as it composes; null — and no
+     * tile — when nothing applies or content-hub does not answer.
+     */
+    @Panel(title = "Novedades", colSpan = 3)
+    Component novedades;
+
     final List<MetricCard> usage = ApiUsageWidget.kpis("verApisExternas");
 
     @Panel(title = "")
@@ -33,6 +47,12 @@ public class Inicio extends Welcome {
 
     @Panel(title = "")
     MetricCard opera = usage.get(2);
+
+    @Override
+    public Component component(HttpRequest httpRequest) {
+        novedades = ContentSlots.block(httpRequest, SLOT).orElse(null);
+        return super.component(httpRequest);
+    }
 
     @Override
     protected String heroTitle() {

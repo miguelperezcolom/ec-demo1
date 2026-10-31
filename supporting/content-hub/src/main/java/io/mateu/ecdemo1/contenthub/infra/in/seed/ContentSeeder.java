@@ -67,14 +67,60 @@ public class ContentSeeder {
 
     @EventListener(ApplicationReadyEvent.class)
     public void seed() {
-        if (!enabled || !items.findAll().isEmpty()) {
+        if (!enabled) {
             return;
         }
         try {
-            run();
-            log.info("Demo content seeded");
+            if (items.findAll().isEmpty()) {
+                run();
+                log.info("Demo content seeded");
+            }
+            // Every boot, each slot only if missing: a slot added to the demo appears in an
+            // environment that was seeded before it existed, without re-seeding the rest.
+            seedSlots();
         } catch (RuntimeException e) {
             log.error("Could not seed the demo content", e);
+        }
+    }
+
+    /**
+     * The content slots other applications draw (ui-commons ContentSlots): the front office's welcome
+     * and the two consoles' homes, each with a variant for everyone and some for an audience.
+     */
+    void seedSlots() {
+        if (slotRepository.find("front-office.bienvenida.destacado").isEmpty()) {
+            slots.registerDescriptor("front-office", List.of(new SlotCommands.SlotDescriptor(
+                    "front-office.bienvenida.destacado", "Destacado en la bienvenida del front office", "Sin novedades")));
+            slots.putVariant(SYSTEM, "front-office.bienvenida.destacado", new SlotVariant("general", Audience.EVERYONE, 1,
+                    "Nueva intranet", "<p>Consulta las novedades en la intranet.</p>", "/intranet/inicio"));
+            slots.putVariant(SYSTEM, "front-office.bienvenida.destacado", new SlotVariant("canarias",
+                    new Audience.Named("recepcion-canarias"), 10, "Turnos de noviembre",
+                    "<p>El nuevo cuadrante de turnos ya está publicado.</p>", "/intranet/noticias/turnos-canarias"));
+        }
+        if (slotRepository.find("data-plane.inicio.novedades").isEmpty()) {
+            slots.registerDescriptor("data-plane", List.of(new SlotCommands.SlotDescriptor(
+                    "data-plane.inicio.novedades", "Novedades en el inicio del data plane", "")));
+            slots.putVariant(SYSTEM, "data-plane.inicio.novedades", new SlotVariant("general", Audience.EVERYONE, 1,
+                    "La intranet ya está aquí",
+                    "<p>Noticias, avisos y documentos de la cadena, en un solo sitio: menú <b>Intranet</b>.</p>",
+                    "/intranet/inicio"));
+            slots.putVariant(SYSTEM, "data-plane.inicio.novedades", new SlotVariant("canarias",
+                    new Audience.Named("recepcion-canarias"), 5, "Turnos de noviembre",
+                    "<p>El nuevo cuadrante de turnos de recepción ya está publicado.</p>",
+                    "/intranet/noticias/turnos-canarias"));
+            slots.putVariant(SYSTEM, "data-plane.inicio.novedades", new SlotVariant("direccion",
+                    new Audience.Named("direccion-hotel"), 10, "Cierre del trimestre",
+                    "<p>Las previsiones de ocupación del cuarto trimestre ya están en Documentos.</p>",
+                    "/intranet/documentos"));
+        }
+        if (slotRepository.find("control-plane.inicio.avisos").isEmpty()) {
+            slots.registerDescriptor("control-plane", List.of(new SlotCommands.SlotDescriptor(
+                    "control-plane.inicio.avisos", "Avisos de plataforma en el inicio del control plane", "")));
+            // No links: the intranet's routes are on the data plane, not on this host.
+            slots.putVariant(SYSTEM, "control-plane.inicio.avisos", new SlotVariant("general", Audience.EVERYONE, 1,
+                    "Ventana de mantenimiento",
+                    "<p>El sábado, de 02:00 a 04:00 (hora peninsular), se actualiza Mateu en las consolas. "
+                            + "Puede haber cortes breves.</p>", null));
         }
     }
 
@@ -178,16 +224,6 @@ public class ContentSeeder {
                                 new Block.Link("Buscar en la intranet", "/intranet/buscar")), null));
         publishPage("portada-operaciones", "operaciones", es("Portada de operaciones",
                 "Lo esencial de la semana para los equipos de hotel.", ""), blocks);
-        // A slot of the front office, with variants
-        if (slotRepository.find("front-office.bienvenida.destacado").isEmpty()) {
-            slots.registerDescriptor("front-office", List.of(new SlotCommands.SlotDescriptor(
-                    "front-office.bienvenida.destacado", "Destacado en la bienvenida del front office", "Sin novedades")));
-            slots.putVariant(SYSTEM, "front-office.bienvenida.destacado", new SlotVariant("general", Audience.EVERYONE, 1,
-                    "Nueva intranet", "<p>Consulta las novedades en la intranet.</p>", "/intranet/inicio"));
-            slots.putVariant(SYSTEM, "front-office.bienvenida.destacado", new SlotVariant("canarias",
-                    new Audience.Named("recepcion-canarias"), 10, "Turnos de noviembre",
-                    "<p>El nuevo cuadrante de turnos ya está publicado.</p>", "/intranet/noticias/turnos-canarias"));
-        }
         newsletter.compose(SYSTEM, "Boletín semanal", "Lo más importante de la semana.",
                 List.of("bienvenida", "turnos-canarias", "menu-otono", "politica-datos"), Audience.EVERYONE);
     }
