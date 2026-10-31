@@ -24,8 +24,10 @@ Entra en v1:
 - Slots de contenido para otras aplicaciones Mateu.
 - Newsletter por email, segmentada.
 - Seguimiento de lectura y confirmación obligatoria, solo en items marcados.
-- Tools MCP de consulta con el token del usuario.
+- Tools MCP de consulta con el token del usuario, incluida una búsqueda semántica (RAG) para el chat.
 - Favoritos por usuario.
+- Biblioteca de medios: subida de ficheros pequeños (imágenes, PDF, audio, vídeo) y, para el resto, URL o código de inserción de YouTube, Vimeo, Drive o cualquier sitio; los medios se incrustan en los contenidos.
+- Búsqueda textual dentro del contenido.
 
 Fase 2:
 
@@ -49,6 +51,8 @@ Un servicio de dominio hexagonal con varios adaptadores de entrada; las UIs y la
 | Núcleo de contenido | Dominio, workflow, función de visibilidad | Spring Boot hexagonal |
 | Directorio de empleados | Proyección local de empleados y sus atributos; universo de hashes | Puerto; adaptador que consume los eventos del servicio de usuarios |
 | Motor de búsqueda | Índice con los hashes que ven cada documento y filtrado en la consulta | Puerto; adaptador FTS de PostgreSQL |
+| Búsqueda semántica (RAG) | Fragmentos de cada traducción publicada, vectorizados, buscados por similitud con el mismo filtro | pgvector + servicio de embeddings del clúster |
+| Biblioteca de medios | Ficheros subidos y medios externos, incrustables en el contenido | Núcleo; ficheros en la base de datos |
 | Backoffice editorial | Edición, audiencias, workflow, ver como, slots, newsletter | App Mateu |
 | Portal intranet | Home, secciones, artículos, búsqueda, confirmaciones | App Mateu |
 | Remoto de slots | Expone fragmentos de UI por clave de slot | Endpoint Mateu, remoto registrado |
@@ -162,9 +166,23 @@ Todos llaman a la función de visibilidad; ninguno tiene lógica de filtrado pro
 - **Slots.** El remoto de slots recibe la clave y la identidad, resuelve la variante de mayor prioridad visible para el usuario y devuelve el JSON de UI. Sin variante visible, respuesta vacía y la app pinta el fallback. Declara caché por hash de atributos.
 - **Newsletter.** Para cada edición, se agrupan los destinatarios por hash de atributos, se calcula una vez por grupo qué items de la selección son visibles y en qué idioma, y se envía un email por grupo e idioma. Un grupo sin items visibles no recibe nada.
 - **MCP.** Tools con el token del usuario y el mismo filtro:
+    - `preguntar_intranet`: los fragmentos más parecidos a una pregunta (RAG), para que el agente responda citando los items;
     - `buscar_contenido`;
     - `leer_item`;
     - `confirmaciones_pendientes`: items visibles con confirmación obligatoria que el usuario aún no ha confirmado en la versión vigente.
+- **Medios.** Un fichero solo se sirve a quien puede ver algún item publicado que lo usa (consulta en el almacén con el mismo filtro).
+
+### Medios
+
+- Biblioteca de medios: ficheros subidos (imágenes, PDF, audio, vídeo; hasta 20 MB, configurable) o medios externos (URL, o el código de inserción que da el proveedor: solo se guardan el proveedor y el id, nunca el HTML pegado).
+- Se incrustan con un bloque `MEDIO` o con la marca `[[media:id]]` en el cuerpo de cualquier item o bloque HTML.
+- Un `<img>` o un `<video>` no envían el token: las URLs de los medios van firmadas (HMAC, 2 horas) para el hash del perfil que pintó la página, y al servirlas se vuelve a comprobar la visibilidad.
+- Mateu elimina los `<iframe>` del HTML: los vídeos externos y los PDF se pintan como un hueco (`data-ec-embed`) con miniatura y enlace, y un script que cargan los shells (`embed.js`, como `push.js`) lo cambia por el reproductor oficial, solo para una lista cerrada de hosts (youtube-nocookie, Vimeo, la vista previa de Drive y los propios medios).
+
+### Búsqueda y chat
+
+- La búsqueda textual usa `tsvector` de PostgreSQL (configuración `simple`, multilingüe, por prefijo) dentro de la misma consulta que filtra la visibilidad.
+- Para el chat, cada traducción publicada se trocea en fragmentos de unos 700 caracteres que un job vectoriza con el servicio de embeddings del clúster (multilingual-e5-small, 384 dimensiones) en pgvector. La búsqueda por similitud se une a la proyección en la misma consulta, así que el agente solo recibe lo que la persona que chatea puede ver.
 
 ### Favoritos
 
@@ -210,7 +228,7 @@ App Mateu para editores y responsables de comunicación. Roles mínimos: editor 
 ### Módulo
 
 - Módulo nuevo `supporting/content-hub` (artifact `content-hub`, paquete `io.mateu.ecdemo1.contenthub`), con las mismas versiones que `supporting/content`: Spring Boot 4.0.x, Java 21, Mateu `3.0-alpha.430`. `supporting/content` (contenidos, etiquetas y tipos) no se toca.
-- Base de datos PostgreSQL propia, como el resto de servicios, y la librería compartida `supporting/messaging` para outbox e inbox.
+- Base de datos propia `content_hub` en `cp-postgres`, el servidor con pgvector (lo necesita el RAG); la crea el initContainer del despliegue. Librería compartida `supporting/messaging` para outbox e inbox.
 - Puerto 8135. Manifest en `deploy/manifests/`, imagen en `deploy/build-images.sh` y arranque en `deploy/local/up.sh`, como los demás servicios.
 - Dos UIs Mateu en el mismo servicio:
     - backoffice en `/_content-hub`, en la consola de control (`control-shell`, host de consola, como `/_users`);
@@ -224,13 +242,14 @@ App Mateu para editores y responsables de comunicación. Roles mínimos: editor 
 - **Catálogo de valores.** Cada atributo toma sus valores de un catálogo cerrado, editable en la UI de usuarios: un CRUD nuevo "Valores de atributo". Los hoteles del catálogo coinciden con los códigos que ya usa la demo (por ejemplo, `MRU01`).
 - **UI.** El formulario de usuario muestra los atributos, con selectores sobre el catálogo.
 - **Eventos a Kafka.** `UserCreated`, `UserUpdated` y `UserDeleted` llevan los atributos y se publican además en el topic `employee-directory`, por el outbox compartido. Hoy ese outbox solo entrega a Keycloak (`IdentityTransport`), así que hace falta un segundo destino. La sincronización con Keycloak no cambia: los atributos **no** viajan en el token.
-- **Carga inicial.** Al arrancar con el directorio vacío, `content-hub` pide una réplica completa por el topic `projection-requests` (el patrón que ya usan otros servicios), y el servicio de usuarios republica todos los usuarios en `employee-directory`.
+- **Carga inicial.** Al arrancar con el directorio vacío, `content-hub` pide una réplica completa por el topic `employee-directory-requests` (un topic propio: `projection-requests` ya lo consume otro servicio con otra carga), y el servicio de usuarios republica todos los usuarios en `employee-directory`.
 
 ### Identidad y roles editoriales
 
 - El usuario de cada petición sale del token de Keycloak (`preferred_username`, que es el `UserId` del servicio de usuarios). Sus atributos salen del directorio local.
 - Los roles editoriales son permisos del servicio de usuarios, con scopes `content:edit`, `content:publish` y `content:admin`, y tres roles de ejemplo: Editor, Publicador y Administrador de contenido.
-- `content-hub` no consulta permisos: el api gateway ya enriquece el token con los roles (`realm_access.roles`) y los scopes (`scope`) del usuario, que saca de `AuthService.getAuthInfo`. El servicio solo lee el claim `scope` del token que le llega.
+- `content-hub` no consulta permisos: el gateway (`consoles/gateway`) los obtiene de `AuthService.getAuthInfo` y los añade como cabeceras `X-User-Roles` y `X-User-Scopes`, después de borrar las que mande el cliente. No reescribe el token: los shells y el front office lo verifican contra Keycloak y un token firmado por el gateway lo rechazarían. Si la cabecera no llega (el gateway no pudo preguntar), el rol `admin` del realm conserva todos los permisos.
+- El MCP no pasa por el gateway (lo llama ia-agent dentro del clúster): `content-hub` verifica allí el token reenviado contra Keycloak.
 - Los atributos de audiencia **no** se añaden a ese enriquecimiento: van por el directorio local, porque el newsletter, el ver como y el universo de hashes los necesitan sin que haya petición del usuario.
 
 ### Adaptadores
@@ -238,7 +257,8 @@ App Mateu para editores y responsables de comunicación. Roles mínimos: editor 
 - **Búsqueda:** FTS de PostgreSQL. Columna `hashes text[]` con índice GIN en la proyección y en el índice de búsqueda; el filtro es `hashes && array[:hashUsuario, 'TODOS']`.
 - **Newsletter:** SMTP a través del relay postfix del entorno (`deploy/manifests/11-postfix.yaml`). Como los empleados de la demo son ficticios, en la demo todo envío se redirige a un buzón configurable (`NEWSLETTER_REDIRECT_TO`), conservando en el asunto el grupo y el idioma.
 - **MCP:** mismo patrón que `customer-mdm-service` (`McpToolsConfig` y `CustomerMcpTools`), con el token del usuario, y registrado en el agente como los demás servidores MCP.
-- **Slots:** requieren la extensión del componente microfrontend de Mateu para renderizar en servidor (y `@ContentSlot`), que otro agente está desarrollando en el repo de Mateu. Por eso la fase de slots va la última: al llegar a ella se comprueba qué versión de Mateu la trae, se sube `mateu.version` y, si aún no está publicada, se para y se avisa. El primer slot de demo va en una pantalla existente del front office.
+- **Slots:** requieren la extensión del componente microfrontend de Mateu para renderizar en servidor (y `@ContentSlot`), que otro agente está desarrollando en el repo de Mateu. Mientras llega, el remoto de slots es REST: `GET /_intranet/api/slots/{clave}` con el token del usuario devuelve la variante visible de mayor prioridad con su HTML ya expandido, o 204 (la aplicación pinta el fallback), y la cabecera `X-Content-Cache-Key` con el hash del perfil. El slot de demo es `front-office.bienvenida.destacado`.
+- **MCP:** registrado en el plano de control de IA como servidor `intranet` para `console-agent` y `reception-agent` (ejemplo en `gitops/example/ia/mcp/intranet.yaml`).
 
 ### Datos de demo
 
