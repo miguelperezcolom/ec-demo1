@@ -67,17 +67,20 @@ public class ViewAsPage implements OptionsSupplier {
     final Visibility visibility;
     final Readers readers;
 
-    @Value("${content-hub.portal-url:http://console.localhost:8800/intranet}")
-    String portalUrl;
+    // Final, like the dependencies above: a non-final field is form state to Mateu, and was drawn as
+    // a "Portal url" input.
+    final String portalUrl;
 
     public ViewAsPage(EmployeeDirectory directory, AudienceCommands audiences, NamedAudienceRepository namedAudiences,
-                      NavigationRepository navigation, Visibility visibility, Readers readers) {
+                      NavigationRepository navigation, Visibility visibility, Readers readers,
+                      @Value("${content-hub.portal-url:http://ec1.localhost:8800/intranet}") String portalUrl) {
         this.directory = directory;
         this.audiences = audiences;
         this.namedAudiences = namedAudiences;
         this.navigation = navigation;
         this.visibility = visibility;
         this.readers = readers;
+        this.portalUrl = portalUrl;
     }
 
     EmployeeAttributes chosen() {

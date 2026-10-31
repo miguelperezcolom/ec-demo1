@@ -87,7 +87,7 @@ content-hub:
     from: ${NEWSLETTER_FROM:intranet@ec1.mateu.io}
     # The demo's employees are made up: every newsletter goes here, saying whom it was for.
     redirect-to: ${NEWSLETTER_REDIRECT_TO:}
-  portal-url: ${PORTAL_URL:http://console.localhost:8800/intranet}
+  portal-url: ${PORTAL_URL:http://ec1.localhost:8800/intranet}
   seed:
     enabled: ${CONTENT_SEED:true}
 
