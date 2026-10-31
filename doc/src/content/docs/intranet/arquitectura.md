@@ -26,7 +26,7 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal, sin *Editorial*; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
 | **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, directorio y visibilidad |
 | **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea |
-| **Remoto de slots** | `GET /_intranet/api/slots/{key}` (`SlotController`) | La variante visible de un slot, como JSON (provisional) |
+| **Remoto de slots** | `GET /_intranet/api/slots/{key}` (`SlotController`) | La variante visible de un slot, como JSON (provisional). La consumen el inicio del data plane (`data-plane.inicio.novedades`), el del control plane (`control-plane.inicio.avisos`) y la bienvenida del front office (`front-office.bienvenida.destacado`), en servidor con el token del usuario (`ui-commons` `ContentSlots`) |
 | **Medios** | `GET /_intranet/media/{id}` (`MediaController`) | Los ficheros de la biblioteca, con URL firmada |
 | **`embed.js`** | `GET /_intranet/embed.js` | Convierte los marcadores de vídeo y PDF en reproductores (ver [Seguridad](#seguridad)) |
 | **Directorio** | `EmployeeDirectoryListener` | Copia local de los empleados y sus atributos, desde `employee-directory` |
