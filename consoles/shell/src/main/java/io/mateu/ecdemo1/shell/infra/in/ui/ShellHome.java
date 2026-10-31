@@ -57,6 +57,9 @@ import java.util.List;
 // Web Push: the inbox's script — it offers to enable notifications, and registers this browser for
 // what enters the inbox of the user's roles. Served by communication-service, public at the gateway.
 @Script(src = "/_inbox/push/push.js")
+// The intranet's embeds: content-hub draws YouTube/Vimeo/Drive players and PDFs as placeholders (the
+// renderers' sanitiser drops iframes) and this turns them into the players. Public at the gateway.
+@Script(src = "/_intranet/embed.js")
 // Served by this app from src/main/resources/static, so it arrives through the gateway's
 // catch-all like the rest of the shell — no route of its own, and no token: the browser loads a
 // logo with an <img> tag, which sends no Authorization header.
@@ -149,6 +152,13 @@ public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
      */
     @Menu
     RemoteMenu riuClass = new RemoteMenu("/_loyalty").withLabel("Riu Class");
+
+    /**
+     * The intranet: news, notices, documents, sections, search, favourites and confirmations — each
+     * employee sees only what their attributes admit (content-hub's visibility function).
+     */
+    @Menu
+    RemoteMenu intranet = new RemoteMenu("/_intranet").withLabel("Intranet");
 
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is

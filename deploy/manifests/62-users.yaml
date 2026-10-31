@@ -46,6 +46,9 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8102"
+            # Where employee-directory goes (content-hub's directory) and its snapshot requests come from.
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/users
             - name: DB_USERNAME

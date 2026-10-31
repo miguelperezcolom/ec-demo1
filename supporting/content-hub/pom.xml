@@ -51,8 +51,8 @@
         <!-- The employee directory arrives on employee-directory (users service) and the domain
              events leave on content-events, relayed from the outbox. -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
         <!-- The outbox, its relay and the inbox, shared by the services. Installed from
              ../messaging first. -->
@@ -92,6 +92,11 @@
             <version>${mateu.version}</version>
         </dependency>
 
+        <!-- Only for the MCP server: ia-agent reaches it inside the cluster with the user's token. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>

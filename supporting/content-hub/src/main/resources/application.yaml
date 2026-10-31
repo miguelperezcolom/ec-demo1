@@ -41,6 +41,15 @@ spring:
       server:
         name: content-hub
         version: 1.0.0
+        protocol: SSE
+
+  # The MCP calls' tokens: Keycloak's keys over the cluster network, the issuer as the token says it.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.ec1.mateu.io/realms/ec-demo1}
 
   mvc:
     async:

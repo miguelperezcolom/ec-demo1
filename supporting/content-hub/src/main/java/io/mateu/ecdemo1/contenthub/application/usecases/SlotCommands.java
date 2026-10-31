@@ -50,6 +50,24 @@ public class SlotCommands {
         }
     }
 
+    /** A slot registered by hand, before any descriptor names it. */
+    @Transactional
+    public void register(Reader reader, String key, String description, String fallback) {
+        reader.require(EditorialPermission.ADMIN);
+        if (slots.find(key).isPresent()) {
+            throw new IllegalArgumentException("Ya hay un slot " + key);
+        }
+        slots.save(Slot.register(key, description, fallback));
+    }
+
+    @Transactional
+    public void describe(Reader reader, String key, String description, String fallback) {
+        reader.require(EditorialPermission.ADMIN);
+        var slot = slots.find(key).orElseThrow();
+        slot.describedAgain(description, fallback);
+        slots.save(slot);
+    }
+
     @Transactional
     public void putVariant(Reader reader, String key, SlotVariant variant) {
         reader.require(EditorialPermission.ADMIN);

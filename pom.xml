@@ -53,6 +53,7 @@
         <module>ai/api-mcp</module>
         <!-- supporting -->
         <module>supporting/content</module>
+        <module>supporting/content-hub</module>
         <module>supporting/ui-commons</module>
         <module>supporting/messaging</module>
         <module>supporting/agent-sql</module>

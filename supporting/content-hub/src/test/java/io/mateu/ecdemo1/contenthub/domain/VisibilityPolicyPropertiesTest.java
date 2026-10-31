@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * profiles, being in the projection's entry is exactly what evaluating the expression says — and the
  * TODOS token stands for exactly the audiences that restrict nothing.
  */
-class VisibilityPolicyProperties {
+class VisibilityPolicyPropertiesTest {
 
     static final List<String> VALUES = List.of("A", "B", "C");
 
