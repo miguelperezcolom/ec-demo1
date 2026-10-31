@@ -99,6 +99,15 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Intranet',
+					items: [
+						{ label: 'Arquitectura', slug: 'intranet/arquitectura' },
+						{ label: 'Manual del portal', slug: 'intranet/manual-portal' },
+						{ label: 'Manual del backoffice', slug: 'intranet/manual-backoffice' },
+						{ label: 'Operación', slug: 'intranet/operacion' },
+					],
+				},
+				{
 					label: 'IA',
 					items: [
 						{ label: 'El plano de control de IA', slug: 'ia/plano-de-control' },
