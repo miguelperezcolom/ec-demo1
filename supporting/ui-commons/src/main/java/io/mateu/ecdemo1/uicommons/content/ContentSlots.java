@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.uicommons.content;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.uicommons.html.Html;
+import io.mateu.uidl.data.Markdown;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HttpRequest;
 import java.net.URI;
@@ -59,9 +60,13 @@ public final class ContentSlots {
         }
     }
 
-    /** The slot as a block of the screen — the one Element of it (see {@link Html}) — or empty. */
+    /**
+     * The slot as a block of the screen, or empty. Markdown carrying the variant's HTML inline, not an
+     * Element: Redwood draws a welcome tile's atoms — texts, charts, Markdown — and left an Element in
+     * one empty; both renderers draw Markdown's allowed inline HTML (sanitised again on their side).
+     */
     public static Optional<Component> block(HttpRequest request, String key) {
-        return fetch(request, key).map(ContentSlots::markup).map(Html::block);
+        return fetch(request, key).map(slot -> new Markdown(markup(slot), "width: 100%;", null));
     }
 
     static Slot slot(JsonNode json) {
