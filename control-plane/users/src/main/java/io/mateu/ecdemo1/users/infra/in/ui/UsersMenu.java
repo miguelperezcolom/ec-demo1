@@ -21,12 +21,8 @@ public class UsersMenu {
     @Menu
     UserGroupCrudOrchestrator userGroups;
 
-    // Not `users`: a leaf named like its parent menu (UsersHome.users) gets the parent's path from
-    // Mateu (/users instead of /users/users), and the CRUD is never reached. Hence the field name, and
-    // the label that keeps what the menu showed.
     @Menu
-    @Label("Users")
-    UsersCrudOrchestrator accounts;
+    UsersCrudOrchestrator users;
 
     @Menu
     @Label("Valores de atributo")
