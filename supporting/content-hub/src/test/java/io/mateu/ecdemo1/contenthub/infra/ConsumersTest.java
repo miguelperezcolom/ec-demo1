@@ -12,6 +12,7 @@ import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.ItemCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.NavigationCommands;
+import io.mateu.ecdemo1.contenthub.application.out.Mailer;
 import io.mateu.ecdemo1.contenthub.application.usecases.NewsletterService;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.application.usecases.SlotCommands;
@@ -335,6 +336,32 @@ class ConsumersTest {
         assertThat(mails).hasSize(2);
         assertThat(editions.find(editionId).orElseThrow().status().name()).isEqualTo("SENT");
         assertThat(newsletter.sendDue()).isZero();
+    }
+
+    @Test
+    void redirected_the_newsletter_goes_as_one_digest_with_a_section_per_group() {
+        var sent = new ArrayList<String>();
+        var digest = new NewsletterService(editions, new PgEmployeeDirectory(jdbc), visibility,
+                new NamedAudiences(new PgNamedAudienceRepository(jdbc)), new Mailer() {
+            @Override
+            public void send(List<String> to, String subject, String html) {
+                sent.add(subject + "\n" + html);
+            }
+
+            @Override
+            public boolean redirected() {
+                return true;
+            }
+        }, clock);
+        var rc = publish(ItemType.ARTICLE, "noticias", RECEPCION_CANARIAS, "Solo recepción", "");
+        var editionId = digest.compose(PUBLISHER, "Boletín", "Hola", List.of(rc), Audience.EVERYONE);
+        digest.schedule(PUBLISHER, editionId, clock.instant());
+        // the same two groups as one per group (ana es, jonas de; klaus nothing), in ONE message
+        assertThat(digest.sendDue()).isEqualTo(1);
+        assertThat(sent).singleElement().satisfies(m -> assertThat(m)
+                .startsWith("Boletín [2 grupos]").contains("Grupo 1 de 2").contains("Grupo 2 de 2"));
+        assertThat(editions.find(editionId).orElseThrow().status().name()).isEqualTo("SENT");
+        assertThat(digest.sendDue()).isZero();
     }
 
     @Test

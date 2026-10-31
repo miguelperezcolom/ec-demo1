@@ -30,6 +30,11 @@ public class SmtpMailer implements Mailer {
     String redirectTo;
 
     @Override
+    public boolean redirected() {
+        return redirectTo != null && !redirectTo.isBlank();
+    }
+
+    @Override
     public void send(List<String> recipients, String subject, String html) {
         try {
             var message = sender.createMimeMessage();
@@ -39,7 +44,8 @@ public class SmtpMailer implements Mailer {
             if (redirectTo != null && !redirectTo.isBlank()) {
                 helper.setTo(redirectTo);
                 body = "<p style=\"background:#fff3cd;padding:8px\">Demo: este envío era para " + recipients.size()
-                        + " destinatarios: " + String.join(", ", recipients) + "</p>" + html;
+                        + " destinatarios" + (recipients.size() <= 10 ? ": " + String.join(", ", recipients) : "")
+                        + "</p>" + html;
             } else {
                 helper.setTo(from);
                 helper.setBcc(recipients.toArray(String[]::new));

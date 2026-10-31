@@ -114,6 +114,9 @@ public class NewsletterService {
     @Transactional
     public int send(String editionId) {
         var edition = editions.find(editionId).orElseThrow();
+        if (mailer.redirected()) {
+            return sendDigest(edition);
+        }
         var emails = 0;
         var failed = false;
         for (var group : groups(edition)) {
@@ -147,6 +150,76 @@ public class NewsletterService {
         }
         editions.save(edition);
         return emails;
+    }
+
+    /**
+     * The demo's way: every message would land in the same mailbox, so the edition goes as ONE message
+     * with a section per group — the version each group gets, and whom it was for — instead of one per
+     * group. Each group is still recorded as sent (or failed) on its own, as the real sending does.
+     */
+    int sendDigest(NewsletterEdition edition) {
+        var pending = new ArrayList<Group>();
+        var itemsByGroup = new LinkedHashMap<Group, List<VisibleItem>>();
+        for (var group : groups(edition)) {
+            if (edition.groupSent(group.hash(), group.language())) {
+                continue;
+            }
+            var items = itemsFor(edition, group.profile());
+            if (items.isEmpty()) {
+                edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
+                        group.recipients().size(), List.of(), clock.instant(), null));
+                continue;
+            }
+            pending.add(group);
+            itemsByGroup.put(group, items);
+        }
+        var emails = 0;
+        var failed = false;
+        if (!pending.isEmpty()) {
+            var html = new StringBuilder("<div style=\"font-family:sans-serif;max-width:680px\">")
+                    .append("<p style=\"background:#e8f0fe;padding:8px\">Demo: ").append(pending.size())
+                    .append(" grupos de destinatarios en un solo correo. Fuera de la demo, cada grupo recibe solo")
+                    .append(" su sección, en su idioma.</p>");
+            var n = 0;
+            for (var group : pending) {
+                n++;
+                html.append("<hr><p style=\"color:#555;font-size:13px\"><b>Grupo ").append(n).append(" de ")
+                        .append(pending.size()).append("</b> · ").append(esc(group.language())).append(" · ")
+                        .append(esc(describe(group.profile()))).append(" · ").append(group.recipients().size())
+                        .append(" destinatario(s): ").append(esc(group.recipients().stream().map(Employee::name)
+                                .collect(java.util.stream.Collectors.joining(", ")))).append("</p>")
+                        .append(render(edition, itemsByGroup.get(group), group.language()));
+            }
+            html.append("</div>");
+            var recipients = pending.stream().flatMap(g -> g.recipients().stream()).map(Employee::email).toList();
+            String error = null;
+            try {
+                mailer.send(recipients, edition.title() + " [" + pending.size() + " grupos]", html.toString());
+                emails = 1;
+            } catch (RuntimeException e) {
+                log.warn("Newsletter {} not sent: {}", edition.id(), e.getMessage());
+                error = e.getMessage();
+                failed = true;
+            }
+            for (var group : pending) {
+                edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
+                        group.recipients().size(), error == null
+                                ? itemsByGroup.get(group).stream().map(VisibleItem::itemId).toList() : List.of(),
+                        error == null ? clock.instant() : null, error));
+            }
+        }
+        if (!failed) {
+            edition.markSent();
+        }
+        editions.save(edition);
+        return emails;
+    }
+
+    /** A group's profile, for the digest: its attributes, in their canonical order. */
+    static String describe(EmployeeAttributes profile) {
+        return profile.values().isEmpty() ? "sin atributos" : new java.util.TreeMap<>(profile.values()).entrySet()
+                .stream().map(e -> e.getKey().name().toLowerCase() + "=" + e.getValue())
+                .collect(java.util.stream.Collectors.joining(" · "));
     }
 
     public String render(NewsletterEdition edition, List<VisibleItem> items, String language) {
