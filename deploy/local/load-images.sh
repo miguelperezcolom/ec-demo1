@@ -20,7 +20,7 @@ CLUSTER=ec-demo1-local
 TAG="${1:-$(sed -n 's#.*image: miguelperezcolom/ec-demo1-shell:\(.*\)$#\1#p' deploy/manifests/30-shell.yaml | head -1)}"
 shift || true
 APPS="${*:-$(sed -n 's/^APPS="\(.*\)"$/\1/p' deploy/build-images.sh)}"
-RENDERED_TWICE="consoles/shell consoles/control-shell"
+RENDERED_TWICE="consoles/shell consoles/control-shell consoles/intranet-shell"
 DOCS_TAG="$(sed -n 's#.*image: miguelperezcolom/ec-demo1-docs:\(.*\)$#\1#p' deploy/manifests/81-docs.yaml | head -1)"
 PLATFORM="linux/$(docker version -f '{{.Server.Arch}}')"
 # The docker driver: --load puts the image in this Docker without an export, which kind then reads.

@@ -6,6 +6,7 @@ import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Email;
 import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Name;
 import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Status;
 import io.mateu.ecdemo1.users.domain.aggregates.user.User;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.UserId;
 import io.mateu.ecdemo1.users.domain.aggregates.usergroup.vo.UserGroupId;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.mateu.core.infra.JsonSerializer.listFromJson;
+import static io.mateu.core.infra.JsonSerializer.pojoFromJson;
 import static io.mateu.core.infra.JsonSerializer.toJson;
 
 @Service
@@ -35,8 +37,17 @@ public class UserDBRepository implements UserRepository {
                 new Email(entity.email),
                 Status.valueOf(entity.status),
                 listFromJson(entity.groupsJson, String.class).stream().map(UserGroupId::new).toList(),
-                listFromJson(entity.rolesJson, String.class).stream().map(RoleId::new).toList()
+                listFromJson(entity.rolesJson, String.class).stream().map(RoleId::new).toList(),
+                attributesOf(entity.attributesJson)
         );
+    }
+
+    /** No column value (a row from before attributes existed) is no attributes. */
+    static EmployeeAttributes attributesOf(String json) {
+        if (json == null || json.isBlank()) {
+            return EmployeeAttributes.NONE;
+        }
+        return pojoFromJson(json, EmployeeAttributes.class);
     }
 
     private UserEntity toEntity(User user) {
@@ -46,8 +57,14 @@ public class UserDBRepository implements UserRepository {
                 user.getEmail().email(),
                 toJson(user.getGroups().stream().map(UserGroupId::id).toList()),
                 toJson(user.getRoles().stream().map(RoleId::id).toList()),
-                user.getStatus().name()
+                user.getStatus().name(),
+                toJson(user.getAttributes() == null ? EmployeeAttributes.NONE : user.getAttributes())
         );
+    }
+
+    @Override
+    public List<User> findAll() {
+        return repository.findAll().stream().map(this::toDomain).toList();
     }
 
     @Override

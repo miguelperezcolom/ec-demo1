@@ -44,12 +44,24 @@
       "redirectUris": [
         "https://ec1.mateu.io/*",
         "https://rw.ec1.mateu.io/*",
-        "https://front.ec1.mateu.io/*"
+        "https://front.ec1.mateu.io/*",
+        "https://ws.ec1.mateu.io/*",
+        "https://workspace.ec1.mateu.io/*",
+        "https://rw-ws.ec1.mateu.io/*",
+        "https://rw-workspace.ec1.mateu.io/*",
+        "https://intranet.ec1.mateu.io/*",
+        "https://rw-intranet.ec1.mateu.io/*"
       ],
       "webOrigins": [
         "https://ec1.mateu.io",
         "https://rw.ec1.mateu.io",
-        "https://front.ec1.mateu.io"
+        "https://front.ec1.mateu.io",
+        "https://ws.ec1.mateu.io",
+        "https://workspace.ec1.mateu.io",
+        "https://rw-ws.ec1.mateu.io",
+        "https://rw-workspace.ec1.mateu.io",
+        "https://intranet.ec1.mateu.io",
+        "https://rw-intranet.ec1.mateu.io"
       ],
       "attributes": {
         "post.logout.redirect.uris": "+",

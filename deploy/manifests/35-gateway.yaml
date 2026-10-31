@@ -61,11 +61,21 @@ spec:
               value: http://users:8102
             - name: IA_AGENT_URL
               value: http://ia-agent:8095
+            # content-hub: /_intranet on the data plane (portal, editorial), /_content-hub on the control host (configuration).
+            - name: CONTENT_HUB_URL
+              value: http://content-hub:8135
+            # The users service's gRPC AuthService, which the gateway asks for each caller's roles
+            # and scopes and forwards as X-User-Roles / X-User-Scopes (UserAuthorityEnrichmentFilter).
+            # Best-effort: if users is down, requests go through without those two headers.
+            - name: AUTH_GRPC_ADDRESS
+              value: static://users:9191
             # The two consoles. Every route names one of these explicitly, so nothing falls
             # through from one host to the other, and SecurityConfig reads CONTROL_HOST for the
             # ai-admin-role rule — the value has to be the host a browser actually asks for.
+            # The data plane's hosts: ec1 and the names it is moving to, ws and workspace, while
+            # both are tried (comma-separated: the routes' Host predicates take a list).
             - name: CONSOLE_HOST
-              value: ec1.mateu.io
+              value: ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io
             - name: CONTROL_HOST
               value: console.ec1.mateu.io
             - name: IA_CONTROL_PLANE_URL

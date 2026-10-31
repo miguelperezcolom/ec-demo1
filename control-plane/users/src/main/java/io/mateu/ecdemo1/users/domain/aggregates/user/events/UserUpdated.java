@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.users.domain.aggregates.user.events;
 
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
 import io.mateu.workflow.ddd.DomainEvent;
 
 /**
@@ -11,7 +12,11 @@ import io.mateu.workflow.ddd.DomainEvent;
  * <p>The two types are kept apart anyway, because "a user appeared" and "a user changed" read
  * differently in a log and count differently in a metric, and collapsing them would throw that
  * away for no saving.
+ *
+ * <p>The attributes travel in full for the same reason: the directory upserts the employee as they
+ * are now, rather than patching what changed.
  */
-public record UserUpdated(String userId, String name, String email, boolean enabled)
+public record UserUpdated(String userId, String name, String email, boolean enabled,
+                          EmployeeAttributes attributes)
         implements DomainEvent {
 }

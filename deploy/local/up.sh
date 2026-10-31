@@ -9,6 +9,8 @@
 #   http://ec1.localhost:8800  http://rw.localhost:8800  http://console.localhost:8800
 #   http://rw-console.localhost:8800  http://front.localhost:8800  http://auth.localhost:8800
 #   http://grafana.localhost:8800  http://doc.localhost:8800
+#   http://ws.localhost:8800  http://workspace.localhost:8800 (the data plane again, under its new names)
+#   http://intranet.localhost:8800  http://rw-intranet.localhost:8800 (the intranet alone)
 #
 # Port 8800, not 80: this machine's k3s (Traefik, through iptables) takes 127.0.0.1:80 and :443 before
 # Docker's port mapping sees them. Inside the cluster the ingress Service listens on 8800 too, so a
@@ -137,8 +139,8 @@ for path in sys.argv[1:]:
     open(path, 'w').write('\n---'.join(out))
 PY
 "$SED" -i "s#localhost:PORT#localhost:$PORT#g" "$TREE/deploy/manifests/40-ingress.yaml"
-# The gateway's other three hosts: not in its manifest, their defaults (in the jar) are ec1's.
-"$SED" -i -E 's#^(\s*)- name: CONTROL_HOST$#\1- name: RW_CONSOLE_HOST\n\1  value: rw.localhost\n\1- name: RW_CONTROL_HOST\n\1  value: rw-console.localhost\n\1- name: FRONT_OFFICE_HOST\n\1  value: front.localhost\n\1- name: CONTROL_HOST#' \
+# The gateway's other hosts: not in its manifest, their defaults (in the jar) are ec1's.
+"$SED" -i -E 's#^(\s*)- name: CONTROL_HOST$#\1- name: RW_CONSOLE_HOST\n\1  value: rw.localhost,rw-ws.localhost,rw-workspace.localhost\n\1- name: INTRANET_HOST\n\1  value: intranet.localhost\n\1- name: RW_INTRANET_HOST\n\1  value: rw-intranet.localhost\n\1- name: RW_CONTROL_HOST\n\1  value: rw-console.localhost\n\1- name: FRONT_OFFICE_HOST\n\1  value: front.localhost\n\1- name: CONTROL_HOST#' \
   "$TREE/deploy/manifests/35-gateway.yaml"
 # The ingress controller: on the node's ports 80/443 (kind maps them to this machine), no
 # LoadBalancer, and no redirect to https (the Ingresses keep their tls: blocks; nothing issues them).

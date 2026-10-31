@@ -9,6 +9,7 @@ import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Status;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserCreated;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserDeleted;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserUpdated;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.UserId;
 import io.mateu.ecdemo1.users.domain.aggregates.usergroup.vo.UserGroupId;
 import lombok.AllArgsConstructor;
@@ -33,18 +34,32 @@ public class User extends AggregateRoot {
 
     List<RoleId> roles;
 
-    public static User of(UserId userId, Name name, Email email, List<UserGroupId> groups, List<RoleId> roles) {
-        var user = new User(userId, name, email, Status.Active, groups, roles);
-        user.send(new UserCreated(userId.id(), name.name(), email.email(), user.isEnabled()));
+    /**
+     * The employee attributes the content service's audiences are written over. Never null: a user
+     * without any is {@link EmployeeAttributes#NONE}. Who derives country and region from the hotel
+     * is the caller's business (it needs the catalogue); the aggregate keeps what it is given.
+     */
+    EmployeeAttributes attributes;
+
+    public static User of(UserId userId, Name name, Email email, List<UserGroupId> groups, List<RoleId> roles,
+                          EmployeeAttributes attributes) {
+        var user = new User(userId, name, email, Status.Active, groups, roles, orNone(attributes));
+        user.send(new UserCreated(userId.id(), name.name(), email.email(), user.isEnabled(), user.attributes));
         return user;
     }
 
-    public void update(Name name, Email email, List<UserGroupId> groups, List<RoleId> roles) {
+    public void update(Name name, Email email, List<UserGroupId> groups, List<RoleId> roles,
+                       EmployeeAttributes attributes) {
         this.name = name;
         this.email = email;
         this.groups = groups;
         this.roles = roles;
-        send(new UserUpdated(id.id(), name.name(), email.email(), isEnabled()));
+        this.attributes = orNone(attributes);
+        send(new UserUpdated(id.id(), name.name(), email.email(), isEnabled(), this.attributes));
+    }
+
+    private static EmployeeAttributes orNone(EmployeeAttributes attributes) {
+        return attributes == null ? EmployeeAttributes.NONE : attributes;
     }
 
     /**

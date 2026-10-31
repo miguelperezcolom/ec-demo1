@@ -191,3 +191,150 @@ spec:
           - path: /
             pathType: Prefix
             backend: { service: { name: gateway, port: { number: 8190 } } }
+
+# ── The data plane under the names it is moving to, ws.* and workspace.* (and their Redwood twins),
+# beside ec1.mateu.io while both are tried. One Ingress per host, not several hosts in one: the
+# gateway tells the planes apart by the Host header, and deploy/local/up.sh pins the Host each
+# Ingress sends upstream to its first host. (Not that annotation's name here: up.sh skips an Ingress
+# whose text already mentions it, and this comment ends the previous one's document.)
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ws-console
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [ws.ec1.mateu.io]
+      secretName: ws-console-tls
+  rules:
+    - host: ws.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: workspace-console
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [workspace.ec1.mateu.io]
+      secretName: workspace-console-tls
+  rules:
+    - host: workspace.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rw-ws-console
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [rw-ws.ec1.mateu.io]
+      secretName: rw-ws-console-tls
+  rules:
+    - host: rw-ws.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rw-workspace-console
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [rw-workspace.ec1.mateu.io]
+      secretName: rw-workspace-console-tls
+  rules:
+    - host: rw-workspace.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }
+
+# ── The intranet on a host of its own (32/33-intranet-shell*.yaml): the reader portal alone, Vaadin and
+# Redwood. Through the gateway like everything else.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: intranet
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [intranet.ec1.mateu.io]
+      secretName: intranet-tls
+  rules:
+    - host: intranet.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rw-intranet
+  namespace: ec-demo1
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [rw-intranet.ec1.mateu.io]
+      secretName: rw-intranet-tls
+  rules:
+    - host: rw-intranet.ec1.mateu.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { number: 8190 } } }

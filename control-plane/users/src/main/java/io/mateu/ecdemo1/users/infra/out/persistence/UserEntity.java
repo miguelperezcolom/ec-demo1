@@ -28,4 +28,12 @@ public class UserEntity {
 
     String status;
 
+    /**
+     * The employee attributes, as JSON: seven optional codes read and written together, never queried
+     * one by one here (the content service filters on them, in its own directory). Added after the
+     * table existed — ddl-auto adds the column, and rows from before read as null, i.e. no attributes.
+     */
+    @Column(columnDefinition = "TEXT")
+    String attributesJson;
+
 }

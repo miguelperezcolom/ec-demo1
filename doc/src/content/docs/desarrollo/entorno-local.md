@@ -25,9 +25,10 @@ de `deploy/` con los nombres cambiados. Los pods no se ven en `docker ps`: se ve
 
 | Consola | URL |
 | :-- | :-- |
-| Datos (Vaadin / Redwood) | http://ec1.localhost:8800 · http://rw.localhost:8800 |
+| Datos (Vaadin / Redwood) | http://ec1.localhost:8800 · http://rw.localhost:8800 (también `ws.` / `rw-ws.` y `workspace.` / `rw-workspace.`) |
 | Control (Vaadin / Redwood) | http://console.localhost:8800 · http://rw-console.localhost:8800 |
 | Front office | http://front.localhost:8800 |
+| Intranet, solo el portal (Vaadin / Redwood) | http://intranet.localhost:8800 · http://rw-intranet.localhost:8800 |
 | Keycloak · Grafana · Documentación | http://auth.localhost:8800 · http://grafana.localhost:8800 · http://doc.localhost:8800 |
 
 El usuario `demo` y su contraseña son los de ec1 (`DEMO_PASSWORD`). La documentación pide el usuario

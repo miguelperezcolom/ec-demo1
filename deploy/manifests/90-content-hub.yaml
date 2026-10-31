@@ -1,0 +1,127 @@
+# content-hub — the intranet: content with audience-based visibility (docs/specs/servicio-contenido.md).
+# Two Mateu UIs: /_intranet (data plane's shells) — the portal, and the editorial work as its "Editorial"
+# entry for holders of a content:* permission — and /_content-hub (control console, behind ai-admin) —
+# the intranet's configuration; an MCP server for the chat agent (cluster-internal,
+# the user's token verified here); the newsletter through postfix.
+#
+# Its database is on cp-postgres — the server with pgvector, which the chat's RAG needs — created by the
+# initContainer if it is not there. It listens to the users service's employee-directory and publishes
+# content-events, both through Kafka (the outbox and inbox of supporting/messaging).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content-hub
+  namespace: ec-demo1
+  labels: { app: content-hub }
+spec:
+  replicas: 1
+  # Recreate: one replica, and the media URLs' signing secret and the "ver como" choices live in memory.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: content-hub }
+  template:
+    metadata:
+      labels:
+        app: content-hub
+        app.kubernetes.io/component: content-hub
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8135"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: create-database
+          image: pgvector/pgvector:pg16
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h cp-postgres -U "$PGUSER"; do echo waiting for cp-postgres; sleep 2; done
+              psql -h cp-postgres -U "$PGUSER" -d postgres -tc "select 1 from pg_database where datname = 'content_hub'" | grep -q 1 \
+                || psql -h cp-postgres -U "$PGUSER" -d postgres -c "create database content_hub"
+          env:
+            - name: PGUSER
+              valueFrom: { secretKeyRef: { name: ec-cp-postgres, key: POSTGRES_USER } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: ec-cp-postgres, key: POSTGRES_PASSWORD } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redpanda 19092; do echo waiting for kafka; sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: content-hub
+          image: miguelperezcolom/ec-demo1-content-hub:0.76.0
+          env:
+            - name: SERVER_PORT
+              value: "8135"
+            - name: DB_URL
+              value: jdbc:postgresql://cp-postgres:5432/content_hub
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: ec-cp-postgres, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: ec-cp-postgres, key: POSTGRES_PASSWORD } }
+            - name: DB_POOL_SIZE
+              value: "8"
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
+            - name: SMTP_HOST
+              value: "postfix"
+            - name: SMTP_PORT
+              value: "25"
+            # The demo's employees are made up: every newsletter goes to this one address instead.
+            - name: NEWSLETTER_REDIRECT_TO
+              value: "newsletter-demo@example.com"
+            - name: EMBEDDINGS_URL
+              value: http://embeddings
+            - name: PORTAL_URL
+              value: https://ec1.mateu.io/intranet
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8135 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8135 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8135 }
+            initialDelaySeconds: 90
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-hub
+  namespace: ec-demo1
+  labels: { app: content-hub }
+spec:
+  selector: { app: content-hub }
+  ports:
+    - { name: http, port: 8135, targetPort: 8135 }

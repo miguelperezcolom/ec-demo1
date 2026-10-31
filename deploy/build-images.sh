@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds and pushes the images this repository owns: the four shells, the gateway, the four
+# Builds and pushes the images this repository owns: the six shells, the gateway, the four
 # demo services, the IA control plane and the pod that serves catalogued APIs as MCP servers — and
 # the documentation site (doc/), last, with no Maven step.
 #
-# Four shell images from two modules: each console is served by a Vaadin one and a Redwood one,
+# Six shell images from three modules: each console (and the intranet's own host) is served by a Vaadin one and a Redwood one,
 # differing only in which Mateu frontend artifact the build puts on the classpath. consoles/shell
 # builds ec-demo1-shell by default and ec-demo1-shell-redwood with -Predwood (control-shell the
 # same). They render the same backends through different renderers, which is the point — see
@@ -28,7 +28,7 @@ TAG="${1:?usage: build-images.sh TAG — one tag for every image (there is no de
 # By path: the modules are grouped by system (README, "Layout"). The image is named after the
 # module's folder — systems/erp builds ec-demo1-erp. The shells in this list build twice: see
 # RENDERED_TWICE below.
-APPS="consoles/shell consoles/gateway systems/crs/booking supporting/content control-plane/users ai/ia-agent ai/ia-control-plane ai/api-mcp consoles/control-shell systems/erp integration/crs-integration-service integration/mapping-service integration/pms-integration-service control-plane/communication-service control-plane/integrations-service integration/customer-mdm-service systems/front-office systems/notices systems/customer-history systems/loyalty control-plane/registration-rules control-plane/audit-service integration/journey-service"
+APPS="consoles/shell consoles/intranet-shell consoles/gateway systems/crs/booking supporting/content supporting/content-hub control-plane/users ai/ia-agent ai/ia-control-plane ai/api-mcp consoles/control-shell systems/erp integration/crs-integration-service integration/mapping-service integration/pms-integration-service control-plane/communication-service control-plane/integrations-service integration/customer-mdm-service systems/front-office systems/notices systems/customer-history systems/loyalty control-plane/registration-rules control-plane/audit-service integration/journey-service"
 
 # grpc-interface first, and installed rather than packaged: it is not an application and gets no
 # image, but `users` compiles against the protobuf stubs generated from its .proto, so it has to
@@ -60,7 +60,7 @@ echo "── installing ui-commons (what the UIs share) ──"
 # The shells: one module per console, one image per renderer. The default build is the Vaadin
 # image, named after the folder; -Predwood is the Redwood one, the same name plus -redwood. The
 # image names are what the manifests pull, and have not changed since these were four modules.
-RENDERED_TWICE="consoles/shell consoles/control-shell"
+RENDERED_TWICE="consoles/shell consoles/control-shell consoles/intranet-shell"
 
 build_and_push() {  # <module dir> <image name> [maven args...]
   local app="$1" image="$2"; shift 2

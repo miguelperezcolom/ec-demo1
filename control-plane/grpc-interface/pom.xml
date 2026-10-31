@@ -18,13 +18,11 @@
 
     <!-- Why this exists at all: `users` answers GetAuthInfo over gRPC, returning a user's roles
          and scopes, and the stubs for that contract have to be generated from the .proto by
-         protoc. Keeping them in a module of their own is what lets a client — one that does not
-         exist in this deployment yet — depend on the contract without depending on the service.
+         protoc. Keeping them in a module of their own is what lets a client depend on the contract
+         without depending on the service.
 
-         Nothing in this repository calls it today: the gateway validates Keycloak's token
-         directly rather than enriching it from the users service, which is what the demo's own
-         api-gw used this for. It is carried because dropping it would be dropping half of what
-         `users` is, not because anything here needs it yet. -->
+         The client is the gateway: it asks for every signed-in request and passes the answer on
+         as the X-User-Roles / X-User-Scopes headers (consoles/gateway, infra/enrichment). -->
 
     <properties>
         <java.version>21</java.version>

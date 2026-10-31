@@ -343,6 +343,9 @@ kubectl apply -f deploy/manifests/10-keycloak.yaml
 kubectl apply -f deploy/manifests/11-postfix.yaml
 kubectl apply -f deploy/manifests/30-shell.yaml
 kubectl apply -f deploy/manifests/31-shell-redwood.yaml
+# The intranet on its own host (reader portal only), Vaadin and Redwood.
+kubectl apply -f deploy/manifests/32-intranet-shell.yaml
+kubectl apply -f deploy/manifests/33-intranet-shell-redwood.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
 kubectl apply -f deploy/manifests/50-kafka-console.yaml
@@ -379,6 +382,9 @@ kubectl apply -f deploy/manifests/85-customer-history.yaml
 # Riu Class, the loyalty programme — a demo of it (data plane): members, tier and points, which accrue from the
 # front office's closed stays; the front office asks it at the check-in.
 kubectl apply -f deploy/manifests/86-loyalty.yaml
+# The intranet (content-hub): content with audience-based visibility — portal on the data plane,
+# backoffice on the control console; its database on cp-postgres (pgvector), created by its initContainer.
+kubectl apply -f deploy/manifests/90-content-hub.yaml
 # The documentation site (doc/), behind basic auth.
 kubectl apply -f deploy/manifests/81-docs.yaml
 # The control console: its database first, then the service, then its shell.

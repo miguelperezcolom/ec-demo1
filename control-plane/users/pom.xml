@@ -53,9 +53,16 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- No Kafka binder, deliberately — the same removal as in `content`, and for the same
-             reason: the version this was ported from declared three bindings and implemented
-             none of them, under the engine's own consumer group names. -->
+        <!-- Plain spring-kafka through Boot's starter (Boot 4 keeps Kafka's auto-configuration in
+             its own module): the employee directory goes out on `employee-directory` through the
+             shared outbox, and snapshot requests come in on `employee-directory-requests`
+             (@KafkaListener). No Spring Cloud Stream binder, deliberately — the version this was
+             ported from declared three bindings and implemented none of them, under the engine's
+             own consumer group names. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>io.mateu.workflow</groupId>
@@ -106,7 +113,9 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <!-- The outbox and its relay, shared by the services: here it delivers the identity changes
-             to Keycloak (IdentityTransport). Installed from ../../supporting/messaging first. -->
+             to Keycloak (IdentityTransport) and the employee directory to Kafka, routed by
+             RoutingOutboxTransport; and the inbox the directory requests are deduplicated in.
+             Installed from ../../supporting/messaging first. -->
         <dependency>
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>messaging</artifactId>
@@ -121,6 +130,12 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

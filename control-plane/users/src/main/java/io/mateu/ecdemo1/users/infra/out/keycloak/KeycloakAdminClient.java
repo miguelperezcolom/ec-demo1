@@ -128,14 +128,17 @@ public class KeycloakAdminClient implements IdentityProviderPort {
 
     private void createUser(UserIdentity user) {
         var uri = URI.create(baseUrl + "/admin/realms/" + realm + "/users");
+        // A user created with the email skipped (the demo seed's, at example.com) gets no required
+        // action either: "must set password" with no email to set it from is just a locked account.
+        var setupEmail = passwordSetupEmail && !user.skipPasswordSetupEmail();
         var response = send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + accessToken())
-                .POST(HttpRequest.BodyPublishers.ofString(representation(user, passwordSetupEmail)))
+                .POST(HttpRequest.BodyPublishers.ofString(representation(user, setupEmail)))
                 .build(), "create user");
         if (response.statusCode() == 201) {
             log.info("Created Keycloak user {}", user.username());
-            if (passwordSetupEmail) {
+            if (setupEmail) {
                 sendPasswordSetupEmail(user.username());
             }
             return;

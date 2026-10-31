@@ -35,6 +35,17 @@ esquema; el servicio dueño del lenguaje es el `x-owner` del propio esquema.
 | `audit` | contracts-schemas (audit) | integrations, mapping, front-office, booking, registration-rules | audit | `AuditedAction` |
 | `human-tasks` | communication (eventconductor-forms; es `HumanTaskChanged` del motor) | forms | communication | Las tareas del motor de formularios, para la bandeja |
 
+## Los de la intranet
+
+Sin esquema en `contracts/schemas`: el contrato de `employee-directory` es el record
+`EmployeeDirectoryMessage` del servicio de usuarios. Ver [Arquitectura de la intranet](/intranet/arquitectura/#eventos-y-topics).
+
+| Topic | Productores | Consumidores | Qué lleva |
+| :---- | :---------- | :----------- | :-------- |
+| `employee-directory` | users (outbox → Kafka) | content-hub (inbox) | `EmployeeUpserted` (el empleado entero: nombre, email, activo, atributos como códigos del catálogo e idioma) y `EmployeeRemoved`. Clave el id de usuario |
+| `employee-directory-requests` | content-hub | users | `{requestId, requestedBy}`: una copia completa del directorio, que users responde republicando a todos en `employee-directory`. Al arrancar con el directorio vacío o desde *Intranet → Visibilidad* |
+| `content-events` | content-hub | — (nadie fuera del servicio, de momento) | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`. Clave el sujeto |
+
 ## Los del motor
 
 Llevan el protocolo de EventConductor; sus cargas son los contratos de tarea de ec-definitions.

@@ -1,0 +1,106 @@
+server:
+  port: 8135
+
+spring:
+  application:
+    name: ec-demo1-content-hub
+
+  # content-hub's database lives on cp-postgres, the server with pgvector (the chat's RAG).
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/content_hub}
+    username: ${DB_USERNAME:workflow}
+    password: ${DB_PASSWORD:}
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+
+  # Its own tables, additive only (schema.sql: "if not exists"); the outbox and inbox tables are the
+  # messaging library's.
+  sql:
+    init:
+      mode: always
+      continue-on-error: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9192}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      auto-offset-reset: earliest
+
+  # The newsletter, through the environment's relay (11-postfix.yaml).
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:25}
+
+  ai:
+    mcp:
+      server:
+        name: content-hub
+        version: 1.0.0
+        protocol: SSE
+
+  # The MCP calls' tokens: Keycloak's keys over the cluster network, the issuer as the token says it.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.ec1.mateu.io/realms/ec-demo1}
+
+  mvc:
+    async:
+      request-timeout: -1   # the MCP server talks SSE, and those connections must not expire
+
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 30MB
+
+# No security here, and none is missing: this pod is only reachable through the gateway, which
+# requires a Keycloak token on /_intranet/** and sets X-User-Scopes from the users service — which
+# decides who sees the "Editorial" backoffice (content:* permissions, @EyesOnly + EditorialIdentity).
+# The media URLs it lets through unauthenticated carry a signature this service checks (MediaUrls).
+
+messaging:
+  outbox:
+    interval: 1000ms
+    continue-after-failure: true
+
+content-hub:
+  # Off the request's thread: publishing answers at once and the backoffice shows when it is applied.
+  projection:
+    async: ${PROJECTION_ASYNC:true}
+  kafka:
+    enabled: ${KAFKA_ENABLED:true}
+  media:
+    max-bytes: ${MEDIA_MAX_BYTES:20971520}
+    # Signs the media URLs; one replica, so a random one at startup would do — set it to survive restarts.
+    secret: ${MEDIA_SECRET:}
+  embeddings:
+    url: ${EMBEDDINGS_URL:http://embeddings}
+    model: ${EMBEDDINGS_MODEL:intfloat/multilingual-e5-small}
+  newsletter:
+    from: ${NEWSLETTER_FROM:intranet@ec1.mateu.io}
+    # The demo's employees are made up: every newsletter goes here, saying whom it was for.
+    redirect-to: ${NEWSLETTER_REDIRECT_TO:}
+  portal-url: ${PORTAL_URL:http://ec1.localhost:8800/intranet}
+  seed:
+    enabled: ${CONTENT_SEED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.apache.kafka: warn
