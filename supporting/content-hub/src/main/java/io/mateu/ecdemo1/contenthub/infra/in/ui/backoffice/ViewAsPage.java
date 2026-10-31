@@ -118,10 +118,11 @@ public class ViewAsPage implements OptionsSupplier {
                 + PageRenderer.list(items.content())) + "</div>");
     }
 
+    /** Redraws the page, so the preview (a component computed when the page is drawn) follows the choice. */
     @Toolbar
     @Action
     public Object previsualizar(HttpRequest httpRequest) {
-        return chosen() == null ? Message.warning("Elige un perfil") : Message.success("Vista previa actualizada");
+        return chosen() == null ? Message.warning("Elige un perfil") : this;
     }
 
     @Toolbar
