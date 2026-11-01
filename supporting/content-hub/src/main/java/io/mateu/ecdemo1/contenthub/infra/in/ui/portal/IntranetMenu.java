@@ -27,6 +27,14 @@ public class IntranetMenu {
     SectionsListing secciones;
 
     @Menu
+    @Label("Personas")
+    PeopleListing personas;
+
+    @Menu
+    @Label("Organigrama")
+    OrgChartPage organigrama;
+
+    @Menu
     @Label("Buscar")
     SearchListing buscar;
 
