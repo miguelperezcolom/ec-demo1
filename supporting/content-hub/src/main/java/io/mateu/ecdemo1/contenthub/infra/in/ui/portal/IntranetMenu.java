@@ -47,6 +47,18 @@ public class IntranetMenu {
     PendingListing pendientes;
 
     @Menu
+    @Label("Nueva solicitud")
+    NewRequestPage nuevaSolicitud;
+
+    @Menu
+    @Label("Mis solicitudes")
+    MyRequestsListing solicitudes;
+
+    @Menu
+    @Label("Por aprobar")
+    ApprovalsListing porAprobar;
+
+    @Menu
     @Label("Mis preferencias")
     PreferencesPage preferencias;
 }

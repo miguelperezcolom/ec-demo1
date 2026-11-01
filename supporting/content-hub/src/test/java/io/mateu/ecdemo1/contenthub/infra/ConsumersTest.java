@@ -207,6 +207,52 @@ class ConsumersTest {
     }
 
     @Test
+    void a_request_starts_its_process_and_follows_what_the_process_announces() {
+        var started = new ArrayList<Map<String, String>>();
+        var employees = new PgEmployeeDirectory(jdbc);
+        directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "boss2", "Jefa", "boss2@example.com",
+                true, null, null, Map.of("hotel", "TFS01", "language", "es"), null, null));
+        directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "boss1", "Jefe", "boss1@example.com",
+                true, "boss2", null, Map.of("hotel", "TFS01", "language", "es"), null, null));
+        directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "worker", "Trabajadora",
+                "worker@example.com", true, "boss1", null, Map.of("hotel", "TFS01", "language", "es"), null, null));
+        var mailbox = new ArrayList<String>();
+        var service = new io.mateu.ecdemo1.contenthub.application.usecases.RequestService(
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgRequestRepository(jdbc), employees,
+                (definition, key, variables) -> started.add(new java.util.HashMap<>(Map.of("definition", definition, "key", key,
+                        "managerId", variables.get("managerId"), "escalateToId", variables.get("escalateToId")))),
+                null, (to, subject, html) -> mailbox.add(subject + " → " + to), clock, "hr", "http://intranet");
+        var worker = new Reader("worker", "Trabajadora", EmployeeAttributes.NONE, Set.of(), null);
+
+        var request = service.create(worker, io.mateu.ecdemo1.contenthub.domain.request.RequestType.VACACIONES,
+                java.time.LocalDate.of(2026, 12, 1), java.time.LocalDate.of(2026, 12, 5), "Navidad");
+
+        assertThat(started).hasSize(1);
+        assertThat(started.get(0)).containsEntry("definition", "solicitud-empleado").containsEntry("key", "solicitud:" + request.id())
+                .containsEntry("managerId", "boss1").containsEntry("escalateToId", "boss2");
+        service.apply(request.id(), io.mateu.ecdemo1.contenthub.domain.request.RequestStatus.PENDIENTE_RRHH, "boss1", "OK por mi parte");
+        service.apply(request.id(), io.mateu.ecdemo1.contenthub.domain.request.RequestStatus.PENDIENTE_RRHH, "boss1", "OK por mi parte"); // redelivered
+        service.apply(request.id(), io.mateu.ecdemo1.contenthub.domain.request.RequestStatus.APROBADA, "hr", "Disfrútalas");
+        var after = service.find(request.id()).orElseThrow();
+        assertThat(after.status()).isEqualTo(io.mateu.ecdemo1.contenthub.domain.request.RequestStatus.APROBADA);
+        assertThat(after.history()).hasSize(3);
+        assertThat(mailbox).singleElement().asString().contains("aprobada").contains("worker@example.com");
+        assertThat(service.mine(worker)).extracting(r -> r.id()).contains(request.id());
+    }
+
+    @Test
+    void without_a_manager_there_is_no_request() {
+        directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "loner", "Sola", "loner@example.com",
+                true, null, null, Map.of("language", "es"), null, null));
+        var service = new io.mateu.ecdemo1.contenthub.application.usecases.RequestService(
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgRequestRepository(jdbc), new PgEmployeeDirectory(jdbc),
+                (d, k, v) -> { throw new AssertionError("no process"); }, null, (t, s, h) -> { }, clock, "hr", "http://intranet");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(new Reader("loner", "Sola", EmployeeAttributes.NONE, Set.of(), null),
+                io.mateu.ecdemo1.contenthub.domain.request.RequestType.MATERIAL, null, null, "Un portátil"))
+                .hasMessageContaining("responsable");
+    }
+
+    @Test
     void the_directory_keeps_who_each_one_reports_to_and_their_phone() {
         directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "lucia", "Lucía",
                 "lucia@example.com", true, "carlos", "+34 600 000 103", Map.of("hotel", "TFS01", "language", "es"),

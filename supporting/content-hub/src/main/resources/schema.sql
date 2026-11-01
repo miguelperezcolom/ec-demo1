@@ -25,6 +25,10 @@ create table if not exists ch_employee (
 alter table ch_employee add column if not exists manager_id text;
 alter table ch_employee add column if not exists phone text;
 alter table ch_employee add column if not exists labels jsonb;
+-- Employees' requests (vacation, training, equipment), decided by the solicitud-empleado process
+create table if not exists ch_request (id text primary key, employee_id text not null, status text not null,
+    created_at timestamptz not null, doc jsonb not null);
+create index if not exists ch_request_employee on ch_request (employee_id, created_at desc);
 -- Newsletter opens and clicks, per edition and group of recipients (never per person)
 create table if not exists ch_newsletter_event (edition_id text not null, grp text not null, kind text not null,
     item_id text, at timestamptz not null);

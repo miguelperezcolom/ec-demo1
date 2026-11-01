@@ -117,6 +117,10 @@ orchestrator:
   security:
     enabled: false
   extraEnv:
+    # PUBLISH_EVENT destinations: a definition names one, never a topic. «solicitudes» is where
+    # solicitud-empleado announces each transition of an employee's request; the intranet
+    # (content-hub) projects it.
+    WORKFLOW_EVENTS_DESTINATIONS_SOLICITUDES_TOPIC: "solicitudes"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_URL: "https://github.com/miguelperezcolom/ec-definitions.git"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_BRANCH: "master"
     WORKFLOW_GITIMPORT_REPOSITORIES_0_DIRECTORY: "definitions/workflows"
