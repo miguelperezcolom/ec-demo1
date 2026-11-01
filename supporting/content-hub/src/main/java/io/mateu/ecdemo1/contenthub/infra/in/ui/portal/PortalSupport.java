@@ -42,13 +42,22 @@ public class PortalSupport {
     }
 
     /** One page of a query, through the visibility function, as Mateu's listing wants it. */
+    /**
+     * A page of the visible items the query asks for. The text typed in the listing's search bar
+     * narrows it (full text, words by prefix) unless the query already brings its own.
+     */
     public ListingData<ItemRow> listing(HttpRequest httpRequest, SearchRequest request, ContentQuery query,
                                         String empty) {
         var reader = reader(httpRequest);
+        var typed = request == null || request.searchText() == null ? "" : request.searchText().trim();
+        var text = query.text() != null ? query.text() : typed.isEmpty() ? null : typed;
+        if (query.text() == null && text != null) {
+            empty = "Nada de lo que puedes ver coincide con «" + text + "»";
+        }
         var pageable = request == null ? null : request.pageable();
         var size = pageable == null || pageable.size() <= 0 ? 20 : pageable.size();
         var number = pageable == null ? 0 : Math.max(0, pageable.page());
-        var q = new ContentQuery(query.types(), query.sectionId(), query.itemIds(), query.text(), number * size, size);
+        var q = new ContentQuery(query.types(), query.sectionId(), query.itemIds(), text, number * size, size);
         var page = visibility.visibles(reader.attributes(), q);
         return rows(page, reader, number, size, request == null ? "" : request.searchText(), empty);
     }

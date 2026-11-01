@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
+import io.mateu.uidl.interfaces.Searchable;
 import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @Title("Avisos")
-public class NoticesListing extends VisibleListing {
+public class NoticesListing extends VisibleListing implements Searchable {
 
     public NoticesListing(PortalSupport portal, ObjectProvider<ItemPage> pages) {
         super(portal, pages);
