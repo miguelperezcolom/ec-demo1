@@ -251,18 +251,19 @@ El usuario pidió las cuatro mejoras (2026-11-01):
 
 ## H — Inicios por audiencia (home configurable)
 
-Hoy `portal/HomePage` es fijo e igual para todos: saludo, pendientes de confirmar, 5 avisos y 8 noticias. Lo que cambia por persona es solo qué contenidos salen (cada uno filtrado por su audiencia). El usuario pidió (2026-11-01) poder definir **un inicio distinto por usuario o grupo**, con los mismos criterios de audiencia que los contenidos.
+Hoy `portal/HomePage` es fijo e igual para todos: saludo, pendientes de confirmar, 5 avisos y 8 noticias. Lo que cambia por persona es solo qué contenidos salen (cada uno filtrado por su audiencia). El usuario pidió (2026-11-01) poder definir **un inicio distinto por usuario o grupo**, con los mismos criterios que los contenidos.
 
-**Diseño**: reutilizar dos mecanismos que ya existen.
-- Las **páginas de bloques**: `ItemType.PAGE` con `Block`, cada bloque con su audiencia que estrecha la de la página.
-- La **elección de variante de los slots**: la de mayor prioridad cuya audiencia cumple el lector, con fallback.
+**Diseño (simplificado a propuesta del usuario):** un inicio es **una página más**.
+- Es un item `PAGE` normal: se crea, edita, versiona y publica como cualquier contenido, con **su audiencia de siempre**. Puede haber tantos como se quiera.
+- Sin tipo nuevo, sin prioridad en el item y sin menú propio.
+- Lo único que se añade es **qué páginas son inicios y en qué orden**, porque un lector puede cumplir varias.
 
 | # | Paso | Estado |
 |---|---|---|
-| H1 | **Un inicio es una página de bloques** con audiencia y **prioridad**: nuevo tipo `HOME` (o PAGE marcada como inicio), prioridad única entre inicios. Al lector le toca el de mayor prioridad cuya audiencia cumple; si no, el inicio por defecto. Cacheado por hash de perfil como el resto del portal (`ProjectionCache`). | pendiente |
-| H2 | **Bloques nuevos** para lo que pinta el inicio de hoy: `GREETING` (saludo), `PENDING` (pendientes de confirmar), `NOTICES` (últimos avisos, cuántos), `LATEST` (últimas noticias/páginas, cuántos, sección opcional), `SLOT` (una clave de slot). `PageRenderer` los pinta. El inicio actual pasa a ser el **inicio por defecto** hecho con bloques: sembrado en `ContentSeeder`, con la misma apariencia. | pendiente |
-| H3 | **Backoffice**: *Editorial → Inicios* (listado con audiencia y prioridad, edición con el formulario de bloques mejorado) y en **Ver como…** qué inicio le toca a cada perfil. Publicación por el flujo normal (revisión, publicar, retirar), versionada como cualquier contenido. | pendiente |
-| H4 | **Ejemplo en la seed**: un inicio "Recepción Canarias" con enlaces rápidos a turnos y al procedimiento de recepción, más un banner. Probar con Ana Pérez (TFS01, recepción) frente a un chef de Cancún, en Vaadin y Redwood; documentar en los manuales (portal y backoffice). | pendiente |
+| H1 | **Configuración → Inicio** (control plane, `content:admin`): una **lista ordenada de páginas** publicadas. Al lector le toca la **primera de la lista que puede ver** (la función de visibilidad de siempre); si no ve ninguna, el inicio de hoy (`HomePage`). `HomePage` resuelve eso y pinta la página con `PageRenderer`, cacheado por hash de perfil (`ProjectionCache`). Una página quitada de la lista vuelve a ser una página normal. | pendiente |
+| H2 | **Bloques dinámicos**, para que una página pueda mostrar lo que hoy pinta el inicio: `GREETING` (saludo con el nombre), `PENDING` (pendientes de confirmar), `NOTICES` y `LATEST` (últimos avisos / noticias y páginas, cuántos, sección opcional). Opcional: `SLOT` (una clave de slot). Sirven en cualquier página, no solo en inicios. | pendiente |
+| H3 | **Ver como…** del backoffice muestra también qué página de inicio le toca a ese perfil (o "el de por defecto"). | pendiente |
+| H4 | **Ejemplo en la seed**: la página "Inicio Recepción Canarias" (audiencia: departamento RECEPCION y región CANARIAS), con saludo, pendientes, enlaces rápidos a turnos y al procedimiento, y un banner, primera en la lista. Probar con Ana Pérez (TFS01, recepción), que la ve, frente a un chef de Cancún, que sigue con el inicio por defecto, en Vaadin y Redwood. Documentar en los manuales (portal, backoffice, configuración). | pendiente |
 
 ## Cómo retomar
 
