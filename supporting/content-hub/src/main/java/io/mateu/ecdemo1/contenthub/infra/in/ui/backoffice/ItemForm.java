@@ -243,7 +243,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
      * Fills the languages that have no title yet from the default language's text, with the model —
      * in the form only: the editor reviews it and saves (nothing is saved or published from here).
      */
-    @Toolbar
+    @io.mateu.uidl.annotations.Button
     @Action
     public Object traducirConIA(HttpRequest httpRequest) {
         readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
@@ -273,7 +273,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     }
 
     /** Puts the chosen medium at the end of the default language's body, where the editor moves it to. */
-    @Toolbar
+    @io.mateu.uidl.annotations.Button
     @Action
     public Object insertarMedio(HttpRequest httpRequest) {
         readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
@@ -290,7 +290,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     }
 
     /** Draws the preview again with what is in the form now (nothing is saved). */
-    @Toolbar
+    @io.mateu.uidl.annotations.Button
     @Action
     public Object previsualizar(HttpRequest httpRequest) {
         return this;

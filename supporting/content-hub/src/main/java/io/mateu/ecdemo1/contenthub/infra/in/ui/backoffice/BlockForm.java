@@ -5,6 +5,7 @@ import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
 import io.mateu.ecdemo1.contenthub.domain.item.BlockType;
+import io.mateu.uidl.annotations.HiddenInList;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.data.FieldStereotype;
@@ -29,31 +30,41 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
     public BlockType type = BlockType.HTML;
     @Label("Título")
     public String title;
+    @HiddenInList
     @Label("Contenido (incrusta medios con [[media:id]])")
     @Stereotype(FieldStereotype.richText)
     public String html;
+    @HiddenInList
     @Label("Item destacado")
     @Stereotype(FieldStereotype.select)
     public String itemId;
+    @HiddenInList
     @Label("Sección listada (vacío: todas)")
     @Stereotype(FieldStereotype.select)
     public String sectionId;
+    @HiddenInList
     @Label("Cuántos")
     public Integer limit;
+    @HiddenInList
     @Label("Enlaces")
     public List<LinkForm> links = new java.util.ArrayList<>();
+    @HiddenInList
     @Label("Medio de la biblioteca")
     @Stereotype(FieldStereotype.select)
     public String mediaId;
+    @HiddenInList
     @Label("Solo estos departamentos")
     @Stereotype(FieldStereotype.multiSelect)
     public List<String> blockDepartments;
+    @HiddenInList
     @Label("Solo estos hoteles")
     @Stereotype(FieldStereotype.multiSelect)
     public List<String> blockHotels;
+    @HiddenInList
     @Label("Solo estos puestos")
     @Stereotype(FieldStereotype.multiSelect)
     public List<String> blockJobTitles;
+    @HiddenInList
     @Label("Id")
     public String id;
 
