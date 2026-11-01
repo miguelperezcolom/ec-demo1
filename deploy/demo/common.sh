@@ -10,7 +10,11 @@ DATABASES="audit booking communication crs_integration customer_history customer
 # the task dedup store — is gigabytes and not the demo's state; and what is set up, not run — the event
 # triggers of events.yaml (event_trigger), the paused schedules and triggers — stays, as the definitions do.
 ENGINE_DB=workflow
-ENGINE_TABLES="process_entity step_execution_entity form_execution_entity process_lock process_lock_waiter resource_entity process_index task_override inbound_event_receipt"
+# 2.37 adds state that goes with the processes and the tasks: a task's candidate users and groups (forms
+# V8, 2.31), a process's search attributes (V48), its updates (V55), and what flow control holds back
+# (V56: debounce/throttle keys, starts waiting, dispatches waiting on a rate limit). Older engines lack
+# them: engine_restore_sql and zero.sh's wipe skip the tables that are not there.
+ENGINE_TABLES="process_entity step_execution_entity form_execution_entity process_lock process_lock_waiter resource_entity process_index task_override inbound_event_receipt form_execution_candidate_user form_execution_candidate_group process_search_attribute process_index_search_attribute process_update flow_control_key flow_control_pending deferred_dispatch"
 
 # What stops while the state is put back, and starts again after.
 SERVICES="audit-service booking communication-service crs-integration-service customer-mdm-service front-office integrations-service mapping-service erp notices customer-history loyalty pms-integration-service registration-rules ec-eventconductor-orchestrator ec-eventconductor-forms"

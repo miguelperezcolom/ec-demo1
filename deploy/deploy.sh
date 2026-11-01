@@ -199,11 +199,16 @@ if [ "$DOCS_AUTH" != "$DOCS_AUTH_BEFORE" ]; then
   kubectl create secret generic docs-basic-auth -n "$NS" --from-literal=auth="$DOCS_AUTH" \
     --dry-run=client -o yaml | kubectl apply -f -
 fi
-# Shared by the orchestrator and the forms engine: each reads its own key and ignores the other.
-# Both apps verify inbound webhooks against it, and a blank value would make them verify nothing.
+# Shared by the orchestrator, the forms engine and the rule engine: each reads its own key and ignores
+# the others. They verify inbound webhooks against it, and a blank value would make them verify
+# nothing (from EventConductor 2.28 an engine without a filter chain refuses them instead). The rules
+# and task-contract keys have no webhook registered in GitHub yet; they are set so that adding one
+# later is signed from the start.
 kubectl create secret generic ec-git-webhook -n "$NS" \
   --from-literal=WORKFLOW_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
+  --from-literal=TASKS_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   --from-literal=FORMS_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
+  --from-literal=RULES_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   ${WORKFLOW_AGENT_CLIENT_SECRET:+--from-literal=WORKFLOW_AGENTS_CLIENT_SECRET="$WORKFLOW_AGENT_CLIENT_SECRET"} \
   --dry-run=client -o yaml | kubectl apply -f -
 if [ "$WORKFLOW_AGENTS_ENABLED" = true ]; then
