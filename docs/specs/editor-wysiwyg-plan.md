@@ -102,10 +102,10 @@ Rama de ec-demo1: `feat/content-hub`, o una nueva desde ella.
 
 | # | Paso | Estado |
 |---|---|---|
-| 1.1 | Subir `mateu.version` de los poms de ec-demo1 a la beta del nivel 2 (la cadena completa está en la memoria "Mateu release & shell redeploy": poms → shells → apply). | pendiente |
-| 1.2 | `BlockForm.html` → `@Stereotype(FieldStereotype.richText)`. Comprobar que `PageRenderer`/`ContentRenderer` siguen resolviendo `[[media:id]]` y los embeds (embed.js) dentro del HTML que produce el editor. | pendiente |
-| 1.3 | Campos según el tipo de bloque (`VisibilitySupplier`/`isHidden`, como ya hace `ItemForm`): HTML → título + html; FEATURED → item; AUTOMATIC_LISTING → sección + cuántos; QUICK_LINKS → enlaces; MEDIA → medio; BANNER → lo que use. La audiencia del bloque, siempre. | pendiente |
-| 1.4 | "Insertar medio": botón/acción que abre la biblioteca (`MediaCrud`) con miniaturas y, al elegir, añade `[[media:id]]` al html (o rellena `mediaId` en un bloque MEDIA). `mediaId` pasa a ser un select de la biblioteca. Lo mismo en el cuerpo de `ItemForm`. | pendiente |
+| 1.1 | Subir `mateu.version` de los poms de ec-demo1 a la beta del nivel 2 (la cadena completa está en la memoria "Mateu release & shell redeploy": poms → shells → apply). | hecho: ec-demo1 en 3.0-beta.34 (c333853f) |
+| 1.2 | `BlockForm.html` → `@Stereotype(FieldStereotype.richText)`. Comprobar que `PageRenderer`/`ContentRenderer` siguen resolviendo `[[media:id]]` y los embeds (embed.js) dentro del HTML que produce el editor. | hecho (6874aa9d) |
+| 1.3 | Campos según el tipo de bloque (`VisibilitySupplier`/`isHidden`, como ya hace `ItemForm`): HTML → título + html; FEATURED → item; AUTOMATIC_LISTING → sección + cuántos; QUICK_LINKS → enlaces; MEDIA → medio; BANNER → lo que use. La audiencia del bloque, siempre. | hecho (6874aa9d), incluidos los bloques dinámicos de H2 |
+| 1.4 | "Insertar medio": botón/acción que abre la biblioteca (`MediaCrud`) con miniaturas y, al elegir, añade `[[media:id]]` al html (o rellena `mediaId` en un bloque MEDIA). `mediaId` pasa a ser un select de la biblioteca. Lo mismo en el cuerpo de `ItemForm`. | hecho en parte (6874aa9d): `mediaId` es un select de la biblioteca; el botón que inserta `[[media:id]]` dentro del texto, pendiente |
 | 1.5 | Enlaces como tabla editable (`List<LinkForm>` con texto y URL) en lugar de líneas `Texto \| URL`; migrar `of()`/`toBlock()`. | pendiente |
 | 1.6 | Vista previa junto al formulario que se refresca al editar (hoy "Previsualizar" repinta la página: ver commit d5ecd95a). | pendiente |
 | 1.7 | Probar en local (kind, `deploy/local/up.sh`) en Vaadin y Redwood (`console.localhost:8800` / `rw.localhost:8800`, editorial → contenidos), con el usuario editor de la seed. Actualizar el manual de usuario de la intranet (docs) y el recorrido con capturas. | pendiente |
@@ -235,7 +235,7 @@ El empleado pide algo desde la intranet (vacaciones, formación, material). La s
 
 | # | Paso | Estado |
 |---|---|---|
-| F1.1 | Resolver las preguntas abiertas en el motor y en ec-definitions; cerrar el diseño aquí | hecho — ver «Resultado de F1.1»; falta decidir la versión del motor |
+| F1.1 | Resolver las preguntas abiertas en el motor y en ec-definitions; cerrar el diseño aquí | hecho — ver «Resultado de F1.1»; el usuario eligió subir el motor: 2.37.0 aplicado en local |
 | F1.2 | Proceso `solicitud-empleado` + formularios en ec-definitions (PR) | hecho: ec-definitions #43 (proceso + 2 forms, plugin a 2.37.0) y #44 (la descripción de un workflow va en un varchar(255): el validador no lo comprueba) |
 | F1.3 | Content-hub: tipos de solicitud, "nueva solicitud", outbox de arranque, proyección de estados (inbox) | hecho (bc9c4c42): `EmployeeRequest`, `RequestService`, `OutboxProcessStarter`, `RequestEventsListener`, `PgRequestRepository`, tabla `ch_request`; destino `solicitudes` en el orquestador |
 | F1.4 | Portal: Mis solicitudes y Por aprobar (completar la tarea del responsable) | hecho (bc9c4c42): Nueva solicitud, Mis solicitudes (con historial), Por aprobar (`FormsHumanTasks`: REST del motor de formularios con el token del usuario; reclama si es candidato) |
