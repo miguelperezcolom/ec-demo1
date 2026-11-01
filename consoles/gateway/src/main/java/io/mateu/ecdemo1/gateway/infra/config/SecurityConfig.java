@@ -170,7 +170,10 @@ public class SecurityConfig {
                         // placeholders into players. content-hub serves a medium only on a URL it signed
                         // when it drew the page for someone who may see it, and checks the visibility
                         // again before answering.
-                        .pathMatchers(HttpMethod.GET, "/_intranet/media/**", "/_intranet/embed.js").permitAll()
+                        // …and the newsletter's open pixel and tracked links, fetched by a mail client
+                        // or clicked in a mail app: signed by content-hub, a click only ever goes on
+                        // to a portal item (which asks for a session as usual).
+                        .pathMatchers(HttpMethod.GET, "/_intranet/media/**", "/_intranet/embed.js", "/_intranet/n/**").permitAll()
                         .pathMatchers("/_intranet/**").authenticated()
                         // The same portal without the backoffice, for the intranet's own host.
                         .pathMatchers("/_portal/**").authenticated()

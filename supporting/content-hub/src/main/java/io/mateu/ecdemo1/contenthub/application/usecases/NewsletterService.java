@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.contenthub.application.usecases;
 import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
 import io.mateu.ecdemo1.contenthub.application.out.EmployeeDirectory;
 import io.mateu.ecdemo1.contenthub.application.out.Mailer;
+import io.mateu.ecdemo1.contenthub.application.out.NewsletterLinks;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterRepository;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
@@ -49,6 +50,10 @@ public class NewsletterService {
 
     @Value("${content-hub.portal-url:http://localhost:8800/intranet}")
     String portalUrl;
+
+    /** The tracked links (open pixel, item clicks); none outside Spring (tests) or when not wired. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    NewsletterLinks links = NewsletterLinks.NONE;
 
     /**
      * A group of recipients: everyone with the same profile who reads the same language and wants the
@@ -153,7 +158,7 @@ public class NewsletterService {
             try {
                 mailer.send(group.recipients().stream().map(Employee::email).toList(),
                         edition.title() + " [" + group.language() + " · " + group.hash() + "]",
-                        render(edition, items, group.language()));
+                        render(edition, items, group.language(), NewsletterEdition.groupKey(group.hash(), group.language())));
                 edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
                         group.recipients().size(), items.stream().map(VisibleItem::itemId).toList(), clock.instant(),
                         null));
@@ -209,7 +214,8 @@ public class NewsletterService {
                         .append(esc(describe(group.profile()))).append(" · ").append(group.recipients().size())
                         .append(" destinatario(s): ").append(esc(group.recipients().stream().map(Employee::name)
                                 .collect(java.util.stream.Collectors.joining(", ")))).append("</p>")
-                        .append(render(edition, itemsByGroup.get(group), group.language()));
+                        .append(render(edition, itemsByGroup.get(group), group.language(),
+                                NewsletterEdition.groupKey(group.hash(), group.language())));
             }
             html.append("</div>");
             var recipients = pending.stream().flatMap(g -> g.recipients().stream()).map(Employee::email).toList();
@@ -244,6 +250,12 @@ public class NewsletterService {
     }
 
     public String render(NewsletterEdition edition, List<VisibleItem> items, String language) {
+        return render(edition, items, language, null);
+    }
+
+    /** The email for a group: its items' links and the open pixel go through the tracker, for that group. */
+    public String render(NewsletterEdition edition, List<VisibleItem> items, String language, String group) {
+        var tracked = group == null ? NewsletterLinks.NONE : links;
         var html = new StringBuilder("<div style=\"font-family:sans-serif;max-width:640px\">")
                 .append("<h1>").append(esc(edition.title())).append("</h1>");
         if (!edition.intro().isBlank()) {
@@ -253,15 +265,20 @@ public class NewsletterService {
                     : "<p>" + esc(edition.intro()) + "</p>");
         }
         for (var item : items) {
-            html.append("<h2><a href=\"").append(esc(portalUrl)).append("/noticias/").append(esc(item.itemId()))
+            var direct = portalUrl + "/noticias/" + item.itemId();
+            html.append("<h2><a href=\"").append(esc(tracked.click(edition.id(), group, item.itemId(), direct)))
                     .append("\">").append(esc(item.title())).append("</a></h2>")
                     .append("<p>").append(esc(item.summary())).append("</p>");
         }
         html.append("<p style=\"color:#888;font-size:12px\">").append("es".equals(language)
                 ? "Recibes este correo como empleado. Solo incluye lo que puedes ver en la intranet."
                 : "You receive this email as an employee. It only includes what you can see on the intranet.")
-                .append("</p></div>");
-        return html.toString();
+                .append("</p>");
+        var pixel = tracked.open(edition.id(), group);
+        if (pixel != null) {
+            html.append("<img src=\"").append(esc(pixel)).append("\" width=\"1\" height=\"1\" alt=\"\">");
+        }
+        return html.append("</div>").toString();
     }
 
     static String esc(String s) {

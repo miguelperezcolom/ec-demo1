@@ -71,6 +71,12 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
     @Stereotype(FieldStereotype.textarea)
     String groups;
 
+    @Section("Aperturas y clics")
+    @HiddenInCreate
+    @Label("")
+    @Colspan(2)
+    Callable<Component> tracking = this::tracking;
+
     @Section("Vista previa (primer grupo)")
     @HiddenInCreate
     @Label("")
@@ -82,14 +88,17 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
     final AudienceCommands audienceCommands;
     final NamedAudiences namedAudiences;
     final Readers readers;
+    final io.mateu.ecdemo1.contenthub.application.out.NewsletterTracking trackingStore;
 
     public NewsletterForm(NewsletterService newsletter, NewsletterRepository editions, AudienceCommands audienceCommands,
-                          NamedAudiences namedAudiences, Readers readers) {
+                          NamedAudiences namedAudiences, Readers readers,
+                          io.mateu.ecdemo1.contenthub.application.out.NewsletterTracking trackingStore) {
         this.newsletter = newsletter;
         this.editions = editions;
         this.audienceCommands = audienceCommands;
         this.namedAudiences = namedAudiences;
         this.readers = readers;
+        this.trackingStore = trackingStore;
     }
 
     public NewsletterForm load(NewsletterEdition e) {
@@ -117,6 +126,64 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
             groups = "Nadie de la audiencia tiene email";
         }
         return this;
+    }
+
+    /**
+     * Opens and clicks of a sent edition, per group of recipients and summed by hotel and by department
+     * (from each group's profile). Never per person: a group's email is one message to all of them.
+     */
+    Component tracking() {
+        if (id == null || trackingStore == null) {
+            return Html.block("");
+        }
+        var e = editions.find(id).orElse(null);
+        if (e == null || e.sends().isEmpty()) {
+            return Html.block("<p style=\"opacity:.7\">Sin datos hasta que se envíe.</p>");
+        }
+        var stats = trackingStore.stats(id);
+        var profiles = audienceCommands.allProfiles();
+        var byHotel = new java.util.TreeMap<String, long[]>();
+        var byDepartment = new java.util.TreeMap<String, long[]>();
+        var rows = new StringBuilder();
+        long recipients = 0, opens = 0, clicks = 0;
+        for (var send : e.sends()) {
+            var key = io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterEdition.groupKey(send.hash(), send.language());
+            var s = stats.stream().filter(x -> x.group().equals(key)).findFirst().orElse(null);
+            long o = s == null ? 0 : s.opens(), c = s == null ? 0 : s.clicks();
+            recipients += send.recipients();
+            opens += o;
+            clicks += c;
+            var profile = profiles.get(send.hash().split("~")[0]);
+            var attrs = profile == null ? null : profile.attributes();
+            var hotel = attrs == null ? "?" : attrs.get(io.mateu.ecdemo1.contenthub.domain.audience.Attribute.HOTEL).orElse("Servicios centrales");
+            var dept = attrs == null ? "?" : attrs.get(io.mateu.ecdemo1.contenthub.domain.audience.Attribute.DEPARTMENT).orElse("—");
+            add(byHotel, hotel, send.recipients(), o, c);
+            add(byDepartment, dept, send.recipients(), o, c);
+            rows.append("<tr><td>").append(Ui.esc(attrs == null ? send.hash() : attrs.canonical().replace(";", " · ")))
+                    .append(" [").append(Ui.esc(send.language())).append("]</td><td>").append(send.recipients())
+                    .append("</td><td>").append(o).append("</td><td>").append(c).append("</td></tr>");
+        }
+        return Html.block("<p><b>" + opens + "</b> aperturas y <b>" + clicks + "</b> clics de " + recipients
+                + " destinatarios. Se cuentan por grupo: el correo de un grupo es uno para todos.</p>"
+                + "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:1rem\">"
+                + Ui.card("<h3 style=\"margin-top:0\">Por hotel</h3>" + table("Hotel", byHotel))
+                + Ui.card("<h3 style=\"margin-top:0\">Por departamento</h3>" + table("Departamento", byDepartment))
+                + "</div>" + Ui.card("<h3 style=\"margin-top:0\">Por grupo</h3><table style=\"width:100%\"><tr>"
+                + "<th align=\"left\">Grupo</th><th>Destinatarios</th><th>Aperturas</th><th>Clics</th></tr>" + rows + "</table>"));
+    }
+
+    static void add(java.util.Map<String, long[]> to, String key, long recipients, long opens, long clicks) {
+        var v = to.computeIfAbsent(key, k -> new long[3]);
+        v[0] += recipients;
+        v[1] += opens;
+        v[2] += clicks;
+    }
+
+    static String table(String what, java.util.Map<String, long[]> rows) {
+        return "<table style=\"width:100%\"><tr><th align=\"left\">" + what + "</th><th>Destinatarios</th>"
+                + "<th>Aperturas</th><th>Clics</th></tr>" + rows.entrySet().stream().map(r -> "<tr><td>"
+                + Ui.esc(r.getKey()) + "</td><td>" + r.getValue()[0] + "</td><td>" + r.getValue()[1] + "</td><td>"
+                + r.getValue()[2] + "</td></tr>").collect(Collectors.joining()) + "</table>";
     }
 
     Component preview() {

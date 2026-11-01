@@ -200,6 +200,10 @@ revisión).
   items que ve cada grupo. **Cada grupo recibe solo lo que puede ver**, en su idioma; un grupo que no ve
   ninguno de los items no recibe nada.
 - **Vista previa (primer grupo)**: el correo tal como saldría.
+- **Aperturas y clics** (una edición enviada): cuántas veces se abrió y cuántos clics tuvo cada item, por
+  grupo y sumado por **hotel** y por **departamento**. Se cuentan **por grupo**, nunca por persona: el
+  correo de un grupo es un solo mensaje para todos. La apertura depende de que el cliente de correo cargue
+  imágenes, así que es una cifra mínima.
 - Los grupos respetan las **preferencias** de cada empleado (*Mis preferencias* en el portal): quien se ha
   dado de baja no está en ninguno, y quien eligió secciones forma grupo aparte y solo recibe los items de
   esas secciones.

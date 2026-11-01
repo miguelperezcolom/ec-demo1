@@ -388,6 +388,27 @@ class ConsumersTest {
     }
 
     @Test
+    void newsletter_opens_and_clicks_count_per_group_only_with_a_valid_signature() {
+        var signer = new io.mateu.ecdemo1.contenthub.infra.in.web.NewsletterLinksSigner("s3cret", "http://ec1.localhost:8800/intranet");
+        var store = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterTracking(jdbc);
+        var controller = new io.mateu.ecdemo1.contenthub.infra.in.web.NewsletterTrackingController(signer, store,
+                "http://ec1.localhost:8800/intranet");
+        var link = signer.click("n-t", "abc|es", "bienvenida", "direct");
+        assertThat(link).startsWith("http://ec1.localhost:8800/_intranet/n/c/n-t/abc%7Ces/bienvenida/");
+        var sig = link.substring(link.lastIndexOf('/') + 1);
+
+        controller.open("n-t", "abc|es", signer.open("n-t", "abc|es").replaceAll(".*/([^/]+)\\.gif$", "$1"));
+        controller.click("n-t", "abc|es", "bienvenida", sig);
+        controller.click("n-t", "abc|es", "bienvenida", "forged");      // not counted, still redirected
+        controller.click("n-t", "abc|es", "../../evil", sig);           // not an item id: 404
+
+        var stats = store.stats("n-t");
+        assertThat(stats).hasSize(1);
+        assertThat(stats.get(0).opens()).isEqualTo(1);
+        assertThat(stats.get(0).clicks()).isEqualTo(1);
+    }
+
+    @Test
     void redirected_the_newsletter_goes_as_one_digest_with_a_section_per_group() {
         var sent = new ArrayList<String>();
         var digest = new NewsletterService(editions, new PgEmployeeDirectory(jdbc), visibility,

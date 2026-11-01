@@ -25,6 +25,10 @@ create table if not exists ch_employee (
 alter table ch_employee add column if not exists manager_id text;
 alter table ch_employee add column if not exists phone text;
 alter table ch_employee add column if not exists labels jsonb;
+-- Newsletter opens and clicks, per edition and group of recipients (never per person)
+create table if not exists ch_newsletter_event (edition_id text not null, grp text not null, kind text not null,
+    item_id text, at timestamptz not null);
+create index if not exists ch_newsletter_event_edition on ch_newsletter_event (edition_id);
 -- What each employee wants from the newsletter (no row: everything)
 create table if not exists ch_newsletter_pref (user_id text primary key, subscribed boolean not null,
     sections text[] not null);
