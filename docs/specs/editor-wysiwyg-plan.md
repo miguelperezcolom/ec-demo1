@@ -60,7 +60,7 @@ Rama: `feat/redwood-spectra-rich-text`.
 | 2.3 | Barra por defecto razonable (`toolbarItems`): títulos, negrita/cursiva/subrayado, listas, enlace, línea, deshacer/rehacer, ver código. Sin fuentes/colores. UPLOAD_IMAGE solo si 2.1 dice que encaja. | hecho (#985) |
 | 2.4 | `mateu-rich-text-field` queda como respaldo si el componente no carga (CDN caído): decidirlo en 2.2. Actualizar el comentario de `richtext.mjs` ("JET has no rich text editor" → Spectra sí). | hecho (#985) |
 | 2.5 | Tests: `poc/test*.mjs` (la cobertura de `tooling-tests` exige líneas ≥98 %, funciones ≥95 %, ramas ≥85 %), `npm run bridge && npm run build && npm run copy` (bundles regenerados: lo comprueba `bundle-freshness`), e2e si cubre richText en Redwood. CHANGELOG en Unreleased. | hecho (#985) |
-| 2.6 | PR #985 abierto por el fork (2.2–2.5 hechos: `mateu-rich-text-field` monta `oj-sp-input-rich-text-2`, con su editor propio de respaldo). PR → CI verde (`e2e`, `tooling-tests`, `frontend-lib`) → merge → release `gh release create v3.0-beta.N --target master` (notas en viñetas) → esperar "Build and publish" y Maven Central (`io.mateu:mateu-mvc/vaadin/redwood`). | pendiente |
+| 2.6 | PR #985 abierto por el fork (2.2–2.5 hechos: `mateu-rich-text-field` monta `oj-sp-input-rich-text-2`, con su editor propio de respaldo). PR → CI verde (`e2e`, `tooling-tests`, `frontend-lib`) → merge → release `gh release create v3.0-beta.N --target master` (notas en viñetas) → esperar "Build and publish" y Maven Central (`io.mateu:mateu-mvc/vaadin/redwood`). | hecho: #985 y #986 (+#987) en **3.0-beta.34**; ec-demo1 y los demos desplegados con beta.34 (2026-11-01) |
 
 ### Notas del fork al cerrar #985
 
@@ -322,6 +322,24 @@ El empleado pide algo desde la intranet (vacaciones, formación, material). La s
 - `WORKFLOW_AGENTS_ENABLED=true` en `deploy.sh` sigue sustituyendo la imagen del orquestador por una construida desde `feat/workflow-agent-step`. Con 2.37.0 el paso `AGENT` ya viene en la imagen publicada. Falta comprobar si el ia-agent habla el mismo contrato (`run-agent@1` en `agent-calls`) y retirar ese override; no se ha tocado.
 - Volver atrás tras migrar solo es posible restaurando la base de datos `workflow` completa (paso 2).
 - ec1/Cloudfleet: la misma subida vale con `deploy.sh`, pero está fuera de alcance.
+
+
+**Aplicada en local (2026-11-01, tarde):**
+- Rama `chore/eventconductor-2.37` fusionada en `feat/content-hub`. En los poms, Mateu beta.33/34 y EC 2.37.0.
+- Imágenes arm64 de orquestador, formularios y reglas construidas desde el tag `v2.37.0`, con un worktree aparte de eventconductor.
+- Antes de nada, volcado completo de la BD del motor (`pg_dumpall`, en el scratchpad de la sesión): es el punto de vuelta.
+- `up.sh` falló en el paso del motor por un fallo previo de `deploy.sh` en el bash 3.2 de macOS (`engine_args[@]` vacío con `set -u`); arreglado en 5191987d.
+- Migraciones aplicadas: orquestador V58, formularios V8.
+- Workers reconstruidos (`load-images.sh`) y las 28 apps reiniciadas. Ojo: en zsh las variables no se parten en palabras; usar `bash -c`.
+- `demo-prep.sh health` contra el clúster local (con `KUBECONFIG` local: el contexto por defecto es ec1):
+  - 39 despliegues listos; las 72 tareas con worker vivo; integraciones activas;
+  - `dead-letter` vacío; 4 procesos en espera, las causas PMS_REJECTED que ya había.
+- **Tareas humanas en 2.37**: el motor de formularios crea la tarea (nuevas columnas `escalation_level`, `restricted`…) y la cancela con el proceso.
+  - Para F1: una tarea que no nombra a nadie **no sale** en `GET /forms/api/tasks?scope=candidate`. Comprobar con `assignee` el `scope=mine` del responsable.
+- **Incidente evitado**: para probar, se arrancó `reset-demo` (v2) por REST con la idea de contestar «no».
+  - Creó todos sus pasos de reset en CREATED (el motor los crea por adelantado) y se **canceló al momento**: solo corrió `start`, y los datos se comprobaron intactos.
+  - **No usar `reset-demo` para pruebas**: para F1, una definición de prueba propia.
+- Arrancar por REST: el cuerpo es `{definitionId, businessKey, variables:{…}}`. El de Kafka (`workflowDefinitionId`, `variables:[…]`) es otro.
 
 ## F3 — Traducir con IA en el editor
 
