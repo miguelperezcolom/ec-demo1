@@ -90,6 +90,38 @@ Se entra por `http://intranet.localhost:8800` (o por el menú **Intranet** del p
 
 *Búsqueda en la intranet.*
 
+### Personas y organigrama
+
+«Personas» es el directorio: cada empleado tiene su ficha (contacto, puesto, hotel y a quién reporta, con la cadena hasta dirección), con enlace directo, como `/intranet/personas/ana.perez`. «Organigrama» la pinta entera: dirección arriba y, debajo, la estructura (empresa › región › hotel › departamento).
+
+![La ficha de Ana Pérez: contacto y a quién reporta (Carlos Díaz → Elena Rodríguez).](../../../assets/intranet/p12-ficha.png)
+
+*La ficha de Ana Pérez: contacto y a quién reporta (Carlos Díaz → Elena Rodríguez).*
+
+![El organigrama, en la intranet con Redwood (rw-intranet.localhost).](../../../assets/intranet/p13-organigrama-rw.png)
+
+*El organigrama, en la intranet con Redwood (rw-intranet.localhost).*
+
+### Solicitudes
+
+Un empleado pide vacaciones, formación o material desde «Nueva solicitud». La solicitud la aprueba su responsable y después RRHH; si el responsable no la decide en dos días, pasa a su superior. El proceso lo lleva EventConductor (`solicitud-empleado`): cada paso es una tarea humana y cada decisión vuelve a la intranet por el tema `solicitudes`. Al decidirse, el empleado recibe un correo.
+
+![Nueva solicitud: qué se pide, las fechas y un detalle.](../../../assets/intranet/p14-nueva-solicitud.png)
+
+*Nueva solicitud: qué se pide, las fechas y un detalle.*
+
+![«Por aprobar» de Carlos Díaz, responsable de Ana: sus tareas, con el papel que le toca y el vencimiento.](../../../assets/intranet/p16-por-aprobar.png)
+
+*«Por aprobar» de Carlos Díaz, responsable de Ana: sus tareas, con el papel que le toca y el vencimiento.*
+
+![La misma solicitud cuando le llega a RRHH (Isabel Torres): el historial con el comentario del responsable, un comentario para el empleado y Aprobar / Rechazar.](../../../assets/intranet/p17-aprobar-rrhh.png)
+
+*La misma solicitud cuando le llega a RRHH (Isabel Torres): el historial con el comentario del responsable, un comentario para el empleado y Aprobar / Rechazar.*
+
+![«Mis solicitudes» → una solicitud aprobada: cada paso con quién lo dio y su comentario.](../../../assets/intranet/p15-solicitud.png)
+
+*«Mis solicitudes» → una solicitud aprobada: cada paso con quién lo dio y su comentario.*
+
 ## 4. La misma intranet, otro perfil
 
 La visibilidad se decide por los **atributos del empleado** (los mantiene el servicio de usuarios y llegan a content-hub por Kafka, tema `employee-directory`), nunca por el token. Comparar dos perfiles es la forma más rápida de verlo:
@@ -136,6 +168,18 @@ En el plano de datos (`http://ec1.localhost:8800/editorial/contenidos`) el menú
 ![La ficha de un item: audiencia (con nombre o por atributos, y «Quién lo verá» con el número de empleados), contenido, traducciones (es, en, de), publicación, bloques y avisos.](../../../assets/intranet/e02-item.png)
 
 *La ficha de un item: audiencia (con nombre o por atributos, y «Quién lo verá» con el número de empleados), contenido, traducciones (es, en, de), publicación, bloques y avisos.*
+
+  
+
+El cuerpo se escribe con un editor de texto rico (negrita, listas, enlaces…), sin teclear HTML. Al editar, la sección «Medios y vista previa» permite elegir un medio de la biblioteca e insertarlo en el texto, y ver el contenido como lo leerá el empleado. «Traducir con IA» rellena los demás idiomas para revisarlos antes de guardar. En las páginas, los bloques se listan por tipo y título, y cada uno se edita con «Edit»; los enlaces rápidos son una tabla de texto y URL.
+
+![Editando un artículo: el cuerpo con el editor de texto rico.](../../../assets/intranet/e11-texto-rico.png)
+
+*Editando un artículo: el cuerpo con el editor de texto rico.*
+
+![La vista previa: el contenido como lo leerá el empleado, con los medios ya incrustados.](../../../assets/intranet/e10-vista-previa.png)
+
+*La vista previa: el contenido como lo leerá el empleado, con los medios ya incrustados.*
 
   
 
