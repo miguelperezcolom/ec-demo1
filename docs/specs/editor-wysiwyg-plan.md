@@ -242,6 +242,87 @@ El empleado pide algo desde la intranet (vacaciones, formación, material). La s
 | F1.5 | Emails de estado (communication-service) y escalado por timeout | pendiente |
 | F1.6 | Probar en local de punta a punta (Ana pide vacaciones → Carlos aprueba → RRHH → Ana ve "aprobada") y documentar | pendiente |
 
+### Subida de EventConductor a 2.37
+
+**Decisión (2026-11-01):** el usuario aprueba subir el motor de 2.27.1 a **2.37.0**, para tener asignación por usuario y escalado (desde 2.31). Preparada en la rama `chore/eventconductor-2.37` (sale de `feat/content-hub`). Sin desplegar.
+
+**Qué cambia en el motor (2.28 → 2.37), y si nos afecta:**
+
+- **2.28, endurecimiento de seguridad.**
+  - *Webhooks de git-import sin firma se rechazan.* Ya firmábamos: `ec-git-webhook` lleva `WORKFLOW_`/`FORMS_GITIMPORT_WEBHOOKSECRET`. Se añaden `RULES_` y `TASKS_GITIMPORT_WEBHOOKSECRET`, con el mismo `GIT_WEBHOOK_SECRET`. No hay webhook de reglas ni de contratos en GitHub. **Nada que hacer en GitHub**: los dos webhooks de ec-definitions (workflow y forms) siguen con el mismo secreto.
+  - *Las apps standalone ya no imprimen una contraseña de admin generada.* Los tres motores van con `security.enabled: false`. La app instala entonces una cadena de filtros `permitAll`, sin usuario admin. `SECURITY_PASSWORD` no aplica.
+  - *Consolas y MCP rechazan peticiones anónimas* sin cadena de filtros de Spring Security. Las apps standalone la tienen (`permitAll`): no cambia nada, `/_workflow` y `/_forms` siguen detrás del gateway, que exige token.
+  - *gRPC del motor de reglas, apagado por defecto.* Ya estaba `grpcEnabled: false` y nada de ec-demo1 lee reglas por gRPC.
+  - *`HTTP_CALL`: credenciales atadas a hosts.* Ninguna definición usa `HTTP_CALL`, `LLM_CALL`, `PUBLISH_EVENT` ni `AGENT_CALL`. Revisado en los tres checkouts de ec-definitions; solo hay `ACTION`, `CHOICE`, `LOCK`/`UNLOCK`, `WAIT_FOR_MESSAGE`, `FORK`/`JOIN` y un `USER_TASK`.
+  - *Las páginas de tareas solo se fían del token reenviado con `workflow.security.trust-forwarded-token=true`* (Mateu 3.0-alpha.411). **Este sí nos afecta.** Sin él, reclamar o completar una tarea no ve a nadie autenticado (p. ej. el `confirm` de `reset-demo`), y la asignación por usuario de F1 no funcionaría. Se pone `WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN=true` en el pod de forms: el gateway verifica el token antes de reenviar `/_forms`.
+  - Migraciones V45–V46. V45 rellena `process_entity.finished` de los procesos terminados: un `UPDATE` único, rápido con nuestro volumen.
+- **2.29–2.30:** bucles y `forEach`, operaciones sobre procesos vivos, incidentes, atributos de búsqueda, operaciones por lotes, workers por HTTP. Migraciones V47–V50, solo tablas o columnas nuevas.
+- **2.31:** asignación y escalado de `USER_TASK`, bandeja `/forms/api/tasks`, migración de procesos.
+  - Migración **V8 de formularios**.
+  - Las tareas reclamadas pasan a estado `ASSIGNED`. La bandeja de communication-service (`HumanTask.open()`) ya trataba `ASSIGNED` como abierta.
+  - Los eventos de ciclo de vida van en el mismo `human-tasks`, con el mismo `HumanTaskChanged` y campos nuevos. El lector es tolerante.
+- **2.32:** variables sensibles (V53). No declaramos ninguna, así que no hacen falta claves.
+- **2.33:** updates, control de flujo, `CONTINUE_AS_NEW`, prioridad de tareas (V55, V56, V56.1).
+  - `TaskExecutionRequested` gana `priority`.
+  - No hay *record patterns* sobre los DTOs del motor en los workers: compilan sin cambios.
+  - 2.33.1 corrige la pérdida de eventos en Kafka con contención.
+- **2.34:** paso `AGENT`; `AGENT_CALL` desaparece. No usamos ninguno de los dos en ec-definitions. Migración V57: solo columnas.
+- **2.35:** `HTTP_CALL`, `LLM_CALL` y `PUBLISH_EVENT` los sirven workers integrados en la imagen del orquestador.
+  - Topics `http-calls`, `llm-calls` y `event-publications`, grupo `orchestrator-builtin-workers`; se autocrean.
+  - No desplegamos `http-worker` ni `llm-worker` standalone, así que nada consume dos veces.
+- **2.36–2.37:** el editor de grafos cubre `assignment`/`escalation`; gauge `eventconductor.incidents.open`.
+  - La 2.37.0 trae también `WorkflowExecutionController` + V58, la API de ejecución desde el IDE que pedía `deploy/ide-execution/README.md`.
+
+**Qué se ha tocado:**
+
+- `deploy/values/eventconductor.yaml`: `imageTag` 2.37.0 en orquestador, forms y reglas; `WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN: "true"` en forms.
+- `deploy/deploy.sh`: el secreto `ec-git-webhook` gana `RULES_` y `TASKS_GITIMPORT_WEBHOOKSECRET`. No hay valores en git.
+- `<eventconductor.version>2.37.0` en los 19 poms que lo fijaban (`shared`, `worker-kafka`, `worker-api`). Sin cambios en el código de producción.
+  - Compila todo el reactor afectado (`-am -amd`).
+  - Tests de los 19 módulos: todos verdes salvo uno, el contrato de `human-tasks`.
+- **Contrato `human-tasks` → v2.** `HumanTaskChanged` gana siete componentes (`event`, `candidateUsers`, `candidateGroups`, `priority`, `dueDate`, `escalationLevel`, `businessKey`), y el comprobador de contratos lo cuenta como incompatible (campos nuevos obligatorios).
+  - `CommunicationContractsTest` publica ahora `contracts/schemas/human-tasks/v2.schema.json`, con ejemplos `created` y `claimed`.
+  - `v1.schema.json` se queda tal cual: ya no se puede generar desde el record del motor.
+  - El consumidor de communication-service lee los ejemplos de v1 y de v2.
+- `deploy/demo/common.sh`: `ENGINE_TABLES` incluye el estado nuevo que va con procesos y tareas. Así `snapshot.sh`, `reset.sh` y `zero.sh` lo copian y lo vacían. Las tablas:
+  - `form_execution_candidate_user` / `_group`;
+  - `process_search_attribute` y `process_index_search_attribute`;
+  - `process_update`;
+  - `flow_control_key` / `_pending`;
+  - `deferred_dispatch`.
+- La documentación que citaba 2.27.1 (`doc/…/compilar.md`, `entorno-local.md`, `servicios.md`, `estado-del-repositorio.md`, `procesos.md`, `programaciones.md`).
+
+**Cómo desplegarlo en local** (kind, `deploy/local/up.sh`), en este orden:
+
+1. **Imágenes arm64 del motor.** Docker Hub solo tiene amd64. Hay que construir `orchestrator-`, `forms-` y `rule-standalone-app:2.37.0` desde el jar publicado, con la receta de `doc/…/desarrollo/entorno-local.md` y un checkout de eventconductor en `v2.37.0`. `up.sh` las carga en el nodo, porque lee las etiquetas de los values.
+2. **Antes de nada, una línea base** (`deploy/demo/snapshot.sh`) por si hay que volver atrás. Flyway no deshace: volver a 2.27.1 con el esquema ya migrado no está probado. La vuelta segura es restaurar la base de datos `workflow` entera, no solo las tablas de estado.
+3. **Motor primero:** `deploy/local/up.sh`, o `deploy.sh` sobre la copia local, que hace el `helm upgrade` del release `ec` con el chart vendorizado. Al arrancar se aplican, en este orden:
+   - en el orquestador, V45 → V58 (V56.1 crea índices `CONCURRENTLY`; el motor toma un lock de sesión de Flyway);
+   - en forms, V8.
+   Hay que esperar a que los tres pods estén *Ready* y comprobar en los logs que las migraciones han terminado. Ninguna definición nueva hasta entonces.
+4. **Después, los workers:** `deploy/local/load-images.sh` (reconstruye con los poms en 2.37.0) y `kubectl -n ec-demo1 rollout restart` de los servicios con worker. Con el motor nuevo y los workers viejos se convive: los campos nuevos de los DTOs son opcionales en el cable. Pero 2.33.1 corrige las réplicas perdidas en el worker-kafka, así que conviene no dejarlos atrás.
+5. **Solo entonces** puede entrar en ec-definitions una definición con `assignment`/`escalation` (F1.2). La 2.31 lo exige: forms y workers en ≥ 2.31 antes de usar `escalation`.
+
+**Prueba de humo** (después del paso 4):
+
+- `deploy/demo/demo-prep.sh health`: todo *Ready*, motor arriba, Opera/Salesforce. Incluye `check-contracts.sh --cluster`: cada tarea referenciada tiene un worker vivo en su topic.
+- En `/_workflow`, las definiciones importadas de ec-definitions siguen *ACTIVE*, sin errores de carga.
+- Los flujos de `doc/src/content/docs/guias/procesos.md`, con los seeds de `demo-prep.sh`:
+  - una reserva nueva del CRS → `proyectar-reserva` (con `LOCK`/`UNLOCK` y `WAIT_FOR_MESSAGE`) hasta Opera y front office;
+  - una cancelación → `proyectar-cancelacion`;
+  - `seed arriving-opera-today` → check-in/check-out (`registrar-checkin`/`-checkout`);
+  - un cargo y su anulación → `registrar-cargo`/`anular-cargo`;
+  - `seed arriving-today` → `registrar-no-show`.
+- `reset-demo` desde la consola: su `USER_TASK` `confirm` tiene que aparecer en la bandeja y poder reclamarse y completarse con el usuario del token. Prueba el `trust-forwarded-token`.
+- Ningún proceso en `ERROR` nuevo en *Incidents* (página nueva de la 2.30) y nada en el topic `dead-letter`.
+
+**Lo que necesita al usuario / riesgos abiertos:**
+
+- **ec-definitions** (no tocado): su `pom.xml` fija `eventconductor.plugin.version` 2.23.0. Para validar en CI definiciones con `assignment`/`escalation`, súbelo a 2.37.0 en el mismo PR de F1.2.
+- `WORKFLOW_AGENTS_ENABLED=true` en `deploy.sh` sigue sustituyendo la imagen del orquestador por una construida desde `feat/workflow-agent-step`. Con 2.37.0 el paso `AGENT` ya viene en la imagen publicada. Falta comprobar si el ia-agent habla el mismo contrato (`run-agent@1` en `agent-calls`) y retirar ese override; no se ha tocado.
+- Volver atrás tras migrar solo es posible restaurando la base de datos `workflow` completa (paso 2).
+- ec1/Cloudfleet: la misma subida vale con `deploy.sh`, pero está fuera de alcance.
+
 ## F3 — Traducir con IA en el editor
 
 Los contenidos tienen español, inglés y alemán (`ItemForm` y sus secciones por idioma), y cada traducción se escribe a mano. Un botón **Traducir con IA** en el editor rellenará los idiomas vacíos desde el idioma por defecto (título, resumen, cuerpo HTML conservando la marca y los `[[media:id]]`). El editor la **revisa** antes de enviarla a revisión o publicar.

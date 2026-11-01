@@ -80,7 +80,16 @@ orchestrator:
   # 2.27.1: event triggers and onEvent (2.26.0, V39–V41); secure defaults, LOCK release however a
   # process ends, ordered outbox with several relays (2.27.0, V42–V44). The standalone app keeps its
   # REST API open behind its own filter chain.
-  imageTag: "2.27.1"
+  # 2.37.0: hardening (2.28: HTTP_CALL credentials bound to hosts, signed webhooks — already signed
+  # here, see ec-git-webhook —, consoles refused to anonymous callers unless there is a filter chain:
+  # SECURITY_ENABLED=false still installs a permitAll one, so nothing changes here), loops/forEach
+  # (2.29, V47), operations, incidents and search attributes (2.30, V48–V50), migration of running
+  # processes (2.31), sensitive variables (2.32, V53), updates and flow control (2.33, V55–V56.1),
+  # the AGENT step (2.34, V57; AGENT_CALL gone), HTTP_CALL/LLM_CALL/PUBLISH_EVENT served by built-in
+  # workers inside this image (2.35: topics http-calls, llm-calls, event-publications, group
+  # orchestrator-builtin-workers — no standalone http/llm worker runs here, so nothing to move).
+  # Upgrade notes: docs/specs/editor-wysiwyg-plan.md, «Subida de EventConductor a 2.37».
+  imageTag: "2.37.0"
   replicas: 1
   servicePort: 8105
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -222,7 +231,11 @@ forms:
   # signed-in user, only the assignee completes (eventconductor#451).
   # 2.23.8: Claim hidden once claimed, Release for the assignee (eventconductor#452).
   # 2.27.1: the same release as the orchestrator.
-  imageTag: "2.27.1"
+  # 2.37.0: per-user assignment and escalation of USER_TASKs (2.31, forms migration V8: assignment
+  # columns and candidate tables), the task inbox API /forms/api/tasks, lifecycle events on
+  # human-tasks (same HumanTaskChanged payload, more fields). Upgrade it with the orchestrator and
+  # before any definition declares `assignment` or `escalation`.
+  imageTag: "2.37.0"
   replicas: 1
   servicePort: 8106
   # The engine owns its schema now. It always could — the image ships flyway-core and
@@ -257,6 +270,12 @@ forms:
     # receive every task — different consumer groups — and the worker answers the human ones
     # itself. Here a USER_TASK reaches the forms engine only by naming `topic: forms`.
     SPRING_CLOUD_STREAM_BINDINGS_CONSUMEWORKEREVENTFORFORMSENGINE_IN_0_DESTINATION: "forms"
+    # 2.28 (Mateu 3.0-alpha.411): the task pages no longer read the caller from a bearer token nobody
+    # verified, so claim/release/complete saw nobody signed in. The gateway verifies the token before
+    # it forwards /_forms, which is the case this flag exists for: the forms engine reads the user and
+    # the realm roles from it again (workflow.security.claims.* defaults: preferred_username,
+    # realm_access.roles) — and per-user assignment (2.31) needs exactly that user.
+    WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN: "true"
   extraEnvFromSecret: ec-git-webhook
   nodeSelector:
     topology.kubernetes.io/region: hel1
@@ -274,7 +293,9 @@ forms:
 rules:
   image: miguelperezcolom/rule-standalone-app
   # 2.27.1: starts with gRPC on again (2.26.0/2.27.0 did not); off here anyway.
-  imageTag: "2.27.1"
+  # 2.37.0: gRPC off by default since 2.28 (grpcEnabled: false below already said so; nothing here
+  # reads rules over gRPC).
+  imageTag: "2.37.0"
   replicas: 1
   servicePort: 8107
   grpcEnabled: false
