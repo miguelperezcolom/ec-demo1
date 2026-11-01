@@ -13,7 +13,6 @@ import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.OptionsSupplier;
 import io.mateu.uidl.interfaces.VisibilitySupplier;
 
-import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.UUID;
@@ -41,9 +40,8 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
     public String sectionId;
     @Label("Cuántos")
     public Integer limit;
-    @Label("Enlaces (una línea por enlace: Texto | URL)")
-    @Stereotype(FieldStereotype.textarea)
-    public String links;
+    @Label("Enlaces")
+    public List<LinkForm> links = new java.util.ArrayList<>();
     @Label("Medio de la biblioteca")
     @Stereotype(FieldStereotype.select)
     public String mediaId;
@@ -69,7 +67,7 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
         f.sectionId = b.sectionId();
         f.limit = b.limit();
         f.mediaId = b.mediaId();
-        f.links = String.join("\n", b.links().stream().map(l -> l.label() + " | " + l.url()).toList());
+        f.links = new java.util.ArrayList<>(b.links().stream().map(l -> LinkForm.of(l.label(), l.url())).toList());
         var parsed = AudienceFields.parse(b.audience());
         f.blockDepartments = parsed.values().get(Attribute.DEPARTMENT);
         f.blockHotels = parsed.values().get(Attribute.HOTEL);
@@ -83,12 +81,10 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
         values.put(Attribute.HOTEL, blockHotels);
         values.put(Attribute.JOB_TITLE, blockJobTitles);
         Audience audience = AudienceFields.build(null, values, null);
-        var parsedLinks = links == null ? List.<Block.Link>of() : Arrays.stream(links.split("\n"))
-                .map(String::trim).filter(l -> !l.isEmpty())
-                .map(l -> {
-                    var at = l.lastIndexOf('|');
-                    return at < 0 ? new Block.Link(l, l) : new Block.Link(l.substring(0, at).trim(), l.substring(at + 1).trim());
-                }).toList();
+        var parsedLinks = links == null ? List.<Block.Link>of() : links.stream()
+                .filter(l -> l != null && l.url != null && !l.url.isBlank())
+                .map(l -> new Block.Link(l.label == null || l.label.isBlank() ? l.url.trim() : l.label.trim(), l.url.trim()))
+                .toList();
         return new Block(id == null || id.isBlank() ? "b" + UUID.randomUUID().toString().substring(0, 6) : id,
                 type == null ? BlockType.HTML : type, audience, title, html, blank(itemId), blank(sectionId), limit,
                 parsedLinks, blank(mediaId));

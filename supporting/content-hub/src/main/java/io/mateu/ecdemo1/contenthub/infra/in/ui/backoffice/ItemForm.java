@@ -127,6 +127,15 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Label("Bloques")
     List<BlockForm> blocks = new ArrayList<>();
 
+    @Section("Medios y vista previa")
+    @Label("Medio de la biblioteca para insertar")
+    @Stereotype(FieldStereotype.select)
+    String medioAInsertar;
+
+    @Label("Vista previa (idioma por defecto)")
+    @Colspan(2)
+    java.util.concurrent.Callable<io.mateu.uidl.fluent.Component> vistaPrevia = this::preview;
+
     @Section("Avisos")
     @ReadOnly
     @HiddenInCreate
@@ -141,10 +150,12 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     final NamedAudiences namedAudiences;
     final Readers readers;
     final io.mateu.ecdemo1.contenthub.application.out.Translator translator;
+    final io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer;
 
     public ItemForm(ItemCommands commands, ItemRepository items, ContentIndex index, AudienceCommands audienceCommands,
                     NamedAudiences namedAudiences, Readers readers,
-                    io.mateu.ecdemo1.contenthub.application.out.Translator translator) {
+                    io.mateu.ecdemo1.contenthub.application.out.Translator translator,
+                    io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer) {
         this.commands = commands;
         this.items = items;
         this.index = index;
@@ -152,6 +163,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         this.namedAudiences = namedAudiences;
         this.readers = readers;
         this.translator = translator;
+        this.renderer = renderer;
     }
 
     public ItemForm load(Item item) {
@@ -260,6 +272,45 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         return List.of(this, Message.success("Traducido con IA a " + String.join(", ", done) + ". Revísalo y guarda."));
     }
 
+    /** Puts the chosen medium at the end of the default language's body, where the editor moves it to. */
+    @Toolbar
+    @Action
+    public Object insertarMedio(HttpRequest httpRequest) {
+        readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
+        if (medioAInsertar == null || medioAInsertar.isBlank()) {
+            return Message.warning("Elige primero el medio, en «Medios y vista previa»");
+        }
+        var language = defaultLanguage == null ? "es" : defaultLanguage;
+        var t = text(language);
+        var body = t.body() == null ? "" : t.body();
+        set(language, new io.mateu.ecdemo1.contenthub.domain.item.Translation(t.title(), t.summary(),
+                body + "<p>[[media:" + medioAInsertar + "]]</p>"));
+        medioAInsertar = null;
+        return List.of(this, Message.success("Medio insertado al final del cuerpo (" + language + "). Muévelo donde quieras y guarda."));
+    }
+
+    /** Draws the preview again with what is in the form now (nothing is saved). */
+    @Toolbar
+    @Action
+    public Object previsualizar(HttpRequest httpRequest) {
+        return this;
+    }
+
+    /**
+     * The default language's text as a reader will see it — title, summary and body with the media
+     * expanded (signed for the editor). Blocks and audience: «Ver como».
+     */
+    io.mateu.uidl.fluent.Component preview() {
+        var t = text(defaultLanguage == null ? "es" : defaultLanguage);
+        var html = "<article style=\"max-width:860px;border:1px dashed rgba(128,128,128,.4);border-radius:12px;padding:1rem 1.25rem\">"
+                + "<h1 style=\"margin-top:0\">" + Ui.esc(t.title()) + "</h1>"
+                + (t.summary() == null || t.summary().isBlank() ? "" : "<p style=\"font-size:1.1rem;opacity:.85\">" + Ui.esc(t.summary()) + "</p>")
+                + renderer.body(t.body(), io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PageRenderer.PORTAL_BASE,
+                io.mateu.ecdemo1.contenthub.infra.in.render.MediaUrls.EDITOR)
+                + "</article>";
+        return io.mateu.ecdemo1.uicommons.html.Html.block(html);
+    }
+
     io.mateu.ecdemo1.contenthub.domain.item.Translation text(String language) {
         return switch (language) {
             case "en" -> new io.mateu.ecdemo1.contenthub.domain.item.Translation(titleEn, summaryEn, bodyEn);
@@ -333,7 +384,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
 
     @Override
     public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
-        return "sectionId".equals(fieldName) || "defaultLanguage".equals(fieldName)
+        return "sectionId".equals(fieldName) || "defaultLanguage".equals(fieldName) || "medioAInsertar".equals(fieldName)
                 || super.supports(fieldType, fieldName, formType);
     }
 
@@ -342,6 +393,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         return switch (fieldName) {
             case "sectionId" -> Catalog.get().sections();
             case "defaultLanguage" -> Catalog.languages();
+            case "medioAInsertar" -> Catalog.get().media();
             default -> super.options(fieldName, httpRequest);
         };
     }
