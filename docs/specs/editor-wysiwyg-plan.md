@@ -113,6 +113,61 @@ Idea, sin compromiso:
 - Punto delicado: estrechar la audiencia del bloque sin perder de vista la de la página.
 - Decidir tras usar 1 y 2.
 
+---
+
+# Plan paralelo: directorio de la intranet (organigrama + fichas)
+
+Pedido el 2026-11-01. Va **en paralelo** con el editor: el nivel 2 lo lleva otro agente en el worktree de Mateu; el directorio, en ec-demo1.
+
+## Punto de partida
+
+- El content-hub ya guarda una copia del directorio de empleados:
+  - la alimenta el servicio de usuarios por el topic `employee-directory`;
+  - `application/out/EmployeeDirectory`, `infra/out/persistence/PgEmployeeDirectory`;
+  - cada persona: userId, nombre, email, enabled y atributos (company, country, region, hotel, department, jobTitle, language: códigos del catálogo).
+- Pantalla: solo `backoffice/DirectoryListing` (tabla plana, para administradores de contenido). Los empleados no ven nada.
+- En usuarios (`control-plane/users`):
+  - `User` tiene `EmployeeAttributes` (los atributos de audiencia, JSON en `UserEntity.attributesJson`; `ddl-auto: update`);
+  - los eventos `UserCreated`/`UserUpdated` → `EmployeeDirectoryOutboxAppender` → `EmployeeDirectoryMessage`;
+  - seed en `DemoDirectorySeeder`.
+- **Falta la jerarquía**: nadie guarda quién reporta a quién.
+
+## Diseño
+
+- **Usuarios**: un VO nuevo `EmployeeProfile(managerId, phone)` en `User`.
+  - No va en `EmployeeAttributes`: esos son los atributos de audiencia, códigos de catálogo.
+  - Se persiste en su propia columna JSON `UserEntity.profileJson` (`ddl-auto` la añade; null = sin perfil).
+  - Viaja en `UserCreated`/`UserUpdated`.
+  - Se edita en `UserViewModel`: jefe = select de usuarios; teléfono.
+  - `managerId` no puede ser el propio usuario.
+- **Contrato `employee-directory`**: campos nuevos opcionales al nivel de `name`/`email`: `"managerId":"…","phone":"…"`.
+  - Ausentes si no hay valor. Es aditivo: los consumidores actuales no se rompen.
+  - Actualizar el javadoc de `EmployeeDirectoryMessage` y el test del appender.
+- **Content-hub**:
+  - el consumidor del directorio guarda `managerId` y `phone` (columnas nuevas en la tabla del directorio, `schema.sql`);
+  - `EmployeeDirectory` los expone.
+- **Portal (intranet)**, sección "Personas":
+  1. Buscador: nombre, puesto, hotel o departamento, con filtros por hotel, departamento y región. Cada fila abre la ficha.
+  2. Ficha: avatar de iniciales (sin fotos reales), puesto, departamento, hotel, región, email, teléfono, jefe (enlace), colaboradores directos (enlaces) y "mismo equipo" (mismo departamento y hotel).
+  3. Organigrama por estructura: empresa → región → hotel → departamento → personas, en árbol (vista tree de Mateu). Los nombres de los códigos salen del catálogo de atributos.
+  4. Organigrama por personas: la cadena de jefes de alguien y sus colaboradores, desde la ficha.
+  - Solo para usuarios de la intranet (`@Readers`) y solo datos de trabajo. Los empleados deshabilitados no se muestran.
+- **Seed**: jefes coherentes en `DemoDirectorySeeder`: dirección → directores de hotel → jefes de departamento → empleados. Teléfonos ficticios (`+34 600 000 xxx`).
+- **Extra**: herramienta MCP en `IntranetMcpTools` para que el chat responda "¿quién es el jefe de recepción del TFS01?".
+
+## Pasos
+
+| # | Paso | Estado |
+|---|---|---|
+| D1 | Usuarios: `EmployeeProfile` en `User` (dominio, eventos, comandos, casos de uso, entidad/repositorio, DTO, `UserViewModel`) + tests | pendiente |
+| D2 | Contrato `employee-directory` con `managerId`/`phone` + snapshot (`PublishEmployeeDirectorySnapshotUseCase`) + tests | pendiente |
+| D3 | Seed con jerarquía y teléfonos | pendiente |
+| D4 | Content-hub: consumidor + `schema.sql` + `EmployeeDirectory` con managerId/phone | pendiente |
+| D5 | Portal: "Personas" (buscador + ficha) en el menú de la intranet | pendiente |
+| D6 | Portal: organigrama (estructura + cadena de jefes) | pendiente |
+| D7 | MCP: consulta de directorio para el chat | pendiente |
+| D8 | Desplegar en local (kind), probar en Vaadin y Redwood, actualizar manual/recorrido de la intranet | pendiente |
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.
