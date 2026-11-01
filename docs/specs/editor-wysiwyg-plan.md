@@ -55,12 +55,39 @@ Rama: `feat/redwood-spectra-rich-text`.
 
 | # | Paso | Estado |
 |---|---|---|
-| 2.1 | Spike: cargar `oj-sp-input-rich-text-2` en una página Redwood de prueba (p. ej. `demo-museum` en Redwood). Comprobar: `value` entra y sale como HTML; evento de cambio (`valueChanged` de `value`) en blur o en cada tecla; `readonly`; cómo se comporta UPLOAD_IMAGE (¿base64 inline?, ¿evento?). Anotar aquí lo que salga. | pendiente |
+| 2.1 | Spike: cargar `oj-sp-input-rich-text-2` en una página Redwood de prueba (p. ej. `demo-museum` en Redwood). Comprobar: `value` entra y sale como HTML; evento de cambio (`valueChanged` de `value`) en blur o en cada tecla; `readonly`; cómo se comporta UPLOAD_IMAGE (¿base64 inline?, ¿evento?). Anotar aquí lo que salga. | en curso — ver «Resultados del spike» |
 | 2.2 | Sustituir `mateu-rich-text-field` por el componente de Spectra en las plantillas (`fields-extra.html`, `listing-body.html`). Cargar el loader de Spectra igual que los demás `oj-sp-*` que ya se usan (ver cómo se declaran los bundles en el `require` de la app VB). Conservar: la conversión de un Delta antiguo (`richTextHtml`), el saneado por allowlist al guardar (`richTextValueOf`/`sanitizeHtml`), el evento `valueChanged {value, updatedFrom:'internal'}` que esperan las cadenas. | pendiente |
 | 2.3 | Barra por defecto razonable (`toolbarItems`): títulos, negrita/cursiva/subrayado, listas, enlace, línea, deshacer/rehacer, ver código. Sin fuentes/colores. UPLOAD_IMAGE solo si 2.1 dice que encaja. | pendiente |
 | 2.4 | `mateu-rich-text-field` queda como respaldo si el componente no carga (CDN caído): decidirlo en 2.2. Actualizar el comentario de `richtext.mjs` ("JET has no rich text editor" → Spectra sí). | pendiente |
 | 2.5 | Tests: `poc/test*.mjs` (la cobertura de `tooling-tests` exige líneas ≥98 %, funciones ≥95 %, ramas ≥85 %), `npm run bridge && npm run build && npm run copy` (bundles regenerados: lo comprueba `bundle-freshness`), e2e si cubre richText en Redwood. CHANGELOG en Unreleased. | pendiente |
 | 2.6 | PR → CI verde (`e2e`, `tooling-tests`, `frontend-lib`) → merge → release `gh release create v3.0-beta.N --target master` (notas en viñetas) → esperar "Build and publish" y Maven Central (`io.mateu:mateu-mvc/vaadin/redwood`). | pendiente |
+
+### Resultados del spike (2.1, 2026-11-01)
+
+Spike hecho inyectando el componente con JS en https://museums-rw.ec1.mateu.io/welcome:
+`require(['oj-sp/input-rich-text-2/loader'])` + `document.createElement`.
+
+- **Funciona (primer intento)**:
+  - pinta el HTML (h2, negrita, enlaces);
+  - es editable, con la barra por defecto: B/I/U/S, alineación, listas, sangría, quitar formato;
+  - el primer `require` tardó ~9 s (descarga de CKEditor).
+- **Eventos**:
+  - `rawValueChanged` en cada tecla;
+  - `valueChanged {value, updatedFrom:'internal'}` al perder el foco, con el HTML.
+  - Es el mismo contrato que `mateu-rich-text-field`: las cadenas no cambian.
+- **Normaliza enlaces**: añade `target="_blank" rel="noopener noreferrer"`. El saneado de Mateu debe dejar pasar `target`/`rel` en `<a>`, o se perderán al guardar.
+- **Imagen**: CKEditor `Base64UploadAdapter` → la imagen va inline en base64 dentro del HTML. **No usar** `uploadImage`: los medios van por la biblioteca (`[[media:id]]`).
+- **`toolbarItems`** se filtra por nombre de comando:
+  - `heading`, `bold`, `italic`, `underline`, `strikethrough`, `bulletedList`, `numberedList`;
+  - `link`, `horizontalLine`, `removeFormat`, `undo`, `redo`, `generateHtmlSupport` (ver código);
+  - `alignment`, `indent`, `outdent`, `uploadImage`; los menús: `heading`, `fontFamily`, `fontSize`.
+  - Cambiar `displayOptions` después de montado no cambió la barra.
+- **Problema abierto**: tras recargar la página, crear el elemento a mano **se queda en "being upgraded"**.
+  - Lo dice el busy context de `ojs/ojcontext`: no pinta, sin errores en consola.
+  - Pasa incluso repitiendo exactamente el primer intento.
+  - Hipótesis: cargarlo a mano, fuera de los `imports.components` de la página VB, deja alguna dependencia sin resolver.
+  - **Siguiente paso**: probarlo como lo usará Mateu, declarado en `main-start-page.json` (`"oj-sp-input-rich-text-2": {"path": "oj-sp/input-rich-text-2/loader"}`) y pintado desde la plantilla, con una build local del bundle Redwood (`npm run bridge && npm run build && npm run copy`) servida por un demo en local.
+  - Si sigue sin pintar de forma fiable, plan B: mantener `mateu-rich-text-field` y ampliarlo (títulos, enlace, línea) en vez de usar el de Spectra.
 
 ## Nivel 1 — content-hub: un formulario de bloques amable
 
