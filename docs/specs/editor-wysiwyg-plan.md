@@ -362,7 +362,7 @@ Los contenidos tienen español, inglés y alemán (`ItemForm` y sus secciones po
 | F3.1 | Elegir de dónde sale el modelo (catálogo de IA o config propia) y la clave en local | hecho: la clave del secreto del clúster `ec-anthropic` (la misma que usa ia-control-plane), opcional; modelo `content-hub.translation.model` (por defecto `claude-opus-5-5`) |
 | F3.2 | Servicio `Translator` (aplicación) + adaptador Spring AI, con tests del contrato (HTML y marcas intactos) | hecho (ba8944e9): `Translator` + `ClaudeTranslator` con el SDK oficial `anthropic-java` 3.2.0 (no Spring AI): esfuerzo bajo, esquema JSON escrito a mano (la derivación del SDK choca con el jsonschema-generator de Spring AI), fallback de servidor ante rechazos, cuerpo saneado y marcas `[[media:…]]` verificadas; tests |
 | F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | hecho (ba8944e9): acción en `ItemForm` (solo si hay clave); bloques y variantes de slot, pendiente |
-| F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | documentado en el manual del backoffice; falta probarlo en local tras el despliegue |
+| F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | hecho en local (2026-11-01, sin navegador: la acción del formulario): «bienvenida» traducida a en y de con el formato (`<b>`) y la marca `[[media:m1]]` intactos. Hizo falta devolver `List.of(this, Message…)`: un `Message` solo no devuelve el estado del formulario. Documentado en el manual del backoffice |
 
 ## N — Newsletter: recurrente, intro rica, aperturas y clics, suscripción
 

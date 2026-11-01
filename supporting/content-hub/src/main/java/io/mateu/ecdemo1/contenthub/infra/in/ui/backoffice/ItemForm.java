@@ -252,8 +252,12 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
                 return Message.error("No se ha podido traducir a «" + to + "»: " + e.getMessage());
             }
         }
-        return done.isEmpty() ? Message.warning("Todos los idiomas tienen ya título: vacía uno para traducirlo")
-                : Message.success("Traducido con IA a " + String.join(", ", done) + ". Revísalo y guarda.");
+        if (done.isEmpty()) {
+            return Message.warning("Todos los idiomas tienen ya título: vacía uno para traducirlo");
+        }
+        // the form with the translated fields (its state goes back only when the action returns it),
+        // and the message
+        return List.of(this, Message.success("Traducido con IA a " + String.join(", ", done) + ". Revísalo y guarda."));
     }
 
     io.mateu.ecdemo1.contenthub.domain.item.Translation text(String language) {
