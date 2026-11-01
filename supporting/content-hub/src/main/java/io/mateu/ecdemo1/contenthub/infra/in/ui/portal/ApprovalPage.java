@@ -3,20 +3,21 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 import io.mateu.ecdemo1.contenthub.application.usecases.RequestService;
 import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.annotations.Action;
-import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.Hidden;
-import io.mateu.uidl.annotations.Label;
-import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.annotations.Toolbar;
+import io.mateu.uidl.data.FieldDataType;
 import io.mateu.uidl.data.FieldStereotype;
+import io.mateu.uidl.data.FormField;
+import io.mateu.uidl.data.VerticalLayout;
 import io.mateu.uidl.data.Message;
 import io.mateu.uidl.fluent.Component;
+import io.mateu.uidl.interfaces.DetailContentSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.Callable;
+import java.util.List;
 
 /**
  * A request to decide: what was asked and its history, a comment for the employee, and Aprobar /
@@ -24,7 +25,7 @@ import java.util.concurrent.Callable;
  */
 @Service
 @Scope("prototype")
-public class ApprovalPage implements Identifiable {
+public class ApprovalPage implements Identifiable, DetailContentSupplier {
 
     @Hidden
     String id;
@@ -33,13 +34,7 @@ public class ApprovalPage implements Identifiable {
     @Hidden
     String html;
 
-    @Label("")
-    @Colspan(2)
-    Callable<Component> content = () -> Html.block(html == null ? "" : html);
-
-    @Label("Comentario para el empleado")
-    @Stereotype(FieldStereotype.textarea)
-    @Colspan(2)
+    @Hidden
     String comentario;
 
     final PortalSupport portal;
@@ -93,8 +88,22 @@ public class ApprovalPage implements Identifiable {
         } catch (IllegalStateException e) {
             return Message.error(e.getMessage());
         }
-        return Message.success(approve ? (approval.hr() ? "Aprobada. Se le comunica al empleado."
-                : "Aprobada: pasa a RRHH.") : "Rechazada. Se le comunica al empleado.");
+        // the page again, now saying it is no longer pending (Aprobar twice would find no task)
+        load(id, httpRequest);
+        return List.of(this, Message.success(approve ? (approval.hr() ? "Aprobada. Se le comunica al empleado."
+                : "Aprobada: pasa a RRHH.") : "Rechazada. Se le comunica al empleado."));
+    }
+
+    /**
+     * The request and an editable comment: the listing opens this as its record's page, which Mateu
+     * draws read-only from the fields — the comment has to be a field the reader can type in.
+     */
+    @Override
+    public Component detailContent(HttpRequest httpRequest) {
+        return VerticalLayout.builder().fullWidth(true).content(List.of(
+                Html.block(html == null ? "" : html),
+                FormField.builder().id("comentario").label("Comentario para el empleado")
+                        .dataType(FieldDataType.string).stereotype(FieldStereotype.textarea).build())).build();
     }
 
     @Override

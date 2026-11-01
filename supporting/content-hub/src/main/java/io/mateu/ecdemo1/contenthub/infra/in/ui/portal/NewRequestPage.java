@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /** A new request: what, when, why. It goes to the reader's manager, then to HR. */
 @Service
@@ -50,7 +51,12 @@ public class NewRequestPage {
         }
         try {
             var r = requests.create(reader, tipo, desde, hasta == null ? desde : hasta, detalle);
-            return Message.success("Solicitud enviada a tu responsable. Síguela en «Mis solicitudes» (" + r.id() + ").");
+            // an empty form again, so a second click does not send the same request twice
+            tipo = RequestType.VACACIONES;
+            desde = null;
+            hasta = null;
+            detalle = null;
+            return List.of(this, Message.success("Solicitud enviada a tu responsable. Síguela en «Mis solicitudes» (" + r.id() + ")."));
         } catch (IllegalArgumentException e) {
             return Message.error(e.getMessage());
         }
