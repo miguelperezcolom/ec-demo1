@@ -1,5 +1,8 @@
 package io.mateu.ecdemo1.contenthub.infra.in.mcp;
 
+import io.mateu.ecdemo1.contenthub.domain.employee.Employee;
+import io.mateu.ecdemo1.contenthub.infra.in.ui.portal.People;
+
 import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
 import io.mateu.ecdemo1.contenthub.application.usecases.HtmlSanitizer;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
@@ -30,11 +33,21 @@ public class IntranetMcpTools {
     final Visibility visibility;
     final ReaderActions actions;
     final ContentQuestions questions;
+    final People people;
 
     public record Found(String id, String title, String type, String date, String summary, String link) {
     }
 
     public record Passage(String itemId, String title, String text, String link) {
+    }
+
+    /** A person as the directory shows them: work data only. */
+    public record Person(String id, String name, String jobTitle, String department, String hotel, String region,
+                         String email, String phone, String reportsTo, String link) {
+    }
+
+    /** A person's card: them, the chain of managers above them (nearest first) and who reports to them. */
+    public record PersonCard(Person person, List<Person> managers, List<Person> directReports, List<Person> team) {
     }
 
     public record ItemText(String id, String title, String date, String text, String link, boolean mustConfirm) {
@@ -51,6 +64,9 @@ public class IntranetMcpTools {
                 - buscar_contenido busca por palabras; leer_item da el texto completo de un item.
                 - confirmaciones_pendientes: lo que la persona debe confirmar haber leído y aún no ha confirmado.
                   Confirmar se hace en el portal, no desde el chat.
+                - Directorio de personas (organigrama): buscar_personas encuentra empleados por nombre, puesto,
+                  departamento, hotel o región ("jefe recepción tenerife"); ficha_persona da su ficha con su
+                  cadena de responsables y su equipo. Solo datos de trabajo; enlaza siempre la ficha.
                 """;
     }
 
@@ -85,6 +101,28 @@ public class IntranetMcpTools {
         return actions.pendingConfirmations(reader()).stream()
                 .map(i -> new Found(i.itemId(), i.title(), i.type(), Ui.day(i.publishAt()), i.summary(), Ui.itemLink(i.itemId())))
                 .toList();
+    }
+
+    @Tool(description = "Find people in the company directory by name, job title, department, hotel or region (all the words must match, accents ignored), e.g. 'jefe recepcion tenerife'")
+    public List<Person> buscar_personas(@ToolParam(description = "Words to look for") String texto) {
+        reader();
+        return people.search(texto).stream().limit(20).map(this::person).toList();
+    }
+
+    @Tool(description = "A person's directory card: their job, where they work, contact, the chain of managers above them and the people who report to them")
+    public PersonCard ficha_persona(@ToolParam(description = "The person's user id, as buscar_personas returns it") String id) {
+        reader();
+        return people.find(id).map(e -> new PersonCard(person(e), people.chainOf(e).stream().map(this::person).toList(),
+                        people.reportsOf(e.userId()).stream().map(this::person).toList(),
+                        people.teamOf(e).stream().map(this::person).toList()))
+                .orElse(null);
+    }
+
+    Person person(Employee e) {
+        var manager = e.managerId() == null ? null : people.find(e.managerId()).map(Employee::name).orElse(null);
+        return new Person(e.userId(), e.name(), people.jobTitle(e), people.department(e),
+                people.hotel(e).isEmpty() ? "Servicios centrales" : people.hotel(e), people.region(e), e.email(),
+                e.phone(), manager, People.link(e.userId()));
     }
 
     Reader reader() {
