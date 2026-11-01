@@ -206,9 +206,36 @@ El empleado pide algo desde la intranet (vacaciones, formación, material). La s
   - cómo expresar el timeout con escalado.
   - Ver `doc/src/content/docs/guias/procesos.md` y el `.ectask` de `e2e/workflow-agents`.
 
+**Resultado de F1.1 (investigación del motor, 2026-11-01):**
+
+- **Tarea humana**: un paso `type: USER_TASK` con `formId` (un `.ecform` con `requiredRoles` y `fields`) y `topic: forms`.
+  - Los valores enviados pasan a variables del proceso.
+  - Precedente en ec-demo1: `reset-demo.ec` (paso `confirm`, form `confirmar-reset-demo`) en `~/IdeaProjects/ec-definitions-demopage`.
+- **Asignar a una persona concreta**: `assignment: {assignee: "${manager}", candidateUsers, candidateGroups, dueDate…}`, **solo desde EventConductor 2.31**.
+  - Se resuelve al crear la tarea.
+  - El `assignee` se compara con el usuario autenticado, así que el `managerId` del directorio debe ser el login de Keycloak (lo es: los ids de usuario).
+  - Los `requiredRoles` del form siguen aplicando: el form de aprobación no debe exigir un rol que los responsables no tengan.
+  - Doc del motor: `eventconductor/doc/.../guides/human-tasks-assignment-and-escalation.md`.
+- **Escalado**: `escalation: [{after: PT48H, action: reassign|notify, to…}, {after: P5D, escalateTo: otro-paso}]`, también **solo desde 2.31**.
+  - En 2.27.1 solo hay `timeout` + `onTimeoutStepId`.
+- **Completar la tarea**: por **REST** del motor de formularios, `POST /forms/api/tasks/{id}/complete` con `{"values":{…}}`.
+  - Lo hace quien tiene la tarea; antes, `claim`.
+  - La bandeja se consulta con `GET /forms/api/tasks?scope=mine|candidate&businessKey=…`.
+  - No hay vía Kafka limpia para completar un form.
+- **Arrancar**: `process-creation-requested` en `upstream` por el outbox, como ya hace ec-demo1 (`ProcessRouter.java`: `outbox.appendToEngine(new ProcessCreationRequested(...))`).
+  - La business key, `solicitud:<id>`.
+- **Estado hacia fuera**:
+  - el topic `human-tasks` (CloudEvent `io.eventconductor.task.*`, cuerpo `HumanTaskChanged` con `businessKey`, `status`, `userId`…), que ya consume communication-service;
+  - para el resultado final, pasos `PUBLISH_EVENT` del propio proceso a un topic nuestro (`solicitudes`).
+  - `outbox` y `process-index` son internos del motor.
+- **Versión**: ec-demo1 fija **2.27.1** (`deploy/values/eventconductor.yaml`, poms de `integration/*`).
+  - **Para asignar al responsable y escalar hay que subir el motor a ≥ 2.31**: orquestador, formularios y reglas, y la dependencia de los workers.
+  - El motor de formularios aplica la migración V8 al arrancar.
+  - **Decisión del usuario pendiente**: subir el motor, o hacer F1 en 2.27.1 con visibilidad por rol (`requiredRoles`) + `timeout`, filtrando en la intranet "Por aprobar" por `managerId`.
+
 | # | Paso | Estado |
 |---|---|---|
-| F1.1 | Resolver las preguntas abiertas en el motor y en ec-definitions; cerrar el diseño aquí | pendiente |
+| F1.1 | Resolver las preguntas abiertas en el motor y en ec-definitions; cerrar el diseño aquí | hecho — ver «Resultado de F1.1»; falta decidir la versión del motor |
 | F1.2 | Proceso `solicitud-empleado` + formularios en ec-definitions (PR) | pendiente |
 | F1.3 | Content-hub: tipos de solicitud, "nueva solicitud", outbox de arranque, proyección de estados (inbox) | pendiente |
 | F1.4 | Portal: Mis solicitudes y Por aprobar (completar la tarea del responsable) | pendiente |
