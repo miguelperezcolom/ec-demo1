@@ -60,7 +60,7 @@ Rama: `feat/redwood-spectra-rich-text`.
 | 2.3 | Barra por defecto razonable (`toolbarItems`): títulos, negrita/cursiva/subrayado, listas, enlace, línea, deshacer/rehacer, ver código. Sin fuentes/colores. UPLOAD_IMAGE solo si 2.1 dice que encaja. | pendiente |
 | 2.4 | `mateu-rich-text-field` queda como respaldo si el componente no carga (CDN caído): decidirlo en 2.2. Actualizar el comentario de `richtext.mjs` ("JET has no rich text editor" → Spectra sí). | pendiente |
 | 2.5 | Tests: `poc/test*.mjs` (la cobertura de `tooling-tests` exige líneas ≥98 %, funciones ≥95 %, ramas ≥85 %), `npm run bridge && npm run build && npm run copy` (bundles regenerados: lo comprueba `bundle-freshness`), e2e si cubre richText en Redwood. CHANGELOG en Unreleased. | pendiente |
-| 2.6 | PR → CI verde (`e2e`, `tooling-tests`, `frontend-lib`) → merge → release `gh release create v3.0-beta.N --target master` (notas en viñetas) → esperar "Build and publish" y Maven Central (`io.mateu:mateu-mvc/vaadin/redwood`). | pendiente |
+| 2.6 | PR #985 abierto por el fork (2.2–2.5 hechos: `mateu-rich-text-field` monta `oj-sp-input-rich-text-2`, con su editor propio de respaldo). PR → CI verde (`e2e`, `tooling-tests`, `frontend-lib`) → merge → release `gh release create v3.0-beta.N --target master` (notas en viñetas) → esperar "Build and publish" y Maven Central (`io.mateu:mateu-mvc/vaadin/redwood`). | pendiente |
 
 ### Resultados del spike (2.1, 2026-11-01)
 
@@ -165,10 +165,10 @@ Pedido el 2026-11-01. Va **en paralelo** con el editor: el nivel 2 lo lleva otro
 | D4 | Content-hub: consumidor + `schema.sql` (`manager_id`, `phone`, `labels`) + `EmployeeDirectory` | hecho (b074c57e, 968c4cfc) |
 | D5 | Portal: "Personas" (buscador + ficha) en el menú de la intranet — `People`, `PeopleListing`, `PersonPage` | hecho (3fdd4b36), probado en local en Vaadin y Redwood |
 | D6 | Portal: organigrama (estructura + cadena de jefes) — `OrgChartPage` | hecho (3fdd4b36), probado en local en Vaadin y Redwood |
-| D7 | MCP: consulta de directorio para el chat | pendiente |
-| D8 | Desplegar en local (kind), probar en Vaadin y Redwood, actualizar manual/recorrido de la intranet | desplegado y probado en local; falta manual/recorrido |
+| D7 | MCP: consulta de directorio para el chat — `buscar_personas`, `ficha_persona` | hecho (570c72ea) |
+| D8 | Desplegar en local (kind), probar en Vaadin y Redwood, actualizar manual/recorrido de la intranet | desplegado y probado en local; manual del portal, arquitectura y topics actualizados (2e04674e); faltan capturas en el recorrido |
 
-**Bug de Mateu encontrado (D5)**: `SpaFallback.candidate` (backend/shared/core/.../infra/SpaFallback.java) trata como fichero cualquier ruta con un punto, así que un enlace directo o recargar `/intranet/personas/ana.perez` da 404 (en Vaadin y Redwood; navegando dentro de la app funciona). Arreglo propuesto: considerar fichero solo si la extensión del último segmento es de un recurso web conocido (js, css, map, png, svg, ico, json, woff2…); la navegación ya se distingue por `Accept: text/html`. Pendiente de decidir con el usuario (ec-demo1 `feat/content-hub` sigue en Mateu 3.0-alpha.430).
+**Bug de Mateu encontrado (D5)**: `SpaFallback.candidate` (backend/shared/core/.../infra/SpaFallback.java) trata como fichero cualquier ruta con un punto, así que un enlace directo o recargar `/intranet/personas/ana.perez` da 404 (en Vaadin y Redwood; navegando dentro de la app funciona). Arreglo propuesto: considerar fichero solo si la extensión del último segmento es de un recurso web conocido (js, css, map, png, svg, ico, json, woff2…); la navegación ya se distingue por `Accept: text/html`. Arreglado en Mateu PR #986 (el usuario lo pidió el 2026-11-01); sale en la próxima beta junto con #985 (editor de Spectra) y #987 (cursor de mano solo en filas que abren algo). Tras la release: `deploy-after-release.sh` sube ec-demo1 (merge de #270 + la beta nueva) y los demos.
 
 ## Cómo retomar
 
