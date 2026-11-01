@@ -42,7 +42,7 @@ public class DirectoryUpdates {
         }
         var attributes = attributes(message.attributes());
         var employee = new Employee(message.userId(), message.name(), message.email(),
-                message.enabled() == null || message.enabled(), attributes);
+                message.enabled() == null || message.enabled(), attributes, message.managerId(), message.phone());
         var old = directory.upsert(employee);
         var oldHash = old.map(Employee::hash).orElse(null);
         if (employee.enabled()) {

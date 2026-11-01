@@ -4,10 +4,10 @@ import java.util.Map;
 
 /**
  * What the users service says on employee-directory: an employee upserted (with their attributes as
- * catalogue codes) or removed.
+ * catalogue codes, and who they report to and their phone when the users service knows them) or removed.
  */
 public record EmployeeMessage(String eventId, String type, String userId, String name, String email, Boolean enabled,
-                              Map<String, String> attributes, String occurredAt) {
+                              String managerId, String phone, Map<String, String> attributes, String occurredAt) {
 
     public static final String UPSERTED = "EmployeeUpserted";
     public static final String REMOVED = "EmployeeRemoved";

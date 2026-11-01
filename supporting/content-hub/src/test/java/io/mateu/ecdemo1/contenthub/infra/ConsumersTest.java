@@ -155,7 +155,7 @@ class ConsumersTest {
 
     void employee(String id, String hotel, String region, String department, String language) {
         directory.apply(new EmployeeMessage(id + "-" + System.nanoTime(), EmployeeMessage.UPSERTED, id, id,
-                id + "@example.com", true, Map.of("hotel", hotel, "region", region, "department", department,
+                id + "@example.com", true, null, null, Map.of("hotel", hotel, "region", region, "department", department,
                 "language", language), null));
     }
 
@@ -188,6 +188,17 @@ class ConsumersTest {
 
     static final Audience RECEPCION_CANARIAS = Audience.allOf(Audience.in(Attribute.DEPARTMENT, "RECEPCION"),
             Audience.in(Attribute.REGION, "CANARIAS"));
+
+    @Test
+    void the_directory_keeps_who_each_one_reports_to_and_their_phone() {
+        directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "lucia", "Lucía",
+                "lucia@example.com", true, "carlos", "+34 600 000 103", Map.of("hotel", "TFS01", "language", "es"),
+                null));
+
+        var lucia = new PgEmployeeDirectory(jdbc).find("lucia").orElseThrow();
+        assertThat(lucia.managerId()).isEqualTo("carlos");
+        assertThat(lucia.phone()).isEqualTo("+34 600 000 103");
+    }
 
     @Test
     void an_item_whose_audience_the_reader_does_not_meet_appears_in_no_consumer() {

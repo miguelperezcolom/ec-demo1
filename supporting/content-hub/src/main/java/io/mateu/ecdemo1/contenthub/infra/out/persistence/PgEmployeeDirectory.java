@@ -22,17 +22,20 @@ public class PgEmployeeDirectory implements EmployeeDirectory {
     static final TypeReference<Map<Attribute, String>> ATTRIBUTES = new TypeReference<>() {
     };
 
+    static final String COLUMNS = "user_id, name, email, enabled, attributes, language, manager_id, phone";
+
     final JdbcTemplate jdbc;
 
     @Override
     public Optional<Employee> upsert(Employee e) {
         var old = find(e.userId());
-        jdbc.update("insert into ch_employee (user_id, name, email, enabled, attributes, language, hash, updated_at) "
-                        + "values (?, ?, ?, ?, ?::jsonb, ?, ?, ?) on conflict (user_id) do update set name = excluded.name, "
-                        + "email = excluded.email, enabled = excluded.enabled, attributes = excluded.attributes, "
-                        + "language = excluded.language, hash = excluded.hash, updated_at = excluded.updated_at",
+        jdbc.update("insert into ch_employee (user_id, name, email, enabled, attributes, language, hash, updated_at, "
+                        + "manager_id, phone) values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?) on conflict (user_id) do update "
+                        + "set name = excluded.name, email = excluded.email, enabled = excluded.enabled, "
+                        + "attributes = excluded.attributes, language = excluded.language, hash = excluded.hash, "
+                        + "updated_at = excluded.updated_at, manager_id = excluded.manager_id, phone = excluded.phone",
                 e.userId(), e.name(), e.email(), e.enabled(), Json.write(e.attributes().values()),
-                e.attributes().language(), e.hash(), Timestamp.from(Instant.now()));
+                e.attributes().language(), e.hash(), Timestamp.from(Instant.now()), e.managerId(), e.phone());
         return old;
     }
 
@@ -45,13 +48,13 @@ public class PgEmployeeDirectory implements EmployeeDirectory {
 
     @Override
     public Optional<Employee> find(String userId) {
-        return jdbc.query("select user_id, name, email, enabled, attributes, language from ch_employee where user_id = ?",
+        return jdbc.query("select " + COLUMNS + " from ch_employee where user_id = ?",
                 (rs, i) -> map(rs), userId).stream().findFirst();
     }
 
     @Override
     public List<Employee> all() {
-        return jdbc.query("select user_id, name, email, enabled, attributes, language from ch_employee order by user_id",
+        return jdbc.query("select " + COLUMNS + " from ch_employee order by user_id",
                 (rs, i) -> map(rs));
     }
 
@@ -63,6 +66,7 @@ public class PgEmployeeDirectory implements EmployeeDirectory {
 
     static Employee map(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Employee(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4),
-                new EmployeeAttributes(Json.read(rs.getString(5), ATTRIBUTES), rs.getString(6)));
+                new EmployeeAttributes(Json.read(rs.getString(5), ATTRIBUTES), rs.getString(6)), rs.getString(7),
+                rs.getString(8));
     }
 }

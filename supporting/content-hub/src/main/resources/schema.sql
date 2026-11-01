@@ -21,6 +21,9 @@ create table if not exists ch_media (
 create table if not exists ch_employee (
     user_id text primary key, name text, email text, enabled boolean, attributes jsonb, language text,
     hash text, updated_at timestamptz);
+-- The directory's org chart and cards: who each one reports to, their work phone (added later).
+alter table ch_employee add column if not exists manager_id text;
+alter table ch_employee add column if not exists phone text;
 create table if not exists ch_profile (hash text primary key, attributes jsonb not null, canonical text,
     first_seen timestamptz);
 
