@@ -170,6 +170,67 @@ Pedido el 2026-11-01. Va **en paralelo** con el editor: el nivel 2 lo lleva otro
 
 **Bug de Mateu encontrado (D5)**: `SpaFallback.candidate` (backend/shared/core/.../infra/SpaFallback.java) trata como fichero cualquier ruta con un punto, así que un enlace directo o recargar `/intranet/personas/ana.perez` da 404 (en Vaadin y Redwood; navegando dentro de la app funciona). Arreglo propuesto: considerar fichero solo si la extensión del último segmento es de un recurso web conocido (js, css, map, png, svg, ico, json, woff2…); la navegación ya se distingue por `Accept: text/html`. Arreglado en Mateu PR #986 (el usuario lo pidió el 2026-11-01); sale en la próxima beta junto con #985 (editor de Spectra) y #987 (cursor de mano solo en filas que abren algo). Tras la release: `deploy-after-release.sh` sube ec-demo1 (merge de #270 + la beta nueva) y los demos.
 
+---
+
+# Siguientes funcionalidades de la intranet (pedidas el 2026-11-01)
+
+El usuario eligió, de una lista de cinco (solicitudes, agenda de eventos, traducir con IA, analítica editorial, comentarios), la **1** y la **3**. Empiezan cuando estén hechos la release de Mateu (#985/#986/#987) y el despliegue.
+
+## F1 — Solicitudes con aprobación del responsable
+
+El empleado pide algo desde la intranet (vacaciones, formación, material). La solicitud va a **su responsable** (el `managerId` del directorio, D1–D4) y después a RRHH. El empleado sigue el estado en la intranet. Es un proceso de **EventConductor**: une la intranet con el motor de la plataforma.
+
+**Diseño (a validar contra el motor antes de escribir código):**
+- **Proceso** `solicitud-empleado` en **ec-definitions** (cambia por PR; los motores reimportan solos al mergear):
+  - arranque con los datos de la solicitud y el `managerId`;
+  - **tarea humana** del responsable (motor de formularios): aprobar o rechazar, con comentario;
+  - si aprueba, tarea de RRHH;
+  - aviso por email al empleado en cada cambio (communication-service: plantilla nueva);
+  - **timeout**: sin respuesta del responsable en N días, sube al responsable de su responsable (la cadena `People.chainOf`).
+- **Tipos** de solicitud como catálogo, con los campos de cada una: vacaciones (fechas), formación (curso, coste), material (qué, motivo).
+- **Intranet** (portal), nuevo menú **Mis solicitudes**:
+  - nueva solicitud (formulario por tipo);
+  - mis solicitudes con su estado;
+  - **Por aprobar**, solo para quien tiene colaboradores directos: aprobar o rechazar desde la intranet, que completa la tarea humana del motor.
+- **Integración**: comandos y estados por Kafka con outbox/inbox, como el resto de ec-demo1 (memoria "Prefer events over sync", "Commands over Kafka"). El content-hub manda "arranca proceso" y escucha los cambios de estado para su proyección "mis solicitudes".
+- **Preguntas abiertas** (mirarlas en `eventconductor` y `ec-definitions` antes de empezar):
+  - cómo se asigna una tarea humana a un usuario concreto (el responsable) y no a un rol;
+  - cómo completa la intranet esa tarea (API del motor de formularios o un comando por Kafka);
+  - cómo expresar el timeout con escalado.
+  - Ver `doc/src/content/docs/guias/procesos.md` y el `.ectask` de `e2e/workflow-agents`.
+
+| # | Paso | Estado |
+|---|---|---|
+| F1.1 | Resolver las preguntas abiertas en el motor y en ec-definitions; cerrar el diseño aquí | pendiente |
+| F1.2 | Proceso `solicitud-empleado` + formularios en ec-definitions (PR) | pendiente |
+| F1.3 | Content-hub: tipos de solicitud, "nueva solicitud", outbox de arranque, proyección de estados (inbox) | pendiente |
+| F1.4 | Portal: Mis solicitudes y Por aprobar (completar la tarea del responsable) | pendiente |
+| F1.5 | Emails de estado (communication-service) y escalado por timeout | pendiente |
+| F1.6 | Probar en local de punta a punta (Ana pide vacaciones → Carlos aprueba → RRHH → Ana ve "aprobada") y documentar | pendiente |
+
+## F3 — Traducir con IA en el editor
+
+Los contenidos tienen español, inglés y alemán (`ItemForm` y sus secciones por idioma), y cada traducción se escribe a mano. Un botón **Traducir con IA** en el editor rellenará los idiomas vacíos desde el idioma por defecto (título, resumen, cuerpo HTML conservando la marca y los `[[media:id]]`). El editor la **revisa** antes de enviarla a revisión o publicar.
+
+**Diseño:**
+- **Acción** en `ItemForm` (toolbar, `@Editors`):
+  - traduce solo los idiomas vacíos, o el elegido si ya tiene texto, pidiendo confirmación antes de sobrescribir;
+  - deja un aviso "Traducido con IA, revísalo" que se quita al editar.
+- **LLM**: el content-hub ya usa Spring AI. Usar el modelo del catálogo de IA (ec-ia-config / ia-control-plane) si el content-hub puede leerlo; si no, un `ChatClient` configurado con el modelo por defecto del despliegue.
+  - En local no hay clave salvo la de los agentes (memoria "Local agent LLM settings"): decidir cuál usar.
+- **Prompt**:
+  - traducción fiel, el HTML intacto (solo el texto de los nodos), sin traducir los `[[media:…]]` ni las URLs;
+  - el tono de comunicación interna;
+  - salida como JSON {title, summary, body} validado; si el HTML de vuelta no pasa el saneado, se rechaza.
+- También para los **bloques** de una página (título y contenido de cada `BlockForm`) y las **variantes de slot**.
+
+| # | Paso | Estado |
+|---|---|---|
+| F3.1 | Elegir de dónde sale el modelo (catálogo de IA o config propia) y la clave en local | pendiente |
+| F3.2 | Servicio `Translator` (aplicación) + adaptador Spring AI, con tests del contrato (HTML y marcas intactos) | pendiente |
+| F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | pendiente |
+| F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | pendiente |
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.
