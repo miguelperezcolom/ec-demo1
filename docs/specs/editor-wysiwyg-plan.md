@@ -231,6 +231,24 @@ Los contenidos tienen español, inglés y alemán (`ItemForm` y sus secciones po
 | F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | pendiente |
 | F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | pendiente |
 
+## N — Newsletter: recurrente, intro rica, aperturas y clics, suscripción
+
+Lo que hay:
+- Ediciones creadas a mano en *Editorial → Newsletter* (`NewsletterForm`/`NewsletterCrud`, `NewsletterService`, tabla `ch_newsletter`).
+- Cada una se programa; `ContentJobs.newsletters` (cada 30 s) envía las que vencen por el relay del clúster.
+- Cada grupo de empleados recibe solo lo que es para él.
+- En local todo va al email del usuario como un digest con una sección por grupo (config `content-hub.newsletter`).
+- Una edición enviada: "Boletín semanal", 2026-10-31.
+
+El usuario pidió las cuatro mejoras (2026-11-01):
+
+| # | Paso | Estado |
+|---|---|---|
+| N1 | **Recurrente**: una programación (p. ej. semanal, lunes 9:00) que crea sola el borrador de la edición con lo publicado desde la anterior (por tipo y sección, lo más reciente primero). El editor la revisa y la aprueba; sin aprobar no sale. Opción de envío automático sin revisión. | pendiente |
+| N2 | **Intro con el editor rico** (`richText`, el editor de Spectra en Redwood tras #985) y vista previa del email tal como sale. | pendiente |
+| N3 | **Aperturas y clics**. Píxel de apertura y enlaces con redirección firmada (HMAC como los medios, `/_intranet/n/{edición}/{destinatario}/…`), guardados por edición y destinatario. Informe por hotel y departamento en el backoffice. Los empleados ficticios de la demo van al email del usuario: contar por destinatario original. | pendiente |
+| N4 | **Suscripción personal**: en el portal (p. ej. "Mis preferencias") cada empleado elige las secciones que quiere recibir y la frecuencia, dentro de lo que su audiencia le deja ver. `NewsletterService` filtra por ella; el default es todo. | pendiente |
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.
