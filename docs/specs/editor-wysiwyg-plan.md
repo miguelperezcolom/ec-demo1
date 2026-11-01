@@ -249,6 +249,21 @@ El usuario pidió las cuatro mejoras (2026-11-01):
 | N3 | **Aperturas y clics**. Píxel de apertura y enlaces con redirección firmada (HMAC como los medios, `/_intranet/n/{edición}/{destinatario}/…`), guardados por edición y destinatario. Informe por hotel y departamento en el backoffice. Los empleados ficticios de la demo van al email del usuario: contar por destinatario original. | pendiente |
 | N4 | **Suscripción personal**: en el portal (p. ej. "Mis preferencias") cada empleado elige las secciones que quiere recibir y la frecuencia, dentro de lo que su audiencia le deja ver. `NewsletterService` filtra por ella; el default es todo. | pendiente |
 
+## H — Inicios por audiencia (home configurable)
+
+Hoy `portal/HomePage` es fijo e igual para todos: saludo, pendientes de confirmar, 5 avisos y 8 noticias. Lo que cambia por persona es solo qué contenidos salen (cada uno filtrado por su audiencia). El usuario pidió (2026-11-01) poder definir **un inicio distinto por usuario o grupo**, con los mismos criterios de audiencia que los contenidos.
+
+**Diseño**: reutilizar dos mecanismos que ya existen.
+- Las **páginas de bloques**: `ItemType.PAGE` con `Block`, cada bloque con su audiencia que estrecha la de la página.
+- La **elección de variante de los slots**: la de mayor prioridad cuya audiencia cumple el lector, con fallback.
+
+| # | Paso | Estado |
+|---|---|---|
+| H1 | **Un inicio es una página de bloques** con audiencia y **prioridad**: nuevo tipo `HOME` (o PAGE marcada como inicio), prioridad única entre inicios. Al lector le toca el de mayor prioridad cuya audiencia cumple; si no, el inicio por defecto. Cacheado por hash de perfil como el resto del portal (`ProjectionCache`). | pendiente |
+| H2 | **Bloques nuevos** para lo que pinta el inicio de hoy: `GREETING` (saludo), `PENDING` (pendientes de confirmar), `NOTICES` (últimos avisos, cuántos), `LATEST` (últimas noticias/páginas, cuántos, sección opcional), `SLOT` (una clave de slot). `PageRenderer` los pinta. El inicio actual pasa a ser el **inicio por defecto** hecho con bloques: sembrado en `ContentSeeder`, con la misma apariencia. | pendiente |
+| H3 | **Backoffice**: *Editorial → Inicios* (listado con audiencia y prioridad, edición con el formulario de bloques mejorado) y en **Ver como…** qué inicio le toca a cada perfil. Publicación por el flujo normal (revisión, publicar, retirar), versionada como cualquier contenido. | pendiente |
+| H4 | **Ejemplo en la seed**: un inicio "Recepción Canarias" con enlaces rápidos a turnos y al procedimiento de recepción, más un banner. Probar con Ana Pérez (TFS01, recepción) frente a un chef de Cancún, en Vaadin y Redwood; documentar en los manuales (portal y backoffice). | pendiente |
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.
