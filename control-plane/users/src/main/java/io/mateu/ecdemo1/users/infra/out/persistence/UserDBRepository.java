@@ -7,6 +7,7 @@ import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Name;
 import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Status;
 import io.mateu.ecdemo1.users.domain.aggregates.user.User;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.UserId;
 import io.mateu.ecdemo1.users.domain.aggregates.usergroup.vo.UserGroupId;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,8 @@ public class UserDBRepository implements UserRepository {
                 Status.valueOf(entity.status),
                 listFromJson(entity.groupsJson, String.class).stream().map(UserGroupId::new).toList(),
                 listFromJson(entity.rolesJson, String.class).stream().map(RoleId::new).toList(),
-                attributesOf(entity.attributesJson)
+                attributesOf(entity.attributesJson),
+                profileOf(entity.profileJson)
         );
     }
 
@@ -50,6 +52,14 @@ public class UserDBRepository implements UserRepository {
         return pojoFromJson(json, EmployeeAttributes.class);
     }
 
+    /** No column value (a row from before the profile existed) is no profile. */
+    static EmployeeProfile profileOf(String json) {
+        if (json == null || json.isBlank()) {
+            return EmployeeProfile.NONE;
+        }
+        return pojoFromJson(json, EmployeeProfile.class);
+    }
+
     private UserEntity toEntity(User user) {
         return new UserEntity(
                 user.getId().id(),
@@ -58,7 +68,8 @@ public class UserDBRepository implements UserRepository {
                 toJson(user.getGroups().stream().map(UserGroupId::id).toList()),
                 toJson(user.getRoles().stream().map(RoleId::id).toList()),
                 user.getStatus().name(),
-                toJson(user.getAttributes() == null ? EmployeeAttributes.NONE : user.getAttributes())
+                toJson(user.getAttributes() == null ? EmployeeAttributes.NONE : user.getAttributes()),
+                toJson(user.getProfile() == null ? EmployeeProfile.NONE : user.getProfile())
         );
     }
 

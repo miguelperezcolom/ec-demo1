@@ -15,10 +15,13 @@ import io.mateu.ecdemo1.users.application.usecases.user.create.CreateUserUseCase
 import io.mateu.ecdemo1.users.application.usecases.user.save.SaveUserCommand;
 import io.mateu.ecdemo1.users.application.usecases.user.save.SaveUserUseCase;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.ecdemo1.users.infra.in.ui.suppliers.RoleIdLabelSupplier;
 import io.mateu.ecdemo1.users.infra.in.ui.suppliers.RoleIdOptionsSupplier;
 import io.mateu.ecdemo1.users.infra.in.ui.suppliers.UserGroupIdLabelSupplier;
 import io.mateu.ecdemo1.users.infra.in.ui.suppliers.UserGroupIdOptionsSupplier;
+import io.mateu.ecdemo1.users.infra.in.ui.suppliers.UserIdLabelSupplier;
+import io.mateu.ecdemo1.users.infra.in.ui.suppliers.UserIdOptionsSupplier;
 import io.mateu.ecdemo1.users.infra.in.ui.suppliers.attributes.CompanyValues;
 import io.mateu.ecdemo1.users.infra.in.ui.suppliers.attributes.CountryValues;
 import io.mateu.ecdemo1.users.infra.in.ui.suppliers.attributes.DepartmentValues;
@@ -36,7 +39,7 @@ import java.util.List;
 /**
  * A user's form. Besides who they are and what they may do (groups, roles), the employee attributes
  * the content service's audiences are written over — each a lookup on the attribute catalogue, so a
- * value is always one of its codes.
+ * value is always one of its codes — and the directory's profile: who they report to, their work phone.
  */
 @Service
 @Scope("prototype")
@@ -86,20 +89,34 @@ public class UserViewModel implements CatalogueEditor<UserDto> {
     @Label("Idioma")
     String language;
 
+    @Section("Directorio")
+    @Lookup(search = UserIdOptionsSupplier.class, label = UserIdLabelSupplier.class)
+    @Label("Responsable")
+    @Help("A quién reporta: el organigrama de la intranet se dibuja con esto.")
+    String managerId;
+
+    @Label("Teléfono")
+    String phone;
+
     final CreateUserUseCase createUserUseCase;
     final SaveUserUseCase saveUserUseCase;
 
     public String create(HttpRequest httpRequest) {
-        createUserUseCase.handle(new CreateUserCommand(id, name, email, groups, roles, attributes()));
+        createUserUseCase.handle(new CreateUserCommand(id, name, email, groups, roles, attributes(), profile(),
+                false));
         return id;
     }
 
     public void save(HttpRequest httpRequest) {
-        saveUserUseCase.handle(new SaveUserCommand(id, name, email, groups, roles, attributes()));
+        saveUserUseCase.handle(new SaveUserCommand(id, name, email, groups, roles, attributes(), profile()));
     }
 
     private EmployeeAttributes attributes() {
         return new EmployeeAttributes(company, country, region, hotel, department, jobTitle, language);
+    }
+
+    private EmployeeProfile profile() {
+        return new EmployeeProfile(managerId, phone);
     }
 
     @Override
@@ -121,6 +138,9 @@ public class UserViewModel implements CatalogueEditor<UserDto> {
         department = attributes.department();
         jobTitle = attributes.jobTitle();
         language = attributes.language();
+        var profile = user.profile() == null ? EmployeeProfile.NONE : user.profile();
+        managerId = profile.managerId();
+        phone = profile.phone();
         return this;
     }
 

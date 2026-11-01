@@ -66,7 +66,7 @@ public class EmployeeDirectoryOutboxAppender {
     public void appendCurrent(User user) {
         append(EmployeeDirectoryMessage.upserted(UUID.randomUUID().toString(), user.getId().id(),
                 user.getName().name(), user.getEmail().email(), user.isEnabled(), user.getAttributes(),
-                clock.instant().toString()));
+                user.getProfile(), clock.instant().toString()));
     }
 
     void append(EmployeeDirectoryMessage message) {
@@ -77,11 +77,11 @@ public class EmployeeDirectoryOutboxAppender {
     static Optional<EmployeeDirectoryMessage> toMessage(DomainEvent event, String eventId, String occurredAt) {
         if (event instanceof UserCreated e) {
             return Optional.of(EmployeeDirectoryMessage.upserted(eventId, e.userId(), e.name(), e.email(),
-                    e.enabled(), e.attributes(), occurredAt));
+                    e.enabled(), e.attributes(), e.profile(), occurredAt));
         }
         if (event instanceof UserUpdated e) {
             return Optional.of(EmployeeDirectoryMessage.upserted(eventId, e.userId(), e.name(), e.email(),
-                    e.enabled(), e.attributes(), occurredAt));
+                    e.enabled(), e.attributes(), e.profile(), occurredAt));
         }
         if (event instanceof UserDeleted e) {
             return Optional.of(EmployeeDirectoryMessage.removed(eventId, e.userId(), occurredAt));

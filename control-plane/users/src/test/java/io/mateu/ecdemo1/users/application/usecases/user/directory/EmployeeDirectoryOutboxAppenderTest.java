@@ -6,6 +6,7 @@ import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserCreated;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserDeleted;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserUpdated;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.workflow.ddd.DomainEvent;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,20 @@ class EmployeeDirectoryOutboxAppenderTest {
         assertThat(attributes.get("department").asText()).isEqualTo("RECEPCION");
         assertThat(attributes.get("jobTitle").asText()).isEqualTo("RECEPCIONISTA");
         assertThat(attributes.get("language").asText()).isEqualTo("es");
+    }
+
+    @Test
+    void theManagerAndPhoneTravelBesideTheNameAndAreLeftOutWhenUnset() throws Exception {
+        var json = wire(new UserUpdated("ana", "Ana Pérez", "ana@example.com", true, ANA,
+                new EmployeeProfile("luis", "+34 600 000 101")));
+
+        assertThat(json.get("managerId").asText()).isEqualTo("luis");
+        assertThat(json.get("phone").asText()).isEqualTo("+34 600 000 101");
+        assertThat(json.get("attributes").has("managerId")).isFalse();
+
+        var without = wire(new UserCreated("x", "X", "x@example.com", true, ANA));
+        assertThat(without.has("managerId")).isFalse();
+        assertThat(without.has("phone")).isFalse();
     }
 
     @Test

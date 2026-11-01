@@ -40,7 +40,8 @@ public class CreateUserUseCase {
                 // never null: CreateUserCommand turns a missing list into an empty one
                 command.groupIds().stream().map(UserGroupId::new).toList(),
                 command.roleIds().stream().map(RoleId::new).toList(),
-                attributesResolver.resolve(command.attributes())
+                attributesResolver.resolve(command.attributes()),
+                command.profile()
         );
         repository.save(user);
         // Same transaction as the save: the "tell Keycloak" and "tell the directory" intents commit

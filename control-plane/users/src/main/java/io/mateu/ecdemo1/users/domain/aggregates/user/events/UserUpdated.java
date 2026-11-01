@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.users.domain.aggregates.user.events;
 
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.workflow.ddd.DomainEvent;
 
 /**
@@ -17,6 +18,10 @@ import io.mateu.workflow.ddd.DomainEvent;
  * are now, rather than patching what changed.
  */
 public record UserUpdated(String userId, String name, String email, boolean enabled,
-                          EmployeeAttributes attributes)
+                          EmployeeAttributes attributes, EmployeeProfile profile)
         implements DomainEvent {
+
+    public UserUpdated(String userId, String name, String email, boolean enabled, EmployeeAttributes attributes) {
+        this(userId, name, email, enabled, attributes, EmployeeProfile.NONE);
+    }
 }

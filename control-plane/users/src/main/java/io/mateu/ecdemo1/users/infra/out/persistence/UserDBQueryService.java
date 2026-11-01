@@ -41,7 +41,8 @@ public class UserDBQueryService implements UserQueryService {
                 entity.getEmail(),
                 listFromJson(entity.getGroupsJson(), String.class),
                 listFromJson(entity.getRolesJson(), String.class),
-                UserDBRepository.attributesOf(entity.getAttributesJson())
+                UserDBRepository.attributesOf(entity.getAttributesJson()),
+                UserDBRepository.profileOf(entity.getProfileJson())
         ));
     }
 

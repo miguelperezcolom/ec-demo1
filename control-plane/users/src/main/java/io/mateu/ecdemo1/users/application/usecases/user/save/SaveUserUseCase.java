@@ -27,7 +27,8 @@ public class SaveUserUseCase {
                 new Email(command.email()),
                 command.groups().stream().map(UserGroupId::new).toList(),
                 command.roles().stream().map(RoleId::new).toList(),
-                attributesResolver.resolve(command.attributes())
+                attributesResolver.resolve(command.attributes()),
+                command.profile()
                 );
         repository.save(user);
         // Same transaction as the save: the change to propagate commits with the user. See

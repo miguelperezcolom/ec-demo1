@@ -36,4 +36,9 @@ public class UserEntity {
     @Column(columnDefinition = "TEXT")
     String attributesJson;
 
+    /** Manager and work phone ({@code EmployeeProfile}), as JSON — the intranet directory's. Added after
+     *  the table existed, like the attributes: rows from before read as null, i.e. no profile. */
+    @Column(columnDefinition = "TEXT")
+    String profileJson;
+
 }

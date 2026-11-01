@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.users.domain.aggregates.user.events;
 
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.workflow.ddd.DomainEvent;
 
 /**
@@ -22,8 +23,15 @@ import io.mateu.workflow.ddd.DomainEvent;
  * for a different subscriber: the employee directory the content service keeps, which decides who
  * sees what from them. They do not go to the identity provider — the identity translation drops
  * them — because an audience is decided from the directory, not from the token.
+ *
+ * <p>{@code profile} (manager, work phone) is the directory's too, and is dropped on the way to the
+ * identity provider for the same reason.
  */
 public record UserCreated(String userId, String name, String email, boolean enabled,
-                          EmployeeAttributes attributes)
+                          EmployeeAttributes attributes, EmployeeProfile profile)
         implements DomainEvent {
+
+    public UserCreated(String userId, String name, String email, boolean enabled, EmployeeAttributes attributes) {
+        this(userId, name, email, enabled, attributes, EmployeeProfile.NONE);
+    }
 }

@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.users.application.usecases.user.directory;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 
 /**
  * What goes out on the {@code employee-directory} topic, keyed by the user id: the contract the
@@ -10,10 +11,14 @@ import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
  *
  * <pre>{@code
  * {"eventId":"…","type":"EmployeeUpserted","userId":"ana","name":"Ana Pérez","email":"ana@example.com",
- *  "enabled":true,"attributes":{"company":"…","country":"ES","region":"CANARIAS","hotel":"TFS01",
+ *  "enabled":true,"managerId":"luis","phone":"+34 600 000 101","attributes":{"company":"…","country":"ES","region":"CANARIAS","hotel":"TFS01",
  *  "department":"RECEPCION","jobTitle":"RECEPCIONISTA","language":"es"},"occurredAt":"2026-10-31T10:00:00Z"}
  * {"eventId":"…","type":"EmployeeRemoved","userId":"ana","occurredAt":"…"}
  * }</pre>
+ *
+ * <p>{@code managerId} (who they report to, a user id) and {@code phone} are for the intranet's
+ * directory — its org chart and a person's card — and were added later: both optional, left out when
+ * unset, so a consumer that does not know them reads the message as before.
  *
  * <p>An upsert carries the employee in full, not what changed: a consumer replaces its copy, so a
  * redelivery or a snapshot converges on the same state. A disabled user is still an upsert, with
@@ -24,13 +29,16 @@ import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
  * and renaming a field in the domain must not silently rename it on the wire.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({"eventId", "type", "userId", "name", "email", "enabled", "attributes", "occurredAt"})
+@JsonPropertyOrder({"eventId", "type", "userId", "name", "email", "enabled", "managerId", "phone", "attributes",
+        "occurredAt"})
 public record EmployeeDirectoryMessage(String eventId,
                                        String type,
                                        String userId,
                                        String name,
                                        String email,
                                        Boolean enabled,
+                                       String managerId,
+                                       String phone,
                                        Attributes attributes,
                                        String occurredAt) {
 
@@ -52,12 +60,14 @@ public record EmployeeDirectoryMessage(String eventId,
 
     public static EmployeeDirectoryMessage upserted(String eventId, String userId, String name, String email,
                                                     boolean enabled, EmployeeAttributes attributes,
-                                                    String occurredAt) {
-        return new EmployeeDirectoryMessage(eventId, UPSERTED, userId, name, email, enabled,
-                Attributes.of(attributes), occurredAt);
+                                                    EmployeeProfile profile, String occurredAt) {
+        var p = profile == null ? EmployeeProfile.NONE : profile;
+        return new EmployeeDirectoryMessage(eventId, UPSERTED, userId, name, email, enabled, p.managerId(),
+                p.phone(), Attributes.of(attributes), occurredAt);
     }
 
     public static EmployeeDirectoryMessage removed(String eventId, String userId, String occurredAt) {
-        return new EmployeeDirectoryMessage(eventId, REMOVED, userId, null, null, null, null, occurredAt);
+        return new EmployeeDirectoryMessage(eventId, REMOVED, userId, null, null, null, null, null, null,
+                occurredAt);
     }
 }

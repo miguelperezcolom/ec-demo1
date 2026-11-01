@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.users.application.out.AttributeValueRepository;
 import io.mateu.ecdemo1.users.application.out.PermissionRepository;
 import io.mateu.ecdemo1.users.application.out.RoleRepository;
 import io.mateu.ecdemo1.users.application.query.UserQueryService;
+import io.mateu.ecdemo1.users.application.query.dto.UserDto;
 import io.mateu.ecdemo1.users.application.usecases.attributevalue.create.CreateAttributeValueCommand;
 import io.mateu.ecdemo1.users.application.usecases.attributevalue.create.CreateAttributeValueUseCase;
 import io.mateu.ecdemo1.users.application.usecases.permission.create.CreatePermissionCommand;
@@ -19,6 +20,7 @@ import io.mateu.ecdemo1.users.domain.aggregates.attributevalue.vo.AttributeValue
 import io.mateu.ecdemo1.users.domain.aggregates.permission.vo.Scope;
 import io.mateu.ecdemo1.users.domain.aggregates.role.vo.RoleId;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +30,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static io.mateu.ecdemo1.users.domain.aggregates.attributevalue.vo.Attribute.COMPANY;
 import static io.mateu.ecdemo1.users.domain.aggregates.attributevalue.vo.Attribute.COUNTRY;
@@ -47,6 +51,13 @@ import static io.mateu.ecdemo1.users.domain.aggregates.attributevalue.vo.Attribu
  * restarting brings it back; turn the seed off ({@code users.demo-seed.enabled=false}) where that is
  * not wanted.
  *
+ * <p>The employees also get a directory profile — who they report to, a made-up work phone — so the
+ * intranet has an org chart to draw: the staff of a department report to its head at that hotel (or to
+ * the director, where the department has no head), heads and the central services to the director of
+ * their hotel or to the general manager, the directors to the general manager. A seeded user that
+ * exists without a profile (created before profiles existed) is given one; one that has a profile is
+ * left alone.
+ *
  * <p>Users go through the ordinary create use case, so they reach Keycloak and the employee directory
  * like any other — but without the set-password email: their addresses are at example.com. They are
  * created with no password, so they cannot sign in until someone sets one in Keycloak.
@@ -61,6 +72,8 @@ public class DemoDirectorySeeder {
 
     static final String HOTELS_COMPANY = "RIUDEMO_HOTELES";
     static final String CENTRAL_COMPANY = "RIUDEMO_CENTRAL";
+    /** The head of the org chart: reports to nobody. */
+    static final String GENERAL_MANAGER = "rosa.camps";
 
     record CatalogueEntry(Attribute attribute, String code, String label, String country, String region) {
         static CatalogueEntry of(Attribute attribute, String code, String label) {
@@ -127,6 +140,7 @@ public class DemoDirectorySeeder {
             CatalogueEntry.of(JOB_TITLE, "CAMARERA_PISOS", "Camarera de pisos"),
             CatalogueEntry.of(JOB_TITLE, "CHEF", "Chef"),
             CatalogueEntry.of(JOB_TITLE, "DIRECTOR_HOTEL", "Director de hotel"),
+            CatalogueEntry.of(JOB_TITLE, "DIRECTOR_GENERAL", "Director general"),
             CatalogueEntry.of(JOB_TITLE, "TECNICO_MANTENIMIENTO", "Técnico de mantenimiento"),
             CatalogueEntry.of(JOB_TITLE, "COMERCIAL", "Comercial"),
             CatalogueEntry.of(JOB_TITLE, "TECNICO_RRHH", "Técnico RRHH"),
@@ -189,7 +203,9 @@ public class DemoDirectorySeeder {
             Employee.at("CUN01", "gabriela.cruz", "Gabriela Cruz", "PISOS", "GOBERNANTA", "es"),
             Employee.at("CUN01", "emily.johnson", "Emily Johnson", "COMERCIAL", "COMERCIAL", "en"),
             Employee.at("CUN01", "luis.hernandez", "Luis Hernández", "MANTENIMIENTO", "TECNICO_MANTENIMIENTO", "es"),
-            // Servicios centrales (Palma), no hotel
+            Employee.at("CUN01", "ricardo.flores", "Ricardo Flores", "DIRECCION", "DIRECTOR_HOTEL", "es"),
+            // Servicios centrales (Palma), no hotel — the general manager heads the org chart
+            Employee.at(null, GENERAL_MANAGER, "Rosa Camps", "DIRECCION", "DIRECTOR_GENERAL", "es"),
             Employee.at(null, "isabel.torres", "Isabel Torres", "RRHH", "TECNICO_RRHH", "es"),
             Employee.at(null, "miguel.navarro", "Miguel Navarro", "IT", null, "es"),
             // The editorial team the content demo signs in as
@@ -197,10 +213,51 @@ public class DemoDirectorySeeder {
             new Employee("publicador", "Pablo Ortega", null, "DIRECCION", null, "es", List.of("content-publisher"))
     );
 
+    /** Who leads a department at a hotel: its staff report to them. */
+    static final Set<String> HEADS = Set.of("JEFE_RECEPCION", "GOBERNANTA", "CHEF");
+
+    /** Where each hotel's phones are: the prefix of its made-up numbers. */
+    static final Map<String, String> PHONE_PREFIX = Map.of("MRU01", "+230 5000 0", "CUN01", "+52 998 000 0");
+
+    /**
+     * Who an employee reports to, by the rule the class comment states; null for the general manager.
+     * The demo user (headquarters management) reports to the general manager too.
+     */
+    static String managerOf(String id, String hotel, String department, String jobTitle, List<Employee> all) {
+        if (GENERAL_MANAGER.equals(id)) {
+            return null;
+        }
+        if (hotel == null || "DIRECTOR_HOTEL".equals(jobTitle)) {
+            return GENERAL_MANAGER;
+        }
+        var director = all.stream()
+                .filter(e -> hotel.equals(e.hotel()) && "DIRECTOR_HOTEL".equals(e.jobTitle()))
+                .map(Employee::id).findFirst().orElse(GENERAL_MANAGER);
+        if (HEADS.contains(jobTitle)) {
+            return director;
+        }
+        return all.stream()
+                .filter(e -> hotel.equals(e.hotel()) && department != null && department.equals(e.department())
+                        && HEADS.contains(e.jobTitle()) && !e.id().equals(id))
+                .map(Employee::id).findFirst().orElse(director);
+    }
+
+    /** A made-up work phone, stable for each employee: its place in the seed list. */
+    static String phoneOf(Employee employee, List<Employee> all) {
+        var n = String.format("%02d", all.indexOf(employee) + 1);
+        return PHONE_PREFIX.getOrDefault(employee.hotel() == null ? "" : employee.hotel(), "+34 600 000 1") + n;
+    }
+
+    static EmployeeProfile profileOf(Employee employee) {
+        return new EmployeeProfile(managerOf(employee.id(), employee.hotel(), employee.department(),
+                employee.jobTitle(), EMPLOYEES), phoneOf(employee, EMPLOYEES));
+    }
+
     /** The realm's demo user: headquarters, management, Spanish — and content administrator. */
     static final String DEMO_USER = "demo";
     static final EmployeeAttributes DEMO_ATTRIBUTES =
             new EmployeeAttributes(CENTRAL_COMPANY, "ES", "BALEARES", null, "DIRECCION", null, "es");
+    static final EmployeeProfile DEMO_PROFILE = new EmployeeProfile(GENERAL_MANAGER, "+34 600 000 100");
 
     final AttributeValueRepository attributeValues;
     final PermissionRepository permissions;
@@ -262,11 +319,13 @@ public class DemoDirectorySeeder {
         }
         for (var employee : EMPLOYEES) {
             created += attempt("user " + employee.id(), () -> {
-                if (users.getById(employee.id()).isPresent()) {
-                    return false;
+                var existing = users.getById(employee.id());
+                if (existing.isPresent()) {
+                    return giveProfileIfMissing(existing.get(), profileOf(employee));
                 }
                 createUser.handle(new CreateUserCommand(employee.id(), employee.name(),
-                        employee.id() + "@example.com", List.of(), employee.roles(), employee.attributes(), true));
+                        employee.id() + "@example.com", List.of(), employee.roles(), employee.attributes(),
+                        profileOf(employee), true));
                 return true;
             });
         }
@@ -287,14 +346,15 @@ public class DemoDirectorySeeder {
         var existing = users.getById(DEMO_USER);
         if (existing.isEmpty()) {
             createUser.handle(new CreateUserCommand(DEMO_USER, "Demo User", "demo@mateu.io", List.of(),
-                    List.of(CONTENT_ADMIN), DEMO_ATTRIBUTES, true));
+                    List.of(CONTENT_ADMIN), DEMO_ATTRIBUTES, DEMO_PROFILE, true));
             return true;
         }
         var demo = existing.get();
         var noAttributes = demo.attributes() == null || EmployeeAttributes.NONE.equals(demo.attributes());
         var roleIds = new ArrayList<>(demo.roleIds() == null ? List.<String>of() : demo.roleIds());
         var noAdmin = !roleIds.contains(CONTENT_ADMIN);
-        if (!noAttributes && !noAdmin) {
+        var noProfile = demo.profile() == null || EmployeeProfile.NONE.equals(demo.profile());
+        if (!noAttributes && !noAdmin && !noProfile) {
             return false;
         }
         if (noAdmin) {
@@ -303,7 +363,17 @@ public class DemoDirectorySeeder {
         var email = demo.email() == null || demo.email().isBlank() ? "demo@mateu.io" : demo.email();
         var name = demo.name() == null || demo.name().isBlank() ? "Demo User" : demo.name();
         saveUser.handle(new SaveUserCommand(demo.id(), name, email, demo.groupIds(), roleIds,
-                noAttributes ? DEMO_ATTRIBUTES : demo.attributes()));
+                noAttributes ? DEMO_ATTRIBUTES : demo.attributes(), noProfile ? DEMO_PROFILE : demo.profile()));
+        return true;
+    }
+
+    /** A user seeded before profiles existed gets one; a profile someone set is left as it is. */
+    boolean giveProfileIfMissing(UserDto user, EmployeeProfile profile) {
+        if (user.profile() != null && !EmployeeProfile.NONE.equals(user.profile())) {
+            return false;
+        }
+        saveUser.handle(new SaveUserCommand(user.id(), user.name(), user.email(), user.groupIds(), user.roleIds(),
+                user.attributes(), profile));
         return true;
     }
 
