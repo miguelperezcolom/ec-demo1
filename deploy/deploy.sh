@@ -338,7 +338,7 @@ if [ "$WORKFLOW_AGENTS_ENABLED" = true ]; then
   )
 fi
 helm upgrade --install ec deploy/chart/eventconductor -n "$NS" \
-  -f deploy/values/eventconductor.yaml "${engine_args[@]}"
+  -f deploy/values/eventconductor.yaml ${engine_args[@]+"${engine_args[@]}"}  # empty-safe under set -u in bash 3.2 (macOS)
 
 echo "══ 4/6  Keycloak, shells, gateway, ingress, demo services, control plane ══"
 kubectl apply -f deploy/manifests/05-clusterissuer.yaml
