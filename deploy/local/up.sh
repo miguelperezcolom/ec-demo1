@@ -139,6 +139,12 @@ for path in sys.argv[1:]:
     open(path, 'w').write('\n---'.join(out))
 PY
 "$SED" -i "s#localhost:PORT#localhost:$PORT#g" "$TREE/deploy/manifests/40-ingress.yaml"
+# The demo's employees are made up: their mail (newsletter, request decisions) goes to one real mailbox,
+# MAIL_REDIRECT_TO in this machine's credentials file — never in git. Absent, the manifest's placeholder.
+MAIL_REDIRECT_TO="$(sed -n 's/^MAIL_REDIRECT_TO=//p' "$LOCAL_HOME/credentials.env" 2>/dev/null)"
+if [ -n "$MAIL_REDIRECT_TO" ]; then
+  "$SED" -i "s#newsletter-demo@example.com#$MAIL_REDIRECT_TO#" "$TREE/deploy/manifests/90-content-hub.yaml"
+fi
 # The gateway's other hosts: not in its manifest, their defaults (in the jar) are ec1's.
 "$SED" -i -E 's#^(\s*)- name: CONTROL_HOST$#\1- name: RW_CONSOLE_HOST\n\1  value: rw.localhost,rw-ws.localhost,rw-workspace.localhost\n\1- name: INTRANET_HOST\n\1  value: intranet.localhost\n\1- name: RW_INTRANET_HOST\n\1  value: rw-intranet.localhost\n\1- name: RW_CONTROL_HOST\n\1  value: rw-console.localhost\n\1- name: FRONT_OFFICE_HOST\n\1  value: front.localhost\n\1- name: CONTROL_HOST#' \
   "$TREE/deploy/manifests/35-gateway.yaml"
