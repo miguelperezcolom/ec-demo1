@@ -200,6 +200,9 @@ revisión).
   items que ve cada grupo. **Cada grupo recibe solo lo que puede ver**, en su idioma; un grupo que no ve
   ninguno de los items no recibe nada.
 - **Vista previa (primer grupo)**: el correo tal como saldría.
+- Los grupos respetan las **preferencias** de cada empleado (*Mis preferencias* en el portal): quien se ha
+  dado de baja no está en ninguno, y quien eligió secciones forma grupo aparte y solo recibe los items de
+  esas secciones.
 - **Programar**: se envía en la fecha indicada (vacía: ya), un correo por grupo, en menos de un minuto.
   Si un grupo falla se reintenta solo ese. Una edición enviada ya no se modifica.
 

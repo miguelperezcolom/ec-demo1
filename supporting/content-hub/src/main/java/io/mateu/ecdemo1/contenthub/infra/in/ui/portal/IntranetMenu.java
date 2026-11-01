@@ -45,4 +45,8 @@ public class IntranetMenu {
     @Menu
     @Label("Pendientes")
     PendingListing pendientes;
+
+    @Menu
+    @Label("Mis preferencias")
+    PreferencesPage preferencias;
 }

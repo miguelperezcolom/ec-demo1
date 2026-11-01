@@ -140,7 +140,8 @@ class ConsumersTest {
         slots = new SlotCommands(slotRepo, events);
         readerActions = new ReaderActions(visibility, favorites, acks, items, clock);
         newsletter = new NewsletterService(editions, employees, visibility, named,
-                (to, subject, html) -> mails.add(subject + " → " + to), clock);
+                (to, subject, html) -> mails.add(subject + " → " + to), clock,
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterPreferences(jdbc));
         Embeddings fake = (texts, query) -> texts.stream().map(ConsumersTest::vector).toList();
         questions = new ContentQuestions(index, fake, projection, clock);
         directory = new DirectoryUpdates(employees, projection, events);
@@ -368,6 +369,25 @@ class ConsumersTest {
     }
 
     @Test
+    void the_newsletter_respects_who_unsubscribed_and_who_wants_only_some_sections() {
+        var prefs = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterPreferences(jdbc);
+        var news = publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Para todos", "");
+        var hr = publish(ItemType.ARTICLE, "nominas", Audience.EVERYONE, "Nóminas de noviembre", "");
+        prefs.save("klaus", new io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference(false, java.util.Set.of()));
+        prefs.save("jonas", new io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference(true, java.util.Set.of("nominas")));
+        var edition = editions.find(newsletter.compose(PUBLISHER, "Boletín", "Hola", List.of(news, hr), Audience.EVERYONE)).orElseThrow();
+
+        var groups = newsletter.groups(edition);
+        assertThat(groups).noneMatch(g -> g.recipients().stream().anyMatch(e -> e.userId().equals("klaus")));
+        var jonas = groups.stream().filter(g -> g.recipients().stream().anyMatch(e -> e.userId().equals("jonas"))).findFirst().orElseThrow();
+        assertThat(newsletter.itemsFor(edition, jonas)).extracting(i -> i.itemId()).containsExactly(hr);
+        var ana = groups.stream().filter(g -> g.recipients().stream().anyMatch(e -> e.userId().equals("ana"))).findFirst().orElseThrow();
+        assertThat(newsletter.itemsFor(edition, ana)).extracting(i -> i.itemId()).containsExactly(news, hr);
+        prefs.save("klaus", io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference.DEFAULT);
+        prefs.save("jonas", io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference.DEFAULT);
+    }
+
+    @Test
     void redirected_the_newsletter_goes_as_one_digest_with_a_section_per_group() {
         var sent = new ArrayList<String>();
         var digest = new NewsletterService(editions, new PgEmployeeDirectory(jdbc), visibility,
@@ -381,7 +401,7 @@ class ConsumersTest {
             public boolean redirected() {
                 return true;
             }
-        }, clock);
+        }, clock, new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterPreferences(jdbc));
         var rc = publish(ItemType.ARTICLE, "noticias", RECEPCION_CANARIAS, "Solo recepción", "");
         var editionId = digest.compose(PUBLISHER, "Boletín", "Hola", List.of(rc), Audience.EVERYONE);
         digest.schedule(PUBLISHER, editionId, clock.instant());

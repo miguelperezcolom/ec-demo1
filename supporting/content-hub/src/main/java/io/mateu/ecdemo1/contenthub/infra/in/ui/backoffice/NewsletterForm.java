@@ -106,7 +106,7 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
         };
         var sent = e.sends().stream().collect(Collectors.toMap(s -> s.hash() + "|" + s.language(), s -> s));
         groups = newsletter.groups(e).stream().map(g -> {
-            var items = newsletter.itemsFor(e, g.profile());
+            var items = newsletter.itemsFor(e, g);
             var s = sent.get(g.hash() + "|" + g.language());
             return g.profile().canonical().replace(";", " · ") + " [" + g.language() + "] — " + g.recipients().size()
                     + " destinatario(s), " + items.size() + " item(s) visibles"
@@ -127,8 +127,8 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
         if (e == null) {
             return Html.block("");
         }
-        var first = newsletter.groups(e).stream().filter(g -> !newsletter.itemsFor(e, g.profile()).isEmpty()).findFirst();
-        return Html.block(first.map(g -> newsletter.render(e, newsletter.itemsFor(e, g.profile()), g.language()))
+        var first = newsletter.groups(e).stream().filter(g -> !newsletter.itemsFor(e, g).isEmpty()).findFirst();
+        return Html.block(first.map(g -> newsletter.render(e, newsletter.itemsFor(e, g), g.language()))
                 .orElse("<p>Ningún grupo vería ninguno de estos items.</p>"));
     }
 

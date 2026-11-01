@@ -25,6 +25,9 @@ create table if not exists ch_employee (
 alter table ch_employee add column if not exists manager_id text;
 alter table ch_employee add column if not exists phone text;
 alter table ch_employee add column if not exists labels jsonb;
+-- What each employee wants from the newsletter (no row: everything)
+create table if not exists ch_newsletter_pref (user_id text primary key, subscribed boolean not null,
+    sections text[] not null);
 -- The pages that are homes, in order: a reader's home is the first they can see.
 create table if not exists ch_home_page (position int primary key, item_id text not null);
 create table if not exists ch_profile (hash text primary key, attributes jsonb not null, canonical text,

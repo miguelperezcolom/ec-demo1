@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.contenthub.application.usecases;
 import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
 import io.mateu.ecdemo1.contenthub.application.out.EmployeeDirectory;
 import io.mateu.ecdemo1.contenthub.application.out.Mailer;
+import io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterRepository;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
 import io.mateu.ecdemo1.contenthub.application.security.EditorialPermission;
@@ -44,12 +45,22 @@ public class NewsletterService {
     final NamedAudiences namedAudiences;
     final Mailer mailer;
     final Clock clock;
+    final NewsletterPreferences preferences;
 
     @Value("${content-hub.portal-url:http://localhost:8800/intranet}")
     String portalUrl;
 
-    /** A group of recipients: everyone with the same profile who reads the same language. */
-    public record Group(String hash, String language, EmployeeAttributes profile, List<Employee> recipients) {
+    /**
+     * A group of recipients: everyone with the same profile who reads the same language and wants the
+     * same from the newsletter. {@code hash} names the group: the profile's hash, followed by the
+     * sections wanted when they are not all ({@code abc123~noticias,rrhh}).
+     */
+    public record Group(String hash, String language, EmployeeAttributes profile, List<Employee> recipients,
+                        NewsletterPreferences.Preference preference) {
+
+        public Group(String hash, String language, EmployeeAttributes profile, List<Employee> recipients) {
+            this(hash, language, profile, recipients, NewsletterPreferences.Preference.DEFAULT);
+        }
     }
 
     @Transactional
@@ -86,11 +97,21 @@ public class NewsletterService {
                     || !policy.admits(edition.audience(), e.attributes())) {
                 continue;
             }
-            var key = NewsletterEdition.groupKey(e.hash(), e.attributes().language());
-            byKey.computeIfAbsent(key, k -> new Group(e.hash(), e.attributes().language(), e.attributes(),
-                    new ArrayList<>())).recipients().add(e);
+            var preference = preferences.of(e.userId());
+            if (!preference.subscribed()) {
+                continue; // unsubscribed: nothing, whatever the edition
+            }
+            var hash = preference.key().isEmpty() ? e.hash() : e.hash() + "~" + preference.key();
+            var key = NewsletterEdition.groupKey(hash, e.attributes().language());
+            byKey.computeIfAbsent(key, k -> new Group(hash, e.attributes().language(), e.attributes(),
+                    new ArrayList<>(), preference)).recipients().add(e);
         }
         return List.copyOf(byKey.values());
+    }
+
+    /** The items of the edition a group gets: those its profile sees, of the sections it wants. */
+    public List<VisibleItem> itemsFor(NewsletterEdition edition, Group group) {
+        return itemsFor(edition, group.profile()).stream().filter(i -> group.preference().wants(i.sectionId())).toList();
     }
 
     /** The items of the edition a profile sees, in the edition's order and in its language. */
@@ -123,7 +144,7 @@ public class NewsletterService {
             if (edition.groupSent(group.hash(), group.language())) {
                 continue;
             }
-            var items = itemsFor(edition, group.profile());
+            var items = itemsFor(edition, group);
             if (items.isEmpty()) {
                 edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
                         group.recipients().size(), List.of(), clock.instant(), null));
@@ -164,7 +185,7 @@ public class NewsletterService {
             if (edition.groupSent(group.hash(), group.language())) {
                 continue;
             }
-            var items = itemsFor(edition, group.profile());
+            var items = itemsFor(edition, group);
             if (items.isEmpty()) {
                 edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
                         group.recipients().size(), List.of(), clock.instant(), null));

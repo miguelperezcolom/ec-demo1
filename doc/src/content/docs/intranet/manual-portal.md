@@ -1,6 +1,6 @@
 ---
 title: Manual del portal
-description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, personas y organigrama, favoritos, confirmar lectura y preguntar al chat.
+description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, personas y organigrama, favoritos, confirmar lectura, preferencias de la newsletter y preguntar al chat.
 ---
 
 La intranet está en la consola del plano de datos, en el menú **Intranet** (`https://ec1.mateu.io`, en
@@ -91,6 +91,16 @@ desactivados no aparecen. Quién reporta a quién y el teléfono los mantiene RR
 En un contenido, **Favorito** (en la barra de herramientas) lo añade a **Mis favoritos**; pulsarlo otra vez
 lo quita. Si un favorito deja de ser para ti (se retira, caduca o cambia su audiencia), desaparece de la
 lista; si vuelve a serlo, reaparece.
+
+## Mis preferencias
+
+*Mis preferencias* decide qué te llega por la **newsletter**:
+
+- **Recibir la newsletter**: desmárcalo y no te llegará ninguna edición.
+- **Solo de estas secciones**: elige las que te interesan; vacío, todas. Solo aparecen secciones con algo
+  que puedes ver.
+
+Nunca te llegará nada que no puedas ver en la intranet, elijas lo que elijas.
 
 ## Confirmar lectura
 
