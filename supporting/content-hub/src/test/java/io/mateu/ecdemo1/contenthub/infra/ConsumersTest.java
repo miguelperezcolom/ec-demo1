@@ -156,7 +156,7 @@ class ConsumersTest {
     void employee(String id, String hotel, String region, String department, String language) {
         directory.apply(new EmployeeMessage(id + "-" + System.nanoTime(), EmployeeMessage.UPSERTED, id, id,
                 id + "@example.com", true, null, null, Map.of("hotel", hotel, "region", region, "department", department,
-                "language", language), null));
+                "language", language), null, null));
     }
 
     static EmployeeAttributes profile(String hotel, String region, String department, String language) {
@@ -193,11 +193,13 @@ class ConsumersTest {
     void the_directory_keeps_who_each_one_reports_to_and_their_phone() {
         directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "lucia", "Lucía",
                 "lucia@example.com", true, "carlos", "+34 600 000 103", Map.of("hotel", "TFS01", "language", "es"),
-                null));
+                Map.of("hotel", "Riu Demo Tenerife"), null));
 
         var lucia = new PgEmployeeDirectory(jdbc).find("lucia").orElseThrow();
         assertThat(lucia.managerId()).isEqualTo("carlos");
         assertThat(lucia.phone()).isEqualTo("+34 600 000 103");
+        assertThat(lucia.label("hotel", "TFS01")).isEqualTo("Riu Demo Tenerife");
+        assertThat(lucia.label("department", "RECEPCION")).isEqualTo("RECEPCION");
     }
 
     @Test

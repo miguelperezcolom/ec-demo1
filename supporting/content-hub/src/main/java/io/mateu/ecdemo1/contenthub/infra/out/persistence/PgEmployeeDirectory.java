@@ -22,7 +22,10 @@ public class PgEmployeeDirectory implements EmployeeDirectory {
     static final TypeReference<Map<Attribute, String>> ATTRIBUTES = new TypeReference<>() {
     };
 
-    static final String COLUMNS = "user_id, name, email, enabled, attributes, language, manager_id, phone";
+    static final TypeReference<Map<String, String>> LABELS = new TypeReference<>() {
+    };
+
+    static final String COLUMNS = "user_id, name, email, enabled, attributes, language, manager_id, phone, labels";
 
     final JdbcTemplate jdbc;
 
@@ -30,12 +33,15 @@ public class PgEmployeeDirectory implements EmployeeDirectory {
     public Optional<Employee> upsert(Employee e) {
         var old = find(e.userId());
         jdbc.update("insert into ch_employee (user_id, name, email, enabled, attributes, language, hash, updated_at, "
-                        + "manager_id, phone) values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?) on conflict (user_id) do update "
+                        + "manager_id, phone, labels) values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?::jsonb) "
+                        + "on conflict (user_id) do update "
                         + "set name = excluded.name, email = excluded.email, enabled = excluded.enabled, "
                         + "attributes = excluded.attributes, language = excluded.language, hash = excluded.hash, "
-                        + "updated_at = excluded.updated_at, manager_id = excluded.manager_id, phone = excluded.phone",
+                        + "updated_at = excluded.updated_at, manager_id = excluded.manager_id, phone = excluded.phone, "
+                        + "labels = excluded.labels",
                 e.userId(), e.name(), e.email(), e.enabled(), Json.write(e.attributes().values()),
-                e.attributes().language(), e.hash(), Timestamp.from(Instant.now()), e.managerId(), e.phone());
+                e.attributes().language(), e.hash(), Timestamp.from(Instant.now()), e.managerId(), e.phone(),
+                Json.write(e.labels()));
         return old;
     }
 
@@ -67,6 +73,6 @@ public class PgEmployeeDirectory implements EmployeeDirectory {
     static Employee map(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Employee(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4),
                 new EmployeeAttributes(Json.read(rs.getString(5), ATTRIBUTES), rs.getString(6)), rs.getString(7),
-                rs.getString(8));
+                rs.getString(8), rs.getString(9) == null ? null : Json.read(rs.getString(9), LABELS));
     }
 }

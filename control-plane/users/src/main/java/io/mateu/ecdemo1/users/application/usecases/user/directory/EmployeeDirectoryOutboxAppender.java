@@ -3,6 +3,10 @@ package io.mateu.ecdemo1.users.application.usecases.user.directory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mateu.ecdemo1.messaging.Outbox;
+import io.mateu.ecdemo1.users.application.out.AttributeValueRepository;
+import io.mateu.ecdemo1.users.domain.aggregates.attributevalue.AttributeValue;
+import io.mateu.ecdemo1.users.domain.aggregates.attributevalue.vo.Attribute;
+import io.mateu.ecdemo1.users.domain.aggregates.attributevalue.vo.AttributeValueId;
 import io.mateu.ecdemo1.users.domain.aggregates.user.User;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserCreated;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserDeleted;
@@ -13,9 +17,12 @@ import org.springframework.stereotype.Service;
 
 import java.io.UncheckedIOException;
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * Appends a saved user's domain events to the outbox for the {@value #TOPIC} topic, as
@@ -40,15 +47,23 @@ public class EmployeeDirectoryOutboxAppender {
 
     private final Outbox outbox;
     private final Clock clock;
+    /** A catalogue code's label, or null: what the message's {@code labels} are made of. */
+    private final Function<AttributeValueId, String> labels;
 
     @Autowired
-    public EmployeeDirectoryOutboxAppender(Outbox outbox) {
-        this(outbox, Clock.systemUTC());
+    public EmployeeDirectoryOutboxAppender(Outbox outbox, AttributeValueRepository catalogue) {
+        this(outbox, Clock.systemUTC(), id -> catalogue.findById(id).map(AttributeValue::getLabel).orElse(null));
     }
 
-    EmployeeDirectoryOutboxAppender(Outbox outbox, Clock clock) {
+    /** Without a catalogue: messages go without labels. */
+    public EmployeeDirectoryOutboxAppender(Outbox outbox) {
+        this(outbox, Clock.systemUTC(), id -> null);
+    }
+
+    EmployeeDirectoryOutboxAppender(Outbox outbox, Clock clock, Function<AttributeValueId, String> labels) {
         this.outbox = outbox;
         this.clock = clock;
+        this.labels = labels;
     }
 
     public static String outboxKey(String userId) {
@@ -70,6 +85,7 @@ public class EmployeeDirectoryOutboxAppender {
     }
 
     void append(EmployeeDirectoryMessage message) {
+        message = message.withLabels(labelsOf(message.attributes()));
         outbox.append(TOPIC, outboxKey(message.userId()), message.type(), toJson(message), null);
     }
 
@@ -87,6 +103,31 @@ public class EmployeeDirectoryOutboxAppender {
             return Optional.of(EmployeeDirectoryMessage.removed(eventId, e.userId(), occurredAt));
         }
         return Optional.empty();
+    }
+
+    /** The labels of the codes an employee has, keyed like the attributes ({@code hotel}, {@code jobTitle}). */
+    Map<String, String> labelsOf(EmployeeDirectoryMessage.Attributes a) {
+        var out = new LinkedHashMap<String, String>();
+        if (a == null) {
+            return out;
+        }
+        put(out, "company", Attribute.COMPANY, a.company());
+        put(out, "country", Attribute.COUNTRY, a.country());
+        put(out, "region", Attribute.REGION, a.region());
+        put(out, "hotel", Attribute.HOTEL, a.hotel());
+        put(out, "department", Attribute.DEPARTMENT, a.department());
+        put(out, "jobTitle", Attribute.JOB_TITLE, a.jobTitle());
+        return out;
+    }
+
+    private void put(Map<String, String> out, String key, Attribute attribute, String code) {
+        if (code == null) {
+            return;
+        }
+        var label = labels.apply(AttributeValueId.of(attribute, code));
+        if (label != null && !label.isBlank()) {
+            out.put(key, label);
+        }
     }
 
     /** Compact JSON, UTF-8 on the wire (the Kafka transport encodes it). */

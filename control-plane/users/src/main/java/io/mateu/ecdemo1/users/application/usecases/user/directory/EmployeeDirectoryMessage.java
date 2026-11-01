@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.users.application.usecases.user.directory;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import java.util.Map;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 
@@ -20,6 +21,11 @@ import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
  * directory — its org chart and a person's card — and were added later: both optional, left out when
  * unset, so a consumer that does not know them reads the message as before.
  *
+ * <p>{@code labels} names the attribute codes as people read them ({@code "hotel":"Riu Demo Tenerife"},
+ * {@code "jobTitle":"Jefe de recepción"}), from the catalogue when the message is written: what the
+ * directory shows on a card, so the consumer needs no copy of the catalogue. Optional too; a label
+ * edited later reaches the consumer with the employee's next message or snapshot.
+ *
  * <p>An upsert carries the employee in full, not what changed: a consumer replaces its copy, so a
  * redelivery or a snapshot converges on the same state. A disabled user is still an upsert, with
  * {@code enabled} false — the person exists, and an audience may still want to know them. Absent
@@ -30,7 +36,7 @@ import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({"eventId", "type", "userId", "name", "email", "enabled", "managerId", "phone", "attributes",
-        "occurredAt"})
+        "labels", "occurredAt"})
 public record EmployeeDirectoryMessage(String eventId,
                                        String type,
                                        String userId,
@@ -40,6 +46,7 @@ public record EmployeeDirectoryMessage(String eventId,
                                        String managerId,
                                        String phone,
                                        Attributes attributes,
+                                       Map<String, String> labels,
                                        String occurredAt) {
 
     public static final String UPSERTED = "EmployeeUpserted";
@@ -63,11 +70,17 @@ public record EmployeeDirectoryMessage(String eventId,
                                                     EmployeeProfile profile, String occurredAt) {
         var p = profile == null ? EmployeeProfile.NONE : profile;
         return new EmployeeDirectoryMessage(eventId, UPSERTED, userId, name, email, enabled, p.managerId(),
-                p.phone(), Attributes.of(attributes), occurredAt);
+                p.phone(), Attributes.of(attributes), null, occurredAt);
     }
 
     public static EmployeeDirectoryMessage removed(String eventId, String userId, String occurredAt) {
-        return new EmployeeDirectoryMessage(eventId, REMOVED, userId, null, null, null, null, null, null,
+        return new EmployeeDirectoryMessage(eventId, REMOVED, userId, null, null, null, null, null, null, null,
                 occurredAt);
+    }
+
+    /** The same message, with the attribute codes' labels (left out when there are none). */
+    public EmployeeDirectoryMessage withLabels(Map<String, String> labels) {
+        return new EmployeeDirectoryMessage(eventId, type, userId, name, email, enabled, managerId, phone, attributes,
+                labels == null || labels.isEmpty() ? null : labels, occurredAt);
     }
 }

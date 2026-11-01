@@ -10,6 +10,9 @@ import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.workflow.ddd.DomainEvent;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** The {@code employee-directory} contract, as the content service reads it. */
@@ -57,6 +60,17 @@ class EmployeeDirectoryOutboxAppenderTest {
         var without = wire(new UserCreated("x", "X", "x@example.com", true, ANA));
         assertThat(without.has("managerId")).isFalse();
         assertThat(without.has("phone")).isFalse();
+    }
+
+    @Test
+    void theCodesLabelsComeFromTheCatalogueAndUnknownOnesAreLeftOut() {
+        var catalogue = Map.of("HOTEL:TFS01", "Riu Demo Tenerife", "JOB_TITLE:RECEPCIONISTA", "Recepcionista");
+        var appender = new EmployeeDirectoryOutboxAppender(null, Clock.systemUTC(), id -> catalogue.get(id.id()));
+        var message = EmployeeDirectoryOutboxAppender.toMessage(new UserCreated("ana", "Ana", "a@x", true, ANA),
+                "e-1", "now").orElseThrow();
+
+        assertThat(appender.labelsOf(message.attributes()))
+                .containsExactly(Map.entry("hotel", "Riu Demo Tenerife"), Map.entry("jobTitle", "Recepcionista"));
     }
 
     @Test

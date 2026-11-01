@@ -24,6 +24,7 @@ create table if not exists ch_employee (
 -- The directory's org chart and cards: who each one reports to, their work phone (added later).
 alter table ch_employee add column if not exists manager_id text;
 alter table ch_employee add column if not exists phone text;
+alter table ch_employee add column if not exists labels jsonb;
 create table if not exists ch_profile (hash text primary key, attributes jsonb not null, canonical text,
     first_seen timestamptz);
 
