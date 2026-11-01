@@ -40,6 +40,13 @@ modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 | **Bloques (solo páginas)** | Los bloques de una página (ver abajo) |
 | **Avisos** | Lo que conviene revisar antes de publicar: una audiencia que no cumple nadie, un bloque que nadie vería |
 
+**Traducir con IA** (en la barra del formulario) rellena los idiomas que aún no tienen título a partir
+del idioma por defecto: título, resumen y cuerpo, con el formato intacto y las marcas `[[media:…]]` en su
+sitio. Solo cambia el formulario: **revísalo y guarda**. Nada se publica sin pasar por el flujo de siempre.
+Para retraducir un idioma, vacía su título. Si una traducción pierde una marca de medio, no se aplica. La
+acción solo aparece si el despliegue tiene clave de IA (`ANTHROPIC_API_KEY`, del secreto `ec-anthropic`);
+el modelo se configura con `content-hub.translation.model`.
+
 Arriba del formulario, **Estado** y **Aplicado a los lectores**: tras publicar, «Aplicando la versión
 N…» hasta que la visibilidad está recalculada (unos segundos) y luego «Sí — versión N aplicada el …».
 

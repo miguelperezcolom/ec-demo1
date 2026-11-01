@@ -140,15 +140,18 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     final AudienceCommands audienceCommands;
     final NamedAudiences namedAudiences;
     final Readers readers;
+    final io.mateu.ecdemo1.contenthub.application.out.Translator translator;
 
     public ItemForm(ItemCommands commands, ItemRepository items, ContentIndex index, AudienceCommands audienceCommands,
-                    NamedAudiences namedAudiences, Readers readers) {
+                    NamedAudiences namedAudiences, Readers readers,
+                    io.mateu.ecdemo1.contenthub.application.out.Translator translator) {
         this.commands = commands;
         this.items = items;
         this.index = index;
         this.audienceCommands = audienceCommands;
         this.namedAudiences = namedAudiences;
         this.readers = readers;
+        this.translator = translator;
     }
 
     public ItemForm load(Item item) {
@@ -224,6 +227,51 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         commands.edit(readers.of(httpRequest), id, content());
     }
 
+    /**
+     * Fills the languages that have no title yet from the default language's text, with the model —
+     * in the form only: the editor reviews it and saves (nothing is saved or published from here).
+     */
+    @Toolbar
+    @Action
+    public Object traducirConIA(HttpRequest httpRequest) {
+        readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
+        var from = defaultLanguage == null ? "es" : defaultLanguage;
+        var source = text(from);
+        if (source.title().isBlank()) {
+            return Message.warning("Escribe primero el título en el idioma por defecto (" + from + ")");
+        }
+        var done = new java.util.ArrayList<String>();
+        for (var to : List.of("es", "en", "de")) {
+            if (to.equals(from) || !text(to).title().isBlank()) {
+                continue;
+            }
+            try {
+                set(to, translator.translate(source, from, to));
+                done.add(to);
+            } catch (RuntimeException e) {
+                return Message.error("No se ha podido traducir a «" + to + "»: " + e.getMessage());
+            }
+        }
+        return done.isEmpty() ? Message.warning("Todos los idiomas tienen ya título: vacía uno para traducirlo")
+                : Message.success("Traducido con IA a " + String.join(", ", done) + ". Revísalo y guarda.");
+    }
+
+    io.mateu.ecdemo1.contenthub.domain.item.Translation text(String language) {
+        return switch (language) {
+            case "en" -> new io.mateu.ecdemo1.contenthub.domain.item.Translation(titleEn, summaryEn, bodyEn);
+            case "de" -> new io.mateu.ecdemo1.contenthub.domain.item.Translation(titleDe, summaryDe, bodyDe);
+            default -> new io.mateu.ecdemo1.contenthub.domain.item.Translation(titleEs, summaryEs, bodyEs);
+        };
+    }
+
+    void set(String language, io.mateu.ecdemo1.contenthub.domain.item.Translation t) {
+        switch (language) {
+            case "en" -> { titleEn = t.title(); summaryEn = t.summary(); bodyEn = t.body(); }
+            case "de" -> { titleDe = t.title(); summaryDe = t.summary(); bodyDe = t.body(); }
+            default -> { titleEs = t.title(); summaryEs = t.summary(); bodyEs = t.body(); }
+        }
+    }
+
     @Toolbar
     @Action
     public Object enviarARevision(HttpRequest httpRequest) {
@@ -259,6 +307,9 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
 
     @Override
     public boolean isHidden(String fieldName, HttpRequest httpRequest) {
+        if ("traducirConIA".equals(fieldName)) {
+            return !translator.available();
+        }
         if (id == null) {
             return List.of("enviarARevision", "publicar", "rechazar", "retirar").contains(fieldName);
         }

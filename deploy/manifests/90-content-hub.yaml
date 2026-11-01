@@ -92,6 +92,14 @@ spec:
               value: https://auth.ec1.mateu.io/realms/ec-demo1
             - name: KEYCLOAK_JWKS_URI
               value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+            # «Traducir con IA» in the editor: the same key the IA control plane uses. Optional —
+            # without it the editor does not offer the action.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ec-anthropic
+                  key: ANTHROPIC_API_KEY
+                  optional: true
           ports:
             - { name: http, containerPort: 8135 }
           securityContext:
