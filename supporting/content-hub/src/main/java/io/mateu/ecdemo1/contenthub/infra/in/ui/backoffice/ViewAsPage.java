@@ -66,6 +66,7 @@ public class ViewAsPage implements OptionsSupplier {
     final NavigationRepository navigation;
     final Visibility visibility;
     final Readers readers;
+    final io.mateu.ecdemo1.contenthub.application.out.HomePages homes;
 
     // Final, like the dependencies above: a non-final field is form state to Mateu, and was drawn as
     // a "Portal url" input.
@@ -73,6 +74,7 @@ public class ViewAsPage implements OptionsSupplier {
 
     public ViewAsPage(EmployeeDirectory directory, AudienceCommands audiences, NamedAudienceRepository namedAudiences,
                       NavigationRepository navigation, Visibility visibility, Readers readers,
+                      io.mateu.ecdemo1.contenthub.application.out.HomePages homes,
                       @Value("${content-hub.portal-url:http://ec1.localhost:8800/intranet}") String portalUrl) {
         this.directory = directory;
         this.audiences = audiences;
@@ -80,6 +82,7 @@ public class ViewAsPage implements OptionsSupplier {
         this.navigation = navigation;
         this.visibility = visibility;
         this.readers = readers;
+        this.homes = homes;
         this.portalUrl = portalUrl;
     }
 
@@ -110,8 +113,13 @@ public class ViewAsPage implements OptionsSupplier {
                 .map(s -> "  ".repeat(nav.ancestors(s.id()).size()) + "• " + Ui.esc(s.name(attrs.language())))
                 .reduce("", (a, b) -> a + b + "<br/>");
         var items = visibility.visibles(attrs, ContentQuery.latest(30));
+        // the home this profile gets: the first page of Configuración → Inicio it can see
+        var home = homes.pageIds().stream().map(id -> visibility.item(attrs, id)).flatMap(java.util.Optional::stream)
+                .findFirst().map(i -> "<a href=\"" + Ui.itemLink(i.itemId()) + "\">" + Ui.esc(i.title()) + "</a>")
+                .orElse("el inicio por defecto");
         return Html.block("<p><b>Perfil:</b> " + Ui.esc(attrs.canonical().replace(";", " · ")) + " · idioma "
                 + attrs.language() + " · hash <code>" + attrs.hash() + "</code></p>"
+                + "<p><b>Su inicio:</b> " + home + "</p>"
                 + "<div style=\"display:grid;grid-template-columns:1fr 2fr;gap:1rem\">"
                 + Ui.card("<h3 style=\"margin-top:0\">Menú</h3>" + (menu.isEmpty() ? "<i>sin secciones</i>" : menu))
                 + Ui.card("<h3 style=\"margin-top:0\">Contenido visible (" + items.total() + ")</h3>"

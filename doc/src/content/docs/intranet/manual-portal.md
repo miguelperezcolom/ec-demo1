@@ -24,6 +24,9 @@ que ves cambia en unos segundos.
 
 Cada título abre el contenido.
 
+Ese es el inicio **por defecto**. Tu empresa puede haber preparado un inicio para tu grupo (por ejemplo,
+para recepción en Canarias, con tus turnos y enlaces a mano): si es así, al entrar verás ese en su lugar.
+
 ## Noticias, avisos y documentos
 
 | Menú | Qué lista |

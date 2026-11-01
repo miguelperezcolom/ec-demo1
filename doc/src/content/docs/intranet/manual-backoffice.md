@@ -66,6 +66,13 @@ El mismo en items, audiencias con nombre y newsletter:
 | **Listado automático** | Los últimos items visibles de una sección (o de todas); *Cuántos* |
 | **Enlaces rápidos** | Una línea por enlace: `Texto \| URL` |
 | **Medio** | Un fichero o vídeo de la biblioteca, elegido de una lista con su título y tipo |
+| **Saludo** | «Hola, …» con el nombre de quien lo lee |
+| **Pendientes de confirmar** | Lo que el lector debe confirmar y no ha confirmado (nada, si no hay) |
+| **Últimos avisos** | Los últimos avisos que el lector puede ver; *Cuántos* |
+| **Últimas noticias** | Las últimas noticias y páginas que el lector puede ver, de una sección o de todas; *Cuántos* |
+
+Los cuatro últimos sirven para montar **inicios** (ver [Inicios por audiencia](#inicios-por-audiencia)),
+pero valen en cualquier página.
 
 Al elegir el **tipo** solo se ven los campos que ese tipo usa (un bloque HTML, su título y su contenido;
 un listado, su sección y cuántos), además de la audiencia.
@@ -146,6 +153,18 @@ visibilidad que usa el portal (no es una simulación). Elige uno:
 ese perfil —inicio, listados, secciones, búsqueda—, con una banda amarilla que lo recuerda, hasta que
 pulses **Salir de ver como** (o pase una hora sin usarlo). Mientras tanto no se registran tus lecturas ni
 puedes confirmar.
+
+## Inicios por audiencia
+
+Un inicio es **una página más**: se escribe con bloques, se revisa y se publica como cualquier contenido,
+con su audiencia de siempre. En la consola de control, *Intranet → Inicio* guarda la **lista ordenada** de
+páginas que hacen de inicio: a cada lector le toca **la primera de la lista que puede ver**; si no ve
+ninguna, el inicio por defecto (saludo, pendientes, avisos y noticias). Pon primero las más concretas
+(«Recepción Canarias») y después las generales. Solo admite páginas publicadas.
+
+*Ver como* dice qué inicio le toca a cada perfil. La demo trae «Inicio · Recepción Canarias» (audiencia:
+recepción y Canarias), primera de la lista: Ana Pérez (recepción, Tenerife) la ve; un chef de Cancún
+sigue con el inicio por defecto.
 
 ## Slots
 
