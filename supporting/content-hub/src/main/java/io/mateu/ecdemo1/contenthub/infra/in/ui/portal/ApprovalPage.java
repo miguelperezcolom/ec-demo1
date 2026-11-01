@@ -14,6 +14,7 @@ import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.DetailContentSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
+import io.mateu.uidl.interfaces.VisibilitySupplier;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +26,7 @@ import java.util.List;
  */
 @Service
 @Scope("prototype")
-public class ApprovalPage implements Identifiable, DetailContentSupplier {
+public class ApprovalPage implements Identifiable, DetailContentSupplier, VisibilitySupplier {
 
     @Hidden
     String id;
@@ -36,6 +37,9 @@ public class ApprovalPage implements Identifiable, DetailContentSupplier {
 
     @Hidden
     String comentario;
+    /** No task of the reader's any more: decided, or never theirs. */
+    @Hidden
+    boolean decided;
 
     final PortalSupport portal;
     final RequestService requests;
@@ -50,6 +54,7 @@ public class ApprovalPage implements Identifiable, DetailContentSupplier {
         this.id = taskId;
         var approval = approval(httpRequest);
         if (approval == null) {
+            decided = true;
             title = "Ya no está pendiente";
             html = "<p>Esa tarea ya está decidida, o no es tuya.</p>";
             return this;
@@ -100,10 +105,18 @@ public class ApprovalPage implements Identifiable, DetailContentSupplier {
      */
     @Override
     public Component detailContent(HttpRequest httpRequest) {
+        if (decided) {
+            return Html.block(html == null ? "" : html);
+        }
         return VerticalLayout.builder().fullWidth(true).content(List.of(
                 Html.block(html == null ? "" : html),
                 FormField.builder().id("comentario").label("Comentario para el empleado")
                         .dataType(FieldDataType.string).stereotype(FieldStereotype.textarea).build())).build();
+    }
+
+    @Override
+    public boolean isHidden(String fieldName, HttpRequest httpRequest) {
+        return decided && ("aprobar".equals(fieldName) || "rechazar".equals(fieldName));
     }
 
     @Override
