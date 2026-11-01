@@ -62,6 +62,13 @@ Rama: `feat/redwood-spectra-rich-text`.
 | 2.5 | Tests: `poc/test*.mjs` (la cobertura de `tooling-tests` exige líneas ≥98 %, funciones ≥95 %, ramas ≥85 %), `npm run bridge && npm run build && npm run copy` (bundles regenerados: lo comprueba `bundle-freshness`), e2e si cubre richText en Redwood. CHANGELOG en Unreleased. | hecho (#985) |
 | 2.6 | PR #985 abierto por el fork (2.2–2.5 hechos: `mateu-rich-text-field` monta `oj-sp-input-rich-text-2`, con su editor propio de respaldo). PR → CI verde (`e2e`, `tooling-tests`, `frontend-lib`) → merge → release `gh release create v3.0-beta.N --target master` (notas en viñetas) → esperar "Build and publish" y Maven Central (`io.mateu:mateu-mvc/vaadin/redwood`). | pendiente |
 
+### Notas del fork al cerrar #985
+
+- `data-oj-binding-provider="none"` es lo que deja pintar un elemento JET montado a mano dentro de una página VB.
+- La primera carga del editor tarda unos 9 s (descarga de CKEditor), solo una vez.
+- El toast de Redwood pinta formateado un mensaje que lleva etiquetas HTML: en e2e, comprobar en la petición, no en el toast.
+- `tests/renderer/**` corre también con el renderer Vaadin: una spec solo de Redwood debe saltarse fuera de `renderer-vb`.
+
 ### Resultados del spike (2.1, 2026-11-01)
 
 Spike hecho inyectando el componente con JS en https://museums-rw.ec1.mateu.io/welcome:
@@ -244,10 +251,10 @@ El usuario pidió las cuatro mejoras (2026-11-01):
 
 | # | Paso | Estado |
 |---|---|---|
-| N1 | **Recurrente**: una programación (p. ej. semanal, lunes 9:00) que crea sola el borrador de la edición con lo publicado desde la anterior (por tipo y sección, lo más reciente primero). El editor la revisa y la aprueba; sin aprobar no sale. Opción de envío automático sin revisión. | pendiente |
-| N2 | **Intro con el editor rico** (`richText`, el editor de Spectra en Redwood tras #985) y vista previa del email tal como sale. | pendiente |
+| N1 | **Recurrente**: una programación (p. ej. semanal, lunes 9:00) que crea sola el borrador de la edición con lo publicado desde la anterior (por tipo y sección, lo más reciente primero). El editor la revisa y la aprueba; sin aprobar no sale. Opción de envío automático sin revisión. | hecho (608ee80d): `WeeklyNewsletter`, cron en `ContentJobs`, «Preparar boletín de la semana» |
+| N2 | **Intro con el editor rico** (`richText`, el editor de Spectra en Redwood tras #985) y vista previa del email tal como sale. | hecho (608ee80d): la intro es `richText`; vista previa = la que ya había |
 | N3 | **Aperturas y clics**. Píxel de apertura y enlaces con redirección firmada (HMAC como los medios, `/_intranet/n/{edición}/{destinatario}/…`), guardados por edición y destinatario. Informe por hotel y departamento en el backoffice. Los empleados ficticios de la demo van al email del usuario: contar por destinatario original. | pendiente |
-| N4 | **Suscripción personal**: en el portal (p. ej. "Mis preferencias") cada empleado elige las secciones que quiere recibir y la frecuencia, dentro de lo que su audiencia le deja ver. `NewsletterService` filtra por ella; el default es todo. | pendiente |
+| N4 | **Suscripción personal**: en el portal (p. ej. "Mis preferencias") cada empleado elige las secciones que quiere recibir y la frecuencia, dentro de lo que su audiencia le deja ver. `NewsletterService` filtra por ella; el default es todo. | hecho (4f15abb1): `NewsletterPreferences`/`ch_newsletter_pref`, `PreferencesPage` (Hydratable) |
 
 ## H — Inicios por audiencia (home configurable)
 
