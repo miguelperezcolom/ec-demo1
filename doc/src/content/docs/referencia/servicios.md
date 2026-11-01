@@ -65,8 +65,8 @@ El puerto es el del Service; si el contenedor escucha en otro, va entre parénte
 | :--------- | :----- | -----: |
 | `content` | `supporting/content`, un CRUD (`/_content`, base de datos `content`) | 8104 |
 | `content-hub` | `supporting/content-hub`, la [intranet](/intranet/arquitectura/): portal en `/_intranet` (datos), trabajo editorial en su menú *Editorial* (permisos `content:*`), configuración en `/_content-hub` (control), MCP solo dentro del clúster; base de datos `cp-postgres:5432/content_hub` (pgvector) | 8135 |
-| `orchestrator`, `forms` | EventConductor (chart vendorizado; `orchestrator-standalone-app:2.27.1`, `forms-standalone-app:2.27.1`): `/_workflow`, `/_forms` y sus `-admin`. El orquestador incluye [Schedules](/operacion/programaciones/) | 8105, 8106 (contenedor 8080) |
-| `rules` | El motor de reglas de EventConductor (`rule-standalone-app:2.27.1`), del mismo chart. Configurado para importar `definitions/rules` de ec-definitions; ese catálogo pertenece al repositorio externo. Sin ruta en el gateway | 8107 (contenedor 8080) |
+| `orchestrator`, `forms` | EventConductor (chart vendorizado; `orchestrator-standalone-app:2.37.0`, `forms-standalone-app:2.37.0`): `/_workflow`, `/_forms` y sus `-admin`. El orquestador incluye [Schedules](/operacion/programaciones/) | 8105, 8106 (contenedor 8080) |
+| `rules` | El motor de reglas de EventConductor (`rule-standalone-app:2.37.0`), del mismo chart. Configurado para importar `definitions/rules` de ec-definitions; ese catálogo pertenece al repositorio externo. Sin ruta en el gateway | 8107 (contenedor 8080) |
 | `postgres`, `redpanda` | El PostgreSQL (`postgres:16`) y el Kafka (Redpanda `v24.1.7`) del motor (y de todos) | 5432, 19092 |
 | `cp-postgres` | `pgvector/pgvector:pg16`, la base de datos del plano de control de IA | 5432 |
 | `keycloak` | `quay.io/keycloak/keycloak:26.0`, en `auth.ec1.mateu.io` | 8080 |
