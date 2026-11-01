@@ -236,11 +236,11 @@ El empleado pide algo desde la intranet (vacaciones, formación, material). La s
 | # | Paso | Estado |
 |---|---|---|
 | F1.1 | Resolver las preguntas abiertas en el motor y en ec-definitions; cerrar el diseño aquí | hecho — ver «Resultado de F1.1»; falta decidir la versión del motor |
-| F1.2 | Proceso `solicitud-empleado` + formularios en ec-definitions (PR) | pendiente |
-| F1.3 | Content-hub: tipos de solicitud, "nueva solicitud", outbox de arranque, proyección de estados (inbox) | pendiente |
-| F1.4 | Portal: Mis solicitudes y Por aprobar (completar la tarea del responsable) | pendiente |
-| F1.5 | Emails de estado (communication-service) y escalado por timeout | pendiente |
-| F1.6 | Probar en local de punta a punta (Ana pide vacaciones → Carlos aprueba → RRHH → Ana ve "aprobada") y documentar | pendiente |
+| F1.2 | Proceso `solicitud-empleado` + formularios en ec-definitions (PR) | hecho: ec-definitions #43 (proceso + 2 forms, plugin a 2.37.0) y #44 (la descripción de un workflow va en un varchar(255): el validador no lo comprueba) |
+| F1.3 | Content-hub: tipos de solicitud, "nueva solicitud", outbox de arranque, proyección de estados (inbox) | hecho (bc9c4c42): `EmployeeRequest`, `RequestService`, `OutboxProcessStarter`, `RequestEventsListener`, `PgRequestRepository`, tabla `ch_request`; destino `solicitudes` en el orquestador |
+| F1.4 | Portal: Mis solicitudes y Por aprobar (completar la tarea del responsable) | hecho (bc9c4c42): Nueva solicitud, Mis solicitudes (con historial), Por aprobar (`FormsHumanTasks`: REST del motor de formularios con el token del usuario; reclama si es candidato) |
+| F1.5 | Emails de estado (communication-service) y escalado por timeout | hecho: correo al empleado al decidirse (Mailer, con la redirección local a `MAIL_REDIRECT_TO`); el escalado lo hace el motor (`escalation`, P2D) — no probado en vivo (dos días) |
+| F1.6 | Probar en local de punta a punta (Ana pide vacaciones → Carlos aprueba → RRHH → Ana ve "aprobada") y documentar | hecho en local (2026-11-01): Ana pide vacaciones → Carlos aprueba (tarea asignada) → Isabel (RRHH, candidata: reclama) aprueba → proceso COMPLETED, solicitud APROBADA con 3 pasos; y Ana pide material → Carlos rechaza → RECHAZADA, correo `status=sent` por Gmail. Usuarios de prueba con contraseña local (`TEST_USERS_PASSWORD` en el fichero de credenciales local). Documentado en el manual del portal, arquitectura y topics |
 
 ### Subida de EventConductor a 2.37
 

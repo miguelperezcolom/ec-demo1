@@ -1,6 +1,6 @@
 ---
 title: Manual del portal
-description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, personas y organigrama, favoritos, confirmar lectura, preferencias de la newsletter y preguntar al chat.
+description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, personas y organigrama, solicitudes, favoritos, confirmar lectura, preferencias de la newsletter y preguntar al chat.
 ---
 
 La intranet está en la consola del plano de datos, en el menú **Intranet** (`https://ec1.mateu.io`, en
@@ -91,6 +91,25 @@ desactivados no aparecen. Quién reporta a quién y el teléfono los mantiene RR
 En un contenido, **Favorito** (en la barra de herramientas) lo añade a **Mis favoritos**; pulsarlo otra vez
 lo quita. Si un favorito deja de ser para ti (se retira, caduca o cambia su audiencia), desaparece de la
 lista; si vuelve a serlo, reaparece.
+
+## Solicitudes
+
+**Nueva solicitud** pide algo a la empresa: **vacaciones** (con fechas), **formación** o **material**, con el
+detalle que quieras. Al enviarla:
+
+1. La decide **tu responsable** (el del organigrama). Le aparece en su **Por aprobar**. Si en **dos días**
+   no la ha decidido, pasa al responsable de tu responsable.
+2. Si la aprueba, la revisa **RRHH**.
+3. Te llega un **correo** cuando está decidida, aprobada o rechazada, con el comentario de quien la decidió.
+
+**Mis solicitudes** las lista con su estado (*Pendiente de tu responsable*, *Pendiente de RRHH*,
+*Aprobada*, *Rechazada*). Cada una abre su **historial**: quién hizo qué, cuándo y con qué comentario.
+
+**Por aprobar** es lo que te toca decidir: las solicitudes de tu equipo, como responsable, o las que
+llegan a RRHH, si eres de RRHH. Abre una, escribe un comentario para el empleado y pulsa **Aprobar** o
+**Rechazar** (rechazar pide confirmación).
+
+Sin responsable en el directorio no se puede hacer una solicitud: RRHH tiene que asignártelo.
 
 ## Mis preferencias
 

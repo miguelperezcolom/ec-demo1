@@ -44,6 +44,7 @@ Sin esquema en `contracts/schemas`: el contrato de `employee-directory` es el re
 | :---- | :---------- | :----------- | :-------- |
 | `employee-directory` | users (outbox → Kafka) | content-hub (inbox) | `EmployeeUpserted` (el empleado entero: nombre, email, activo, `managerId` y `phone` si los tiene, atributos como códigos del catálogo e idioma, y `labels` con la etiqueta de cada código) y `EmployeeRemoved`. Clave el id de usuario |
 | `employee-directory-requests` | content-hub | users | `{requestId, requestedBy}`: una copia completa del directorio, que users responde republicando a todos en `employee-directory`. Al arrancar con el directorio vacío o desde *Intranet → Visibilidad* |
+| `solicitudes` | orquestador de EventConductor (pasos PUBLISH_EVENT de `solicitud-empleado`, destino `solicitudes`) | content-hub | Cada transición de una solicitud: `{requestId, status, by, comment}`, con `status` en `PENDIENTE_RRHH`, `APROBADA` o `RECHAZADA` (CloudEvent binario, `ce_type` `ec.solicitud.*`) |
 | `content-events` | content-hub | — (nadie fuera del servicio, de momento) | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`. Clave el sujeto |
 
 ## Los del motor
