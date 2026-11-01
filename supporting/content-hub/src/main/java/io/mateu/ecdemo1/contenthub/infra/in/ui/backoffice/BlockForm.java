@@ -11,6 +11,7 @@ import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.data.Option;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.OptionsSupplier;
+import io.mateu.uidl.interfaces.VisibilitySupplier;
 
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -19,17 +20,18 @@ import java.util.UUID;
 
 /**
  * One block of a page, as the editor fills it in. Its audience can only narrow the page's: whatever is
- * chosen here is ANDed with the page's audience.
+ * chosen here is ANDed with the page's audience. Only the fields its type uses are shown: an HTML block
+ * is a title and its content (rich text, no HTML to type), a listing its section and how many…
  */
 @Editors
-public class BlockForm implements OptionsSupplier {
+public class BlockForm implements OptionsSupplier, VisibilitySupplier {
 
     @Label("Tipo")
     public BlockType type = BlockType.HTML;
     @Label("Título")
     public String title;
-    @Label("HTML (admite [[media:id]])")
-    @Stereotype(FieldStereotype.textarea)
+    @Label("Contenido (incrusta medios con [[media:id]])")
+    @Stereotype(FieldStereotype.richText)
     public String html;
     @Label("Item destacado")
     @Stereotype(FieldStereotype.select)
@@ -42,7 +44,8 @@ public class BlockForm implements OptionsSupplier {
     @Label("Enlaces (una línea por enlace: Texto | URL)")
     @Stereotype(FieldStereotype.textarea)
     public String links;
-    @Label("Medio (id de la biblioteca)")
+    @Label("Medio de la biblioteca")
+    @Stereotype(FieldStereotype.select)
     public String mediaId;
     @Label("Solo estos departamentos")
     @Stereotype(FieldStereotype.multiSelect)
@@ -97,7 +100,8 @@ public class BlockForm implements OptionsSupplier {
 
     @Override
     public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
-        return "itemId".equals(fieldName) || "sectionId".equals(fieldName) || AudienceFields.supports(fieldName);
+        return "itemId".equals(fieldName) || "sectionId".equals(fieldName) || "mediaId".equals(fieldName)
+                || AudienceFields.supports(fieldName);
     }
 
     @Override
@@ -105,8 +109,31 @@ public class BlockForm implements OptionsSupplier {
         return switch (fieldName) {
             case "itemId" -> Catalog.get().publishedItems();
             case "sectionId" -> Catalog.get().sections();
+            case "mediaId" -> Catalog.get().media();
             default -> AudienceFields.options(fieldName);
         };
+    }
+
+    /** The fields each type uses (what PageRenderer reads); the title and the audience, always. */
+    static final java.util.Map<BlockType, java.util.Set<String>> FIELDS_OF = java.util.Map.of(
+            BlockType.HTML, java.util.Set.of("html"),
+            BlockType.BANNER, java.util.Set.of("html"),
+            BlockType.FEATURED, java.util.Set.of("itemId"),
+            BlockType.AUTOMATIC_LISTING, java.util.Set.of("sectionId", "limit"),
+            BlockType.QUICK_LINKS, java.util.Set.of("links"),
+            BlockType.MEDIA, java.util.Set.of("mediaId"));
+
+    static final java.util.Set<String> BY_TYPE = java.util.Set.of("html", "itemId", "sectionId", "limit", "links", "mediaId");
+
+    @Override
+    public boolean isHidden(String fieldName, HttpRequest httpRequest) {
+        if ("id".equals(fieldName)) {
+            return true;
+        }
+        if (!BY_TYPE.contains(fieldName)) {
+            return false;
+        }
+        return !FIELDS_OF.getOrDefault(type == null ? BlockType.HTML : type, java.util.Set.of()).contains(fieldName);
     }
 
     @Override

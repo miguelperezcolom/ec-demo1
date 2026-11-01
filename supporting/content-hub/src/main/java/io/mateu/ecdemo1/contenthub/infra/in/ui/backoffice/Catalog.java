@@ -29,6 +29,7 @@ public class Catalog {
     final NamedAudienceRepository audiences;
     final NavigationRepository navigation;
     final ItemRepository items;
+    final io.mateu.ecdemo1.contenthub.application.out.MediaRepository media;
 
     @PostConstruct
     void register() {
@@ -63,6 +64,12 @@ public class Catalog {
         return items.findAll().stream().filter(i -> i.status() == ItemStatus.PUBLISHED)
                 .map(i -> new Option(i.id(), i.draft().in(i.defaultLanguage(), i.defaultLanguage()).title()
                         + " (" + i.type().label() + ")")).toList();
+    }
+
+    /** The media library, newest first: what a MEDIA block shows, and what can be embedded with [[media:id]]. */
+    public List<Option> media() {
+        return media.search("", 0, 200).stream()
+                .map(m -> new Option(m.id(), m.title() + " (" + m.kind().name().toLowerCase() + ")")).toList();
     }
 
     public static List<Option> languages() {
