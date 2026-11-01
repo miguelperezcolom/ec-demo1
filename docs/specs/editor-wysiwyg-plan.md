@@ -159,14 +159,16 @@ Pedido el 2026-11-01. Va **en paralelo** con el editor: el nivel 2 lo lleva otro
 
 | # | Paso | Estado |
 |---|---|---|
-| D1 | Usuarios: `EmployeeProfile` en `User` (dominio, eventos, comandos, casos de uso, entidad/repositorio, DTO, `UserViewModel`) + tests | pendiente |
-| D2 | Contrato `employee-directory` con `managerId`/`phone` + snapshot (`PublishEmployeeDirectorySnapshotUseCase`) + tests | pendiente |
-| D3 | Seed con jerarquía y teléfonos | pendiente |
-| D4 | Content-hub: consumidor + `schema.sql` + `EmployeeDirectory` con managerId/phone | pendiente |
-| D5 | Portal: "Personas" (buscador + ficha) en el menú de la intranet | pendiente |
-| D6 | Portal: organigrama (estructura + cadena de jefes) | pendiente |
+| D1 | Usuarios: `EmployeeProfile` en `User` (dominio, eventos, comandos, casos de uso, entidad/repositorio, DTO, `UserViewModel`) + tests | hecho (721e0693) |
+| D2 | Contrato `employee-directory` con `managerId`/`phone` + snapshot (`PublishEmployeeDirectorySnapshotUseCase`) + tests. Además `labels` (código → etiqueta del catálogo) para que el content-hub no necesite copia del catálogo | hecho (721e0693, 968c4cfc) |
+| D3 | Seed con jerarquía y teléfonos: regla plantilla → jefe de departamento → director de hotel → directora general (`rosa.camps`, nueva); director nuevo en CUN01 (`ricardo.flores`); a los usuarios ya sembrados sin perfil se les da uno | hecho (721e0693) |
+| D4 | Content-hub: consumidor + `schema.sql` (`manager_id`, `phone`, `labels`) + `EmployeeDirectory` | hecho (b074c57e, 968c4cfc) |
+| D5 | Portal: "Personas" (buscador + ficha) en el menú de la intranet — `People`, `PeopleListing`, `PersonPage` | hecho (3fdd4b36), probado en local en Vaadin y Redwood |
+| D6 | Portal: organigrama (estructura + cadena de jefes) — `OrgChartPage` | hecho (3fdd4b36), probado en local en Vaadin y Redwood |
 | D7 | MCP: consulta de directorio para el chat | pendiente |
-| D8 | Desplegar en local (kind), probar en Vaadin y Redwood, actualizar manual/recorrido de la intranet | pendiente |
+| D8 | Desplegar en local (kind), probar en Vaadin y Redwood, actualizar manual/recorrido de la intranet | desplegado y probado en local; falta manual/recorrido |
+
+**Bug de Mateu encontrado (D5)**: `SpaFallback.candidate` (backend/shared/core/.../infra/SpaFallback.java) trata como fichero cualquier ruta con un punto, así que un enlace directo o recargar `/intranet/personas/ana.perez` da 404 (en Vaadin y Redwood; navegando dentro de la app funciona). Arreglo propuesto: considerar fichero solo si la extensión del último segmento es de un recurso web conocido (js, css, map, png, svg, ico, json, woff2…); la navegación ya se distingue por `Accept: text/html`. Pendiente de decidir con el usuario (ec-demo1 `feat/content-hub` sigue en Mateu 3.0-alpha.430).
 
 ## Cómo retomar
 
