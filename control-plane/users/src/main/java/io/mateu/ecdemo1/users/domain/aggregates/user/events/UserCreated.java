@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.users.domain.aggregates.user.events;
 
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.workflow.ddd.DomainEvent;
 
 /**
@@ -16,7 +18,20 @@ import io.mateu.workflow.ddd.DomainEvent;
  * <p>{@code enabled} is the projection of {@code Status}: active means yes, disabled or archived
  * means no. It travels as a boolean because that is the one thing Keycloak has a field for; the
  * three-way distinction stays on this side, where it means something.
+ *
+ * <p>{@code attributes} are the employee attributes (company, hotel, department…), and they are
+ * for a different subscriber: the employee directory the content service keeps, which decides who
+ * sees what from them. They do not go to the identity provider — the identity translation drops
+ * them — because an audience is decided from the directory, not from the token.
+ *
+ * <p>{@code profile} (manager, work phone) is the directory's too, and is dropped on the way to the
+ * identity provider for the same reason.
  */
-public record UserCreated(String userId, String name, String email, boolean enabled)
+public record UserCreated(String userId, String name, String email, boolean enabled,
+                          EmployeeAttributes attributes, EmployeeProfile profile)
         implements DomainEvent {
+
+    public UserCreated(String userId, String name, String email, boolean enabled, EmployeeAttributes attributes) {
+        this(userId, name, email, enabled, attributes, EmployeeProfile.NONE);
+    }
 }

@@ -9,6 +9,8 @@ import io.mateu.ecdemo1.users.domain.aggregates.shared.vo.Status;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserCreated;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserDeleted;
 import io.mateu.ecdemo1.users.domain.aggregates.user.events.UserUpdated;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeAttributes;
+import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
 import io.mateu.ecdemo1.users.domain.aggregates.user.vo.UserId;
 import io.mateu.ecdemo1.users.domain.aggregates.usergroup.vo.UserGroupId;
 import lombok.AllArgsConstructor;
@@ -33,18 +35,58 @@ public class User extends AggregateRoot {
 
     List<RoleId> roles;
 
-    public static User of(UserId userId, Name name, Email email, List<UserGroupId> groups, List<RoleId> roles) {
-        var user = new User(userId, name, email, Status.Active, groups, roles);
-        user.send(new UserCreated(userId.id(), name.name(), email.email(), user.isEnabled()));
+    /**
+     * The employee attributes the content service's audiences are written over. Never null: a user
+     * without any is {@link EmployeeAttributes#NONE}. Who derives country and region from the hotel
+     * is the caller's business (it needs the catalogue); the aggregate keeps what it is given.
+     */
+    EmployeeAttributes attributes;
+
+    /** Who they report to and their work phone — the intranet directory's. Never null: none is
+     *  {@link EmployeeProfile#NONE}. */
+    EmployeeProfile profile;
+
+    public static User of(UserId userId, Name name, Email email, List<UserGroupId> groups, List<RoleId> roles,
+                          EmployeeAttributes attributes) {
+        return of(userId, name, email, groups, roles, attributes, EmployeeProfile.NONE);
+    }
+
+    public static User of(UserId userId, Name name, Email email, List<UserGroupId> groups, List<RoleId> roles,
+                          EmployeeAttributes attributes, EmployeeProfile profile) {
+        var user = new User(userId, name, email, Status.Active, groups, roles, orNone(attributes),
+                profileOf(userId, profile));
+        user.send(new UserCreated(userId.id(), name.name(), email.email(), user.isEnabled(), user.attributes,
+                user.profile));
         return user;
     }
 
-    public void update(Name name, Email email, List<UserGroupId> groups, List<RoleId> roles) {
+    public void update(Name name, Email email, List<UserGroupId> groups, List<RoleId> roles,
+                       EmployeeAttributes attributes) {
+        update(name, email, groups, roles, attributes, profile);
+    }
+
+    public void update(Name name, Email email, List<UserGroupId> groups, List<RoleId> roles,
+                       EmployeeAttributes attributes, EmployeeProfile profile) {
         this.name = name;
         this.email = email;
         this.groups = groups;
         this.roles = roles;
-        send(new UserUpdated(id.id(), name.name(), email.email(), isEnabled()));
+        this.attributes = orNone(attributes);
+        this.profile = profileOf(id, profile);
+        send(new UserUpdated(id.id(), name.name(), email.email(), isEnabled(), this.attributes, this.profile));
+    }
+
+    /** Nobody reports to themselves: the org chart would loop on its first step. */
+    private static EmployeeProfile profileOf(UserId userId, EmployeeProfile profile) {
+        var p = profile == null ? EmployeeProfile.NONE : profile;
+        if (p.managerId() != null && p.managerId().equals(userId.id())) {
+            throw new IllegalArgumentException("A user cannot report to themselves");
+        }
+        return p;
+    }
+
+    private static EmployeeAttributes orNone(EmployeeAttributes attributes) {
+        return attributes == null ? EmployeeAttributes.NONE : attributes;
     }
 
     /**

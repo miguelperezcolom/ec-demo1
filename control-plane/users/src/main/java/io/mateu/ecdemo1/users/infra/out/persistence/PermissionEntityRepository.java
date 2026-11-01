@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PermissionEntityRepository extends JpaRepository<PermissionEntity, Long> {
     Page<PermissionEntity> findAllByNameContainingIgnoreCase(String searchText, Pageable pageable);
+
+    java.util.Optional<PermissionEntity> findFirstByScopeOrderByIdAsc(String scope);
 }

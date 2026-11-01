@@ -18,7 +18,7 @@ Cada módulo es su propio proyecto Maven y su propia imagen, con el nombre de su
 | `consoles/` | Lo que ve la gente: `gateway`, `shell` (plano de datos) y `control-shell` (plano de control) |
 | `ai/` | Los agentes: `ia-agent`, `ia-control-plane` (los catálogos) y `api-mcp` |
 | `contracts/` | El lenguaje que hablan los servicios: librerías por contexto, esquemas de los topics y las tareas de cada worker. Ver [Contratos](/contratos/librerias-y-esquemas/) |
-| `supporting/` | `content` (un CRUD), `ui-commons` (interfaces), `messaging` (outbox, relay e inbox), `agent-sql` (lectura SQL para los agentes) y `demo-reset` (reset de cada servicio) |
+| `supporting/` | `content` (un CRUD), `content-hub` (la [intranet](/intranet/arquitectura/): contenido con visibilidad por audiencia), `ui-commons` (interfaces), `messaging` (outbox, relay e inbox), `agent-sql` (lectura SQL para los agentes) y `demo-reset` (reset de cada servicio) |
 | `deploy/` | Manifiestos, el chart del motor (vendorizado), observabilidad, `deploy.sh`, `build-images.sh` y los scripts de la demo |
 | `e2e/` | Playwright contra el clúster desplegado, y la batería punta a punta local |
 | `gitops/` | El esquema público del catálogo de IA en YAML y un ejemplo |

@@ -1,0 +1,6 @@
+kind: mcp
+id: intranet
+name: Intranet
+url: http://content-hub:8135
+transport: SSE
+description: La intranet de comunicación interna — noticias, avisos, documentos y confirmaciones pendientes, solo lo que la persona que chatea puede ver; preguntar_intranet responde con los fragmentos más relevantes (RAG).

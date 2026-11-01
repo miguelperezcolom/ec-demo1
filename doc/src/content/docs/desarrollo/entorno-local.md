@@ -25,9 +25,10 @@ de `deploy/` con los nombres cambiados. Los pods no se ven en `docker ps`: se ve
 
 | Consola | URL |
 | :-- | :-- |
-| Datos (Vaadin / Redwood) | http://ec1.localhost:8800 · http://rw.localhost:8800 |
+| Datos (Vaadin / Redwood) | http://ec1.localhost:8800 · http://rw.localhost:8800 (también `ws.` / `rw-ws.` y `workspace.` / `rw-workspace.`) |
 | Control (Vaadin / Redwood) | http://console.localhost:8800 · http://rw-console.localhost:8800 |
 | Front office | http://front.localhost:8800 |
+| Intranet, solo el portal (Vaadin / Redwood) | http://intranet.localhost:8800 · http://rw-intranet.localhost:8800 |
 | Keycloak · Grafana · Documentación | http://auth.localhost:8800 · http://grafana.localhost:8800 · http://doc.localhost:8800 |
 
 El usuario `demo` y su contraseña son los de ec1 (`DEMO_PASSWORD`). La documentación pide el usuario
@@ -85,8 +86,8 @@ brew install kind gnu-sed
   las carga en el nodo (`kind load`) en lugar de descargarlas:
 
   ```sh
-  img=miguelperezcolom/orchestrator-standalone-app:2.27.1   # y forms-, rule-
-  c=$(docker create --platform linux/amd64 $img); docker cp $c:/opt/app/app.jar <app>/target/<app>-2.27.1.jar
+  img=miguelperezcolom/orchestrator-standalone-app:2.37.0   # y forms-, rule-
+  c=$(docker create --platform linux/amd64 $img); docker cp $c:/opt/app/app.jar <app>/target/<app>-2.37.0.jar
   docker buildx build --builder desktop-linux --platform linux/arm64 -f <app>/Dockerfile.ci -t $img --load <app>
   ```
 

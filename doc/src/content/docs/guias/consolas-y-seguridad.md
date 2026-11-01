@@ -7,8 +7,13 @@ description: Los hosts, cómo se federan las pantallas de cada servicio, qué co
 
 | | Vaadin | Redwood |
 | :-- | :-- | :-- |
-| **Plano de datos** (el producto) | `ec1.mateu.io` — `shell` | `rw.ec1.mateu.io` — `shell-redwood` |
+| **Plano de datos** (el producto) | `ec1.mateu.io`, `ws.ec1.mateu.io`, `workspace.ec1.mateu.io` — `shell` | `rw.ec1.mateu.io`, `rw-ws.…`, `rw-workspace.…` — `shell-redwood` |
 | **Plano de control** (la plataforma) | `console.ec1.mateu.io` — `control-shell` | `rw-console.ec1.mateu.io` — `control-shell-redwood` |
+| **Intranet** (solo el portal) | `intranet.ec1.mateu.io` — `intranet-shell` | `rw-intranet.ec1.mateu.io` — `intranet-shell-redwood` |
+
+El plano de datos responde con tres nombres mientras se prueba a cuál pasa: `ec1`, `ws` y `workspace`
+son el mismo shell y las mismas rutas (`CONSOLE_HOST` y `RW_CONSOLE_HOST` admiten una lista). La
+intranet aparte monta solo el portal de content-hub (`/_portal`), sin el backoffice editorial.
 
 Y además `front.ec1.mateu.io`, el front office del hotel (Redwood), con su propio agente de chat.
 
@@ -41,17 +46,18 @@ seguridad; **el gateway valida el token de Keycloak antes de que ningún backend
 
 `SecurityConfig.java` es el único sitio donde está escrita la regla:
 
-- **Autenticado** en cualquier host: `/_workflow`, `/_forms`, `/_booking`, `/_content`, `/_erp`,
+- **Autenticado** en cualquier host: `/_workflow`, `/_forms`, `/_booking`, `/_content`, `/_intranet`, `/_erp`,
   `/_customers`, `/_journey`, `/_notices`, `/_inbox/**`, `/_api-usage/**` y **`/ai/**`** — cada prompt
   que llega al agente se factura, así que el chat no puede ser un endpoint abierto.
 - **Rol `ai-admin`**, solo en los hosts de control: `/_ia-cp`, `/_users`, `/mateu/**`,
   `/_workflow-admin`, `/_forms-admin`, `/_integrations`, `/_mapping`, `/_communication`, `/_mdm`,
-  `/_registration-rules`, `/_audit` y también **`/ai/**`**: el agente del control plane llega a
+  `/_registration-rules`, `/_audit`, `/_content-hub` (la configuración de la intranet) y también **`/ai/**`**: el agente del control plane llega a
   aprobaciones de mapeado, decisiones de integración y datos personales del MDM.
 - **Públicos, y por qué**: los webhooks de git del motor (`/workflow/webhooks/**`, `/forms/webhooks/**`,
   verificados por HMAC), el de GitOps del catálogo de IA (`/cp-webhooks/**`, también HMAC, y solo en
   los hosts de control), los scripts de Web Push de la bandeja (`/_inbox/push/push.js` y `sw.js`), los
-  recursos estáticos del motor (`/eventconductor/**`) y la salud. Y dos `GET` que solo redirigen a una
+  recursos estáticos del motor (`/eventconductor/**`), los medios de la intranet y su `embed.js`
+  (`GET /_intranet/media/**`: URL firmadas que content-hub comprueba) y la salud. Y dos `GET` que solo redirigen a una
   pantalla de la consola, que es la que pide el login: `/_inbox` (o `/_inbox/`), tecleado en la barra
   de direcciones, lleva a la bandeja (`/inbox/pending`), y `/_api-usage/apis`, a las APIs externas
 (`/usage/apis`). Lo
@@ -69,8 +75,19 @@ Lo que **no** tiene ruta y no debe tenerla: el `/internal/**` del plano de contr
 credencial del LLM en claro al agente), el REST de `integrations-service` (`/integrations/connections`
 entrega al conector el secreto de Opera), `api-mcp` (llama a APIs de terceros con credenciales
 guardadas), el `POST /alerts/alertmanager` de `communication-service` (por donde entran las alertas de
-la plataforma a la bandeja) y el puerto gRPC 9191 de `users` (no autentica nada). Son alcanzables solo desde dentro
-del namespace.
+la plataforma a la bandeja), el puerto gRPC 9191 de `users` (no autentica nada; solo lo llama el gateway)
+y el servidor MCP de `content-hub`. Son alcanzables solo desde dentro del namespace.
+
+### Roles y permisos hacia los backends
+
+En cada petición con un token válido, el gateway pregunta al servicio de usuarios
+(`AuthService.GetAuthInfo`, gRPC, `AUTH_GRPC_ADDRESS`) qué roles y permisos tiene el usuario y los pasa en
+**`X-User-Roles`** y **`X-User-Scopes`** (separados por espacios, cacheados 5 minutos por token). Antes
+**borra siempre** las que traiga el cliente, así que un backend puede fiarse de ellas para el tráfico que
+llega por el gateway. Es de mejor esfuerzo: si `users` no contesta, la petición sigue sin ellas. El token
+no se re-firma: los shells y el front office lo verifican contra Keycloak y uno firmado por el gateway
+sería un 401. Hoy las lee la [intranet](/intranet/arquitectura/#seguridad) (`content:edit`,
+`content:publish`, `content:admin`).
 
 ## Keycloak
 

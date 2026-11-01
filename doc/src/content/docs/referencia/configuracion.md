@@ -27,10 +27,11 @@ repositorio**.
 
 ### gateway
 
-`CONSOLE_HOST=ec1.mateu.io`, `CONTROL_HOST=console.ec1.mateu.io` (y `RW_CONSOLE_HOST`,
-`RW_CONTROL_HOST`, `FRONT_OFFICE_HOST`, con sus valores por defecto en `application.yaml`), y la URL de
+`CONSOLE_HOST=ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io` (una lista: el plano de datos con
+sus tres nombres), `CONTROL_HOST=console.ec1.mateu.io` (y `RW_CONSOLE_HOST`, `RW_CONTROL_HOST`,
+`FRONT_OFFICE_HOST`, `INTRANET_HOST`, `RW_INTRANET_HOST`, con sus valores por defecto en `application.yaml`), y la URL de
 cada backend que enruta. El manifiesto solo da algunas (`ORCHESTRATOR_URL`, `FORMS_URL`, `SHELL_URL`,
-`BOOKING_URL`, `CONTENT_URL`, `USERS_URL`, `IA_AGENT_URL`, `IA_CONTROL_PLANE_URL`, `CONTROL_SHELL_URL`);
+`BOOKING_URL`, `CONTENT_URL`, `CONTENT_HUB_URL`, `USERS_URL`, `IA_AGENT_URL`, `IA_CONTROL_PLANE_URL`, `CONTROL_SHELL_URL`);
 el resto —`NOTICES_URL`, `REGISTRATION_RULES_URL`, `COMMUNICATION_URL`, `INTEGRATIONS_URL`,
 `MAPPING_URL`, `CUSTOMER_MDM_URL`, `AUDIT_URL`, `JOURNEY_URL`, `ERP_URL`, `FRONT_OFFICE_URL`…— va con
 el valor por defecto de `application.yaml`, `http://<servicio>:<puerto>`.
@@ -41,8 +42,14 @@ el valor por defecto de `application.yaml`, `http://<servicio>:<puerto>`.
 | `CONTROL_PLANE_AGENT` | `control-plane-agent` por defecto | El de la consola de control (`X-Agent-Channel: control-plane`) |
 | `FRONT_OFFICE_AGENT` | `reception-agent` por defecto | El del front office (`X-Agent-Channel: front-office`) |
 | `KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI` | `http://keycloak:8080/realms/ec-demo1/…/certs`, `https://auth.ec1.mateu.io/realms/ec-demo1` | Las claves, por la red del clúster, y el emisor tal como viene en el token |
+| `CONTENT_HUB_URL` | `http://content-hub:8135` | Las dos rutas de la intranet: `/_intranet` (hosts de datos: portal y editorial) y `/_content-hub` (hosts de control: configuración) |
+| `AUTH_GRPC_ADDRESS` | `static://users:9191` | El `AuthService` del servicio de usuarios, al que pregunta los roles y scopes de cada usuario para las cabeceras `X-User-Roles` y `X-User-Scopes` (también vale `users:9191` o `dns:///users:9191`) |
+| `AUTH_GRPC_DEADLINE` | `1s` por defecto | Cuánto espera esa llamada; si vence, la petición sigue sin las dos cabeceras |
+| `AUTH_CACHE_TTL` | `5m` por defecto | Cuánto se cachea la respuesta por token: lo que tarda en notarse un cambio de roles |
 
 Las cabeceras se sustituyen siempre: lo que mande el navegador con esos nombres no llega al agente.
+Lo mismo con `X-User-Roles` y `X-User-Scopes`: el gateway borra las que traiga el cliente antes de
+poner las suyas.
 
 ### shells
 
@@ -249,6 +256,18 @@ de consumo de tokens; `GITOPS_SYNC_ON_STARTUP` (`true`) y `GITOPS_POLL_MS` (`300
 
 `KEYCLOAK_URL=http://keycloak:8080`, `KEYCLOAK_REALM=ec-demo1`, `KEYCLOAK_ADMIN_USERNAME=admin` y
 `KEYCLOAK_ADMIN_PASSWORD` (Secret `keycloak-admin`): la propagación de usuarios a Keycloak.
+`KAFKA_BROKERS=redpanda:19092`: el directorio de empleados (`employee-directory`) y sus peticiones de
+copia. En `application.yaml`: `USERS_DEMO_SEED` (`true`), el catálogo de atributos, los roles editoriales
+y los empleados de la demo de la intranet.
+
+### content-hub
+
+Su base de datos en `cp-postgres` (Secret `ec-cp-postgres`), `SMTP_HOST`/`SMTP_PORT` (`postfix`, `25`),
+`NEWSLETTER_REDIRECT_TO` (`newsletter-demo@example.com`: toda newsletter va ahí), `EMBEDDINGS_URL`
+(`http://embeddings`), `PORTAL_URL` (`https://ec1.mateu.io/intranet`) y `KEYCLOAK_ISSUER_URI`/
+`KEYCLOAK_JWKS_URI` (las llamadas MCP). En `application.yaml`: `MEDIA_SECRET` (vacío: aleatoria por
+arranque), `MEDIA_MAX_BYTES` (20 MB), `PROJECTION_ASYNC`, `CONTENT_SEED`, `NEWSLETTER_FROM`,
+`EMBEDDINGS_MODEL`. La tabla completa está en [Operación de la intranet](/intranet/operacion/#variables-de-entorno).
 
 ### Terceros
 

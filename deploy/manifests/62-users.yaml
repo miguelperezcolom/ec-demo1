@@ -1,11 +1,13 @@
 # The users service — users, groups, roles and permissions, as a Mateu CRUD at /_users.
 #
-# It also answers GetAuthInfo over gRPC on 9191, returning a user's roles and scopes. Nothing in
-# this deployment calls it: the gateway validates Keycloak's token directly rather than enriching
-# it from here, which is what the demo's own api-gw used this port for. It is carried because it
-# is half of what this service is, and it is on the Service but on no ingress — the port is
-# unauthenticated, so anything that gets a pod in this namespace can ask it about any user. That
-# is fine while it stays inside the namespace and stops being fine the moment it does not.
+# It also answers GetAuthInfo over gRPC on 9191, returning a user's roles and scopes: the gateway asks
+# it for every signed-in request and passes them on as X-User-Roles / X-User-Scopes (it does not
+# rewrite the token — the shells verify that against Keycloak). The port is on the Service but on no
+# ingress — it is unauthenticated, so anything that gets a pod in this namespace can ask it about any
+# user. That is fine while it stays inside the namespace and stops being fine the moment it does not.
+#
+# Employee attributes (hotel, department…) go out on Kafka's employee-directory, through the shared
+# outbox, for content-hub's directory; never into the token.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -46,6 +48,9 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8102"
+            # Where employee-directory goes (content-hub's directory) and its snapshot requests come from.
+            - name: KAFKA_BROKERS
+              value: redpanda:19092
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/users
             - name: DB_USERNAME

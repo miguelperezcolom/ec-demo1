@@ -42,16 +42,29 @@ class CommunicationContractsTest {
     final ObjectMapper boot = bootMapper();
     final CommunicationConfig config = new CommunicationConfig();
 
+    /**
+     * v2: the record as the forms engine writes it since EventConductor 2.31 — the lifecycle event, the
+     * assignment (candidate users and groups, priority, due date), the escalation level and the business
+     * key. v1 (engines 2.19–2.30) stays committed as it was: it can no longer be generated from the
+     * engine's record, and {@link #everyExampleOfHumanTasksIsATaskInTheInbox} still reads its examples.
+     */
     @Test
     void theSchemaOfHumanTasksIsTheFormsEnginesRecord() {
-        SchemaFiles.publish(TopicSpec.topic("human-tasks")
-                .describedAs("A human task opened, completed or cancelled in EventConductor's forms engine "
-                        + "(HumanTaskChanged, engine 2.19+). Best effort: an inbox may lag, a task never fails for it.")
+        SchemaFiles.publish(TopicSpec.topic("human-tasks").version(2)
+                .describedAs("A human task created, assigned, claimed, released, completed, cancelled or escalated "
+                        + "in EventConductor's forms engine (HumanTaskChanged, engine 2.31+; CloudEvent type "
+                        + "io.eventconductor.task.<event>). Best effort: an inbox may lag, a task never fails for it.")
                 .ownedBy("eventconductor-forms").keyedBy("taskId")
                 .producedBy("eventconductor-forms").consumedBy("communication-service")
                 .messages(HumanTaskChanged.class)
                 .example(new HumanTaskChanged("T-1", "approve-mapping", "Aprobar equivalencias", "P-1", "approve",
-                        "PENDING", List.of("mapping-approver"), null, Instant.parse("2026-11-12T09:30:00Z"))));
+                                "PENDING", List.of("mapping-approver"), null, Instant.parse("2026-11-12T09:30:00Z"),
+                                HumanTaskChanged.CREATED, List.of("ana", "carlos"), List.of("mapping-approvers"), 50,
+                                Instant.parse("2026-11-14T09:30:00Z"), 0, "mapping:MRU01"),
+                        new HumanTaskChanged("T-1", "approve-mapping", "Aprobar equivalencias", "P-1", "approve",
+                                "ASSIGNED", List.of("mapping-approver"), "carlos", Instant.parse("2026-11-12T10:00:00Z"),
+                                HumanTaskChanged.CLAIMED, List.of("ana", "carlos"), List.of("mapping-approvers"), 50,
+                                Instant.parse("2026-11-14T09:30:00Z"), 0, "mapping:MRU01")));
     }
 
     @Test
@@ -89,7 +102,9 @@ class CommunicationContractsTest {
         var inbox = mock(Inbox.class);
         var consumer = config.consumeHumanTasks(inbox, boot);
 
-        var examples = Contracts.topic("human-tasks").examples();
+        // Every version still on the topic: v1 from a forms engine older than 2.31, v2 from a newer one.
+        var examples = new java.util.ArrayList<>(Contracts.topic("human-tasks", 1).examples());
+        examples.addAll(Contracts.topic("human-tasks", 2).examples());
         examples.forEach(json -> consumer.accept(MessageBuilder.withPayload(json.getBytes()).build()));
 
         var read = ArgumentCaptor.forClass(HumanTask.class);

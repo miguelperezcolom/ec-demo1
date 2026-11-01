@@ -1,0 +1,83 @@
+# The intranet on a host of its own (intranet.ec1.mateu.io): a shell that mounts only content-hub's
+# reader portal (/_portal). The same intranet is also an entry of the data plane's shells (/_intranet),
+# with the editorial backoffice for editors; this one is for reading. consoles/intranet-shell, built
+# like consoles/shell: this image is the Vaadin one, 33-intranet-shell-redwood.yaml the Redwood one.
+#
+# The Keycloak URL is compiled into this image, so changing the hostname means rebuilding it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intranet-shell
+  namespace: ec-demo1
+  labels: { app: intranet-shell }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: intranet-shell }
+  template:
+    metadata:
+      labels:
+        app: intranet-shell
+        app.kubernetes.io/component: intranet-shell
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8141"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: intranet-shell
+          image: miguelperezcolom/ec-demo1-intranet-shell:0.76.0
+          env:
+            - name: SERVER_PORT
+              value: "8141"
+            # The issuer is the public URL, because that is what the `iss` claim says and Spring
+            # checks it. The keys come from the Service, so startup does not wait on the ingress.
+            # Mateu 3.0-alpha.415 resolves a relative RemoteMenu (/_booking…) against this, not the request's
+            # Origin (SSRF): without it the shell calls itself (localhost) and every remote screen is a 404.
+            # The intranet's public host, which the gateway routes /_portal on.
+            - name: MATEU_SELF_BASE_URL
+              value: https://intranet.ec1.mateu.io
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8141 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8141 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8141 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intranet-shell
+  namespace: ec-demo1
+  labels: { app: intranet-shell }
+spec:
+  selector: { app: intranet-shell }
+  ports:
+    - { name: http, port: 8141, targetPort: 8141 }

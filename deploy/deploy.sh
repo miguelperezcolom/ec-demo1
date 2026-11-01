@@ -199,11 +199,16 @@ if [ "$DOCS_AUTH" != "$DOCS_AUTH_BEFORE" ]; then
   kubectl create secret generic docs-basic-auth -n "$NS" --from-literal=auth="$DOCS_AUTH" \
     --dry-run=client -o yaml | kubectl apply -f -
 fi
-# Shared by the orchestrator and the forms engine: each reads its own key and ignores the other.
-# Both apps verify inbound webhooks against it, and a blank value would make them verify nothing.
+# Shared by the orchestrator, the forms engine and the rule engine: each reads its own key and ignores
+# the others. They verify inbound webhooks against it, and a blank value would make them verify
+# nothing (from EventConductor 2.28 an engine without a filter chain refuses them instead). The rules
+# and task-contract keys have no webhook registered in GitHub yet; they are set so that adding one
+# later is signed from the start.
 kubectl create secret generic ec-git-webhook -n "$NS" \
   --from-literal=WORKFLOW_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
+  --from-literal=TASKS_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   --from-literal=FORMS_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
+  --from-literal=RULES_GITIMPORT_WEBHOOKSECRET="$GIT_WEBHOOK_SECRET" \
   ${WORKFLOW_AGENT_CLIENT_SECRET:+--from-literal=WORKFLOW_AGENTS_CLIENT_SECRET="$WORKFLOW_AGENT_CLIENT_SECRET"} \
   --dry-run=client -o yaml | kubectl apply -f -
 if [ "$WORKFLOW_AGENTS_ENABLED" = true ]; then
@@ -333,7 +338,7 @@ if [ "$WORKFLOW_AGENTS_ENABLED" = true ]; then
   )
 fi
 helm upgrade --install ec deploy/chart/eventconductor -n "$NS" \
-  -f deploy/values/eventconductor.yaml "${engine_args[@]}"
+  -f deploy/values/eventconductor.yaml ${engine_args[@]+"${engine_args[@]}"}  # empty-safe under set -u in bash 3.2 (macOS)
 
 echo "══ 4/6  Keycloak, shells, gateway, ingress, demo services, control plane ══"
 kubectl apply -f deploy/manifests/05-clusterissuer.yaml
@@ -343,6 +348,9 @@ kubectl apply -f deploy/manifests/10-keycloak.yaml
 kubectl apply -f deploy/manifests/11-postfix.yaml
 kubectl apply -f deploy/manifests/30-shell.yaml
 kubectl apply -f deploy/manifests/31-shell-redwood.yaml
+# The intranet on its own host (reader portal only), Vaadin and Redwood.
+kubectl apply -f deploy/manifests/32-intranet-shell.yaml
+kubectl apply -f deploy/manifests/33-intranet-shell-redwood.yaml
 kubectl apply -f deploy/manifests/35-gateway.yaml
 kubectl apply -f deploy/manifests/40-ingress.yaml
 kubectl apply -f deploy/manifests/50-kafka-console.yaml
@@ -379,6 +387,9 @@ kubectl apply -f deploy/manifests/85-customer-history.yaml
 # Riu Class, the loyalty programme — a demo of it (data plane): members, tier and points, which accrue from the
 # front office's closed stays; the front office asks it at the check-in.
 kubectl apply -f deploy/manifests/86-loyalty.yaml
+# The intranet (content-hub): content with audience-based visibility — portal on the data plane,
+# backoffice on the control console; its database on cp-postgres (pgvector), created by its initContainer.
+kubectl apply -f deploy/manifests/90-content-hub.yaml
 # The documentation site (doc/), behind basic auth.
 kubectl apply -f deploy/manifests/81-docs.yaml
 # The control console: its database first, then the service, then its shell.

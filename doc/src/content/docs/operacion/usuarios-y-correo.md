@@ -48,8 +48,38 @@ envío, que lo recoge y lo entrega a Gmail.
 - **Lo que evita el spam es el DNS** del dominio: SPF, DKIM y DMARC de Google para `mateu.io`. El README
   del repositorio tiene los registros.
 
+## Atributos de empleado y directorio
+
+Para la [intranet](/intranet/arquitectura/), cada usuario tiene además **atributos de empleado**: empresa,
+país, región, hotel, departamento, puesto e idioma, todos opcionales. Son lo que deciden las audiencias de
+la intranet (el idioma solo elige la traducción).
+
+- **Valores de un catálogo cerrado.** *Usuarios → Valores de atributo* es el CRUD del catálogo: cada valor
+  tiene un **código** (lo que se guarda en el usuario y con lo que se escriben las audiencias; no cambia
+  una vez creado) y una etiqueta. Un hotel dice además su país y región. El formulario del usuario elige
+  cada atributo de una lista sobre ese catálogo, así que `region IN (CANARIAS)` no puede fallar por cómo
+  se tecleó.
+- **País y región salen del hotel.** Si el usuario tiene hotel, se le ponen el país y la región del hotel
+  en el catálogo (`EmployeeAttributesResolver`), diga lo que diga el formulario. Sin hotel (servicios
+  centrales), se guardan los que se elijan.
+- **No van en el token.** Keycloak no los recibe: la propagación a Keycloak sigue siendo solo la identidad.
+- **Se publican en Kafka.** Cada alta, cambio o baja escribe también en el outbox un mensaje para el topic
+  **`employee-directory`** (`EmployeeUpserted` con el empleado entero, o `EmployeeRemoved`), en la misma
+  transacción. El relay elige el transporte por destino (`RoutingOutboxTransport`): `identity` a Keycloak,
+  `employee-directory` a Kafka; la clave del directorio va aparte, así que una caída de Keycloak no lo
+  retiene. content-hub construye con él su directorio.
+- **Copia completa a petición.** Un mensaje en **`employee-directory-requests`** (lo manda content-hub al
+  arrancar con el directorio vacío, o desde *Intranet → Visibilidad*) hace que `users` republique a todos
+  los usuarios (`EmployeeDirectoryRequestsListener`), una vez por `requestId`.
+- **Semilla de demo** (`DemoDirectorySeeder`, `USERS_DEMO_SEED=true`): el catálogo, los permisos
+  `content:edit`, `content:publish`, `content:admin`, los roles `content-editor`, `content-publisher` y
+  `content-admin`, y unos 30 empleados. Se crean **sin contraseña ni correo** (emails de `example.com`):
+  para entrar como uno hay que fijarle contraseña en Keycloak y rellenar su apellido, que el perfil de
+  usuario de Keycloak exige. Ver [Operación de la intranet](/intranet/operacion/#datos-de-demo).
+
 ## El gRPC de `users`
 
-`users` sirve también `GetAuthInfo` por gRPC en el puerto 9191 (los roles y permisos de un usuario).
-**No autentica nada** y nada del despliegue lo llama: está en su Service y en ningún ingress, y no debe
-exponerse tal como está.
+`users` sirve también `GetAuthInfo` por gRPC en el puerto 9191 (los roles y permisos de un usuario). Lo
+llama el **gateway** en cada petición con token (cacheado 5 minutos por token) para poner las cabeceras
+`X-User-Roles` y `X-User-Scopes` que leen los backends —la intranet saca de ahí los permisos editoriales—.
+**No autentica nada**: está en su Service y en ningún ingress, y no debe exponerse tal como está.

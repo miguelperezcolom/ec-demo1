@@ -47,6 +47,11 @@ public class PermissionDBRepository implements PermissionRepository {
     }
 
     @Override
+    public Optional<PermissionId> findIdByScope(Scope scope) {
+        return repository.findFirstByScopeOrderByIdAsc(scope.scope()).map(entity -> new PermissionId(entity.id));
+    }
+
+    @Override
     public void deleteAllById(List<PermissionId> selectedIds) {
         repository.deleteAllById(selectedIds.stream().map(PermissionId::id).toList());
     }

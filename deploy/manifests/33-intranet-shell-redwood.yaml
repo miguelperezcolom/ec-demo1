@@ -1,0 +1,81 @@
+# The intranet on its own host, rendered by Redwood (rw-intranet.ec1.mateu.io): consoles/intranet-shell
+# built with -Predwood, beside the Vaadin one (32-intranet-shell.yaml). Same gateway, same remote.
+#
+# The Keycloak URL is compiled into this image, so changing the hostname means rebuilding it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intranet-shell-redwood
+  namespace: ec-demo1
+  labels: { app: intranet-shell-redwood }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: intranet-shell-redwood }
+  template:
+    metadata:
+      labels:
+        app: intranet-shell-redwood
+        app.kubernetes.io/component: intranet-shell
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8142"
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: hel1
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: intranet-shell-redwood
+          image: miguelperezcolom/ec-demo1-intranet-shell-redwood:0.76.0
+          env:
+            - name: SERVER_PORT
+              value: "8142"
+            # The issuer is the public URL, because that is what the `iss` claim says and Spring
+            # checks it. The keys come from the Service, so startup does not wait on the ingress.
+            # Mateu 3.0-alpha.415 resolves a relative RemoteMenu (/_booking…) against this, not the request's
+            # Origin (SSRF): without it the shell calls itself (localhost) and every remote screen is a 404.
+            # The intranet's public host, which the gateway routes /_portal on.
+            - name: MATEU_SELF_BASE_URL
+              value: https://rw-intranet.ec1.mateu.io
+            - name: KEYCLOAK_ISSUER_URI
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: KEYCLOAK_JWKS_URI
+              value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
+          ports:
+            - { name: http, containerPort: 8142 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { memory: "768Mi", cpu: "250m" }
+            limits:   { memory: "2Gi",   cpu: "1" }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8142 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8142 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intranet-shell-redwood
+  namespace: ec-demo1
+  labels: { app: intranet-shell-redwood }
+spec:
+  selector: { app: intranet-shell-redwood }
+  ports:
+    - { name: http, port: 8142, targetPort: 8142 }
