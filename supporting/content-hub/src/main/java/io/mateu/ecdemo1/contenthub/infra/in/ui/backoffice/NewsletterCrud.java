@@ -30,6 +30,19 @@ public class NewsletterCrud extends SimpleCrud<NewsletterForm, NewsletterForm, N
 
     final ObjectProvider<NewsletterForm> forms;
     final NewsletterRepository editions;
+    final io.mateu.ecdemo1.contenthub.application.usecases.WeeklyNewsletter weekly;
+    final io.mateu.ecdemo1.contenthub.infra.in.security.Readers readers;
+    final java.time.Clock clock;
+
+    /** This week's edition now, instead of waiting for Monday: a draft to review. */
+    @io.mateu.uidl.annotations.Toolbar
+    @io.mateu.uidl.annotations.Action
+    public Object prepararBoletinDeLaSemana(HttpRequest httpRequest) {
+        readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
+        return weekly.compose(clock.instant(), false)
+                .<Object>map(id -> io.mateu.uidl.data.Message.success("Preparado el borrador " + id + ": revísalo y prográmalo"))
+                .orElseGet(() -> io.mateu.uidl.data.Message.warning("Ya existe el boletín de esta semana, o no hay nada nuevo que contar"));
+    }
 
     @Override
     protected Class<NewsletterForm> formClass() {

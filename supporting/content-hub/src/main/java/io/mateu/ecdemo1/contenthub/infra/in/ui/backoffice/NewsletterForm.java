@@ -54,7 +54,8 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
     @Label("Título")
     String title;
     @Label("Introducción")
-    @Stereotype(FieldStereotype.textarea)
+    @Stereotype(FieldStereotype.richText)
+    @Colspan(2)
     String intro;
     @Label("Items (en este orden)")
     @Stereotype(FieldStereotype.multiSelect)

@@ -190,6 +190,22 @@ class ConsumersTest {
             Audience.in(Attribute.REGION, "CANARIAS"));
 
     @Test
+    void the_weekly_newsletter_composes_itself_once_a_week_with_what_was_published() {
+        var weekly = new io.mateu.ecdemo1.contenthub.application.usecases.WeeklyNewsletter(editions,
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgItemRepository(jdbc),
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgHomePages(jdbc));
+        publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Semana de la sostenibilidad", "<p>x</p>");
+        var now = clock.instant().plus(java.time.Duration.ofMinutes(1));
+
+        var id = weekly.compose(now, false).orElseThrow();
+        var edition = editions.find(id).orElseThrow();
+        assertThat(edition.status()).isEqualTo(io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterEdition.Status.DRAFT);
+        assertThat(edition.itemIds()).isNotEmpty();
+        // once a week: the same week composes nothing more
+        assertThat(weekly.compose(now, false)).isEmpty();
+    }
+
+    @Test
     void the_directory_keeps_who_each_one_reports_to_and_their_phone() {
         directory.apply(new EmployeeMessage("e-" + System.nanoTime(), EmployeeMessage.UPSERTED, "lucia", "Lucía",
                 "lucia@example.com", true, "carlos", "+34 600 000 103", Map.of("hotel", "TFS01", "language", "es"),

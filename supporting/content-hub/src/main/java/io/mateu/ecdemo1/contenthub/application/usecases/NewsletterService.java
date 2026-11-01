@@ -226,7 +226,10 @@ public class NewsletterService {
         var html = new StringBuilder("<div style=\"font-family:sans-serif;max-width:640px\">")
                 .append("<h1>").append(esc(edition.title())).append("</h1>");
         if (!edition.intro().isBlank()) {
-            html.append("<p>").append(esc(edition.intro())).append("</p>");
+            // written in the rich text editor (HTML, sanitised like any content); an older edition's
+            // plain text is one paragraph
+            html.append(edition.intro().contains("<") ? HtmlSanitizer.sanitize(edition.intro())
+                    : "<p>" + esc(edition.intro()) + "</p>");
         }
         for (var item : items) {
             html.append("<h2><a href=\"").append(esc(portalUrl)).append("/noticias/").append(esc(item.itemId()))

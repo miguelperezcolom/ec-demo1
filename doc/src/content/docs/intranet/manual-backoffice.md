@@ -186,8 +186,15 @@ El de la demo es `front-office.bienvenida.destacado`: una variante general para 
 ## Newsletter
 
 *Editorial → Newsletter*. Una edición la compone un editor; **programarla** (enviarla) es publicar y
-pide `content:publish`. Una edición tiene título, introducción, **items en orden**,
-audiencia y fecha de envío.
+pide `content:publish`. Una edición tiene título, introducción (escrita en el editor, con formato),
+**items en orden**, audiencia y fecha de envío.
+
+**El boletín de la semana se prepara solo**: cada lunes a las 9 (hora de Madrid) aparece un borrador
+`w-AAAA-Wnn` con lo publicado desde el boletín anterior (noticias, avisos y páginas, lo más reciente
+primero, sin las páginas de inicio), para todos. Revísalo, quita o reordena items y prográmalo. Sin
+programar no sale. **Preparar boletín de la semana** (en el listado) lo crea en el momento, sin esperar
+al lunes. Se configura con `content-hub.newsletter.weekly.*`: `cron`, `enabled` y `send` (enviar sin
+revisión).
 
 - **Grupos de destinatarios**: los empleados que la recibirían, agrupados por perfil e idioma, con los
   items que ve cada grupo. **Cada grupo recibe solo lo que puede ver**, en su idioma; un grupo que no ve
