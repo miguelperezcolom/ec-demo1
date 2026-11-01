@@ -1,6 +1,6 @@
 ---
 title: Manual del portal
-description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, favoritos, confirmar lectura y preguntar al chat.
+description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, personas y organigrama, favoritos, confirmar lectura y preguntar al chat.
 ---
 
 La intranet está en la consola del plano de datos, en el menú **Intranet** (`https://ec1.mateu.io`, en
@@ -58,6 +58,31 @@ principio**: «vacac» encuentra «vacaciones», «turn» encuentra «turnos». 
 Los resultados, las páginas y el total solo cuentan lo que puedes ver: nunca verás «20 resultados» de los
 que te faltan la mitad.
 
+## Personas y organigrama
+
+**Personas** es el directorio de la empresa: todos los empleados en activo, con su puesto, departamento,
+hotel, teléfono y email. Escribe en la barra de búsqueda palabras de su nombre, puesto, departamento, hotel
+o región; tienen que estar **todas** y los acentos no importan: «recepcion tenerife» da el equipo de
+recepción de Tenerife, «jefe recepcion» los jefes de recepción de todos los hoteles.
+
+Una fila abre la **ficha** de la persona:
+
+- su puesto, departamento, hotel y región, con su email y su teléfono (un clic los abre en el correo o el
+  teléfono);
+- **Reporta a**: su responsable y el responsable de su responsable, hasta la dirección general;
+- **Su equipo directo**: quién le reporta, si es responsable de alguien;
+- **Mismo equipo**: quién está en su departamento y su hotel.
+
+Cada persona de la ficha enlaza a su propia ficha.
+
+**Organigrama** muestra la empresa entera: arriba quien la dirige y quien le reporta; debajo, **por
+estructura**, cada empresa con sus regiones, hotel por hotel (o los servicios centrales), y en cada
+departamento sus personas, el responsable primero.
+
+El directorio no depende de las audiencias: todos ven a todos. Solo salen datos de trabajo, y los usuarios
+desactivados no aparecen. Quién reporta a quién y el teléfono los mantiene RRHH en el servicio de usuarios
+(*Usuarios → Directorio*, campos **Responsable** y **Teléfono**).
+
 ## Favoritos
 
 En un contenido, **Favorito** (en la barra de herramientas) lo añade a **Mis favoritos**; pulsarlo otra vez
@@ -88,6 +113,8 @@ sabe lo que tú puedes leer.
   y responde citando el contenido con su enlace.
 - «Busca avisos sobre turnos» — busca por palabras.
 - «¿Tengo algo pendiente de confirmar?» — lista tus pendientes.
+- «¿Quién es el jefe de recepción de Tenerife?» o «¿a quién reporta Ana Pérez?» — busca en el directorio
+  y responde con el enlace a la ficha.
 
 Confirmar una lectura **no** se hace desde el chat: abre el enlace y confírmala en el portal. Un contenido
 recién publicado tarda unos segundos en estar disponible para el chat.

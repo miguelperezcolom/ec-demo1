@@ -21,15 +21,15 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 
 | Componente | Dónde | Qué hace |
 | :--------- | :---- | :------- |
-| **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, favoritos, pendientes |
+| **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, personas y organigrama (`People`, `PeopleListing`, `PersonPage`, `OrgChartPage`), favoritos, pendientes |
 | **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, ver como y confirmaciones |
 | **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal, sin *Editorial*; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
 | **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, directorio y visibilidad |
-| **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea |
+| **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea: contenido (`preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`) y directorio (`buscar_personas`, `ficha_persona`) |
 | **Remoto de slots** | `GET /_intranet/api/slots/{key}` (`SlotController`) | La variante visible de un slot, como JSON (provisional). La consumen el inicio del data plane (`data-plane.inicio.novedades`), el del control plane (`control-plane.inicio.avisos`) y la bienvenida del front office (`front-office.bienvenida.destacado`), en servidor con el token del usuario (`ui-commons` `ContentSlots`) |
 | **Medios** | `GET /_intranet/media/{id}` (`MediaController`) | Los ficheros de la biblioteca, con URL firmada |
 | **`embed.js`** | `GET /_intranet/embed.js` | Convierte los marcadores de vídeo y PDF en reproductores (ver [Seguridad](#seguridad)) |
-| **Directorio** | `EmployeeDirectoryListener` | Copia local de los empleados y sus atributos, desde `employee-directory` |
+| **Directorio** | `EmployeeDirectoryListener` | Copia local de los empleados —atributos, responsable (`managerId`), teléfono y etiquetas de los códigos— desde `employee-directory`. De ella salen las audiencias, la newsletter y el directorio de personas |
 | **Trabajos** | `ContentJobs` | Cruces de fechas, newsletter, embeddings del RAG y limpieza de perfiles huérfanos |
 
 Portal y trabajo editorial son la misma UI, en `ec1.mateu.io`, donde trabajan los empleados y los
@@ -129,7 +129,7 @@ Ocho agregados, referenciados entre sí solo por id, y un servicio de dominio (`
 | **Slot** (`domain/slot`) | Clave `aplicacion.pantalla.nombre`, descripción, fallback, variantes con audiencia y prioridad | Clave inmutable, prioridad única, huérfano en vez de borrado |
 | **Audiencia con nombre** (`domain/audience`) | Nombre y expresión | No se refiere a sí misma |
 | **Edición de newsletter** (`domain/newsletter`) | Título, intro, items en orden, audiencia, fecha, envío por grupo | No se modifica una vez enviada |
-| **Empleado** (`domain/employee`) | Atributos y hash | Solo lo escribe el consumidor del directorio |
+| **Empleado** (`domain/employee`) | Atributos y hash; responsable, teléfono y etiquetas de los códigos (para el directorio) | Solo lo escribe el consumidor del directorio |
 | **Favoritos** (`domain/favorites`) | Uno por empleado, items por id | Sin duplicados |
 | **Acuse** (`domain/ack`) | (item, versión, empleado, tipo `READ`/`CONFIRMATION`) | Idempotente |
 
@@ -170,7 +170,7 @@ que pone el gateway; sin esa cabecera (el gateway no pudo preguntar), un usuario
 
 | Topic | Sentido | Qué lleva |
 | :---- | :------ | :-------- |
-| `employee-directory` | users → content-hub | `EmployeeUpserted` (el empleado entero: nombre, email, activo, atributos como códigos del catálogo e idioma) y `EmployeeRemoved`; clave el id de usuario |
+| `employee-directory` | users → content-hub | `EmployeeUpserted` (el empleado entero: nombre, email, activo, `managerId` y `phone` si los tiene, atributos como códigos del catálogo e idioma, `labels` con la etiqueta de cada código) y `EmployeeRemoved`; clave el id de usuario |
 | `employee-directory-requests` | content-hub → users | `{"requestId", "requestedBy"}`: pide una copia completa del directorio. Se manda al arrancar con el directorio vacío, o a mano desde *Visibilidad* |
 | `content-events` | content-hub → quien quiera | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`. Clave el sujeto. Hoy nadie los consume fuera del servicio |
 
