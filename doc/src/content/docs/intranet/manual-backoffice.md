@@ -60,12 +60,15 @@ El mismo en items, audiencias con nombre y newsletter:
 
 | Tipo | Qué muestra |
 | :--- | :---------- |
-| **HTML** | Un título y HTML libre (admite `[[media:id]]`) |
-| **Banner** | Un título y un texto destacado |
+| **HTML** | Un título y un contenido con formato, escrito en el editor (títulos, negrita, listas, enlaces…; admite `[[media:id]]`) |
+| **Banner** | Un título y un texto destacado, también en el editor |
 | **Destacado** | Un item publicado, elegido de la lista, en grande |
 | **Listado automático** | Los últimos items visibles de una sección (o de todas); *Cuántos* |
 | **Enlaces rápidos** | Una línea por enlace: `Texto \| URL` |
-| **Medio** | Un fichero o vídeo de la biblioteca, por su id |
+| **Medio** | Un fichero o vídeo de la biblioteca, elegido de una lista con su título y tipo |
+
+Al elegir el **tipo** solo se ven los campos que ese tipo usa (un bloque HTML, su título y su contenido;
+un listado, su sección y cuántos), además de la audiencia.
 
 Cada bloque puede restringirse a unos **departamentos, hoteles o puestos**. Esa audiencia **solo
 estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple ambas, *Avisos* lo dice.
@@ -104,7 +107,7 @@ Para usarlo en un contenido:
 
 - pega **`[[media:id]]`** en el cuerpo (o en un bloque HTML, o en el HTML de una variante de slot), donde
   quieras que aparezca; o
-- añade un bloque **Medio** con su id; o
+- añade un bloque **Medio** y elígelo de la lista; o
 - en un documento, pon `media:id` como URL.
 
 Las imágenes, el audio y el vídeo propios se ven directamente; los PDF y los vídeos externos salen como un
