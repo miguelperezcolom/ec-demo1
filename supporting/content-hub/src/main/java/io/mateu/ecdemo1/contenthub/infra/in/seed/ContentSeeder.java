@@ -60,6 +60,7 @@ public class ContentSeeder {
     final SlotRepository slotRepository;
     final MediaRepository media;
     final NewsletterService newsletter;
+    final io.mateu.ecdemo1.contenthub.application.out.HomePages homes;
     final Clock clock;
 
     @Value("${content-hub.seed.enabled:true}")
@@ -78,8 +79,43 @@ public class ContentSeeder {
             // Every boot, each slot only if missing: a slot added to the demo appears in an
             // environment that was seeded before it existed, without re-seeding the rest.
             seedSlots();
+            // the same for the example home: an environment seeded before homes existed gets it
+            seedHomes();
         } catch (RuntimeException e) {
             log.error("Could not seed the demo content", e);
+        }
+    }
+
+    static final String RECEPTION_CANARIAS_HOME = "inicio-recepcion-canarias";
+
+    /**
+     * The example home: a page for the front desk of the Canary Islands hotels — greeting, pending
+     * confirmations, their shifts and procedure at hand, the notices — first in the homes list, so
+     * Ana Pérez (TFS01, reception) gets it while a chef in Cancún keeps the default home. Created if
+     * missing; the list is set only while it is empty (an administrator's order is left alone).
+     */
+    void seedHomes() {
+        if (items.find(RECEPTION_CANARIAS_HOME).isEmpty()) {
+            var blocks = List.of(
+                    new Block("h-hola", BlockType.GREETING, null, null, null, null, null, null, null, null),
+                    new Block("h-banner", BlockType.BANNER, null, "Recepción · Canarias",
+                            "<p>Todo lo del mostrador, a mano: turnos, procedimiento y avisos.</p>", null, null, null, null, null),
+                    new Block("h-pendientes", BlockType.PENDING, null, null, null, null, null, null, null, null),
+                    new Block("h-enlaces", BlockType.QUICK_LINKS, null, "Para el turno", null, null, null, null,
+                            List.of(new Block.Link("Turnos de recepción en Canarias", "/intranet/noticias/turnos-canarias"),
+                                    new Block.Link("Personas de recepción", "/intranet/personas?searchText=recepcion"),
+                                    new Block.Link("Buscar en la intranet", "/intranet/buscar")), null),
+                    new Block("h-avisos", BlockType.NOTICES, null, null, null, null, null, 5, null, null),
+                    new Block("h-noticias", BlockType.LATEST, null, null, null, null, null, 5, null, null));
+            var t = es("Inicio · Recepción Canarias", "El inicio de los equipos de recepción de Canarias.", "");
+            itemCommands.createWithId(RECEPTION_CANARIAS_HOME, "editora", ItemType.PAGE, "es", new ItemContent(
+                    "operaciones", Audience.allOf(Audience.in(Attribute.DEPARTMENT, "RECEPCION"),
+                    Audience.in(Attribute.REGION, "CANARIAS")), t, blocks, null, null, false, false, null, null));
+            itemCommands.publish(SYSTEM, RECEPTION_CANARIAS_HOME, false);
+            log.info("Example home seeded: {}", RECEPTION_CANARIAS_HOME);
+        }
+        if (homes.pageIds().isEmpty()) {
+            homes.save(List.of(RECEPTION_CANARIAS_HOME));
         }
     }
 

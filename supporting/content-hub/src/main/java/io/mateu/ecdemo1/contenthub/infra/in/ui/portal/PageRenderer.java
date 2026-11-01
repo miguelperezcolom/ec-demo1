@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
 import io.mateu.ecdemo1.contenthub.application.out.ItemRepository;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
+import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.application.visibility.Visibility;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
@@ -31,6 +32,7 @@ public class PageRenderer {
     final Visibility visibility;
     final ItemRepository items;
     final ContentRenderer renderer;
+    final ReaderActions actions;
 
     public String item(Reader reader, VisibleItem item, Map<String, String> sectionNames) {
         var hash = reader.attributes().hash();
@@ -63,6 +65,15 @@ public class PageRenderer {
             html.append(blocks(reader, item.itemId()));
         }
         return html.append("</article>").toString();
+    }
+
+    /**
+     * A page used as the reader's home: its body and its blocks, without the item's header (type,
+     * date, summary) — a home is not read as an article.
+     */
+    public String home(Reader reader, VisibleItem page) {
+        return "<div>" + renderer.body(page.body(), PORTAL_BASE, reader.attributes().hash())
+                + blocks(reader, page.itemId()) + "</div>";
     }
 
     String blocks(Reader reader, String pageId) {
@@ -98,12 +109,34 @@ public class PageRenderer {
                     .map(i -> Ui.card(title + "<h2 style=\"margin:.25rem 0\"><a href=\"" + Ui.itemLink(i.itemId()) + "\">"
                             + esc(i.title()) + "</a></h2><p>" + esc(i.summary()) + "</p>"))
                     .orElse("");
+            case GREETING -> "<h1 style=\"margin:.25rem 0 1rem\">Hola, " + esc(reader.name()) + "</h1>";
+            case PENDING -> {
+                if (reader.viewingAs() != null) {
+                    yield "";
+                }
+                var pending = actions.pendingConfirmations(reader);
+                yield pending.isEmpty() ? "" : Ui.card("<h3 style=\"margin-top:0\">⚠️ " + (title.isEmpty()
+                        ? "Tienes " + pending.size() + " contenido(s) pendiente(s) de confirmar" : esc(b.title()))
+                        + "</h3>" + list(pending));
+            }
+            case NOTICES -> latest(reader, b, java.util.Set.of(ItemType.NOTICE), "📢 Avisos", "Sin avisos.");
+            case LATEST -> latest(reader, b, java.util.Set.of(ItemType.ARTICLE, ItemType.PAGE), "📰 Últimas noticias",
+                    "Sin noticias.");
             case AUTOMATIC_LISTING -> {
                 var list = visibility.visibles(reader.attributes(), new ContentQuery(java.util.Set.of(), b.sectionId(),
                         null, null, 0, b.limit() == null ? 5 : b.limit())).content();
                 yield list.isEmpty() ? "" : Ui.card(title + list(list));
             }
         };
+    }
+
+    /** The latest visible items of some types (and a section, if the block names one), as a card. */
+    String latest(Reader reader, Block b, java.util.Set<ItemType> types, String defaultTitle, String empty) {
+        var list = visibility.visibles(reader.attributes(), new ContentQuery(types, b.sectionId(), null, null, 0,
+                b.limit() == null ? 5 : b.limit())).content();
+        var heading = "<h3 style=\"margin-top:0\">" + esc(b.title() == null || b.title().isBlank() ? defaultTitle : b.title())
+                + "</h3>";
+        return Ui.card(heading + (list.isEmpty() ? "<p style=\"opacity:.7\">" + empty + "</p>" : list(list)));
     }
 
     public static String list(java.util.List<VisibleItem> items) {

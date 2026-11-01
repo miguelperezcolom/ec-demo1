@@ -121,7 +121,11 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
             BlockType.FEATURED, java.util.Set.of("itemId"),
             BlockType.AUTOMATIC_LISTING, java.util.Set.of("sectionId", "limit"),
             BlockType.QUICK_LINKS, java.util.Set.of("links"),
-            BlockType.MEDIA, java.util.Set.of("mediaId"));
+            BlockType.MEDIA, java.util.Set.of("mediaId"),
+            BlockType.GREETING, java.util.Set.of(),
+            BlockType.PENDING, java.util.Set.of(),
+            BlockType.NOTICES, java.util.Set.of("limit"),
+            BlockType.LATEST, java.util.Set.of("sectionId", "limit"));
 
     static final java.util.Set<String> BY_TYPE = java.util.Set.of("html", "itemId", "sectionId", "limit", "links", "mediaId");
 

@@ -6,6 +6,7 @@ import io.mateu.ecdemo1.contenthub.application.out.NavigationRepository;
 import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.NamedAudience;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemStatus;
+import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.uidl.data.Option;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,12 @@ public class Catalog {
         return items.findAll().stream().filter(i -> i.status() == ItemStatus.PUBLISHED)
                 .map(i -> new Option(i.id(), i.draft().in(i.defaultLanguage(), i.defaultLanguage()).title()
                         + " (" + i.type().label() + ")")).toList();
+    }
+
+    /** The published pages: what can be a home. */
+    public List<Option> publishedPages() {
+        return items.findAll().stream().filter(i -> i.status() == ItemStatus.PUBLISHED && i.type() == ItemType.PAGE)
+                .map(i -> new Option(i.id(), i.draft().in(i.defaultLanguage(), i.defaultLanguage()).title())).toList();
     }
 
     /** The media library, newest first: what a MEDIA block shows, and what can be embedded with [[media:id]]. */

@@ -19,6 +19,10 @@ public class ContentHubConfigMenu {
     SlotsCrud slots;
 
     @Menu
+    @Label("Inicio")
+    HomesPage inicio;
+
+    @Menu
     @Label("Directorio")
     DirectoryListing directorio;
 

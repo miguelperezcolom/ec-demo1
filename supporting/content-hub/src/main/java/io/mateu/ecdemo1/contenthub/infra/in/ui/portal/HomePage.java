@@ -1,6 +1,9 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
 import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
+import io.mateu.ecdemo1.contenthub.application.out.HomePages;
+import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
+import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.application.visibility.ProjectionCache;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
@@ -13,14 +16,16 @@ import io.mateu.uidl.interfaces.HttpRequest;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
 import java.util.Set;
 
 import static io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui.esc;
 
 /**
- * The intranet's home: the reader's pending confirmations, the notices and the latest news — all
- * through the visibility function, the lists cached per profile hash. One block of markup, drawn the
- * same by both renderers.
+ * The intranet's home. A reader whose profile sees one of the configured home pages (Configuración →
+ * Inicio) gets the first of them, drawn as a page of blocks; anyone else gets the default home: the
+ * reader's pending confirmations, the notices and the latest news — all through the visibility
+ * function, the lists cached per profile hash. One block of markup, drawn the same by both renderers.
  */
 @Service
 @Scope("prototype")
@@ -30,16 +35,31 @@ public class HomePage implements ComponentTreeSupplier {
     final PortalSupport portal;
     final ReaderActions actions;
     final ProjectionCache cache;
+    final HomePages homes;
+    final PageRenderer renderer;
 
-    public HomePage(PortalSupport portal, ReaderActions actions, ProjectionCache cache) {
+    public HomePage(PortalSupport portal, ReaderActions actions, ProjectionCache cache, HomePages homes,
+                    PageRenderer renderer) {
         this.portal = portal;
         this.actions = actions;
         this.cache = cache;
+        this.homes = homes;
+        this.renderer = renderer;
+    }
+
+    /** The first configured home page this reader can see, if any. */
+    public Optional<VisibleItem> homeOf(Reader reader) {
+        return homes.pageIds().stream().map(id -> portal.item(reader, id)).flatMap(Optional::stream)
+                .filter(i -> ItemType.PAGE.name().equals(i.type())).findFirst();
     }
 
     @Override
     public Component component(HttpRequest httpRequest) {
         var reader = portal.reader(httpRequest);
+        var home = homeOf(reader);
+        if (home.isPresent()) {
+            return Html.block(ItemPage.banner(reader.viewingAs()) + renderer.home(reader, home.get()));
+        }
         var hash = reader.attributes().hash();
         var language = reader.attributes().language();
         var html = new StringBuilder(ItemPage.banner(reader.viewingAs()));
