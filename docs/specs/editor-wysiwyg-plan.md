@@ -233,10 +233,10 @@ Los contenidos tienen español, inglés y alemán (`ItemForm` y sus secciones po
 
 | # | Paso | Estado |
 |---|---|---|
-| F3.1 | Elegir de dónde sale el modelo (catálogo de IA o config propia) y la clave en local | pendiente |
-| F3.2 | Servicio `Translator` (aplicación) + adaptador Spring AI, con tests del contrato (HTML y marcas intactos) | pendiente |
-| F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | pendiente |
-| F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | pendiente |
+| F3.1 | Elegir de dónde sale el modelo (catálogo de IA o config propia) y la clave en local | hecho: la clave del secreto del clúster `ec-anthropic` (la misma que usa ia-control-plane), opcional; modelo `content-hub.translation.model` (por defecto `claude-opus-5-5`) |
+| F3.2 | Servicio `Translator` (aplicación) + adaptador Spring AI, con tests del contrato (HTML y marcas intactos) | hecho (ba8944e9): `Translator` + `ClaudeTranslator` con el SDK oficial `anthropic-java` 3.2.0 (no Spring AI): esfuerzo bajo, esquema JSON escrito a mano (la derivación del SDK choca con el jsonschema-generator de Spring AI), fallback de servidor ante rechazos, cuerpo saneado y marcas `[[media:…]]` verificadas; tests |
+| F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | hecho (ba8944e9): acción en `ItemForm` (solo si hay clave); bloques y variantes de slot, pendiente |
+| F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | documentado en el manual del backoffice; falta probarlo en local tras el despliegue |
 
 ## N — Newsletter: recurrente, intro rica, aperturas y clics, suscripción
 
