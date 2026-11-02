@@ -137,3 +137,15 @@ create index if not exists ch_item_doc_site on ch_item_doc (site_id, publish_at 
 -- the homes of a site other than the intranet (the intranet's stay in ch_home_page)
 create table if not exists ch_site_home_page (site_id text not null, position int not null, item_id text not null,
     primary key (site_id, position));
+
+-- Newsletters as sites (2026-11): what makes a site a newsletter (layout, sources, cadence), its numbered
+-- issues — never two with the same number, nor two for the same cadence slot — and each reader's
+-- subscription to each. The editions of before (ch_newsletter) and the one preference (ch_newsletter_pref)
+-- are left as they were: NewsletterMigration copies them, once, into «Boletín de la intranet».
+create table if not exists ch_nl_newsletter (id text primary key, doc jsonb not null);
+create table if not exists ch_nl_issue (id text primary key, newsletter_id text not null, number int not null,
+    status text not null, scheduled_at timestamptz, slot timestamptz, doc jsonb not null);
+create unique index if not exists ch_nl_issue_number on ch_nl_issue (newsletter_id, number);
+create unique index if not exists ch_nl_issue_slot on ch_nl_issue (newsletter_id, slot);
+create table if not exists ch_nl_subscription (user_id text not null, newsletter_id text not null,
+    subscribed boolean not null, sections text[] not null, primary key (user_id, newsletter_id));

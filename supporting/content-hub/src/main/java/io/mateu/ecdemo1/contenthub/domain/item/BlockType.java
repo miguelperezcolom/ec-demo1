@@ -22,7 +22,12 @@ public enum BlockType {
      * A screen or element of a registered external UI (a UI source): a Mateu UI federated, a web component
      * or, as a last resort, an iframe. In an e-mail, a link to see it on the web.
      */
-    REMOTE("Componente remoto");
+    REMOTE("Componente remoto"),
+    /**
+     * A newsletter issue's: the items the issue carries in one of its newsletter's sections
+     * ({@code sectionId} = {@code nl:<section>}). Draws nothing on a page of the intranet.
+     */
+    NEWSLETTER_SECTION("Sección de la newsletter");
 
     private final String label;
 

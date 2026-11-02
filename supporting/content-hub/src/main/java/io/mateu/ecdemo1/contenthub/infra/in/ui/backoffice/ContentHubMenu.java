@@ -31,8 +31,16 @@ public class ContentHubMenu {
     SlotContentCrud slots;
 
     @Menu
-    @Label("Newsletter")
-    NewsletterCrud newsletter;
+    @Label("Newsletters")
+    NewsletterCrud newsletters;
+
+    @Menu
+    @Label("Números de newsletter")
+    NewsletterIssuesCrud numeros;
+
+    @Menu
+    @Label("Editor visual de números")
+    IssueVisualEditorListing editorNumeros;
 
     @Menu
     @Label("Encuestas")

@@ -10,7 +10,6 @@ import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.ItemCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.NavigationCommands;
-import io.mateu.ecdemo1.contenthub.application.usecases.NewsletterService;
 import io.mateu.ecdemo1.contenthub.application.usecases.SlotCommands;
 import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
@@ -39,7 +38,7 @@ import java.util.Map;
 /**
  * The demo's content, once, into an empty service: sections, named audiences, items for different
  * audiences — one scheduled, one expired, one to confirm —, a page with blocks, a video, a slot with
- * variants and a newsletter edition. Enough for "ver como" to show different profiles different things.
+ * variants and a newsletter — «Boletín de la intranet», a site of its own with a page and a first issue. Enough for "ver como" to show different profiles different things.
  * Uses the hotels, departments and job titles the users service seeds.
  */
 @Component
@@ -59,7 +58,8 @@ public class ContentSeeder {
     final SlotCommands slots;
     final SlotRepository slotRepository;
     final MediaRepository media;
-    final NewsletterService newsletter;
+    final io.mateu.ecdemo1.contenthub.application.usecases.NewsletterEditorial newsletters;
+    final io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites;
     final io.mateu.ecdemo1.contenthub.application.out.HomePages homes;
     final io.mateu.ecdemo1.contenthub.application.usecases.Surveys surveys;
     final io.mateu.ecdemo1.contenthub.application.out.SurveyRepository surveyRepository;
@@ -92,6 +92,9 @@ public class ContentSeeder {
             seedComments();
             // and the external UIs: two registered sources, a remote page and a page with remote blocks
             seedUiSources();
+            // the newsletter as a site: created if missing (an environment with editions of before has it
+            // from NewsletterMigration), and its «Quiénes somos» page
+            seedNewsletter();
         } catch (RuntimeException e) {
             log.error("Could not seed the demo content", e);
         }
@@ -367,8 +370,53 @@ public class ContentSeeder {
                                 new Block.Link("Buscar en la intranet", "/intranet/buscar")), null));
         publishPage("portada-operaciones", "operaciones", es("Portada de operaciones",
                 "Lo esencial de la semana para los equipos de hotel.", ""), blocks);
-        newsletter.compose(SYSTEM, "Boletín semanal", "Lo más importante de la semana.",
-                List.of("bienvenida", "turnos-canarias", "menu-otono", "politica-datos"), Audience.EVERYONE);
+    }
+
+    static final String BULLETIN = io.mateu.ecdemo1.contenthub.infra.out.persistence.NewsletterMigration.BULLETIN;
+    static final String BULLETIN_ABOUT = "boletin-quienes-somos";
+
+    /**
+     * «Boletín de la intranet»: a newsletter site with two sections — «Lo más destacado», fed by every
+     * section of the intranet, and «Editorial», its own — weekly on Mondays at 9, a first issue as a draft
+     * with four items, and a published «Quiénes somos» page in its menu.
+     */
+    void seedNewsletter() {
+        if (sites.find(BULLETIN).isEmpty()) {
+            var sources = navigationRepository.get().sections().stream().filter(s -> s.parentId() == null)
+                    .map(io.mateu.ecdemo1.contenthub.domain.navigation.Section::id).toList();
+            newsletters.createWithId(BULLETIN, new io.mateu.ecdemo1.contenthub.domain.site.Site.Definition(
+                            io.mateu.ecdemo1.contenthub.infra.out.persistence.NewsletterMigration.BULLETIN_NAME,
+                            "Lo que se ha publicado en la intranet, cada semana.", Audience.EVERYONE, List.of("es"), null,
+                            new io.mateu.ecdemo1.contenthub.domain.site.Site.Theme("#1d5c7a", "#c2410c"),
+                            "<p>Lo que ha pasado en la cadena, cada lunes.</p>",
+                            "<p>Escríbenos a comunicacion@ec1.mateu.io con lo que quieras contar.</p>", true),
+                    List.of(new io.mateu.ecdemo1.contenthub.application.usecases.NewsletterEditorial.SectionSpec(
+                                    io.mateu.ecdemo1.contenthub.infra.out.persistence.NewsletterMigration.HIGHLIGHTS,
+                                    "Lo más destacado", sources),
+                            new io.mateu.ecdemo1.contenthub.application.usecases.NewsletterEditorial.SectionSpec(
+                                    "editorial", "Editorial", List.of())),
+                    new io.mateu.ecdemo1.contenthub.domain.newsletter.Newsletter.Settings(List.of(), Map.of(),
+                            io.mateu.ecdemo1.contenthub.domain.newsletter.Cadence.weekly(java.time.DayOfWeek.MONDAY,
+                                    java.time.LocalTime.of(9, 0)), false));
+            var id = newsletters.newIssue(SYSTEM, BULLETIN);
+            var issue = newsletters.issue(id);
+            var sections = new java.util.LinkedHashMap<>(issue.sections());
+            sections.put(io.mateu.ecdemo1.contenthub.infra.out.persistence.NewsletterMigration.HIGHLIGHTS,
+                    List.of("bienvenida", "turnos-canarias", "menu-otono", "politica-datos").stream()
+                            .filter(i -> items.find(i).isPresent()).toList());
+            newsletters.editIssue(SYSTEM, id, issue.subject(), issue.date(), issue.blocks(), sections);
+            log.info("Newsletter «{}» seeded with its first issue as a draft", BULLETIN);
+        }
+        if (items.find(BULLETIN_ABOUT).isEmpty() && sites.find(BULLETIN).isPresent()) {
+            itemCommands.createWithIdInSite(BULLETIN_ABOUT, BULLETIN, "editora", ItemType.PAGE, "es", new ItemContent(null,
+                    Audience.EVERYONE, es("Quiénes somos", "El equipo que hace el boletín.",
+                    "<p>El boletín lo prepara el equipo de comunicación interna con lo que publicáis en la intranet."
+                            + " ¿Quieres contar algo? Escríbenos.</p>"), List.of(
+                    new Block("q-equipo", BlockType.HTML, null, "El equipo",
+                            "<p>Comunicación interna · Servicios centrales</p>", null, null, null, null, null)),
+                    null, null, false, false, null, null).withNotification(false, false));
+            itemCommands.publish(SYSTEM, BULLETIN_ABOUT, false);
+        }
     }
 
     void publish(String id, ItemType type, String section, Audience audience, Map<String, Translation> t,
