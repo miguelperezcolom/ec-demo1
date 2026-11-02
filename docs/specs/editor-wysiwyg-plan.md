@@ -537,6 +537,30 @@ y revocar, cualquier permiso editorial; abrir, cualquier empleado con sesión.
 | P4 | Vista previa: *Enlace de vista previa* en el formulario → `PreviewLinksPage` (`/editorial/vistaPrevia/{id}`: días, ver como, crear, lista con estado y vistas, revocar); lista de solo lectura en el formulario; *Enlaces de vista previa* en el menú; `PreviewPage` en el portal (`/intranet/vista-previa/{id}.{firma}`) | hecho: `PreviewPageTest` (sesión, firma, caducidad, revocación, publicación, ver como); falta probarlo en el navegador |
 | P5 | Números de newsletter: enlace de vista previa de un número, y plantillas como maqueta de número | pendiente (las páginas y artículos de una newsletter sí tienen ambas cosas: son items) |
 
+## S — Salud del contenido
+
+Pedido el 2026-11-02 (rama `feat/content-health`). Una pantalla en *Editorial* (verla: `content:edit|publish|admin`;
+actuar: `content:edit`; borrar medios: `content:admin`) con cinco comprobaciones sobre todos los sitios, cada
+noche y a demanda, sus avisos guardados, enlace a lo que hay que arreglar y «marcar como revisado». Nada se
+arregla ni se borra solo.
+
+| # | Paso | Estado |
+|---|---|---|
+| S1 | Comprobaciones puras sobre una foto del contenido (`ContentSnapshot`, `ContentReferences`, `HealthChecks`): enlaces rotos (contenidos, secciones, rutas, personas, encuestas, medios, URL firmadas, enlaces rápidos, slots, inicios, menús), huérfanos (con tamaño), imágenes sin `alt`, caducidad (pronto, y caducado aún enlazado), desactualizado y páginas sin visitas (con la analítica de master) | hecho, con tests |
+| S2 | Enlaces externos: `LinkChecker` (HEAD→GET, timeout, pausa por host, tope por pasada, caché 7 d / 1 d, User-Agent, sin direcciones internas ni redirecciones a ellas) y `JdkHttpProbe` | hecho, con tests (cliente HTTP de mentira) |
+| S3 | Guardado y noche: `ch_health_run` (la noche reclamada por su fecha), `ch_health_finding`, `ch_health_snooze`, `ch_health_link`; `HealthJobs` (03:15 Madrid) | hecho, con test de idempotencia (Testcontainers, dos réplicas a la vez) |
+| S4 | Texto alternativo con IA: `ia-agent` acepta imágenes en línea por A2A (partes `file` con bytes → `Media` de Spring AI); `AgentAltText` → agente `intranet-alt-text` con el token del editor; el editor revisa y aplica (`ch_media_alt`, que el renderer usa como `alt`) | hecho, con tests (IA de mentira; nunca la real) |
+| S5 | Pantalla: `HealthListing` (`/editorial/salud`: cuentas por comprobación en el subtítulo, filtros por comprobación, estado y sitio; «Comprobar ahora»; «Marcar como revisados») y `FindingPage` (abrir contenido / número / medio, sugerir y aplicar `alt`, borrar huérfano, revisado N días con nota) | hecho |
+| S6 | Todos los sitios (tras #279–#281): secciones e inicios por sitio, rutas de newsletter (`/intranet/n/{sitio}/…`), bloques de los números sin enviar, entradas de menú de cada sitio (también `ISSUE`), y UIs externas borradas o desactivadas en bloques `REMOTE`, pantallas externas y menús `REMOTE` | hecho, con tests |
+| S7 | Crear el agente `intranet-alt-text` en el catálogo del plano de control (modelo con visión; prompt en Operación) | pendiente (no se despliega en esta rama) |
+| S8 | Desplegar en local y probar en el navegador (Vaadin y Redwood): la lista, el subtítulo con las cuentas, los filtros `Set<Enum>`, las acciones de la fila y la IA con un agente real | pendiente |
+
+Limitaciones conocidas:
+- los avisos de slots, inicios y menús dicen dónde arreglarlo (consola de control), pero no navegan allí: es otra UI;
+- «sin visitas» necesita al menos dos semanas de analítica y solo mira páginas (no inicios);
+- las plantillas de contenido (rama `feat/templates-preview-links`) aún no están en master: cuando entren, sus
+  bloques deben contar como uso de un medio (`ContentReferences.mediaInUse`).
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.

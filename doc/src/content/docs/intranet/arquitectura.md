@@ -829,6 +829,43 @@ booleano— que:
 
 Con eso, `RemoteUiRenderer` pondría la opción y `embed.js` dejaría de tocar el cromo.
 
+## Salud del contenido
+
+Cinco comprobaciones sobre **todos los sitios** (la intranet y cada newsletter), cada noche y a demanda, con sus
+avisos guardados (pantalla: *Editorial → Salud del contenido*).
+
+- **Una foto y funciones puras.** `ContentHealth.snapshot()` lee una vez items, medios, textos alternativos,
+  slots, sitios con sus inicios y secciones, menús, números y maquetas de newsletter, el registro de UIs,
+  directorio, encuestas y analítica (`ContentSnapshot`). `ContentReferences` saca de ahí a qué apunta lo vivo
+  —items publicados sin caducar, slots, inicios, entradas de menú activas y números aún sin enviar—, cada
+  referencia con su sitio y dónde está. `HealthChecks` son funciones de la foto: sin E/S, y así se prueban.
+- **Qué es un enlace.** Una URL del host del portal (o una ruta, con o sin `/_intranet`/`/_portal`) es una ruta:
+  `/intranet/{función}`, `/intranet/noticias|secciones|personas|encuestas/{id}`, `/intranet/enlace|ui/{sitio}/{entrada}`
+  y las de una newsletter, `/intranet/n/{sitio}[/p/{id} | /secciones/{id} | /archivo | /numeros/{id}]`. Una
+  sección se busca en el sitio de quien la nombra. Un contenido caducado no es un enlace roto sino un aviso de
+  **caducidad**, con su fecha. `ui:<fuente>…` (pantallas externas, bloques «Componente remoto», menús `REMOTE`)
+  necesita una fuente del registro **activa**.
+- **Huérfanos, con prudencia.** Cuenta como uso cualquier borrador, cualquier versión (también las viejas), los
+  slots y todos los números y maquetas de newsletter, enviados o no. Borrar lo hace un administrador, y antes se
+  vuelve a mirar.
+- **El aviso es lo que es, no cómo se dice.** Su clave es un hash de comprobación, sujeto y objetivo (la URL, el
+  medio, el contenido enlazado), nunca del texto: «caduca en 5 días» y «en 4» son el mismo aviso, y su
+  «revisado» (`ch_health_snooze`, hasta una fecha) sigue en él. Cada pasada sustituye los avisos y conserva
+  cuándo se vio cada uno por primera vez; uno que desaparece se lleva su marca.
+- **La noche, una vez.** `HealthJobs` (cron) llama a `ContentHealth.nightly(día)`, que la **reclama** con un
+  `insert … on conflict do nothing` sobre el día: idempotente con varios disparos, reinicios o réplicas. A
+  demanda va en un hilo virtual, y no se solapan dos pasadas en el proceso.
+- **Enlaces externos con educación** (`LinkChecker` sobre el puerto `HttpProbe`): caché (`ch_health_link`),
+  pausa por host, HEAD y luego GET, tope por pasada, User-Agent propio y **ninguna dirección interna**, tampoco
+  tras una redirección (que se siguen a mano). Ver [Operación](./operacion/#salud-del-contenido).
+- **Texto alternativo con IA**, por el mismo camino que «Traducir con IA»: `AgentAltText` manda por A2A al agente
+  `intranet-alt-text`, con el token del editor, el texto de la petición y **la imagen como parte `file` con sus
+  bytes**. `ia-agent` acepta esas partes (imágenes en línea, hasta 4 de 5 MB, sin SVG) y se las da al modelo como
+  `Media` de Spring AI solo en ese turno; un ejecutor que no ve imágenes responde *ContentTypeNotSupported*. La
+  respuesta se limpia (una línea, sin marcado ni comillas, hasta 250 caracteres) y queda en el formulario: el
+  editor la aplica, y entonces va a `ch_media_alt`, que `ContentRenderer` usa como `alt` de la imagen (antes, el
+  título).
+
 ## Slots
 
 Un **slot** es un hueco en la pantalla de otra aplicación donde va contenido editorial, con clave estable
@@ -876,6 +913,8 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 | Mirar las fechas para notificar, no escuchar `ItemBecameEffective` | Ese evento se pierde si el servicio está caído al cruzar la fecha, y el reparto tiene que esperar a la proyección de todos modos |
 | Búsqueda híbrida por rangos recíprocos | `ts_rank` y la distancia coseno no se pueden comparar; los rangos no necesitan calibrarse |
 | La IA por A2A y no con una clave propia | El LLM, la credencial, el consumo y la auditoría se gobiernan en un solo sitio, por persona |
+| Salud del contenido: avisos, nunca arreglos solos | Un enlace que «parece» roto, un medio que «parece» huérfano o una frase de la IA pueden estar mal: decide el editor; el sistema solo propone |
+| La imagen por A2A al plano de control, no una clave en content-hub | El mismo gobierno que el resto de la IA (consumo por persona, auditoría); hizo falta enseñar a `ia-agent` a aceptar imágenes en línea |
 | El agente sin herramientas: content-hub le manda los pasajes | La visibilidad se decide en un solo sitio y no depende de lo que haga el modelo |
 | Drive por referencia, con cuenta de servicio y sin delegación por defecto | Una sola versión; lo mínimo para funcionar compartiendo ficheros, sin pedir permisos de dominio |
 | El menú como datos, pero las rutas en código | El administrador decide qué se ve y cómo se llama; los enlaces del contenido, de las notificaciones y de la newsletter (`/intranet/noticias/{id}`) no pueden depender de él |
@@ -937,3 +976,11 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
   los fallos, y que una traducción mal formada o sin el formato del cuerpo nunca se aplica.
 - `DriveFileRefTest`, `DriveDocumentsTest` (con un Drive falso), `GoogleDriveClientTest` (contra un servidor local
   que hace de Google): las formas de URL, el trabajo de metadatos, el JWT firmado y un fichero que no se puede ver.
+- `HealthChecksTest`: cada comprobación de «Salud del contenido» sobre contenido construido con el dominio —rutas,
+  secciones por sitio, números, menús, UIs externas activas o no, huérfanos prudentes, `alt`, caducidad, desactualizado
+  y sin visitas— y que la clave de un aviso no cambia con su texto. `LinkCheckerTest` (cliente HTTP de mentira):
+  HEAD/GET, redirecciones, direcciones internas, caché, pausa por host y tope por pasada.
+- `ContentHealthTest` (Testcontainers): la noche se ejecuta una vez aunque el temporizador salte varias o lo
+  intenten dos réplicas a la vez; avisos estables entre pasadas; «revisado»; borrar un huérfano; y el texto
+  alternativo con una IA de mentira, que nunca se aplica solo. `AgentAltTextTest`: la imagen como parte `file`
+  y el token, contra un endpoint A2A falso.

@@ -605,6 +605,33 @@ minutos en aparecer:
 Las búsquedas se guardan sin saber quién las hizo, y lo que se mira en «ver como» no cuenta. Las cifras de un
 contenido concreto están en su formulario, en *Cifras*.
 
+## Salud del contenido
+
+*Salud del contenido*, en el menú *Editorial* (`/editorial/salud`), lista lo que conviene arreglar en **todos
+los sitios** (la intranet y cada newsletter). La ve quien tiene cualquier permiso editorial; actuar pide
+`content:edit`, y borrar un medio, `content:admin`. Se comprueba **cada noche** (a las 3:15) y cuando alguien
+pulsa **Comprobar ahora** (en segundo plano: los enlaces externos tardan; vuelve a buscar al rato).
+
+El subtítulo da **cuántos avisos pendientes hay de cada comprobación** y cuándo fue la última. Los filtros:
+comprobación, estado (*Pendientes*, por defecto, o *Revisados*) y sitio. Cada fila dice el problema, dónde
+(contenido, medio, slot, inicios, menú o número de newsletter), el sitio, la comprobación y desde cuándo está.
+
+| Comprobación | Qué mira | Cómo se arregla |
+| :-- | :-- | :-- |
+| **Enlaces rotos** | En lo publicado (cuerpos, bloques, enlaces rápidos, URL de enlaces y documentos), slots, inicios, entradas de menú y números de newsletter aún sin enviar: enlaces a contenidos que no existen, sin publicar o retirados; secciones, personas, encuestas, rutas del portal o números que no existen; `[[media:id]]` y bloques de medio sin medio; URL firmadas de medios pegadas a mano (caducan); UIs externas borradas o desactivadas (bloques «Componente remoto», pantallas externas, menús); y los enlaces externos que fallan | *Abrir el contenido* (o *Abrir el número*); slots, inicios y menús se corrigen en la consola de control |
+| **Medios huérfanos** | Medios que nada usa (ni borradores, ni versiones antiguas, ni slots, ni números o maquetas de newsletter), con su tamaño. Uno subido hace menos de un día no cuenta todavía | *Borrar el medio*: solo `content:admin`, con confirmación, y solo si en ese momento sigue sin usarse. **Nunca se borra solo** |
+| **Imágenes sin texto alternativo** | Imágenes de la biblioteca sin texto alternativo (hasta ahora se leía su título) e `<img>` sin `alt` en cuerpos, bloques, slots y números | En una imagen de la biblioteca: escribe el texto, o **Sugerir texto alternativo con IA**, revísalo y **Aplicar el texto alternativo**. La sugerencia nunca se aplica sola |
+| **Caducidad** | Contenidos publicados que caducan en los próximos 14 días, y contenidos ya caducados a los que aún enlazan páginas, inicios o menús | Amplía la fecha, o quita el enlace |
+| **Contenido desactualizado** | Contenidos publicados sin republicar en más de 12 meses (en las secciones configuradas, o en todas), y páginas que nadie ha abierto en los últimos 90 días (con al menos dos semanas de analítica; un inicio no cuenta) | Revisa si sigue siendo cierto y vuelve a publicar, o retíralo |
+
+**Marcar como revisado**: en un aviso, durante los días que digas (30 por defecto) y con una nota; desde la lista,
+los seleccionados, 30 días. Sale de las cuentas hasta esa fecha y vuelve si sigue ahí; *Volver a pendiente* lo
+deshace. Un aviso que desaparece (porque se arregló) se lleva su marca.
+
+**Sugerir texto alternativo con IA** manda la imagen (hasta 5 MB) a la IA del plano de control con tu token,
+junto a su título y dónde se usa, y pone en el campo una frase corta en español. Si la IA no está disponible, o
+no puede ver la imagen, lo dice y no cambia nada.
+
 ## Directorio y visibilidad
 
 En la consola de control, *Intranet*:
