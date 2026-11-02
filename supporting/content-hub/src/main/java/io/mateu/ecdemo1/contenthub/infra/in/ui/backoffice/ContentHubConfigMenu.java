@@ -11,6 +11,14 @@ public class ContentHubConfigMenu {
     SectionsCrud secciones;
 
     @Menu
+    @Label("Menús")
+    MenusCrud menus;
+
+    @Menu
+    @Label("Menús: vista previa")
+    MenuPreviewPage menusVistaPrevia;
+
+    @Menu
     @Label("Audiencias")
     NamedAudiencesCrud audiencias;
 

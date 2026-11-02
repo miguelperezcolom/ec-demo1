@@ -416,6 +416,31 @@ Hoy `portal/HomePage` es fijo e igual para todos: saludo, pendientes de confirma
 | H3 | **Ver como…** del backoffice muestra también qué página de inicio le toca a ese perfil (o "el de por defecto"). | hecho (0396cc69) |
 | H4 | **Ejemplo en la seed**: la página "Inicio Recepción Canarias" (audiencia: departamento RECEPCION y región CANARIAS), con saludo, pendientes, enlaces rápidos a turnos y al procedimiento, y un banner, primera en la lista. Probar con Ana Pérez (TFS01, recepción), que la ve, frente a un chef de Cancún, que sigue con el inicio por defecto, en Vaadin y Redwood. Documentar en los manuales (portal, backoffice, configuración). | hecho (f4c99699, docs 0396cc69); falta probarlo en el despliegue |
 
+## M — Menús configurables
+
+Hasta ahora el menú del portal estaba en código (`IntranetMenu`, un `@Menu` por función). El usuario pidió
+(2026-11-02) hacerlo **configurable como datos y reutilizable**: la intranet lo usa ya; cada newsletter (que
+pasa a ser "un sitio más", rama `feat/newsletter-issues`) tendrá el suyo con la misma pieza; y una entrada
+puede llevar a **otra interfaz** del registro de interfaces (rama `feat/remote-uis`).
+
+**Diseño acordado:** un menú es un árbol ordenado de entradas, de un **sitio** (`intranet` o el id de otro
+sitio). Entrada: texto por idioma (es/en/de, reserva en el idioma del sitio), destino, audiencia ("quién lo
+verá", el mismo modelo que los items) y activa. Destinos: `PAGE`, `SECTION`, `BUILTIN` (las funciones del
+portal), `URL` (ruta o externa, pestaña nueva), `REMOTE` (otra interfaz) y los que añada otro tipo de sitio.
+El portal lo dibuja por petición con `MenuSupplier`; una entrada que el lector no ve no sale, ni un submenú
+vacío. Las rutas siguen saliendo de las páginas de siempre.
+
+| # | Paso | Estado |
+|---|---|---|
+| M1 | Dominio: `SiteMenu` (árbol: añadir, cambiar, mover, subir/bajar, meter/sacar de submenú, borrar con lo que cuelga; lo que ve un lector), `MenuEntry`, `MenuTarget` (tipo abierto), `MenuNode` | hecho: `domain/menu`, `SiteMenuTest` |
+| M2 | Aplicación: `SiteMenus` (por sitio, `content:admin`, `shown(MenuContext)`), un `MenuTargetResolver` por tipo (`StandardTargets`), `PortalFunction`, `DefaultMenus`; costuras `SiteRoutes` y `UiSources` | hecho: `application/menu`, `SiteMenusTest` |
+| M3 | Persistencia `ch_menu` (un documento por sitio) y siembra idempotente del menú de siempre (`MenuSeeder`) | hecho: `PgMenuRepository`, `MenuStoreTest` |
+| M4 | Portal: `IntranetMenu` como `MenuSupplier` (`PortalMenu`): funciones como `FieldLink`, páginas/secciones/rutas como `RouteLink`, submenús sin path, funciones fuera del primer nivel ocultas pero enrutadas; `MenuEntryPage` para enlaces externos e interfaces alojadas | hecho: `PortalMenuTest`; sin cambios en los shells |
+| M5 | Configuración → Menús (`MenusCrud`, `MenuEntryForm` con sitio, posición, textos, destino, quién lo verá, activa y subir/bajar/meter/sacar) y Menús: vista previa (`MenuPreviewPage`); *Ver como* enseña el menú configurado | hecho |
+| M6 | Probar en local en Vaadin (`intranet.localhost`) y Redwood (`rw-intranet.localhost`): el menú sembrado igual que antes, un submenú, una página con audiencia, un enlace externo; deep links | pendiente (despliegue lo coordina el agente principal) |
+| M7 | Newsletter: su menú con `SiteMenus` y sus destinos propios (`MenuTargetResolver` con `appliesTo`) | pendiente, en `feat/newsletter-issues` |
+| M8 | Registro de interfaces: implementación real de `UiSources` (`@Primary`) | pendiente, en `feat/remote-uis` |
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.
