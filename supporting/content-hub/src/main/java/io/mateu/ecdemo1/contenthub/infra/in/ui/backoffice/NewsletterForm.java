@@ -243,6 +243,7 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
     /** A new issue now, pre-filled from the newsletter: the layout and what was published since the previous one. */
     @Toolbar
     @Action
+    @Label("Nuevo número")
     public Object nuevoNumero(HttpRequest httpRequest) {
         var issueId = editorial.newIssue(readers.of(httpRequest), id);
         return UICommand.navigateTo(NewsletterIssuesCrud.route(issueId));
@@ -251,6 +252,7 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
     /** A new page of the newsletter's own, opened in the content form (publish it there; edit it on the page). */
     @Toolbar
     @Action
+    @Label("Nueva página")
     public Object nuevaPagina(HttpRequest httpRequest) {
         var pageId = editorial.newPage(readers.of(httpRequest), id, "Nueva página");
         return UICommand.navigateTo(VisualEditorPage.formRoute(pageId));

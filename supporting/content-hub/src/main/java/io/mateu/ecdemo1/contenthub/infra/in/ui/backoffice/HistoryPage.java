@@ -9,6 +9,7 @@ import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Hidden;
+import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.data.FieldDataType;
 import io.mateu.uidl.data.FieldStereotype;
@@ -133,6 +134,7 @@ public class HistoryPage implements Identifiable, DetailContentSupplier {
     @Writers
     @Action(confirmationRequired = true, confirmationTitle = "¿Restaurar esta versión?",
             confirmationMessage = "Se copia en el borrador: no se publica. Luego sigue el flujo de siempre (revisión, publicación).")
+    @Label("Restaurar esta versión")
     public Object restaurarEstaVersion(HttpRequest httpRequest) {
         if (aRestaurar == null || aRestaurar.isBlank()) {
             return List.of(this, Message.warning("Elige la versión a restaurar"));

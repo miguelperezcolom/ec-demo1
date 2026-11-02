@@ -241,12 +241,14 @@ public class MenuEntryForm implements SimpleCrud.CrudForm, VisibilitySupplier, i
 
     @Toolbar
     @Action
+    @Label("Meter en el submenú de encima")
     public Object meterEnElSubmenuDeEncima(HttpRequest httpRequest) {
         return step(httpRequest, "Ahora está en el submenú de encima", id -> menus.indent(readers.of(httpRequest), site, id));
     }
 
     @Toolbar
     @Action
+    @Label("Sacar del submenú")
     public Object sacarDelSubmenu(HttpRequest httpRequest) {
         return step(httpRequest, "Ahora está detrás de su submenú", id -> menus.outdent(readers.of(httpRequest), site, id));
     }
