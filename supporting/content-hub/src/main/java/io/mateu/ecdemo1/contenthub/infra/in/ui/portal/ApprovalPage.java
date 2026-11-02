@@ -90,12 +90,12 @@ public class ApprovalPage implements Identifiable, DetailContentSupplier, Visibi
     Object decide(HttpRequest httpRequest, boolean approve) {
         var approval = approval(httpRequest);
         if (approval == null) {
-            return Message.warning("Esa tarea ya está decidida, o no es tuya");
+            return List.of(this, Message.warning("Esa tarea ya está decidida, o no es tuya"));
         }
         try {
             requests.decide(httpRequest.getHeaderValue("Authorization"), approval, approve, comentario);
         } catch (IllegalStateException e) {
-            return Message.error(e.getMessage());
+            return List.of(this, Message.error(e.getMessage()));
         }
         // the page again, now saying it is no longer pending (Aprobar twice would find no task)
         load(id, httpRequest);

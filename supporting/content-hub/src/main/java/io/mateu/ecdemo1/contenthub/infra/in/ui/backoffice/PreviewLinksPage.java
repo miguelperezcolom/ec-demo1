@@ -141,7 +141,7 @@ public class PreviewLinksPage implements Identifiable, DetailContentSupplier {
         if (verComo != null && !verComo.isBlank()) {
             var profile = audiences.allProfiles().get(verComo);
             if (profile == null) {
-                return Message.warning("Ese perfil ya no está en el directorio");
+                return List.of(this, Message.warning("Ese perfil ya no está en el directorio"));
             }
             label = profile.attributes().canonical().replace(";", " · ");
         }
@@ -157,7 +157,7 @@ public class PreviewLinksPage implements Identifiable, DetailContentSupplier {
     @Label("Revocar enlace")
     public Object revocarEnlace(HttpRequest httpRequest) {
         if (enlaceARevocar == null || enlaceARevocar.isBlank()) {
-            return Message.warning("Elige en «Enlace a revocar» cuál");
+            return List.of(this, Message.warning("Elige en «Enlace a revocar» cuál"));
         }
         previewLinks.revoke(readers.real(httpRequest::getHeaderValue), enlaceARevocar);
         enlaceARevocar = null;

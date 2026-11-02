@@ -792,42 +792,20 @@ como una pantalla externa.
 
 ### El cromo de una UI embebida
 
-Un `MicroFrontend` de Mateu dibuja la página del remoto como si fuera la de arriba: una **miga de pan
-automática**, calculada con el menú y la URL **del host** («Intranet › Noticias › Acumulaciones» dentro de un
-bloque), y su **título de ventana** (`SetWindowTitle`) en la pestaña. Mateu no tiene aún una opción de
-«embebido». Mientras tanto:
+Un `MicroFrontend` de Mateu, sin más, dibuja la página del remoto como si fuera la de arriba: una miga de pan
+calculada con el menú y la URL del host y su título de ventana en la pestaña. Desde Mateu 3.0-beta.42,
+`RemoteUiRenderer` le pone `chrome(EmbeddedChrome…)`: la isla es un bloque de la página, no da nombre a la
+ventana, no toca la barra de direcciones ni el favicon (las peticiones al remoto lo dicen, y su servidor no
+manda esos comandos) y no pinta miga propia. Funciona igual en Vaadin y en Redwood.
 
-- `RemoteUiRenderer.Mode`: `BLOCK` (un componente remoto) o `PAGE` (una pantalla externa o una entrada de menú
-  alojada). La isla lleva las clases `ec-remote-ui`, `ec-remote-block` o `ec-remote-page` y, en un bloque con
-  título propio, `ec-remote-notitle`.
-- `embed.js` mete en los shadow roots de cada isla un estilo que quita la miga de pan (`.breadcrumbs-bar`: la
-  de la página es la de la intranet) y, en un bloque con título, el título de la página remota
-  (`.form-header h2`: queda una cabecera compacta, con sus acciones). Vigila esos shadow roots para volver a
-  ponerlo cuando el remoto se repinta.
-- **Guarda del título**: si la pestaña pasa a llamarse como un encabezado dibujado dentro de un bloque remoto,
-  `embed.js` le devuelve el título que tenía (el de la página). Una pantalla externa sí puede dar nombre a la
-  ventana.
+| `RemoteUiRenderer.Mode` | Uso | `EmbeddedChrome` |
+|---|---|---|
+| `BLOCK`, con título propio | Un componente remoto con título | `COMPACT`: de la cabecera del remoto solo quedan sus acciones |
+| `BLOCK`, sin título | Un componente remoto sin título | `PAGE`: la cabecera del remoto (título y acciones), sin miga |
+| `PAGE` | Una pantalla externa o una entrada de menú alojada | `PAGE`; la pestaña lleva el título de la página de la intranet |
 
-Es CSS sobre clases internas del renderer Vaadin de Mateu (`.breadcrumbs-bar`, `.form-header h2`): si cambian,
-vuelve la miga. En Redwood un `MicroFrontend` es una superficie dentro de la página (sin miga propia); la
-guarda del título busca los encabezados dentro de `.ec-remote-ui`, que Redwood quizá no ponga.
-
-#### Lo que Mateu necesitaría
-
-Una opción en `MicroFrontend` —p. ej. `chrome(EmbeddedChrome.NONE | COMPACT | PAGE)`, o un `embedded`
-booleano— que:
-
-1. en el cliente (los dos renderers), para `NONE`/`COMPACT`: no aplique los comandos de ventana que traiga la
-   isla (`SetWindowTitle`, `PushStateToHistory`, `SetFavicon`), no calcule la miga automática
-   (`mateu-content-header.crumbsOf`: tratarla como `level > 0`, igual que hoy `noBreadcrumbs`) y, en `NONE`,
-   tampoco pinte el título de la página (en `COMPACT`, solo sus acciones); para `PAGE`: el título puede nombrar
-   la ventana, pero sin miga propia;
-2. en la petición al remoto, una marca (como la de `_embeddedMediator` que ya mira `CommandMapper`) para que el
-   servidor del remoto no mande esos comandos;
-3. lo mismo en `Resolve.SERVER` (que ya quita los comandos del primer pintado, `MicroFrontendServerResolver.
-   embeddable`), para las interacciones siguientes.
-
-Con eso, `RemoteUiRenderer` pondría la opción y `embed.js` dejaría de tocar el cromo.
+Las clases `ec-remote-ui`, `ec-remote-block`/`ec-remote-page` y `ec-remote-notitle` solo marcan la isla;
+`embed.js` ya no toca el cromo (antes lo quitaba con CSS y una guarda del título).
 
 ## Salud del contenido
 
