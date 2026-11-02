@@ -439,7 +439,43 @@ vacío. Las rutas siguen saliendo de las páginas de siempre.
 | M5 | Configuración → Menús (`MenusCrud`, `MenuEntryForm` con sitio, posición, textos, destino, quién lo verá, activa y subir/bajar/meter/sacar) y Menús: vista previa (`MenuPreviewPage`); *Ver como* enseña el menú configurado | hecho |
 | M6 | Probar en local en Vaadin (`intranet.localhost`) y Redwood (`rw-intranet.localhost`): el menú sembrado igual que antes, un submenú, una página con audiencia, un enlace externo; deep links | pendiente (despliegue lo coordina el agente principal) |
 | M7 | Newsletter: su menú con `SiteMenus` y sus destinos propios (`MenuTargetResolver` con `appliesTo`) | pendiente, en `feat/newsletter-issues` |
-| M8 | Registro de interfaces: implementación real de `UiSources` (`@Primary`) | pendiente, en `feat/remote-uis` |
+| M8 | Registro de interfaces: implementación real de `UiSources` (`@Primary`) | hecho en `feat/remote-uis`: un solo `UiSources` con el `UiSource` del dominio; `PgUiSourceRepository` (`@Primary`), sin el bean vacío de `MenuConfig` |
+
+## R — UIs externas (registro y uso como páginas y bloques)
+
+Pedido el 2026-11-02 (rama `feat/remote-uis`). Diseño acordado con el usuario:
+- **Registro** (configuración, plano de control, `content:admin`): `UiSource {id, nombre, tipo, dónde está,
+  etiqueta, audiencia, permisos que exige, activa}`. Tipos: `MATEU_REMOTE` (el prefijo de una UI de Mateu en
+  el gateway, `/_loyalty`), `WEB_COMPONENT` (la ruta de su script en el gateway + su etiqueta), `IFRAME`
+  (una URL https de un origen permitido por el despliegue; último recurso). Nunca un host arbitrario,
+  `javascript:`, `..` ni `//`.
+- **Usos** (los editores solo eligen entre las registradas): una **pantalla externa** (`REMOTE_PAGE`: su URL
+  guarda `ui:<fuente><ruta>`) y el bloque **«Componente remoto»** (`REMOTE`: fuente + ruta o atributos).
+  Los **menús** (rama `feat/configurable-menus`) usan el registro por el puerto `UiSources`.
+- **Seguridad**: el token del usuario viaja por el gateway como siempre y la UI remota aplica sus permisos;
+  la audiencia de la fuente es una audiencia con nombre para la política (`ui-source:<id>`), así que lo que la
+  usa se proyecta con ella (AND) y desaparece de todo si se estrecha, desactiva o borra; los permisos se
+  miran en la puerta (`RemoteUis.usable`). Nada ensancha.
+
+| # | Paso | Estado |
+|---|---|---|
+| R1 | Dominio: `UiSource`, `RemoteUi`, `BlockType.REMOTE`, `ItemType.REMOTE_PAGE`; validación (rutas del gateway, orígenes permitidos, atributos sin `on*`/`javascript:`) y la audiencia de la fuente en la proyección (`Block.visibilityAudience`, `ItemContent.visibilityAudience`) | hecho (580f74a3), con tests |
+| R2 | Registro: puerto `UiSources` (`find`, `all`), `PgUiSourceRepository` (`ch_ui_source`), `UiSourceCommands`, `RemoteUis`; Configuración → **UIs externas** (`UiSourcesCrud`/`UiSourceForm`, con el constructor de audiencias y «Dónde se usa») | hecho (580f74a3) |
+| R3 | Dibujo: portal (`MicroFrontend` para Mateu, `<ec-ui-source>` de `embed.js` para web component e iframe), editor visual (una tarjeta), correo (`RemoteUiRenderer.fallbackHtml`/`fallbackText`: «ver en la web») | hecho (580f74a3, a7d39263) |
+| R4 | Editores: pantalla externa en `ItemForm`; campos del bloque en `BlockForm` y en el editor visual (el registro como lista) | hecho (a7d39263) |
+| R5 | Ejemplos en la semilla: Riu Class (`/_loyalty`) y `<ec-push-toggle>`; «Riu Class · socios» (pantalla externa) y «Herramientas» (página con dos componentes remotos) | hecho (0c7c96d2) |
+| R6 | Desplegar en local y probar en el navegador, Vaadin y Redwood, en `ws.localhost:8800` (el gateway enruta `/_loyalty` en el plano de datos) | pendiente (lo coordina el agente principal) |
+| R7 | En el host propio de la intranet (`intranet.*`) el gateway solo enruta `/_portal`, `/_inbox` y los medios: una UI de Mateu de otro servicio necesita su ruta allí (decidir cuáles) | pendiente |
+| R8 | Manual del backoffice, arquitectura y operación | hecho |
+
+Limitaciones conocidas:
+- dentro de una pantalla externa, un enlace de la UI remota navega a su propia ruta (p. ej. `/loyalty/members/…`):
+  en la consola de datos la resuelve su `RemoteMenu`; en el host de la intranet, no;
+- los permisos que exige una fuente se miran al dibujar: un lector sin ellos ve la pantalla externa en los
+  listados, pero al abrirla le sale «No puedes usar esta aplicación» (la audiencia, en cambio, sí la oculta en
+  todo); con «ver como», los permisos son los del editor;
+- un web component `.mjs` cargado con token (blob) no resuelve imports relativos: que el script sea un bundle;
+- un iframe no lleva el token del usuario: el otro sitio inicia sesión por su cuenta.
 
 ## Cómo retomar
 

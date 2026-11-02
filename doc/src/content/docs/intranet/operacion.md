@@ -41,6 +41,7 @@ espera a que exista); la imagen es
 | `NOTIFICATIONS_BATCH_SIZE` | — | `200` | Lectores por transacción del reparto, y destinatarios por correo |
 | `ANALYTICS_RETENTION` | — | `P90D` | Cuánto se guardan los eventos de uso en crudo (nunca menos de 30 días) |
 | `PORTAL_URL` | `https://ec1.mateu.io/intranet` | `http://ec1.localhost:8800/intranet` | Los enlaces de la newsletter y el mensaje de «ver como» |
+| `UI_SOURCES_IFRAME_ORIGINS` | — | vacío | Los únicos orígenes (`https://host[:puerto]`, separados por comas) a los que puede apuntar una UI externa de tipo iframe. Vacío: ninguna |
 | `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWKS_URI` | `https://auth.ec1.mateu.io/realms/ec-demo1`, `http://keycloak:8080/…/certs` | iguales | Verificar el token de las llamadas MCP |
 | `MEDIA_SECRET` | — | vacío | Firma las URL de los medios. Vacío: una clave aleatoria por arranque (las URL ya dibujadas dejan de valer al reiniciar) |
 | `MEDIA_MAX_BYTES` | — | `20971520` (20 MB) | Tamaño máximo de un fichero subido |
@@ -136,7 +137,9 @@ Dos semillas, idempotentes:
   distintas —uno para todos con el vídeo, el cuadrante de turnos de Canarias, la carta de otoño para
   cocinas, la política de datos con confirmación obligatoria, uno solo para directores, uno programado y
   uno caducado—, una página con bloques (uno solo para recepción), el slot
-  `front-office.bienvenida.destacado` y una edición de newsletter.
+  `front-office.bienvenida.destacado` y una edición de newsletter. En cada arranque, si faltan: las UIs
+  externas **Riu Class** (`/_loyalty`) y **Notificaciones en este navegador** (`<ec-push-toggle>`), la
+  pantalla externa «Riu Class · socios» y la página «Herramientas» con dos componentes remotos.
 
 Para enseñar las diferencias: *Ver como* con `ana.perez` (recepción, Tenerife), `kevin.lee` (cocina,
 Mauricio) y `raj.patel` (director, Mauricio).
@@ -184,6 +187,15 @@ llamada se rechaza.
   servidor y `@ContentSlot` de Mateu, que aún no se han publicado; los descriptores de las aplicaciones
   tampoco se cargan todavía (el slot de demo lo registra la semilla). Cuando Mateu lo publique, se sube
   `mateu.version` y el remoto pasa a ser un componente.
+- **UIs externas y hosts.** Una UI de Mateu registrada se pide por su prefijo en el gateway desde el host donde
+  se lee la intranet: en la consola de datos lo están los de sus menús; en `intranet.*`, solo `/_portal` y
+  `/_inbox`, así que allí una pantalla de Riu Class no carga hasta que el gateway enrute `/_loyalty` en ese
+  host. Dentro de una pantalla externa, un enlace de la UI remota navega a su ruta propia, que resuelve la
+  consola de datos (su `RemoteMenu`) y no el host de la intranet.
+- **UIs externas: permisos al dibujar.** Los permisos que exige una fuente se miran al pintar, no en la
+  proyección: quien no los tiene ve la pantalla externa en los listados y, al abrirla, «No puedes usar esta
+  aplicación». Un web component `.mjs` cargado con token no resuelve imports relativos; un iframe no lleva el
+  token.
 - **"Ver como" vive en memoria** (una hora por editor), igual que la clave aleatoria de las URL de medios
   si no se fija `MEDIA_SECRET`: un reinicio los pierde.
 - **Una sola réplica.** Por lo anterior y por la caché local por hash, el manifiesto usa una réplica y

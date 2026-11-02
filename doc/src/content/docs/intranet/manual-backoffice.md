@@ -9,7 +9,7 @@ El backoffice tiene dos caras, en dos consolas:
   confirmaciones—, es un menú de la propia intranet en la consola de datos (`https://ec1.mateu.io`, en
   local `http://ec1.localhost:8800` → *Editorial*). Solo lo ve quien tiene algún **permiso editorial**;
   quien no, ni ve la entrada ni puede abrir sus pantallas tecleando la URL.
-- **Configuración** —secciones, menús, audiencias con nombre, slots, directorio y visibilidad: cómo funciona la
+- **Configuración** —secciones, menús, audiencias con nombre, slots, UIs externas, directorio y visibilidad: cómo funciona la
   intranet, no lo que publica— está en la consola de control (`https://console.ec1.mateu.io`, en local
   `http://console.localhost:8800` → *Intranet*), con el rol `ai-admin` y además `content:admin`.
 
@@ -19,7 +19,7 @@ Los permisos se asignan con roles en *Usuarios* (consola de control):
 | :-- | :------- | :---- |
 | Editor de contenido (`content-editor`) | `content:edit` | Crear y editar contenidos, subir medios, enviar a revisión, componer newsletters |
 | Publicador de contenido (`content-publisher`) | `content:edit`, `content:publish` | Además aprobar, publicar (con o sin revisión), rechazar, retirar, programar el envío de una newsletter y editar el contenido de los slots |
-| Administrador de contenido (`content-admin`) | los tres | Además, en la consola de control, la configuración: secciones, menús, audiencias con nombre, slots, directorio y visibilidad |
+| Administrador de contenido (`content-admin`) | los tres | Además, en la consola de control, la configuración: secciones, menús, audiencias con nombre, slots, UIs externas, directorio y visibilidad |
 
 En la demo: `editora` es editora, `publicador` es publicador y `demo` es administrador (ver
 [Operación](/intranet/operacion/#datos-de-demo)).
@@ -33,11 +33,12 @@ modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 
 | Sección del formulario | Qué se rellena |
 | :--------------------- | :------------- |
-| **Contenido** | **Tipo** (Artículo, Página, Aviso, Enlace, Documento; no se cambia después), **Sección** del árbol, **Idioma por defecto** |
+| **Contenido** | **Tipo** (Artículo, Página, Aviso, Enlace, Documento, Pantalla externa; no se cambia después), **Sección** del árbol, **Idioma por defecto** |
 | **Español / English / Deutsch** | Por idioma: título, resumen y cuerpo (texto enriquecido). Un idioma sin título no se publica; al lector sin traducción en su idioma se le muestra el idioma por defecto, que **debe** tener título |
 | **Audiencia** | Quién lo verá (ver [El constructor de audiencias](#el-constructor-de-audiencias)) |
 | **Publicación** | *Publicar a partir de* (vacío: en el momento de publicar), *Caduca el*, *URL* (obligatoria en enlaces y documentos; vale `media:id` para un fichero de la biblioteca), *Seguimiento de lectura*, *Confirmación obligatoria* y *Confirmar antes del*, *Al publicar, exigir reconfirmar*, *Comentarios cerrados* (se aplica al guardar, sin esperar a publicar: ver [Comentarios](#comentarios)), *Notificar a los lectores al publicar*, *Importante* |
 | **Cifras** (al editar) | *Vistas*, *Lectores únicos*, *Confirmaciones* (de la versión que cuenta) y *Lectores notificados* |
+| **Pantalla externa** (solo ese tipo) | *UI externa*, *Ruta* y *Atributos* (ver [Pantallas externas y componentes remotos](#pantallas-externas-y-componentes-remotos)) |
 | **Bloques (solo páginas)** | Los bloques de una página (ver abajo) |
 | **Avisos** | Lo que conviene revisar antes de publicar: una audiencia que no cumple nadie, un bloque que nadie vería |
 
@@ -79,6 +80,7 @@ El mismo en items, audiencias con nombre y newsletter:
 | **Pendientes de confirmar** | Lo que el lector debe confirmar y no ha confirmado (nada, si no hay) |
 | **Últimos avisos** | Los últimos avisos que el lector puede ver; *Cuántos* |
 | **Últimas noticias** | Las últimas noticias y páginas que el lector puede ver, de una sección o de todas; *Cuántos* |
+| **Componente remoto** | Una pantalla o un elemento de otra aplicación, de las registradas: *UI externa*, *Ruta* o *Atributos* (ver [Pantallas externas y componentes remotos](#pantallas-externas-y-componentes-remotos)) |
 
 Los cuatro últimos sirven para montar **inicios** (ver [Inicios por audiencia](#inicios-por-audiencia)),
 pero valen en cualquier página.
@@ -88,6 +90,27 @@ un listado, su sección y cuántos), además de la audiencia.
 
 Cada bloque puede restringirse a unos **departamentos, hoteles o puestos**. Esa audiencia **solo
 estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple ambas, *Avisos* lo dice.
+
+### Pantallas externas y componentes remotos
+
+Otras aplicaciones de la casa pueden verse **dentro de la intranet**, con los permisos de cada lector en
+ellas: la configuración las registra (ver [UIs externas](#uis-externas)) y el editor **elige** una de la
+lista; nunca escribe dónde está.
+
+- **Pantalla externa** (tipo de contenido): una página cuyo contenido es una pantalla de otra aplicación, en
+  vivo, con su propia URL en el portal (se puede enlazar, añadir a favoritos o recargar) y el menú de la
+  intranet alrededor. Se rellena *UI externa* y, para una UI de Mateu, la *Ruta* de la pantalla
+  (`/loyalty/members`); para un web component, sus *Atributos* (`nombre=valor`, uno por línea). Lleva
+  título, resumen, sección y audiencia como cualquier contenido, y pasa por el mismo workflow.
+- **Componente remoto** (tipo de bloque): lo mismo, como un bloque más de una página.
+
+Quién lo ve: quien cumple la audiencia del contenido (y la del bloque) **y** la de la UI externa; además, al
+abrirlo, debe tener los permisos que la UI exige. Si no, el bloque no se pinta y la pantalla dice «No puedes
+usar esta aplicación». Dentro, la aplicación aplica sus propios permisos: la intranet nunca da más de lo que
+la aplicación da.
+
+En el **editor visual**, un componente remoto se ve como una tarjeta con la UI y la ruta (en vivo, solo en el
+portal). En la **newsletter** no se puede ejecutar: sale un enlace «… — ver en la web».
 
 ### Editar una página sobre la propia página (editor visual)
 
@@ -256,6 +279,34 @@ constructor. La ficha enseña **los perfiles que la cumplen** y cuántos emplead
 **Redefinir** una cambia lo que ve todo lo que la nombra —items, bloques, variantes de slot—, en cuanto se
 recalcula la visibilidad (segundos). **Borrar** una deja lo que la nombraba **visible para nadie** hasta
 que se edite: nunca se abre el contenido por accidente.
+
+## UIs externas
+
+*Consola de control → Intranet → UIs externas*: el **registro** de las interfaces de otras aplicaciones que
+los editores pueden poner en la intranet como pantalla externa o como componente remoto (y los menús, como
+entrada). Cada una tiene:
+
+| Campo | Qué es |
+| :---- | :----- |
+| **Id** | Minúsculas, cifras y guiones (`riu-class`). Lo guardan las páginas, bloques y menús que la usan: no se cambia |
+| **Nombre** | Lo que ven los editores en la lista |
+| **Tipo** | **UI de Mateu (federada)**, la preferida: se pinta con el mismo renderer de la consola (Vaadin o Redwood), como los menús de los shells. **Web component**: un elemento propio de otra aplicación. **Iframe**: el último recurso, para una web que no es ninguna de las dos |
+| **Dónde está** | UI de Mateu: su prefijo en el gateway (`/_loyalty`, `/_users`). Web component: la ruta de su script en el gateway (`/_inbox/push/push.js`). Iframe: una URL `https://` de un origen que el despliegue permite (`UI_SOURCES_IFRAME_ORIGINS`). Nada más: ni otros hosts, ni `javascript:`, ni `..` |
+| **Etiqueta del web component** | El elemento que define el script (`ec-push-toggle`) |
+| **Audiencia** | El constructor de siempre: quién puede usarla. Se suma (AND) a la de cada contenido o bloque que la use |
+| **Permisos que exige** | Los permisos (`X-User-Scopes`) que el lector debe tener todos. Vacío: ninguno |
+| **Activa** | Desactivarla oculta al momento todo lo que la usa, sin tocar los contenidos |
+
+La ficha dice **dónde se usa**. **Borrar** una deja lo que la usaba **visible para nadie** hasta que un editor
+lo cambie, como una audiencia con nombre borrada.
+
+El prefijo de una UI de Mateu tiene que estar **enrutado por el gateway en el host donde se lee la
+intranet**: en la consola de datos (`ws.…`) lo están los de sus menús (`/_loyalty`, `/_notices`,
+`/_customers`…); en el host propio de la intranet (`intranet.…`), por ahora solo `/_portal` y `/_inbox`.
+
+La demo registra **Riu Class** (`/_loyalty`) y **Notificaciones en este navegador** (el `<ec-push-toggle>`
+del buzón), y los usa en la pantalla externa «Riu Class · socios» y en la página «Herramientas» (sección
+*La empresa*).
 
 ## Ver como
 
