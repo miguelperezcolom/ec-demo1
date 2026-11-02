@@ -119,6 +119,12 @@ añadir enlaces no descoloca las traducciones). Cada parte puede faltar.
   enlace en los tres; `BlockForm.of(bloque, porDefecto)` y `toBlock(porDefecto)` (si cambia el idioma por defecto
   de la página, el del bloque cambia con él).
 - **Saneado y medios**: `Block.mapHtml` sanea el HTML de todos los idiomas; `MediaReferences` cuenta sus marcas.
+- **Historial**: `ContentDiff` compara los campos propios del bloque (idioma por defecto) y, además, cada
+  traducción: «· título (en)», «· contenido (en)», «· textos de los enlaces (en)».
+- **Plantillas**: el texto propio de los bloques de una plantilla es español (`PageTemplate.LANGUAGE`); una
+  página nueva en otro idioma toma el de su idioma como propio y el español queda como traducción
+  (`Block.rebased`), y al guardar una página como plantilla se hace al revés. La vista previa por enlace dibuja
+  los bloques en el idioma de quien la ve, como el resto del borrador.
 - **Traducir con IA** (`BlockTranslation`): ver abajo.
 
 ## La visibilidad
