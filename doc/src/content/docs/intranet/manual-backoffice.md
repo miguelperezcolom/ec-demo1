@@ -43,9 +43,10 @@ modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 **Traducir con IA** (en la barra del formulario) rellena los idiomas que aún no tienen título a partir
 del idioma por defecto: título, resumen y cuerpo, con el formato intacto y las marcas `[[media:…]]` en su
 sitio. Solo cambia el formulario: **revísalo y guarda**. Nada se publica sin pasar por el flujo de siempre.
-Para retraducir un idioma, vacía su título. Si una traducción pierde una marca de medio, no se aplica. La
-acción solo aparece si el despliegue tiene clave de IA (`ANTHROPIC_API_KEY`, del secreto `ec-anthropic`);
-el modelo se configura con `content-hub.translation.model`.
+Para retraducir un idioma, vacía su título. Si una traducción pierde una marca de medio, el formato o un
+enlace del cuerpo, no se aplica. La traduce el agente `intranet-translator` del plano de control de IA, en tu
+nombre y con tu presupuesto; si no está disponible, o su respuesta no sirve, sale un mensaje breve y **el
+formulario no cambia**.
 
 Arriba del formulario, **Estado** y **Aplicado a los lectores**: tras publicar, «Aplicando la versión
 N…» hasta que la visibilidad está recalculada (unos segundos) y luego «Sí — versión N aplicada el …».
@@ -116,6 +117,24 @@ estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple amb
   YouTube, Vimeo o Drive al pulsar *Compartir → Insertar*). Solo se guardan el proveedor y el id del
   vídeo o fichero; el reproductor oficial se construye a partir de ellos. Otra URL cualquiera queda como
   enlace. Para lo que pase de 20 MB, súbelo a YouTube, Vimeo o Drive y pon su URL.
+
+### Un fichero de Google Drive
+
+Pega la URL de un fichero de Drive, Docs, Sheets o Slides, tal como la copias del navegador o de
+*Compartir*, en cualquiera de estos dos sitios:
+
+- en **Medios → Nuevo**, en *URL o código de inserción*; se usa como cualquier medio;
+- en el campo **URL** de un contenido de tipo documento o enlace.
+
+La intranet guarda **solo la referencia**: nunca copia el fichero, así que hay una sola versión, la de Drive.
+El lector ve la vista previa de Google y los enlaces *Abrir en Drive* y *Editar en Drive*. Comparte el fichero
+en Drive con quien deba verlo: **los permisos los pone Google**, no la audiencia del contenido. Una carpeta o
+un documento «publicado en la web» no es un fichero: en Medios se rechaza diciéndolo; en el campo URL de un
+contenido queda como enlace normal.
+
+Si el despliegue está conectado a Drive, en los detalles del medio ves el nombre en Drive, quién lo modificó
+y, si Drive no da acceso a ese fichero, el motivo. No es un error para el lector: pierde solo el
+«Modificado por…».
 
 Para usarlo en un contenido:
 

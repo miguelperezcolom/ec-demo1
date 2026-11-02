@@ -97,6 +97,17 @@ public interface ContentIndex {
     /** Whether some published item that uses the media asset is visible to the hash now. */
     boolean isMediaVisible(String mediaId, String hash, Instant now);
 
+    // ── external files (Google Drive) the visible items point at ────────────────────────────────
+
+    /**
+     * The Google Drive / Docs URLs of the items visible to the hash now — their own URL (a document or a
+     * link) or an external medium they use — newest item first, in the reader's language.
+     */
+    List<ExternalReference> visibleGoogleUrls(String hash, String language, Instant now);
+
+    record ExternalReference(String itemId, String itemTitle, String url) {
+    }
+
     record Page<T>(List<T> content, long total) {
     }
 

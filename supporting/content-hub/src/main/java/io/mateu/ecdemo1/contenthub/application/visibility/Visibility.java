@@ -75,6 +75,21 @@ public class Visibility {
         return index.isMediaVisible(mediaId, reader.hash(), clock.instant());
     }
 
+    /** The Google Drive files the items the reader sees point at (their URL, or a Drive medium they use). */
+    public List<ContentIndex.ExternalReference> googleUrls(EmployeeAttributes reader) {
+        ready(reader);
+        return index.visibleGoogleUrls(reader.hash(), reader.language(), clock.instant());
+    }
+
+    /**
+     * The passages most like a question (its vector), among what the reader may see — what the search and
+     * the AI answer are built from; the filter is inside the same query.
+     */
+    public List<ContentIndex.Passage> similarPassages(EmployeeAttributes reader, float[] question, int limit) {
+        ready(reader);
+        return index.similarVisiblePassages(reader.hash(), reader.language(), clock.instant(), question, limit);
+    }
+
     private void ready(EmployeeAttributes reader) {
         if (!index.knowsProfile(reader.hash())) {
             projection.materialise(reader);

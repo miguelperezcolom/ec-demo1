@@ -1,6 +1,8 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
+import io.mateu.ecdemo1.contenthub.application.drive.DriveDocuments;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
+import io.mateu.ecdemo1.contenthub.domain.drive.DriveFileRef;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Action;
@@ -41,11 +43,13 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
     final PortalSupport portal;
     final PageRenderer renderer;
     final ReaderActions actions;
+    final DriveDocuments drive;
 
-    public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions) {
+    public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions, DriveDocuments drive) {
         this.portal = portal;
         this.renderer = renderer;
         this.actions = actions;
+        this.drive = drive;
     }
 
     public ItemPage load(String id, HttpRequest httpRequest) {
@@ -81,12 +85,17 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
             content.add(section(null, html("body", body)));
         }
         var medium = renderer.medium(reader, item);
+        var driveUrl = DriveFileRef.parse(item.url());
         if (medium != null) {
             content.add(section(null, html("medium", medium)));
+        } else if (driveUrl.isPresent()) {
+            // a reference, not a copy: Google's live preview of the one version, in Drive
+            content.add(section(null, html("medium", renderer.drive(driveUrl.get(), item.title()))));
         } else if (item.url() != null && !item.url().isBlank()) {
             content.add(section(null, new Anchor(ItemType.DOCUMENT.name().equals(item.type()) ? "Abrir el documento"
                     : "Abrir el enlace", item.url(), "_blank", "", "")));
         }
+        drive.ofItem(item).forEach(d -> content.add(section(d.name(), PortalComponents.driveFile(d))));
         if (ItemType.PAGE.name().equals(item.type())) {
             content.addAll(renderer.sections(reader, item.itemId()));
         }

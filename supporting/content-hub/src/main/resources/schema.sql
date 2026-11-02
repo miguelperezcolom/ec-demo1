@@ -70,3 +70,8 @@ create extension if not exists vector;
 create table if not exists ch_chunk (
     item_id text not null, language text not null, chunk_no int not null, version int not null,
     text text not null, embedding vector(384), primary key (item_id, language, chunk_no));
+
+-- Google Drive (requirement 1350): what Drive last said of each referenced file — its metadata, never the
+-- file — refreshed by a job only when GOOGLE_DRIVE_* is configured.
+create table if not exists ch_drive_file (
+    file_id text primary key, doc jsonb not null, refreshed_at timestamptz);

@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.contenthub.domain.media;
 
+import io.mateu.ecdemo1.contenthub.domain.drive.DriveFileRef;
+
 import java.time.Instant;
 
 /**
@@ -37,7 +39,11 @@ public record MediaAsset(String id, MediaKind kind, String title, String fileNam
 
     public static MediaAsset external(String id, String title, String url, String by, Instant at) {
         var ext = ExternalMedia.of(url);
-        return new MediaAsset(id, MediaKind.EXTERNAL, blank(title) ? ext.provider().name() : title, null, null, 0,
+        if (ext.provider() == ExternalMedia.Provider.OTHER && DriveFileRef.isGoogleUrl(url)) {
+            DriveFileRef.of(url); // a Drive folder or a published copy: say why it is no file instead of a mere link
+        }
+        return new MediaAsset(id, MediaKind.EXTERNAL, blank(title) ? ext.drive().map(d -> d.type().label())
+                .orElse(ext.provider().name()) : title, null, null, 0,
                 ext.url(), by, at);
     }
 

@@ -36,7 +36,7 @@ public class TeiEmbeddings implements Embeddings {
         var input = texts.stream().map(t -> (query ? "query: " : "passage: ") + t).toList();
         try {
             var request = HttpRequest.newBuilder(URI.create(baseUrl + "/v1/embeddings"))
-                    .timeout(Duration.ofSeconds(60))
+                    .timeout(Duration.ofSeconds(query ? 10 : 60)) // a question has a reader waiting
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(Json.write(Map.of("model", model, "input", input))))
                     .build();

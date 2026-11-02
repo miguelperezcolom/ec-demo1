@@ -92,13 +92,24 @@ spec:
               value: https://auth.ec1.mateu.io/realms/ec-demo1
             - name: KEYCLOAK_JWKS_URI
               value: http://keycloak:8080/realms/ec-demo1/protocol/openid-connect/certs
-            # «Traducir con IA» in the editor: the same key the IA control plane uses. Optional —
-            # without it the editor does not offer the action.
-            - name: ANTHROPIC_API_KEY
+            # The search's answer and «Traducir con IA» go through the IA control plane over A2A, with
+            # the token of the person asking: no model key here. An agent not yet in the catalogue only
+            # means a brief notice to the user.
+            - name: INTRANET_AGENT_URL
+              value: http://ia-agent:8095/a2a/intranet-agent
+            - name: INTRANET_TRANSLATOR_URL
+              value: http://ia-agent:8095/a2a/intranet-translator
+            # Google Drive metadata (who modified a referenced file, its current name). Optional — without
+            # the ec-google-drive secret the references work from their URL alone. The key file is
+            # mounted below. IMPERSONATE: the user to act as with domain-wide delegation; unset, the
+            # service account sees what is shared with its own address.
+            - name: GOOGLE_DRIVE_CREDENTIALS_FILE
+              value: /etc/google-drive/credentials.json
+            - name: GOOGLE_DRIVE_IMPERSONATE
               valueFrom:
                 secretKeyRef:
-                  name: ec-anthropic
-                  key: ANTHROPIC_API_KEY
+                  name: ec-google-drive
+                  key: GOOGLE_DRIVE_IMPERSONATE
                   optional: true
           ports:
             - { name: http, containerPort: 8135 }
@@ -111,6 +122,7 @@ spec:
             limits:   { memory: "2Gi",   cpu: "1" }
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
+            - { name: google-drive, mountPath: /etc/google-drive, readOnly: true }
           readinessProbe:
             httpGet: { path: /actuator/health/readiness, port: 8135 }
             initialDelaySeconds: 20
@@ -122,6 +134,11 @@ spec:
             periodSeconds: 20
       volumes:
         - { name: tmp, emptyDir: {} }
+        # Optional: the service account's key file, key "credentials.json" of the secret.
+        - name: google-drive
+          secret:
+            secretName: ec-google-drive
+            optional: true
 ---
 apiVersion: v1
 kind: Service
