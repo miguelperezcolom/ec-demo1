@@ -64,4 +64,18 @@ class PushedTest {
         assertThat(Announcements.pushed(task, nobody, browser("luis", "finance"))).isTrue();
         assertThat(Announcements.pushed(task, nobody, browser("pepe", "ai-admin"))).isFalse();
     }
+
+    @Test
+    void anAddressedNotificationIsPushedToItsPeopleOnlyAndNeverAtTheDesk() {
+        var item = new InboxItem();
+        item.kind = InboxItem.Kind.ACTION.name();
+        item.addressees = "ana";
+        var plan = Plan.addressedTo(java.util.List.of("ana"));
+
+        assertThat(Announcements.pushed(item, plan, browser("ana", "user"))).isTrue();
+        assertThat(Announcements.pushed(item, plan, browser("pepe", "ai-admin"))).isFalse();
+        var desk = browser("ana", "user");
+        desk.app = PushSubscription.FRONT_DESK;
+        assertThat(Announcements.pushed(item, plan, desk)).isFalse();
+    }
 }

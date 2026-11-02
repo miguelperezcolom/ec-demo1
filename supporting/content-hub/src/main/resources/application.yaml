@@ -92,6 +92,17 @@ content-hub:
     # Keys who answered an anonymous survey (with each survey's salt): set it, and the database alone
     # cannot tell whether someone answered. Changing it lets everyone answer the open ones once more.
     secret: ${SURVEY_SECRET:${MEDIA_SECRET:}}
+  # What is published reaches its readers through communication-service (the bell, Web Push) and, if
+  # important, by mail (the newsletter's relay and redirect, above).
+  notifications:
+    # Something that became effective longer ago than this, however it was missed, is no longer news.
+    catch-up: ${NOTIFICATIONS_CATCH_UP:PT24H}
+    reminder-before: ${NOTIFICATIONS_REMINDER_BEFORE:P2D}
+    close-after: ${NOTIFICATIONS_CLOSE_AFTER:P30D}
+    batch-size: ${NOTIFICATIONS_BATCH_SIZE:200}
+  analytics:
+    # How long raw usage events are kept; the daily figures stay. Never less than 30 days (the longest window).
+    retention: ${ANALYTICS_RETENTION:P90D}
   seed:
     enabled: ${CONTENT_SEED:true}
 

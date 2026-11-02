@@ -23,5 +23,12 @@ public enum NotificationType {
      */
     PLATFORM_ALERT,
     /** As {@link #PLATFORM_ALERT}, for an alert of severity critical: Opera or Salesforce not answering, a pod down. */
-    PLATFORM_ALERT_CRITICAL
+    PLATFORM_ALERT_CRITICAL,
+    /**
+     * The intranet (content-hub): an item its readers can see became effective — published now, or its
+     * publication date crossed. Addressed to each reader: never routed by the recipients table.
+     */
+    INTRANET_PUBLISHED,
+    /** The intranet: a reader has not yet confirmed an item that must be confirmed, and its deadline is near. Addressed. */
+    INTRANET_CONFIRMATION_DUE
 }

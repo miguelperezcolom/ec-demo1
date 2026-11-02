@@ -53,4 +53,8 @@ public class ContentHubMenu {
     @Menu
     @Label("Pendientes de confirmar")
     PendingConfirmationsListing pendientes;
+
+    @Menu
+    @Label("Analítica")
+    AnalyticsPage analitica;
 }

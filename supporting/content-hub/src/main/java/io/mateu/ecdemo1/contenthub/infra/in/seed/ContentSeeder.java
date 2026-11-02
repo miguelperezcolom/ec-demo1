@@ -333,7 +333,9 @@ public class ContentSeeder {
             return;
         }
         itemCommands.createWithId(id, "editora", type, "es", new ItemContent(section, audience, t, List.of(),
-                publishAt, expireAt, confirm, confirm, confirm ? clock.instant().plus(Duration.ofDays(20)) : null, url));
+                publishAt, expireAt, confirm, confirm, confirm ? clock.instant().plus(Duration.ofDays(20)) : null, url)
+                // the seed tells nobody: a reset of the demo must not fill every reader's bell
+                .withNotification(false, false));
         itemCommands.publish(SYSTEM, id, false);
     }
 
@@ -342,7 +344,7 @@ public class ContentSeeder {
             return;
         }
         itemCommands.createWithId(id, "editora", ItemType.PAGE, "es", new ItemContent(section, Audience.EVERYONE, t, blocks,
-                null, null, false, false, null, null));
+                null, null, false, false, null, null).withNotification(false, false));
         itemCommands.publish(SYSTEM, id, false);
     }
 }

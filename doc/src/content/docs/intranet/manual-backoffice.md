@@ -36,7 +36,8 @@ modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 | **Contenido** | **Tipo** (Artículo, Página, Aviso, Enlace, Documento; no se cambia después), **Sección** del árbol, **Idioma por defecto** |
 | **Español / English / Deutsch** | Por idioma: título, resumen y cuerpo (texto enriquecido). Un idioma sin título no se publica; al lector sin traducción en su idioma se le muestra el idioma por defecto, que **debe** tener título |
 | **Audiencia** | Quién lo verá (ver [El constructor de audiencias](#el-constructor-de-audiencias)) |
-| **Publicación** | *Publicar a partir de* (vacío: en el momento de publicar), *Caduca el*, *URL* (obligatoria en enlaces y documentos; vale `media:id` para un fichero de la biblioteca), *Seguimiento de lectura*, *Confirmación obligatoria* y *Confirmar antes del*, *Al publicar, exigir reconfirmar*, *Comentarios cerrados* (se aplica al guardar, sin esperar a publicar: ver [Comentarios](#comentarios)) |
+| **Publicación** | *Publicar a partir de* (vacío: en el momento de publicar), *Caduca el*, *URL* (obligatoria en enlaces y documentos; vale `media:id` para un fichero de la biblioteca), *Seguimiento de lectura*, *Confirmación obligatoria* y *Confirmar antes del*, *Al publicar, exigir reconfirmar*, *Comentarios cerrados* (se aplica al guardar, sin esperar a publicar: ver [Comentarios](#comentarios)), *Notificar a los lectores al publicar*, *Importante* |
+| **Cifras** (al editar) | *Vistas*, *Lectores únicos*, *Confirmaciones* (de la versión que cuenta) y *Lectores notificados* |
 | **Bloques (solo páginas)** | Los bloques de una página (ver abajo) |
 | **Avisos** | Lo que conviene revisar antes de publicar: una audiencia que no cumple nadie, un bloque que nadie vería |
 
@@ -103,6 +104,20 @@ estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple amb
 - **Reconfirmar**: en un item con confirmación obligatoria, marca *Al publicar, exigir reconfirmar* antes
   de publicar una versión nueva si las confirmaciones anteriores no deben valer. Sin marcar, siguen
   valiendo.
+
+### Notificar a los lectores
+
+Cuando un contenido se hace efectivo —al publicarlo, o al llegar su *Publicar a partir de*— se avisa a quienes
+pueden verlo, en unos segundos, en la campana y en su navegador:
+
+- **Notificar a los lectores al publicar**: *Según el tipo* (por defecto: los avisos sí, lo demás no), *Sí* o
+  *No*. Cada versión avisa una vez: si publicas otra versión de algo que notifica, se vuelve a avisar. Para
+  corregir una errata, pon *No* antes de publicar.
+- **Importante**: además, por correo. En la demo los correos van a la dirección de redirección.
+
+Quien lo ha desactivado en *Mis preferencias* no recibe ese canal. Si el contenido exige confirmación y tiene
+fecha límite, quien no haya confirmado recibe **un** recordatorio unos dos días antes, aunque el contenido no
+notificara al publicarse. *Lectores notificados*, en *Cifras*, dice a cuántos se ha avisado.
 
 ## Biblioteca de medios
 
@@ -264,6 +279,20 @@ por orden alfabético.
 *Editorial → Respuestas de encuestas* da cada respuesta en una fila, para buscar y **exportar a CSV o Excel**. Las
 de una encuesta anónima no dicen quién ni cuándo, y las filas van ordenadas por respuesta para que no se puedan
 reconstruir las respuestas de una misma persona.
+
+## Analítica
+
+*Analítica*, en el menú *Editorial*, resume los últimos 30 días; lo que viene de los agregados tarda hasta 15
+minutos en aparecer:
+
+- **Indicadores**: lectores activos en 7 y 30 días (quien ha abierto un contenido o el inicio), vistas, búsquedas y
+  porcentaje de búsquedas sin resultados.
+- **Gráficos**: vistas por día, contenidos más vistos, lo más buscado, búsquedas sin resultados (lo que la gente
+  busca y la intranet no tiene: lo primero que conviene mirar), adopción por hotel y por departamento (qué parte de
+  sus empleados ha leído algo) y aperturas y clics de las últimas ediciones de la newsletter.
+
+Las búsquedas se guardan sin saber quién las hizo, y lo que se mira en «ver como» no cuenta. Las cifras de un
+contenido concreto están en su formulario, en *Cifras*.
 
 ## Directorio y visibilidad
 

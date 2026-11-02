@@ -130,6 +130,6 @@ public class ItemCommands {
                 .toList();
         return new ItemContent(content.sectionId(), content.audience(), translations, blocks, content.publishAt(),
                 content.expireAt(), content.readTracking(), content.confirmationRequired(),
-                content.confirmationDeadline(), content.url());
+                content.confirmationDeadline(), content.url(), content.notifyReaders(), content.important());
     }
 }

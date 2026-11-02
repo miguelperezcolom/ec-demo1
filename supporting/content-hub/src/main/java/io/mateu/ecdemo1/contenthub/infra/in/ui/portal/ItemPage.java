@@ -1,7 +1,9 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
 import io.mateu.ecdemo1.contenthub.application.usecases.Collaboration;
+import io.mateu.ecdemo1.contenthub.application.usecases.ItemNotifications;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
+import io.mateu.ecdemo1.contenthub.application.usecases.UsageTracker;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Action;
@@ -52,12 +54,17 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
     final PageRenderer renderer;
     final ReaderActions actions;
     final Collaboration collaboration;
+    final UsageTracker usage;
+    final ItemNotifications notifications;
 
-    public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions, Collaboration collaboration) {
+    public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions, Collaboration collaboration,
+                    UsageTracker usage, ItemNotifications notifications) {
         this.portal = portal;
         this.renderer = renderer;
         this.actions = actions;
         this.collaboration = collaboration;
+        this.usage = usage;
+        this.notifications = notifications;
     }
 
     public ItemPage load(String id, HttpRequest httpRequest) {
@@ -79,6 +86,10 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
                     .build();
         }
         actions.recordRead(reader, item);
+        if (PortalSupport.opening(httpRequest)) {
+            usage.itemViewed(reader, item.itemId());
+            notifications.opened(reader, item.itemId());
+        }
         var content = new ArrayList<Component>(PortalComponents.viewingAs(reader.viewingAs()));
         var confirmable = item.confirmationRequired() && reader.viewingAs() == null && !actions.hasConfirmed(reader, item);
         if (confirmable) {
@@ -179,7 +190,9 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
     @Action(confirmationRequired = true, confirmationTitle = "¿Confirmas que lo has leído?",
             confirmationMessage = "Quedará registrado con tu nombre y la versión que has leído.")
     public Object confirmarLectura(HttpRequest httpRequest) {
-        actions.confirm(portal.reader(httpRequest), id);
+        var reader = portal.reader(httpRequest);
+        actions.confirm(reader, id);
+        notifications.confirmed(reader, id);
         return Message.success("Lectura confirmada. ¡Gracias!");
     }
 

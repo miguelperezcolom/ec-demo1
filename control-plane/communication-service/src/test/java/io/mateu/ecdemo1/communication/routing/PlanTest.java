@@ -109,4 +109,20 @@ class PlanTest {
         assertThat(plan.spaces()).containsExactly(1, 2);
         assertThat(plan.inboxRoles()).isEmpty();
     }
+
+    @Test
+    void aNotificationAddressedToSomePeopleIsTheirsAlone() {
+        var plan = Plan.addressedTo(List.of("ana", "jonas"));
+
+        assertThat(plan.inboxUsers()).containsExactly("ana", "jonas");
+        assertThat(plan.pushUsers()).containsExactly("ana", "jonas");
+        // Nobody else's: the administrators who want every type do not get every reader's news.
+        assertThat(plan.inboxRoles()).isEmpty();
+        assertThat(plan.pushRoles()).isEmpty();
+        assertThat(plan.emails()).isEmpty();
+        assertThat(plan.spaces()).isEmpty();
+        assertThat(plan.deskUsers()).isEmpty();
+        assertThat(plan.urgent()).isFalse();
+        assertThat(plan.anyone()).isTrue();
+    }
 }

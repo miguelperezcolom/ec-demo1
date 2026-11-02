@@ -1,6 +1,6 @@
 ---
 title: Arquitectura de la intranet
-description: content-hub, el servicio de contenido con visibilidad por audiencia — componentes, la única función de visibilidad, el modelo por agregados, eventos, almacenamiento, seguridad, RAG y las decisiones tomadas.
+description: content-hub, el servicio de contenido con visibilidad por audiencia — componentes, la única función de visibilidad, el modelo por agregados, eventos, almacenamiento, seguridad, RAG, notificaciones, analítica y las decisiones tomadas.
 ---
 
 La intranet es el primer consumidor de **`content-hub`** (`supporting/content-hub`), un servicio de
@@ -32,7 +32,7 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **`embed.js`** | `GET /_intranet/embed.js` | Convierte los marcadores de vídeo y PDF en reproductores (ver [Seguridad](#seguridad)) |
 | **Solicitudes** | `RequestService`; portal `NewRequestPage`, `MyRequestsListing`, `ApprovalsListing`/`ApprovalPage` | Las solicitudes de los empleados las decide el proceso `solicitud-empleado` de EventConductor (ec-definitions). El content-hub lo arranca por su outbox (`process-creation-requested` en `upstream`, clave `solicitud:<id>`). Sigue su estado en el topic `solicitudes` (`RequestEventsListener`). Aprobar o rechazar completa la tarea del motor de formularios por REST con el token del propio usuario (`FormsHumanTasks`), que el motor acepta (`WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN`) |
 | **Directorio** | `EmployeeDirectoryListener` | Copia local de los empleados —atributos, responsable (`managerId`), teléfono y etiquetas de los códigos— desde `employee-directory`. De ella salen las audiencias, la newsletter y el directorio de personas |
-| **Trabajos** | `ContentJobs` | Cruces de fechas, newsletter, embeddings del RAG y limpieza de perfiles huérfanos |
+| **Trabajos** | `ContentJobs`, `NotificationJobs` | Cruces de fechas, newsletter, embeddings del RAG y limpieza de perfiles huérfanos; reparto de notificaciones, recordatorios y agregados diarios de uso |
 
 Portal y trabajo editorial son la misma UI, en `ec1.mateu.io`, donde trabajan los empleados y los
 editores; **la configuración** —cómo funciona la intranet, no lo que publica— va en la consola de control,
@@ -185,6 +185,8 @@ que pone el gateway; sin esa cabecera (el gateway no pudo preguntar), un usuario
 | `employee-directory` | users → content-hub | `EmployeeUpserted` (el empleado entero: nombre, email, activo, `managerId` y `phone` si los tiene, atributos como códigos del catálogo e idioma, `labels` con la etiqueta de cada código) y `EmployeeRemoved`; clave el id de usuario |
 | `employee-directory-requests` | content-hub → users | `{"requestId", "requestedBy"}`: pide una copia completa del directorio. Se manda al arrancar con el directorio vacío, o a mano desde *Visibilidad* |
 | `content-events` | content-hub → quien quiera | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`, y los de colaboración (`CollaborationEvents`): `CommentPosted`, `CommentModerated`, `ItemLiked`, `SurveyPublished`, `SurveyUpdated`, `SurveyClosed`, `SurveyAnswered` (este nunca dice quién). Clave el sujeto. Hoy nadie los consume fuera del servicio |
+| `notifications` | content-hub → communication-service | `NotificationRequested` con `addressees` (un lector), tipo `INTRANET_PUBLISHED` o `INTRANET_CONFIRMATION_DUE`. Ver [Notificaciones](#notificaciones) |
+| `notification-resolutions` | content-hub → communication-service | `NotificationResolved`: lo que cierra esas notificaciones en la bandeja |
 
 Todo sale por el **outbox** de `supporting/messaging`, en la misma transacción que el cambio, y
 `employee-directory` entra por el **inbox** (cada mensaje una vez, por su `eventId`). En el servicio de
@@ -214,6 +216,8 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | `ch_discussion`, `ch_likes` | Comentarios y «Me gusta», un documento por item, aparte de él |
 | `ch_survey`, `ch_survey_doc` | Las encuestas, y su proyección con los `hashes text[]` que las ven |
 | `ch_survey_participation`, `ch_survey_response` | Quién ha respondido y qué se ha respondido, en dos tablas que no se apuntan entre sí |
+| `ch_notification_job`, `ch_notification_sent`, `ch_notification_pref` | Los repartos pendientes, qué se ha dicho a quién (item, versión, lector, tipo, canal) y cómo quiere cada uno que se le avise |
+| `ch_usage_event`, `ch_usage_daily`, `ch_item_reader` | El uso: eventos en crudo (con retención), sus agregados por día y las vistas por item y lector |
 
 La **búsqueda de texto** es el FTS de PostgreSQL: `ch_item_doc.tsv` (configuración `simple`, índice GIN),
 consulta por **prefijo** («vacac» encuentra «vacaciones»), filtrada por visibilidad en la misma consulta:
@@ -287,6 +291,72 @@ que no ve ninguno no recibe nada. Cada grupo queda registrado por separado: uno 
 la siguiente pasada (cada 30 s) sin reenviar a los demás. Sale por el relay `postfix`; como los empleados
 son ficticios, en la demo todo va a `NEWSLETTER_REDIRECT_TO`, con el grupo y el idioma en el asunto.
 
+## Notificaciones
+
+Cuando un item se hace efectivo —se publica, o cruza su fecha de publicación— se avisa a sus lectores por
+el **mismo contrato que el resto de la plataforma**: `NotificationRequested` en el topic `notifications`,
+que `communication-service` convierte en la bandeja (la campana) y en Web Push. Solo hay una novedad en el
+contrato, aditiva: el campo opcional **`addressees`**. Con él la notificación es para esas personas y nadie
+más: su bandeja y sus navegadores, sin pasar por la tabla de destinatarios, que dice quién cuida de un hotel
+y no quién lee qué.
+
+```mermaid
+flowchart LR
+  J["NotificationJobs<br/>cada 30 s"] --> N["ItemNotifications"]
+  N -- "¿quién lo ve?<br/>una vez por perfil e idioma" --> V["Visibility"]
+  N -- "en lotes: fila + mensaje<br/>en la misma transacción" --> O[("ch_notification_sent<br/>outbox")]
+  O -- notifications --> C["communication-service<br/>bandeja y Web Push"]
+  N -- "solo «importante»" --> M["Mailer<br/>(redirección de la demo)"]
+```
+
+- **Quién.** Los empleados activos a los que `Visibility` les deja ver el item; se pregunta una vez por
+  perfil e idioma, y el título y el resumen van en el idioma de cada uno.
+- **Cuándo.** Cada 30 s se miran las fechas, no los eventos que las cruzan: un cruce ocurrido con el servicio
+  caído se encuentra igual, dentro de `catch-up` (24 h). Lo que se hizo efectivo antes ya no es novedad, y por
+  eso activar esto no anuncia todo lo ya publicado. El reparto **espera a la proyección**: mientras la versión
+  no está aplicada, nadie «puede verla» y se saltaría a todos.
+- **Sin duplicados.** Hay un trabajo por versión y una fila por item, versión, lector, tipo y canal, cuya
+  clave primaria es la idempotencia: quien consigue escribirla es quien envía. Fila y mensaje del outbox van en
+  la transacción de cada lote (200 lectores), así que un reparto cortado sigue donde iba. Además, cada mensaje
+  lleva una `dedupKey` por versión y lector, que `communication-service` respeta. Publicar una versión nueva de
+  un item que notifica **vuelve a avisar**: para una errata, el editor pone *Notificar* en *No* antes de publicar.
+- **Qué notifica.** Por defecto, solo los **avisos** (`NOTICE`): lo que alguien debe saber. Una noticia o una
+  página puede esperar a que la lean, y un enlace o un documento no suele ser noticia. El editor lo decide por
+  item (*Notificar a los lectores*: según el tipo, sí o no); la semilla de la demo no notifica.
+- **Correo.** Un item *importante* también se envía por correo, por el `Mailer` de la newsletter (mismo relay y
+  misma redirección `NEWSLETTER_REDIRECT_TO`): un mensaje por lote e idioma, en Bcc. Se envía y luego se anota:
+  un relay caído se reintenta sin repetir la campana (hasta 20 pasadas); el precio es un posible repetido si el
+  servicio muere justo entre las dos cosas.
+- **Recordatorio.** Quien ve un item de confirmación obligatoria y no lo ha confirmado recibe **un** aviso cuando
+  faltan menos de `reminder-before` (2 días) para la fecha límite, por versión de confirmación. Va aunque el item
+  no notificara al publicarse: es algo que tiene que hacer. Se mira cada 15 minutos.
+- **Preferencias.** Cada lector apaga cada canal en *Mis preferencias* (`ch_notification_pref`; sin fila, todos).
+- **Qué las cierra.** Las notificaciones son por lector (`subject` `intranet/item/{id}/{usuario}` o
+  `intranet/confirmation/{id}/{usuario}`, sin versión) y se cierran con `NotificationResolved`: al abrir el item
+  (nunca en «ver como»), al confirmarlo (el recordatorio), cuando deja de poder leerse, o a los `close-after`
+  (30 días). La bandeja es para lo que sigue esperando.
+- **Dónde se ven.** En la campana de los shells de datos y de control. **Los shells propios de la intranet
+  (`consoles/intranet-shell`) no la tienen** —ni la ruta `/_inbox` en el gateway, ni `push.js`—: quien solo entra
+  por `intranet.ec1.mateu.io` recibe el correo de lo importante y ve lo demás en el portal, pero no la campana. El
+  enlace, `/intranet/noticias/{id}`, resuelve en los hosts de datos, no en la consola de control.
+
+## Analítica
+
+`UsageTracker` anota lo que hacen los lectores en `ch_usage_event`: **cada apertura de un item** (no solo los de
+seguimiento de lectura), **cada búsqueda** y **cada visita al inicio**. Un editor en «ver como» no cuenta, pulsar
+un botón de la página no es otra visita, y un fallo aquí nunca llega a la pantalla. Una búsqueda guarda el texto
+normalizado, cuántos resultados dio y el hash de perfil, **nunca quién**.
+
+- **Agregados.** Cada 15 minutos `UsageAnalytics` recalcula por día (de Madrid) desde el último agregado, hoy
+  incluido, en `ch_usage_daily`: es idempotente, y lo que dibujan los gráficos lleva como mucho ese retraso.
+- **Retención.** Los eventos en crudo se borran a los `ANALYTICS_RETENTION` (90 días; nunca menos de 30, la ventana
+  más larga); los agregados se quedan. Los textos de búsqueda se quedan en los agregados, sin nadie detrás.
+- **Lectores activos y adopción** son personas, que no se suman entre días: se cuentan sobre los eventos en crudo,
+  con quien ha abierto un item o el inicio. La adopción cruza eso con los atributos del directorio.
+- **Por item.** `ch_item_reader` guarda las vistas por item y lector, y de ahí salen *Vistas* y *Lectores únicos*
+  desde que existe el item. **No caduca con la retención**: es un dato por persona, como los acuses de `ch_ack`.
+- El panel es `AnalyticsPage`, el arquetipo `Dashboard` de Mateu con `MetricCard` y `Chart`.
+
 ## Slots
 
 Un **slot** es un hueco en la pantalla de otra aplicación donde va contenido editorial, con clave estable
@@ -316,11 +386,19 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 | Una encuesta se responde una vez, sin editar | Editar exigiría poder volver a encontrar la respuesta de alguien, que es justo lo que una anónima no debe permitir |
 | Comentarios y «Me gusta» aparte del item, con el cierre de comentarios en la conversación | Comentar no compite con el borrador de un editor, y cerrarlos actúa al momento, sin una versión nueva |
 | Un candado consultivo (`pg_advisory_xact_lock`) por item al comentar o reaccionar | Son un solo documento por item: dos a la vez se pisarían; y el primero no tiene aún fila que bloquear |
+| Notificaciones por `notifications` con `addressees`, no un canal propio | La campana y Web Push ya existen y son de `communication-service`; una notificación por lector, y no una por audiencia, deja cerrar la de cada uno cuando la lee, y los `users` de la bandeja no crecen sin límite |
+| Mirar las fechas para notificar, no escuchar `ItemBecameEffective` | Ese evento se pierde si el servicio está caído al cruzar la fecha, y el reparto tiene que esperar a la proyección de todos modos |
 | Slots por REST provisional | El microfrontend de Mateu aún no está; el contrato (clave, identidad, caché por hash) es el mismo |
 
 ## Pruebas
 
 - `ItemTest`: el workflow y las invariantes del item.
+- `NotificationsTest` (Testcontainers): a quién llega (visibilidad, activos, idioma), por tipo y por decisión del
+  editor, una vez por versión, programados y caídas, espera a la proyección, preferencias por canal, lotes que
+  fallan y se reanudan, relay caído, recordatorio y qué cierra cada cosa.
+- `AnalyticsTest` (Testcontainers): lo que se anota y lo que no, agregados por día de Madrid e idempotentes,
+  retención, indicadores del panel, adopción, cifras por item y totales de la newsletter.
+- `NotificationContractTest`: lo que sale por el outbox, contra los esquemas de `contracts/schemas`.
 - `VisibilityPolicyPropertiesTest` (jqwik): con expresiones y perfiles generados, **la proyección es igual a
   evaluar cada expresión para cada perfil**.
 - `DiscussionTest`, `SurveyTest`: las reglas de comentarios, moderación, «Me gusta» y encuestas (una respuesta por

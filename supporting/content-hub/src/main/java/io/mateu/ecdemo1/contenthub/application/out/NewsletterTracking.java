@@ -17,7 +17,14 @@ public interface NewsletterTracking {
     record GroupStats(String group, long opens, long clicks, java.util.Map<String, Long> clicksByItem) {
     }
 
+    /** An edition's totals, for the analytics. */
+    record EditionStats(String editionId, String title, long opens, long clicks) {
+    }
+
     void record(Event event);
+
+    /** The editions opened or clicked most recently, oldest of them first. */
+    List<EditionStats> recentEditions(int limit);
 
     List<GroupStats> stats(String editionId);
 }
