@@ -3,6 +3,8 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 import io.mateu.ecdemo1.contenthub.application.menu.SiteMenus;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.visibility.NamedAudiences;
+import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
+import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.menu.MenuEntry;
 import io.mateu.ecdemo1.contenthub.domain.menu.MenuTarget;
 import io.mateu.ecdemo1.contenthub.domain.menu.SiteMenu;
@@ -25,6 +27,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +41,7 @@ import java.util.function.Consumer;
 @Service
 @Scope("prototype")
 @ContentAdmins
-public class MenuEntryForm extends AudienceForm implements SimpleCrud.CrudForm, VisibilitySupplier {
+public class MenuEntryForm implements SimpleCrud.CrudForm, VisibilitySupplier, io.mateu.uidl.interfaces.OptionsSupplier {
 
     /** The destination select's value for "none": the entry is a submenu. */
     static final String SUBMENU = "";
@@ -78,6 +81,37 @@ public class MenuEntryForm extends AudienceForm implements SimpleCrud.CrudForm, 
     @Label("Ruta dentro de la otra interfaz (opcional)")
     String remoteRoute;
 
+    // «Quién lo verá», last: optional (empty = everyone). AudienceForm's fields, declared here because a
+    // superclass's fields are drawn first.
+    @Section("Audiencia (opcional)")
+    @Label("Audiencia con nombre")
+    @Stereotype(FieldStereotype.select)
+    String namedAudience;
+    @Label("Empresa")
+    @Stereotype(FieldStereotype.multiSelect)
+    List<String> companies;
+    @Label("País")
+    @Stereotype(FieldStereotype.multiSelect)
+    List<String> countries;
+    @Label("Región")
+    @Stereotype(FieldStereotype.multiSelect)
+    List<String> regions;
+    @Label("Hotel")
+    @Stereotype(FieldStereotype.multiSelect)
+    List<String> hotels;
+    @Label("Departamento")
+    @Stereotype(FieldStereotype.multiSelect)
+    List<String> departments;
+    @Label("Puesto")
+    @Stereotype(FieldStereotype.multiSelect)
+    List<String> jobTitles;
+    @io.mateu.uidl.annotations.ReadOnly
+    @Label("Quién lo verá")
+    @io.mateu.uidl.annotations.Colspan(2)
+    String audienceSummary;
+    @io.mateu.uidl.annotations.Hidden
+    String advancedAudience;
+
     @io.mateu.uidl.annotations.Hidden
     String id;
 
@@ -92,6 +126,32 @@ public class MenuEntryForm extends AudienceForm implements SimpleCrud.CrudForm, 
         this.audienceCommands = audienceCommands;
         this.namedAudiences = namedAudiences;
         this.readers = readers;
+    }
+
+    Audience audience() {
+        var values = new EnumMap<Attribute, List<String>>(Attribute.class);
+        values.put(Attribute.COMPANY, companies);
+        values.put(Attribute.COUNTRY, countries);
+        values.put(Attribute.REGION, regions);
+        values.put(Attribute.HOTEL, hotels);
+        values.put(Attribute.DEPARTMENT, departments);
+        values.put(Attribute.JOB_TITLE, jobTitles);
+        return AudienceFields.build(namedAudience, values, advancedAudience);
+    }
+
+    void audience(Audience audience) {
+        var parsed = AudienceFields.parse(audience);
+        namedAudience = parsed.named();
+        companies = parsed.values().get(Attribute.COMPANY);
+        countries = parsed.values().get(Attribute.COUNTRY);
+        regions = parsed.values().get(Attribute.REGION);
+        hotels = parsed.values().get(Attribute.HOTEL);
+        departments = parsed.values().get(Attribute.DEPARTMENT);
+        jobTitles = parsed.values().get(Attribute.JOB_TITLE);
+        advancedAudience = parsed.advanced();
+        var count = audienceCommands.count(audience);
+        audienceSummary = audience.describe(namedAudiences.labels()) + " — " + count + " empleado(s)"
+                + (count == 0 ? " ⚠️ nadie cumple esta audiencia" : "");
     }
 
     /** A row's id: the site and the entry («intranet~noticias»). */
@@ -125,7 +185,7 @@ public class MenuEntryForm extends AudienceForm implements SimpleCrud.CrudForm, 
         } else if (t != null) {
             target = t.kind() + ":" + t.value();
         }
-        audience(e.audience(), audienceCommands, namedAudiences);
+        audience(e.audience());
         return this;
     }
 
@@ -215,7 +275,8 @@ public class MenuEntryForm extends AudienceForm implements SimpleCrud.CrudForm, 
 
     @Override
     public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
-        return List.of("site", "parentId", "target").contains(fieldName) || super.supports(fieldType, fieldName, formType);
+        return List.of("site", "parentId", "target").contains(fieldName) || "namedAudience".equals(fieldName)
+                || AudienceFields.FIELDS.containsKey(fieldName);
     }
 
     @Override
@@ -240,7 +301,8 @@ public class MenuEntryForm extends AudienceForm implements SimpleCrud.CrudForm, 
                 }
                 yield out;
             }
-            default -> super.options(fieldName, httpRequest);
+            case "namedAudience" -> Catalog.get().namedAudiences();
+            default -> AudienceFields.options(fieldName);
         };
     }
 
