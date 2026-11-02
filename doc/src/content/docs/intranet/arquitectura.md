@@ -533,8 +533,12 @@ cada sección, estado (`DRAFT → SCHEDULED → SENT`, o `CANCELLED`) y los env�
   permanente (`/intranet/n/{sitio}/numeros/{número}`) y la baja de esa newsletter (`/intranet/n/{sitio}`).
   El logo se sirve sin firma en `/_intranet/n/logo/{sitio}` (solo el logo de una newsletter).
 - **El sitio en el portal**: `PortalRoutes` lleva `/intranet/n/{sitio}[/archivo|/numeros/{id}|/secciones/{id}|/p/{id}]`
-  a `NewsletterSitePage`, dibujado sobre su propio papel claro (sus colores, como el correo, son para fondo
-  blanco, también con el tema oscuro). Su menú es el **menú configurable de su sitio** (`SiteMenus`, dueño
+  a `NewsletterSitePage`, que **sigue el tema de la consola** (claro u oscuro, Vaadin o Redwood): hereda el
+  color de texto y el fondo de la página; los colores de la newsletter van en sus bandas (cabecera, pestaña
+  activa, banners), con un texto que se lee sobre ellas (blanco o casi negro según su luminancia), y en
+  enlaces y títulos mezclados con el color del texto (`color-mix(…, currentColor)`: más oscuros en claro, más
+  claros en oscuro). Solo el **correo** usa colores fijos y claros, los que todo cliente de correo muestra
+  igual (`NewsletterRenderer.Palette`). Su menú es el **menú configurable de su sitio** (`SiteMenus`, dueño
   el id del sitio): `NewsletterMenus` lo siembra la primera vez (al crearla, o al arrancar para las que ya
   había) con su inicio, sus secciones de primer nivel, su archivo y sus páginas, y «Nueva página» añade la
   página al final; desde entonces se edita en *Configuración → Menús* (`content:admin`), que lista los

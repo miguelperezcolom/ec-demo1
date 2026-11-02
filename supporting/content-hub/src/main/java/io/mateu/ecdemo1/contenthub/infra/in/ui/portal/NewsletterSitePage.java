@@ -149,7 +149,10 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
             }
         }
         var out = new ArrayList<Component>(PortalComponents.viewingAs(reader.viewingAs()));
-        out.add(Html.block("<div style=\"max-width:760px;margin:0 auto;width:100%;box-sizing:border-box;background:#ffffff;color:#1f2933;color-scheme:light;padding:1rem;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.25)\">" + nav(httpRequest, site, current) + body + "</div>"));
+        // the shell's theme, light or dark: the page's own text and background; the newsletter's colours only
+        // on its bands (with ink that reads on them) and mixed with the text colour for links and tabs
+        out.add(Html.block("<div style=\"max-width:760px;margin:0 auto;width:100%;box-sizing:border-box;color:inherit\">"
+                + nav(httpRequest, site, current) + body + "</div>"));
         out.addAll(subscription(reader, site, preference));
         var toolbar = new ArrayList<UserTrigger>();
         if (reader.viewingAs() == null) {
@@ -175,8 +178,8 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
             }
             var on = e.href().equals(current);
             html.append("<a href=\"").append(Html.escape(e.href())).append("\" style=\"padding:.25rem .6rem;border-radius:999px;"
-                    + "text-decoration:none;font-size:.9rem;").append(on ? "background:" + theme.primary() + ";color:#fff"
-                    : "color:" + theme.primary()).append("\">").append(Html.escape(e.label())).append("</a>");
+                    + "text-decoration:none;font-size:.9rem;").append(on ? "background:" + theme.primary() + ";color:" + NewsletterRenderer.ink(theme.primary())
+                    : "color:color-mix(in srgb, " + theme.primary() + " 60%, currentColor)").append("\">").append(Html.escape(e.label())).append("</a>");
         }
         return html.append("</nav>").toString();
     }
@@ -186,7 +189,7 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
         var d = site.definition();
         var logo = d.logoMediaId() == null ? "" : "<img src=\"/_intranet/n/logo/" + Html.escape(site.id())
                 + "\" alt=\"\" style=\"max-height:40px;max-width:160px;display:block;margin-bottom:.5rem\">";
-        return "<div style=\"background:" + d.theme().primary() + ";color:#fff;padding:1rem 1.25rem;border-radius:8px;margin-bottom:1rem\">"
+        return "<div style=\"background:" + d.theme().primary() + ";color:" + NewsletterRenderer.ink(d.theme().primary()) + ";padding:1rem 1.25rem;border-radius:8px;margin-bottom:1rem\">"
                 + logo + "<div style=\"font-size:1.3rem;font-weight:bold\">" + Html.escape(d.name()) + "</div>"
                 + (d.headerHtml().isBlank() ? "" : "<div style=\"font-size:.9rem\">" + rich(reader, d.headerHtml()) + "</div>")
                 + "</div>";
@@ -272,7 +275,8 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
         }
         shown.forEach(i -> html.append("<div style=\"margin:.75rem 0\"><a href=\"")
                 .append(Html.escape(NewsletterService.itemPath(Ui.PORTAL, i, site.id(), id -> isOwn(site, id))))
-                .append("\" style=\"font-weight:bold;color:").append(site.definition().theme().accent()).append("\">")
+                .append("\" style=\"font-weight:bold;color:color-mix(in srgb, ").append(site.definition().theme().accent())
+                .append(" 60%, currentColor)\">")
                 .append(Html.escape(i.title())).append("</a>").append(i.summary() == null || i.summary().isBlank() ? ""
                         : "<div style=\"opacity:.8\">" + Html.escape(i.summary()) + "</div>").append("</div>"));
         return html.toString();
