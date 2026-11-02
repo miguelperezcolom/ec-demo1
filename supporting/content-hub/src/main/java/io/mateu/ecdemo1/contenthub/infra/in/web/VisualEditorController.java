@@ -84,10 +84,22 @@ public class VisualEditorController {
 
     // ── the wire ────────────────────────────────────────────────────────────────────────────────────
 
-    /** A block as the editor edits it: the fields of {@link BlockForm}, its audience as three lists. */
+    /**
+     * A block as the editor edits it: the fields of {@link BlockForm}, its audience as three lists, and — a
+     * «Componente remoto» — the registered UI it shows with its route or attributes.
+     */
     public record BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
                            Integer limit, List<LinkDto> links, String mediaId, List<String> departments,
-                           List<String> hotels, List<String> jobTitles) {
+                           List<String> hotels, List<String> jobTitles, String remoteSourceId, String remoteRoute,
+                           Map<String, String> remoteAttributes) {
+
+        /** A block that shows no external UI. */
+        public BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
+                        Integer limit, List<LinkDto> links, String mediaId, List<String> departments,
+                        List<String> hotels, List<String> jobTitles) {
+            this(id, type, title, html, itemId, sectionId, limit, links, mediaId, departments, hotels, jobTitles,
+                    null, null, null);
+        }
     }
 
     public record LinkDto(String label, String url) {
@@ -132,7 +144,8 @@ public class VisualEditorController {
             if (profile == null) {
                 throw new IllegalArgumentException("Ese perfil ya no está en el directorio");
             }
-            as = new Reader(reader.userId(), reader.name(), profile.attributes(), reader.permissions(), profile.hash());
+            as = new Reader(reader.userId(), reader.name(), profile.attributes(), reader.permissions(), profile.hash(),
+                    reader.scopes());
             out.put("profile", profileLabel(profile));
             out.put("pageVisible", namedAudiences.policy().admits(item.draft().audience(), profile.attributes()));
         }
@@ -197,7 +210,7 @@ public class VisualEditorController {
         var labels = namedAudiences.labels();
         var out = new ArrayList<RenderedBlock>();
         for (var b : blocks) {
-            var effective = Audience.effective(pageAudience, b.audience());
+            var effective = Audience.effective(pageAudience, b.visibilityAudience());
             var visible = !asProfile || policy.admits(effective, reader.attributes());
             var own = b.audience() instanceof Audience.Everyone ? "" : b.audience().describe(labels);
             out.add(new RenderedBlock(b.id(), visible ? renderer.draftHtml(reader, b) : "", visible, own,
@@ -232,6 +245,9 @@ public class VisualEditorController {
         out.put("departments", options(catalog.values(Attribute.DEPARTMENT)));
         out.put("hotels", options(catalog.values(Attribute.HOTEL)));
         out.put("jobTitles", options(catalog.values(Attribute.JOB_TITLE)));
+        // the registry of external UIs: what a «Componente remoto» may show (the editor never types where a UI lives)
+        var sources = catalog.uiSources();
+        out.put("uiSources", options(sources == null ? List.of() : sources));
         return out;
     }
 
@@ -264,7 +280,9 @@ public class VisualEditorController {
         var f = BlockForm.of(b);
         return new BlockDto(b.id(), b.type().name(), b.title(), b.html(), b.itemId(), b.sectionId(), b.limit(),
                 b.links().stream().map(l -> new LinkDto(l.label(), l.url())).toList(), b.mediaId(),
-                nonNull(f.blockDepartments), nonNull(f.blockHotels), nonNull(f.blockJobTitles));
+                nonNull(f.blockDepartments), nonNull(f.blockHotels), nonNull(f.blockJobTitles),
+                b.remote() == null ? null : b.remote().sourceId(), b.remote() == null ? null : b.remote().route(),
+                b.remote() == null ? Map.of() : b.remote().attributes());
     }
 
     /**
@@ -304,6 +322,11 @@ public class VisualEditorController {
             f.links = new ArrayList<>(d.links() == null ? List.of() : d.links().stream().filter(Objects::nonNull)
                     .map(l -> LinkForm.of(l.label(), l.url())).toList());
             f.mediaId = d.mediaId();
+            f.remoteSourceId = d.remoteSourceId();
+            f.remoteRoute = d.remoteRoute();
+            f.remoteAttributes = d.remoteAttributes() == null ? null : d.remoteAttributes().entrySet().stream()
+                    .map(e -> e.getKey() + "=" + (e.getValue() == null ? "" : e.getValue()))
+                    .collect(java.util.stream.Collectors.joining("\n"));
             f.blockDepartments = checked(Attribute.DEPARTMENT, d.departments(), known);
             f.blockHotels = checked(Attribute.HOTEL, d.hotels(), known);
             f.blockJobTitles = checked(Attribute.JOB_TITLE, d.jobTitles(), known);

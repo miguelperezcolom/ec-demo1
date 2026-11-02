@@ -134,6 +134,17 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Label("Importante (avisar también por correo)")
     boolean importante;
 
+    @Section("Pantalla externa")
+    @Label("UI externa")
+    @Help("Una de las UIs registradas en Configuración → UIs externas. La página la muestra en vivo, en su propia URL.")
+    @Stereotype(FieldStereotype.select)
+    String uiSourceId;
+    @Label("Ruta (una UI de Mateu o un iframe: /loyalty/members…)")
+    String uiRoute;
+    @Label("Atributos (un web component: nombre=valor, uno por línea)")
+    @Stereotype(FieldStereotype.textarea)
+    String uiAttributes;
+
     @Section("Bloques (solo páginas)")
     @Label("Bloques")
     List<BlockForm> blocks = new ArrayList<>();
@@ -171,6 +182,8 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @HiddenInCreate
     @Label("Lectores notificados")
     String notificados;
+
+    static final java.util.Set<String> REMOTE_PAGE_FIELDS = java.util.Set.of("uiSourceId", "uiRoute", "uiAttributes");
 
     static final String NOTIFY_BY_TYPE = "POR_TIPO";
     static final String NOTIFY_YES = "SI";
@@ -227,6 +240,12 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         publishAt = Ui.local(c.publishAt());
         expireAt = Ui.local(c.expireAt());
         url = c.url();
+        io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.parse(c.url()).ifPresent(r -> {
+            uiSourceId = r.sourceId();
+            uiRoute = r.route();
+            uiAttributes = r.attributeLines();
+            url = null;
+        });
         readTracking = c.readTracking();
         confirmationRequired = c.confirmationRequired();
         confirmationDeadline = Ui.local(c.confirmationDeadline());
@@ -275,9 +294,21 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         return new ItemContent(sectionId == null || sectionId.isBlank() ? null : sectionId, audience(), translations,
                 type == ItemType.PAGE && blocks != null ? blocks.stream().map(BlockForm::toBlock).toList() : List.of(),
                 Ui.instant(publishAt), Ui.instant(expireAt), readTracking, confirmationRequired,
-                Ui.instant(confirmationDeadline), url == null || url.isBlank() ? null : url.trim())
+                Ui.instant(confirmationDeadline), url())
                 .withNotification(NOTIFY_YES.equals(notificar) ? Boolean.TRUE : NOTIFY_NO.equals(notificar) ? Boolean.FALSE : null,
                         importante);
+    }
+
+    /** The URL as stored: a remote page's is its UI (ui:source/route), the rest as typed. */
+    String url() {
+        if (type == ItemType.REMOTE_PAGE) {
+            if (uiSourceId == null || uiSourceId.isBlank()) {
+                throw new IllegalArgumentException("Elige la UI externa de la pantalla");
+            }
+            return new io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi(uiSourceId.trim(), uiRoute,
+                    io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.attributesOf(uiAttributes)).uri();
+        }
+        return url == null || url.isBlank() ? null : url.trim();
     }
 
     public String create(HttpRequest httpRequest) {
@@ -427,6 +458,12 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         if ("traducirConIA".equals(fieldName)) {
             return !translator.available();
         }
+        if (REMOTE_PAGE_FIELDS.contains(fieldName)) {
+            return type != ItemType.REMOTE_PAGE;
+        }
+        if (("url".equals(fieldName) || "blocks".equals(fieldName)) && type == ItemType.REMOTE_PAGE) {
+            return true;
+        }
         if (id == null) {
             return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina").contains(fieldName);
         }
@@ -450,7 +487,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Override
     public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
         return "sectionId".equals(fieldName) || "defaultLanguage".equals(fieldName) || "medioAInsertar".equals(fieldName)
-                || "notificar".equals(fieldName)
+                || "notificar".equals(fieldName) || "uiSourceId".equals(fieldName)
                 || super.supports(fieldType, fieldName, formType);
     }
 
@@ -460,6 +497,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             case "sectionId" -> Catalog.get().sections();
             case "defaultLanguage" -> Catalog.languages();
             case "medioAInsertar" -> Catalog.get().media();
+            case "uiSourceId" -> Catalog.get().uiSources();
             case "notificar" -> List.of(new Option(NOTIFY_BY_TYPE, "Según el tipo (los avisos, sí)"),
                     new Option(NOTIFY_YES, "Sí"), new Option(NOTIFY_NO, "No"));
             default -> super.options(fieldName, httpRequest);

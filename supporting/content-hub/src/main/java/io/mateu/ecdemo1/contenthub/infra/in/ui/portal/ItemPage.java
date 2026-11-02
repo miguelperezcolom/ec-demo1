@@ -59,9 +59,15 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
     final UsageTracker usage;
     final ItemNotifications notifications;
     final DriveDocuments drive;
+    final io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis;
+    final io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote;
 
     public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions, Collaboration collaboration,
-                    UsageTracker usage, ItemNotifications notifications, DriveDocuments drive) {
+                    UsageTracker usage, ItemNotifications notifications, DriveDocuments drive,
+                    io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis,
+                    io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote) {
+        this.remoteUis = remoteUis;
+        this.remote = remote;
         this.portal = portal;
         this.renderer = renderer;
         this.actions = actions;
@@ -95,6 +101,9 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
             notifications.opened(reader, item.itemId());
         }
         var content = new ArrayList<Component>(PortalComponents.viewingAs(reader.viewingAs()));
+        if (ItemType.REMOTE_PAGE.name().equals(item.type())) {
+            return remotePage(reader, item, content);
+        }
         var confirmable = item.confirmationRequired() && reader.viewingAs() == null && !actions.hasConfirmed(reader, item);
         if (confirmable) {
             content.add(Notice.builder().theme("warning").text("Este contenido requiere tu confirmación de lectura"
@@ -141,6 +150,32 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
                 .subtitle(item.summary())
                 .template(new MultimediaContentPage(PortalComponents.TONE.name()))
                 .toolbar(toolbar)
+                .content(content)
+                .build();
+    }
+
+    /**
+     * A remote page: the screen of a registered UI that it names, live, inside the portal's chrome and at the
+     * page's own URL (a deep link or a reload lands on it) — no banner template, comments or body around it:
+     * it is an application, not an article. A reader who may not use its source (its audience — which the
+     * projection already applies to the page — or its required scopes) gets an empty state instead.
+     */
+    Component remotePage(io.mateu.ecdemo1.contenthub.application.security.Reader reader,
+                         io.mateu.ecdemo1.contenthub.application.out.VisibleItem item, List<Component> content) {
+        var use = io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.parse(item.url()).orElse(null);
+        var source = use == null ? java.util.Optional.<io.mateu.ecdemo1.contenthub.domain.uisource.UiSource>empty()
+                : remoteUis.usable(reader, use);
+        if (source.isPresent()) {
+            content.add(remote.component(source.get(), use));
+        } else {
+            content.add(EmptyState.builder().title("No puedes usar esta aplicación")
+                    .description("No está disponible o no tienes los permisos que pide.").build());
+        }
+        return Form.builder()
+                .title(item.title())
+                .subtitle(item.summary())
+                .toolbar(List.of(Button.builder().label(actions.isFavorite(reader, id) ? "Quitar de favoritos"
+                        : "Añadir a favoritos").actionId("favorito").build()))
                 .content(content)
                 .build();
     }
