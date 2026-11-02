@@ -7,3 +7,5 @@ node_modules
 target
 integration/customer-mdm-service/salesforce/dedup-out
 __pycache__
+e2e/intranet-report
+e2e/.intranet-auth

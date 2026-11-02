@@ -1,12 +1,53 @@
 # e2e
 
-Playwright against the deployed cluster (ec1). Three suites:
+Playwright against the deployed cluster (ec1). Four suites:
 
 | Command | What | Writes? |
 |---|---|---|
 | `npx playwright test` | every screen of the four consoles (`tests/`) | no — run it any time |
 | `npm run demo` | the demo's storyline through the internal APIs (`demo/`), then a reset | yes |
 | `DEMO_E2E_RESET=1 npm run demo:ui` | **the whole demo through the UI** (`demo-ui/`): reset + flows 1–8 | **wipes the demo data** |
+| `npm run intranet` | the intranet (content-hub) on the **local** cluster (`intranet/`), Vaadin and Redwood | only its own «E2E …» content |
+
+## The intranet (`intranet`)
+
+The employee portal, the editorial backoffice, the visual editor, the requests workflow and the control
+plane's intranet configuration, against the local kind cluster (`deploy/local/up.sh`, `*.localhost:8800`).
+From `e2e/`:
+
+```sh
+npm ci                                   # once
+npm run intranet                         # both shells (projects `vaadin` and `redwood`)
+npm run intranet -- --project=vaadin     # one shell
+npm run intranet -- requests             # one spec file
+npx playwright show-report intranet-report
+```
+
+`intranet/run-local.sh` reads `DEMO_PASSWORD` and `TEST_USERS_PASSWORD` from
+`~/.local/share/ec-demo1-local/credentials.env` (another file: `EC_DEMO1_CREDENTIALS=…`) and exports them as
+`E2E_DEMO_PASSWORD` / `E2E_USERS_PASSWORD`, the only names the specs read. They are never printed or
+written anywhere; to run Playwright directly, export those two yourself. `intranet/global-setup.ts` signs
+every user in once, untraced, and keeps their Keycloak session cookies in `e2e/.intranet-auth/`
+(gitignored), so the traces kept on failure never contain a typed password.
+
+| Spec | Users | Covers |
+|---|---|---|
+| `portal.spec.ts` | ana.perez, klaus.schmidt | `/intranet` and `/` open the reader's home; the menu; a deep link with a dotted id (`/intranet/personas/ana.perez`); the news search box; audience (Ana sees the Canarias reception notice, Klaus does not); language (Klaus reads German) |
+| `editorial.spec.ts` | demo | Contenidos; an item's edit form (rich-text body, «Insertar medio» / «Previsualizar» / «Traducir con IA» under it); «Insertar medio» shows the medium in the preview **without saving** (Cancel); the blocks table and its row editor (Quick links → only the links table) |
+| `visual-editor.spec.ts` | demo | on a page it creates: a Banner's text typed in place, a Quick links block with a link, restricted to COCINA, save, reload, persisted; «Ver como» a DIRECCION profile hides that block |
+| `requests.spec.ts` | ana.perez, carlos.diaz, isabel.torres | a vacation request typed `d/m/yyyy` → «Mis solicitudes» pending → Carlos approves with a comment → Isabel (HR) approves → Ana sees «Aprobada» with its history. Sends Ana the decision emails (redirected locally) |
+| `control-plane.spec.ts` | demo | Intranet → «Menús» and «Menús: vista previa» |
+
+**Safe to re-run on the shared demo.** It never deletes, never resets and never saves over seeded content
+(editorial forms are left with Cancel). What it writes is its own, named «E2E …» with a run tag: one
+article with a German translation for PMI01's front desk (created once, reused by later runs), one draft
+page per run and shell for the visual editor, and one vacation request per run and shell in a far-future
+year. Tests a product bug makes fail are marked `test.fail()` with the reason: they pass while the bug is
+there and turn red when it is fixed, so the mark gets removed.
+
+Hosts default to `http://{intranet,rw-intranet,ws,rw,console,rw-console,auth}.localhost:8800`;
+`E2E_SCHEME`, `E2E_DOMAIN` or one `E2E_*_HOST` per host (see `intranet/support.ts`) point it elsewhere.
+Redwood shells take 20–40 s to paint the first time: the waits allow 2 minutes.
 
 ## The demo through the UI (`demo-ui`)
 
