@@ -1,6 +1,6 @@
 ---
 title: Manual del portal
-description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, personas y organigrama, solicitudes, favoritos, confirmar lectura, preferencias de la newsletter y preguntar al chat.
+description: La intranet para el empleado — inicio, noticias, avisos y documentos, comentarios y «Me gusta», encuestas, secciones, búsqueda, personas y organigrama, solicitudes, favoritos, confirmar lectura, preferencias de la newsletter y de los avisos, y preguntar al chat.
 ---
 
 La intranet está en la consola del plano de datos, en el menú **Intranet** (`https://ec1.mateu.io`, en
@@ -19,6 +19,7 @@ que ves cambia en unos segundos.
 *Intranet → Inicio* te saluda por tu nombre y reúne:
 
 - **⚠️ Pendientes de confirmar**, arriba y solo si los hay: los contenidos que debes confirmar haber leído.
+- **Encuestas por responder**, solo si las hay: las encuestas abiertas para ti que aún no has respondido.
 - **📢 Avisos**: los cinco últimos avisos.
 - **📰 Últimas noticias**: las ocho últimas noticias y páginas.
 
@@ -55,11 +56,39 @@ más reciente primero.
 
 ## Buscar
 
-*Buscar* busca en todo lo que puedes ver: título, resumen y cuerpo. Las palabras valen **por su
-principio**: «vacac» encuentra «vacaciones», «turn» encuentra «turnos». Sin texto, muestra lo último.
+*Buscar* busca en todo lo que puedes ver, de dos formas a la vez:
 
-Los resultados, las páginas y el total solo cuentan lo que puedes ver: nunca verás «20 resultados» de los
-que te faltan la mitad.
+- **por palabras**, en título, resumen y cuerpo. Valen **por su principio**: «vacac» encuentra «vacaciones»,
+  «turn» encuentra «turnos»;
+- **por significado**: «días libres» puede encontrar la política de vacaciones aunque no use esas palabras.
+
+Salen los 20 mejores, con el trozo de texto que coincide bajo cada título. Todo lo que aparece es algo que
+puedes abrir. Si el buscador por significado no responde, lo dice y busca solo por palabras.
+
+**Respuesta de la IA.** Si lo que escribes parece una pregunta («¿cuántos días de vacaciones tengo?»), arriba
+de los resultados aparece una respuesta redactada por la IA **solo con contenidos que puedes leer**, y debajo
+los contenidos en los que se apoya, como enlaces. Tarda unos segundos más; compruébala en las fuentes. Si
+escribes solo unas palabras, pulsa **Preguntar a la IA** para pedirla. Si la IA no está disponible, se dice en
+una línea y los resultados siguen ahí.
+
+**Personas.** Si lo que escribes coincide con alguien del directorio, sale aparte, en el grupo *Personas*,
+con un enlace a su ficha.
+
+## Documentos de Drive
+
+Un contenido puede enlazar un fichero de Google Drive, Docs, Sheets o Slides. La intranet guarda solo la
+referencia, nunca una copia, así que **siempre ves la versión que hay en Drive**. Al abrir el contenido:
+
+- verás la **vista previa** de Google, si tu cuenta de Google tiene acceso al fichero. Si te pide iniciar sesión
+  aunque ya la hayas iniciado, tu navegador no deja usar tu sesión de Google dentro de la intranet: usa **Ver en
+  otra ventana**;
+- **Abrir en Drive** lo abre en Google, y **Editar en Drive** en su editor (Docs, Sheets y Slides; un PDF u
+  otro fichero solo se abre);
+- si el despliegue está conectado a Drive, verás también **«Modificado por X el …»** y el nombre actual.
+
+*Documentos de Drive*, en el menú, lista los ficheros de los contenidos que puedes ver; cada fila abre su
+contenido. Quién puede abrir el fichero lo decide Google, con los permisos del propio fichero: que aparezca
+aquí no te da acceso.
 
 ## Personas y organigrama
 
@@ -120,6 +149,43 @@ Sin responsable en el directorio no se puede hacer una solicitud: RRHH tiene que
   que puedes ver.
 
 Nunca te llegará nada que no puedas ver en la intranet, elijas lo que elijas.
+
+### Notificaciones
+
+También decides **cómo se te avisa** de lo que se publica para ti:
+
+- **Avisarme en la aplicación**: la campana de la cabecera y las notificaciones del navegador, si las has
+  activado. Llegan los avisos nuevos que puedes ver, lo que un editor haya marcado para notificar y el
+  recordatorio de lo que debes confirmar, unos dos días antes de la fecha límite.
+- **Avisarme por correo**: solo lo que se publica como *importante*.
+
+Un aviso se cierra solo cuando abres el contenido, y el recordatorio cuando lo confirmas. Solo se te avisa de lo
+que puedes ver.
+
+## Comentarios y «Me gusta»
+
+Debajo de cada contenido están sus **comentarios**. Escribe en *Tu comentario* y pulsa **Comentar**: lo verá
+cualquiera que pueda ver ese contenido, con tu nombre y la hora. Un comentario no se edita ni lo borra quien lo
+escribe, y tiene un máximo de 2.000 caracteres.
+
+**Me gusta**, arriba junto a *Añadir a favoritos*, muestra cuántos van. Solo cuenta uno por persona; pulsarlo
+otra vez lo retira.
+
+Los editores pueden **cerrar los comentarios** de un contenido (los que hay se siguen viendo, pero no se añaden
+más) y **ocultar** un comentario concreto, que deja de verse.
+
+## Encuestas
+
+*Intranet → Encuestas* lista las encuestas abiertas ahora que van dirigidas a ti, con su estado (*Por responder*
+o *Respondida*), cuándo cierran y si son anónimas. Abre una, contesta y pulsa **Enviar**: las preguntas
+obligatorias hay que responderlas.
+
+- **Se responde una sola vez, y no se puede cambiar después.** Revisa antes de enviar.
+- **Anónima**: se anota que has respondido, para que no se responda dos veces, pero tus respuestas no llevan
+  nada que te identifique. La página lo dice antes de que respondas.
+- **Con tu nombre**: los responsables ven quién ha respondido qué. La página también lo dice.
+
+Fuera de sus fechas, o si no es para ti, la encuesta no aparece y su enlace dice que no está disponible.
 
 ## Confirmar lectura
 

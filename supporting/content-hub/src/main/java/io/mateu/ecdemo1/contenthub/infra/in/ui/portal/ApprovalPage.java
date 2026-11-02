@@ -1,15 +1,18 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
 import io.mateu.ecdemo1.contenthub.application.usecases.RequestService;
-import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.Toolbar;
+import io.mateu.uidl.data.EmptyState;
 import io.mateu.uidl.data.FieldDataType;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.data.FormField;
 import io.mateu.uidl.data.VerticalLayout;
 import io.mateu.uidl.data.Message;
+import io.mateu.uidl.data.Notice;
+import io.mateu.uidl.data.Text;
+import io.mateu.uidl.data.TextContainer;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.DetailContentSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
@@ -18,6 +21,7 @@ import io.mateu.uidl.interfaces.VisibilitySupplier;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -32,8 +36,10 @@ public class ApprovalPage implements Identifiable, DetailContentSupplier, Visibi
     String id;
     @Hidden
     String title;
+
+    /** The request the task decides: still shown once the task is gone. */
     @Hidden
-    String html;
+    String requestId;
 
     @Hidden
     String comentario;
@@ -56,12 +62,10 @@ public class ApprovalPage implements Identifiable, DetailContentSupplier, Visibi
         if (approval == null) {
             decided = true;
             title = "Ya no está pendiente";
-            html = "<p>Esa tarea ya está decidida, o no es tuya.</p>";
             return this;
         }
+        requestId = approval.request().id();
         title = approval.request().type().label() + " · " + approval.request().employeeName();
-        html = (approval.hr() ? "<p>Aprobada por su responsable: te toca como <b>RRHH</b>.</p>" : "")
-                + RequestHtml.summary(approval.request()) + RequestHtml.history(approval.request());
         return this;
     }
 
@@ -105,13 +109,24 @@ public class ApprovalPage implements Identifiable, DetailContentSupplier, Visibi
      */
     @Override
     public Component detailContent(HttpRequest httpRequest) {
-        if (decided) {
-            return Html.block(html == null ? "" : html);
+        var approval = decided ? null : approval(httpRequest);
+        var request = approval != null ? approval.request()
+                : requestId == null ? null : requests.find(requestId).orElse(null);
+        if (request == null) {
+            return EmptyState.builder().title("Esa tarea ya está decidida, o no es tuya").build();
         }
-        return VerticalLayout.builder().fullWidth(true).content(List.of(
-                Html.block(html == null ? "" : html),
-                FormField.builder().id("comentario").label("Comentario para el empleado")
-                        .dataType(FieldDataType.string).stereotype(FieldStereotype.textarea).build())).build();
+        var content = new ArrayList<Component>();
+        if (approval != null && approval.hr()) {
+            content.add(Notice.builder().text("Aprobada por su responsable: te toca como RRHH.").build());
+        }
+        content.add(Text.builder().text(RequestComponents.title(request) + " · " + RequestComponents.subtitle(request))
+                .container(TextContainer.h3).build());
+        content.addAll(RequestComponents.sections(request));
+        if (approval != null) {
+            content.add(FormField.builder().id("comentario").label("Comentario para el empleado")
+                    .dataType(FieldDataType.string).stereotype(FieldStereotype.textarea).build());
+        }
+        return VerticalLayout.builder().fullWidth(true).spacing(true).content(content).build();
     }
 
     @Override

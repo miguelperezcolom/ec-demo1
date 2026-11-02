@@ -36,7 +36,11 @@ public class IntranetMenu {
 
     @Menu
     @Label("Buscar")
-    SearchListing buscar;
+    SearchPage buscar;
+
+    @Menu
+    @Label("Documentos de Drive")
+    DriveFilesListing documentosDrive;
 
     @Menu
     @Label("Mis favoritos")
@@ -57,6 +61,10 @@ public class IntranetMenu {
     @Menu
     @Label("Por aprobar")
     ApprovalsListing porAprobar;
+
+    @Menu
+    @Label("Encuestas")
+    SurveysListing encuestas;
 
     @Menu
     @Label("Mis preferencias")

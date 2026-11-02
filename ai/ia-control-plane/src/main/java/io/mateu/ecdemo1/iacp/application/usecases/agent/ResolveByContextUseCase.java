@@ -34,6 +34,11 @@ import java.util.List;
  * <p>Both refusals — an unusable agent and an exhausted budget — are the same kind of answer to the
  * caller: "not now, and here is why", a 409 with a sentence, not a 500. The agent surfaces it as the
  * chat panel's reply.
+ *
+ * <p><strong>A caller that names the agent</strong> — an A2A call — goes through {@link #handleNamed}:
+ * no routing, because the agent is decided, and the same budgets. Its guardrails are those of the
+ * first enabled route that targets that agent and matches the caller on the {@link #A2A_CHANNEL}
+ * channel, so a route for one console's prompts does not apply here, and one with no channel does.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,6 +49,9 @@ public class ResolveByContextUseCase {
     private final ResolveAgentConfigUseCase resolveAgentConfig;
     private final CheckBudgetUseCase checkBudget;
     private final AgentRepository agents;
+
+    /** The channel of a call that came over A2A: what a route says to apply to those. */
+    public static final String A2A_CHANNEL = "a2a";
 
     /**
      * The catalogue-wide default agent (cp.default-agent-id): the last word when no route matches and
@@ -81,8 +89,24 @@ public class ResolveByContextUseCase {
         var agentId = route != null ? route.getTargetAgentId()
                 : context.defaultAgentId() != null && !context.defaultAgentId().isBlank() ? context.defaultAgentId()
                 : defaultAgentId;
-        var resolved = resolveAgentConfig.handle(agentId);
+        return guarded(withinBudget(agentId, context), route);
+    }
 
+    /** The agent the caller named, within budget, with the guardrails of the route that covers it. */
+    @Transactional(readOnly = true)
+    public ResolveAgentConfigUseCase.Resolved handleNamed(String agentId, RequestContext context) {
+        var resolved = withinBudget(agentId, context);
+        for (var route : routes.findEnabledOrderedByPriority()) {
+            if (agentId.equals(route.getTargetAgentId()) && route.matches(context.roles(), context.tenant(),
+                    context.locale(), context.route(), A2A_CHANNEL)) {
+                return guarded(resolved, route);
+            }
+        }
+        return resolved;
+    }
+
+    private ResolveAgentConfigUseCase.Resolved withinBudget(String agentId, RequestContext context) {
+        var resolved = resolveAgentConfig.handle(agentId);
         var verdict = checkBudget.check(agentId, resolved.llm().id(), context.userId(),
                 context.tenant());
         if (!verdict.allowed()) {
@@ -91,6 +115,10 @@ public class ResolveByContextUseCase {
                     + e.spent() + " of " + e.limit() + " tokens this " + e.period()
                     + " for " + e.scope() + " '" + e.subjectId() + "'. Try again after it resets.");
         }
+        return resolved;
+    }
+
+    private ResolveAgentConfigUseCase.Resolved guarded(ResolveAgentConfigUseCase.Resolved resolved, Route route) {
         if (route == null) {
             return resolved;
         }

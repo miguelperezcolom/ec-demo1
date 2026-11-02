@@ -120,6 +120,18 @@ public class PgContentIndex implements ContentIndex {
     }
 
     @Override
+    public void indexSurvey(io.mateu.ecdemo1.contenthub.domain.survey.Survey survey, Set<String> hashes) {
+        var d = survey.definition();
+        jdbc.update("insert into ch_survey_doc (survey_id, status, title, description, opens_at, closes_at, anonymous, "
+                        + "audience, hashes) values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::text[]) on conflict (survey_id) do "
+                        + "update set status = excluded.status, title = excluded.title, description = excluded.description, "
+                        + "opens_at = excluded.opens_at, closes_at = excluded.closes_at, anonymous = excluded.anonymous, "
+                        + "audience = excluded.audience, hashes = excluded.hashes",
+                survey.id(), survey.status().name(), d.title(), d.description(), Sql.ts(d.opensAt()),
+                Sql.ts(d.closesAt()), d.anonymous(), Json.write(d.audience()), Sql.array(hashes));
+    }
+
+    @Override
     public List<Subject> subjects() {
         var out = new ArrayList<Subject>();
         out.addAll(jdbc.query("select item_id, audience, hashes from ch_item_doc where is_default",
@@ -128,6 +140,8 @@ public class PgContentIndex implements ContentIndex {
                 (rs, i) -> new Subject(Kind.BLOCK, rs.getString(1), Json.audience(rs.getString(2)), set(rs.getArray(3)))));
         out.addAll(jdbc.query("select slot_key || '/' || variant_id, audience, hashes from ch_slot_variant_doc",
                 (rs, i) -> new Subject(Kind.VARIANT, rs.getString(1), Json.audience(rs.getString(2)), set(rs.getArray(3)))));
+        out.addAll(jdbc.query("select survey_id, audience, hashes from ch_survey_doc",
+                (rs, i) -> new Subject(Kind.SURVEY, rs.getString(1), Json.audience(rs.getString(2)), set(rs.getArray(3)))));
         return out;
     }
 
@@ -145,6 +159,7 @@ public class PgContentIndex implements ContentIndex {
                 jdbc.update("update ch_slot_variant_doc set hashes = ?::text[] where slot_key = ? and variant_id = ?",
                         array, k[0], k[1]);
             }
+            case SURVEY -> jdbc.update("update ch_survey_doc set hashes = ?::text[] where survey_id = ?", array, key);
         }
     }
 
@@ -165,13 +180,15 @@ public class PgContentIndex implements ContentIndex {
                     jdbc.update("update ch_slot_variant_doc set hashes = array_append(hashes, ?) where slot_key = ? "
                             + "and variant_id = ? and not (? = any(hashes))", hash, k[0], k[1], hash);
                 }
+                case SURVEY -> jdbc.update("update ch_survey_doc set hashes = array_append(hashes, ?) "
+                        + "where survey_id = ? and not (? = any(hashes))", hash, s.key(), hash);
             }
         }
     }
 
     @Override
     public void removeHash(String hash) {
-        for (var table : List.of("ch_item_doc", "ch_block_doc", "ch_slot_variant_doc")) {
+        for (var table : List.of("ch_item_doc", "ch_block_doc", "ch_slot_variant_doc", "ch_survey_doc")) {
             jdbc.update("update " + table + " set hashes = array_remove(hashes, ?) where ? = any(hashes)", hash, hash);
         }
     }
@@ -309,6 +326,22 @@ public class PgContentIndex implements ContentIndex {
     }
 
     @Override
+    public List<VisibleSurvey> openSurveys(String hash, Instant now, String surveyId) {
+        var sql = "select d.survey_id, d.title, d.description, d.opens_at, d.closes_at, d.anonymous from ch_survey_doc d "
+                + "where d.hashes && ?::text[] and d.status = 'PUBLISHED' and (d.opens_at is null or d.opens_at <= ?) "
+                + "and (d.closes_at is null or d.closes_at > ?)";
+        var params = new ArrayList<Object>(List.of(who(hash), Sql.ts(now), Sql.ts(now)));
+        if (surveyId != null) {
+            sql += " and d.survey_id = ?";
+            params.add(surveyId);
+        }
+        return jdbc.query(sql + " order by d.closes_at nulls last, d.title",
+                (rs, i) -> new VisibleSurvey(rs.getString(1), rs.getString(2), rs.getString(3),
+                        Sql.instant(rs.getTimestamp(4)), Sql.instant(rs.getTimestamp(5)), rs.getBoolean(6)),
+                params.toArray());
+    }
+
+    @Override
     public List<Passage> passagesToEmbed(int limit) {
         return jdbc.query("select c.item_id, c.language, c.chunk_no, '', c.text from ch_chunk c where c.embedding is null "
                         + "order by c.item_id, c.language, c.chunk_no limit ?",
@@ -343,6 +376,25 @@ public class PgContentIndex implements ContentIndex {
             sb.append(v[i]);
         }
         return sb.append(']').toString();
+    }
+
+    /** A Google Drive or Docs URL, as an editor may have pasted it. */
+    static final String GOOGLE = "'(drive|docs)\\.google\\.com/'";
+
+    @Override
+    public List<ExternalReference> visibleGoogleUrls(String hash, String language, Instant now) {
+        var who = who(hash);
+        return jdbc.query("select item_id, title, url from ("
+                        + "select d.item_id, d.title, d.url, d.publish_at from ch_item_doc d where" + VISIBLE + " and "
+                        + LANGUAGE + " and d.url ~* " + GOOGLE
+                        + " union "
+                        + "select d.item_id, d.title, m.external_url, d.publish_at from ch_item_doc d join ch_media m "
+                        + "on (d.url = 'media:' || m.id or exists (select 1 from ch_item_media im where "
+                        + "im.item_id = d.item_id and im.media_id = m.id)) where" + VISIBLE + " and " + LANGUAGE
+                        + " and m.kind = 'EXTERNAL' and m.external_url ~* " + GOOGLE
+                        + ") r order by publish_at desc, item_id",
+                (rs, i) -> new ExternalReference(rs.getString(1), rs.getString(2), rs.getString(3)),
+                who, Sql.ts(now), Sql.ts(now), language, language, who, Sql.ts(now), Sql.ts(now), language, language);
     }
 
     @Override

@@ -41,6 +41,9 @@ public class Notification {
     public String dedupKey;
     @Column(length = 2000)
     public String recipients;
+    /** The people it was addressed to, comma-separated; empty (the usual), whoever the recipients say. */
+    @Column(length = 2000)
+    public String addressees;
     @Enumerated(EnumType.STRING)
     public DeliveryStatus status;
     public int attempts;

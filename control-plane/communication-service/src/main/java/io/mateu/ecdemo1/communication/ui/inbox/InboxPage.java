@@ -44,7 +44,7 @@ import java.util.Set;
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-@Title("Inbox")
+@Title("Bandeja")
 @Trigger(type = TriggerType.OnCustomEvent, actionId = "search", eventName = InboxPage.SEEN)
 public class InboxPage implements Listing<InboxRow>, Searchable {
 
@@ -85,14 +85,14 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
     }
 
     static InboxRow row(InboxItem i, String link, Set<String> seen) {
-        var open = link == null || link.isBlank() ? new ColumnAction[0] : new ColumnAction[] {new ColumnAction("open", "Open")};
+        var open = link == null || link.isBlank() ? new ColumnAction[0] : new ColumnAction[] {new ColumnAction("open", "Abrir")};
         return new InboxRow(i.id, i.createdAt == null ? "" : WHEN.format(i.createdAt), kind(i), i.hotelCode, i.title, detailOf(i),
                 seen.contains(i.id), new ColumnActionGroup(open));
     }
 
     static Status kind(InboxItem i) {
-        return InboxItem.Kind.TASK.name().equals(i.kind) ? new Status(StatusType.INFO, "Task")
-                : i.urgent ? new Status(StatusType.DANGER, "Urgent") : new Status(StatusType.WARNING, "To do");
+        return InboxItem.Kind.TASK.name().equals(i.kind) ? new Status(StatusType.INFO, "Tarea")
+                : i.urgent ? new Status(StatusType.DANGER, "Urgente") : new Status(StatusType.WARNING, "Pendiente");
     }
 
     @Override
@@ -201,7 +201,7 @@ public class InboxPage implements Listing<InboxRow>, Searchable {
 
     /** Marks the selected rows seen. The work is in handleAction, like every action of this listing. */
     @ListToolbarButton
-    @Label("Mark as seen")
+    @Label("Marcar como visto")
     public void markAsSeen() {
     }
 

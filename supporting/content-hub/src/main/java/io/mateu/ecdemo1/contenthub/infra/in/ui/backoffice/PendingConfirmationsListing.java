@@ -39,9 +39,4 @@ public class PendingConfirmationsListing implements Listing<PendingConfirmations
     public boolean csvExportable() {
         return true;
     }
-
-    @Override
-    public boolean excelExportable() {
-        return true;
-    }
 }

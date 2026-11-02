@@ -21,7 +21,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <mateu.version>3.0-beta.37</mateu.version>
+        <mateu.version>3.0-beta.38</mateu.version>
         <lombok.version>1.18.44</lombok.version>
         <spring-ai.version>2.0.1</spring-ai.version>
         <jqwik.version>1.9.2</jqwik.version>
@@ -60,6 +60,13 @@
             <groupId>io.mateu.ecdemo1</groupId>
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
+        </dependency>
+        <!-- The intranet's notifications go out on the platform's own topic (notifications,
+             notification-resolutions): communication-service owns the bell and Web Push. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-communication</artifactId>
+            <version>1.0.0</version>
         </dependency>
         <!-- UserFacingErrors: the domain's rule violations reach the user as messages, not as
              "an unexpected error". -->
@@ -108,12 +115,6 @@
             <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
             <version>${spring-ai.version}</version>
         </dependency>
-        <!-- «Traducir con IA» in the editor: the official Anthropic SDK -->
-        <dependency>
-            <groupId>com.anthropic</groupId>
-            <artifactId>anthropic-java</artifactId>
-            <version>3.2.0</version>
-        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -133,6 +134,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-testing</artifactId>
+            <version>1.0.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>

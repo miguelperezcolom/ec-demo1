@@ -57,7 +57,7 @@ public class Announcements {
         for (var item : items.findTop50ByAnnouncedAtIsNullOrderByCreatedAtAsc()) {
             // What was there before this started, or was resolved before it went, is left alone.
             if (item.isOpen() && item.createdAt != null && item.createdAt.isAfter(startedAt.minus(Duration.ofMinutes(1)))) {
-                var plan = routing.plan(item.type, item.hotelCode);
+                var plan = routing.plan(item.type, item.hotelCode, item.addressees);
                 var channels = new java.util.LinkedHashSet<String>();
                 plan.spaces().forEach(space -> channels.add("chat:" + space));
                 var browsers = push.configured() ? subscriptions.findAll() : List.<PushSubscription>of();

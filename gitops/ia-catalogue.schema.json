@@ -463,9 +463,10 @@
           "enum": [
             "data-plane",
             "control-plane",
-            "front-office"
+            "front-office",
+            "a2a"
           ],
-          "description": "The console the prompt comes from, as the gateway stamps it from the host (X-Agent-Channel). Omit for any."
+          "description": "The console the prompt comes from, as the gateway stamps it from the host (X-Agent-Channel), or a2a for a call that names the agent over A2A. Omit for any."
         },
         "targetAgent": {
           "type": "string",

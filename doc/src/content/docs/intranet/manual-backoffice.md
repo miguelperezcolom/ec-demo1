@@ -36,16 +36,18 @@ modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 | **Contenido** | **Tipo** (Artículo, Página, Aviso, Enlace, Documento; no se cambia después), **Sección** del árbol, **Idioma por defecto** |
 | **Español / English / Deutsch** | Por idioma: título, resumen y cuerpo (texto enriquecido). Un idioma sin título no se publica; al lector sin traducción en su idioma se le muestra el idioma por defecto, que **debe** tener título |
 | **Audiencia** | Quién lo verá (ver [El constructor de audiencias](#el-constructor-de-audiencias)) |
-| **Publicación** | *Publicar a partir de* (vacío: en el momento de publicar), *Caduca el*, *URL* (obligatoria en enlaces y documentos; vale `media:id` para un fichero de la biblioteca), *Seguimiento de lectura*, *Confirmación obligatoria* y *Confirmar antes del*, *Al publicar, exigir reconfirmar* |
+| **Publicación** | *Publicar a partir de* (vacío: en el momento de publicar), *Caduca el*, *URL* (obligatoria en enlaces y documentos; vale `media:id` para un fichero de la biblioteca), *Seguimiento de lectura*, *Confirmación obligatoria* y *Confirmar antes del*, *Al publicar, exigir reconfirmar*, *Comentarios cerrados* (se aplica al guardar, sin esperar a publicar: ver [Comentarios](#comentarios)), *Notificar a los lectores al publicar*, *Importante* |
+| **Cifras** (al editar) | *Vistas*, *Lectores únicos*, *Confirmaciones* (de la versión que cuenta) y *Lectores notificados* |
 | **Bloques (solo páginas)** | Los bloques de una página (ver abajo) |
 | **Avisos** | Lo que conviene revisar antes de publicar: una audiencia que no cumple nadie, un bloque que nadie vería |
 
 **Traducir con IA** (en la barra del formulario) rellena los idiomas que aún no tienen título a partir
 del idioma por defecto: título, resumen y cuerpo, con el formato intacto y las marcas `[[media:…]]` en su
 sitio. Solo cambia el formulario: **revísalo y guarda**. Nada se publica sin pasar por el flujo de siempre.
-Para retraducir un idioma, vacía su título. Si una traducción pierde una marca de medio, no se aplica. La
-acción solo aparece si el despliegue tiene clave de IA (`ANTHROPIC_API_KEY`, del secreto `ec-anthropic`);
-el modelo se configura con `content-hub.translation.model`.
+Para retraducir un idioma, vacía su título. Si una traducción pierde una marca de medio, el formato o un
+enlace del cuerpo, no se aplica. La traduce el agente `intranet-translator` del plano de control de IA, en tu
+nombre y con tu presupuesto; si no está disponible, o su respuesta no sirve, sale un mensaje breve y **el
+formulario no cambia**.
 
 Arriba del formulario, **Estado** y **Aplicado a los lectores**: tras publicar, «Aplicando la versión
 N…» hasta que la visibilidad está recalculada (unos segundos) y luego «Sí — versión N aplicada el …».
@@ -104,6 +106,20 @@ estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple amb
   de publicar una versión nueva si las confirmaciones anteriores no deben valer. Sin marcar, siguen
   valiendo.
 
+### Notificar a los lectores
+
+Cuando un contenido se hace efectivo —al publicarlo, o al llegar su *Publicar a partir de*— se avisa a quienes
+pueden verlo, en unos segundos, en la campana y en su navegador:
+
+- **Notificar a los lectores al publicar**: *Según el tipo* (por defecto: los avisos sí, lo demás no), *Sí* o
+  *No*. Cada versión avisa una vez: si publicas otra versión de algo que notifica, se vuelve a avisar. Para
+  corregir una errata, pon *No* antes de publicar.
+- **Importante**: además, por correo. En la demo los correos van a la dirección de redirección.
+
+Quien lo ha desactivado en *Mis preferencias* no recibe ese canal. Si el contenido exige confirmación y tiene
+fecha límite, quien no haya confirmado recibe **un** recordatorio unos dos días antes, aunque el contenido no
+notificara al publicarse. *Lectores notificados*, en *Cifras*, dice a cuántos se ha avisado.
+
 ## Biblioteca de medios
 
 *Intranet → Medios*. Cada medio tiene un id (`m…`) y la marca para incrustarlo (`[[media:id]]`).
@@ -116,6 +132,24 @@ estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple amb
   YouTube, Vimeo o Drive al pulsar *Compartir → Insertar*). Solo se guardan el proveedor y el id del
   vídeo o fichero; el reproductor oficial se construye a partir de ellos. Otra URL cualquiera queda como
   enlace. Para lo que pase de 20 MB, súbelo a YouTube, Vimeo o Drive y pon su URL.
+
+### Un fichero de Google Drive
+
+Pega la URL de un fichero de Drive, Docs, Sheets o Slides, tal como la copias del navegador o de
+*Compartir*, en cualquiera de estos dos sitios:
+
+- en **Medios → Nuevo**, en *URL o código de inserción*; se usa como cualquier medio;
+- en el campo **URL** de un contenido de tipo documento o enlace.
+
+La intranet guarda **solo la referencia**: nunca copia el fichero, así que hay una sola versión, la de Drive.
+El lector ve la vista previa de Google y los enlaces *Abrir en Drive* y *Editar en Drive*. Comparte el fichero
+en Drive con quien deba verlo: **los permisos los pone Google**, no la audiencia del contenido. Una carpeta o
+un documento «publicado en la web» no es un fichero: en Medios se rechaza diciéndolo; en el campo URL de un
+contenido queda como enlace normal.
+
+Si el despliegue está conectado a Drive, en los detalles del medio ves el nombre en Drive, quién lo modificó
+y, si Drive no da acceso a ese fichero, el motivo. No es un error para el lector: pierde solo el
+«Modificado por…».
 
 Para usarlo en un contenido:
 
@@ -228,7 +262,56 @@ Para los items con **confirmación obligatoria**:
   lo ven), cuántos han confirmado en la versión que cuenta, y el porcentaje.
 - **Pendientes de confirmar** — quién falta, con su email, hotel y departamento: la lista para reclamar.
 
-Las dos se **exportan** a CSV o Excel desde el propio listado.
+Las dos se **exportan** a CSV, que Excel abre, desde el propio listado.
+
+## Comentarios
+
+*Editorial → Comentarios* lista todos los comentarios de todos los contenidos, también los ocultos, el más
+reciente primero, y se puede buscar por texto, contenido o autor. Hace falta `content:edit`.
+
+- **Ocultar**: al abrir un comentario, lo quita del portal. No se borra: queda quién lo ocultó y cuándo, y
+  **Mostrar** lo devuelve.
+- **Cerrar los comentarios** de un contenido: *Comentarios cerrados*, en la sección *Publicación* de su formulario.
+  Actúa al guardar, sin crear una versión nueva. Los comentarios que hay se siguen viendo.
+
+## Encuestas
+
+*Editorial → Encuestas* lista todas, con su estado y cuántas respuestas tienen. Las encuestas **no se borran**: se
+cierran, porque sus respuestas se perderían con ellas.
+
+| Sección del formulario | Qué se rellena |
+| :--------------------- | :------------- |
+| **Audiencia** | Quién la verá, con el mismo [constructor](#el-constructor-de-audiencias) que los contenidos |
+| **Encuesta** | *Título*, *Descripción*, *Abre el* (vacío: al publicarla), *Cierra el* (vacío: hasta cerrarla a mano), *Anónima* |
+| **Preguntas** | Enunciado, *Tipo* (opción única, opción múltiple, valoración de 1 a 5, texto libre), *Obligatoria* y, si son de opciones, una por línea (al menos dos) |
+| **Resultados** | Al verla una vez publicada: lo que se ha respondido |
+
+**Publicar** (`content:publish`) la abre a su audiencia en cuanto llegue su fecha. Desde ese momento **sus
+preguntas y si es anónima ya no se pueden cambiar**, para que las respuestas sigan significando lo mismo; su
+título, descripción, audiencia y fechas sí. **Cerrar** (`content:publish`) la termina antes de tiempo; una
+encuesta cerrada ya no se modifica. Llegar a la fecha de cierre deja de admitir respuestas sin hacer nada más.
+
+**Resultados**, pregunta a pregunta: una tarta para la opción única, barras para la múltiple y la valoración
+(con su media), con el recuento y el porcentaje sobre quienes respondieron esa pregunta, y los textos libres,
+por orden alfabético.
+
+*Editorial → Respuestas de encuestas* da cada respuesta en una fila, para buscar y **exportar a CSV**, que Excel abre. Las
+de una encuesta anónima no dicen quién ni cuándo, y las filas van ordenadas por respuesta para que no se puedan
+reconstruir las respuestas de una misma persona.
+
+## Analítica
+
+*Analítica*, en el menú *Editorial*, resume los últimos 30 días; lo que viene de los agregados tarda hasta 15
+minutos en aparecer:
+
+- **Indicadores**: lectores activos en 7 y 30 días (quien ha abierto un contenido o el inicio), vistas, búsquedas y
+  porcentaje de búsquedas sin resultados.
+- **Gráficos**: vistas por día, contenidos más vistos, lo más buscado, búsquedas sin resultados (lo que la gente
+  busca y la intranet no tiene: lo primero que conviene mirar), adopción por hotel y por departamento (qué parte de
+  sus empleados ha leído algo) y aperturas y clics de las últimas ediciones de la newsletter.
+
+Las búsquedas se guardan sin saber quién las hizo, y lo que se mira en «ver como» no cuenta. Las cifras de un
+contenido concreto están en su formulario, en *Cifras*.
 
 ## Directorio y visibilidad
 

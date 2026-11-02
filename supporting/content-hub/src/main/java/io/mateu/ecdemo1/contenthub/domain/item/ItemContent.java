@@ -16,10 +16,14 @@ import java.util.TreeMap;
  * @param confirmationRequired  whether every reader must confirm having read it
  * @param confirmationDeadline  by when, when it must be confirmed
  * @param url                   LINK: where it goes; DOCUMENT: the file
+ * @param notifyReaders         whether its readers are notified when it becomes effective; null = as its
+ *                              type says ({@link #notifies(ItemType)}: notices yes, the rest no)
+ * @param important             whether that notification also goes by e-mail (to readers who allow it)
  */
 public record ItemContent(String sectionId, Audience audience, Map<String, Translation> translations,
                           List<Block> blocks, Instant publishAt, Instant expireAt, boolean readTracking,
-                          boolean confirmationRequired, Instant confirmationDeadline, String url) {
+                          boolean confirmationRequired, Instant confirmationDeadline, String url,
+                          Boolean notifyReaders, boolean important) {
 
     public ItemContent {
         audience = audience == null ? Audience.EVERYONE : audience;
@@ -27,9 +31,30 @@ public record ItemContent(String sectionId, Audience audience, Map<String, Trans
         blocks = blocks == null ? List.of() : List.copyOf(blocks);
     }
 
+    /** Without a say on notifications: as the type says, and not important. */
+    public ItemContent(String sectionId, Audience audience, Map<String, Translation> translations,
+                       List<Block> blocks, Instant publishAt, Instant expireAt, boolean readTracking,
+                       boolean confirmationRequired, Instant confirmationDeadline, String url) {
+        this(sectionId, audience, translations, blocks, publishAt, expireAt, readTracking, confirmationRequired,
+                confirmationDeadline, url, null, false);
+    }
+
     public ItemContent withPublishAt(Instant at) {
         return new ItemContent(sectionId, audience, translations, blocks, at, expireAt, readTracking,
-                confirmationRequired, confirmationDeadline, url);
+                confirmationRequired, confirmationDeadline, url, notifyReaders, important);
+    }
+
+    public ItemContent withNotification(Boolean notifyReaders, boolean important) {
+        return new ItemContent(sectionId, audience, translations, blocks, publishAt, expireAt, readTracking,
+                confirmationRequired, confirmationDeadline, url, notifyReaders, important);
+    }
+
+    /**
+     * Whether an item of this type with this content notifies its readers: what the editor chose, or by
+     * default only a notice — a notice is what someone must know; news can wait for the reader.
+     */
+    public boolean notifies(ItemType type) {
+        return notifyReaders != null ? notifyReaders : type == ItemType.NOTICE;
     }
 
     /** The text in a language, falling back to the default language's. */

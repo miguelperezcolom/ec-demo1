@@ -5,46 +5,64 @@ import io.mateu.ecdemo1.contenthub.application.out.HomePages;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
-import io.mateu.ecdemo1.contenthub.application.visibility.ProjectionCache;
+import io.mateu.ecdemo1.contenthub.application.usecases.Surveys;
+import io.mateu.ecdemo1.contenthub.application.usecases.UsageTracker;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
-import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.annotations.Title;
+import io.mateu.uidl.data.Button;
+import io.mateu.uidl.data.ButtonStyle;
+import io.mateu.uidl.data.DashboardLayout;
+import io.mateu.uidl.data.RouteLink;
+import io.mateu.uidl.data.WelcomePage;
 import io.mateu.uidl.fluent.Component;
+import io.mateu.uidl.fluent.Form;
 import io.mateu.uidl.interfaces.ComponentTreeSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
-import static io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui.esc;
+import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PageRenderer.panel;
+import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.items;
+import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.withLink;
 
 /**
- * The intranet's home. A reader whose profile sees one of the configured home pages (Configuración →
- * Inicio) gets the first of them, drawn as a page of blocks; anyone else gets the default home: the
- * reader's pending confirmations, the notices and the latest news — all through the visibility
- * function, the lists cached per profile hash. One block of markup, drawn the same by both renderers.
+ * The intranet's home: Mateu's welcome page template (Redwood draws Spectra's welcome page) — a
+ * banner greeting the reader, and tiles under it. A reader whose profile sees one of the configured
+ * home pages (Configuración → Inicio) gets the first of them, its blocks as the tiles; anyone else
+ * gets the default home: their pending confirmations, the surveys they have not answered, the notices
+ * and the latest news — all through the visibility function.
  */
 @Service
 @Scope("prototype")
 @Title("Intranet")
 public class HomePage implements ComponentTreeSupplier {
 
+    static final DateTimeFormatter TODAY = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", Locale.of("es"));
+
     final PortalSupport portal;
     final ReaderActions actions;
-    final ProjectionCache cache;
     final HomePages homes;
     final PageRenderer renderer;
+    final Surveys surveys;
+    final UsageTracker usage;
 
-    public HomePage(PortalSupport portal, ReaderActions actions, ProjectionCache cache, HomePages homes,
-                    PageRenderer renderer) {
+    public HomePage(PortalSupport portal, ReaderActions actions, HomePages homes, PageRenderer renderer,
+                    Surveys surveys, UsageTracker usage) {
         this.portal = portal;
         this.actions = actions;
-        this.cache = cache;
         this.homes = homes;
         this.renderer = renderer;
+        this.surveys = surveys;
+        this.usage = usage;
     }
 
     /** The first configured home page this reader can see, if any. */
@@ -56,32 +74,50 @@ public class HomePage implements ComponentTreeSupplier {
     @Override
     public Component component(HttpRequest httpRequest) {
         var reader = portal.reader(httpRequest);
-        var home = homeOf(reader);
-        if (home.isPresent()) {
-            return Html.block(ItemPage.banner(reader.viewingAs()) + renderer.home(reader, home.get()));
+        if (PortalSupport.opening(httpRequest)) {
+            usage.homeVisited(reader);
         }
-        var hash = reader.attributes().hash();
-        var language = reader.attributes().language();
-        var html = new StringBuilder(ItemPage.banner(reader.viewingAs()));
-        html.append("<h1 style=\"margin:.25rem 0 1rem\">Hola, ").append(esc(reader.name())).append("</h1>");
+        var today = TODAY.format(LocalDate.now(Ui.ZONE));
+        var home = homeOf(reader).map(page -> renderer.home(reader, page))
+                .orElseGet(() -> defaultHome(reader));
+        var overline = home.overline() == null ? "Intranet" : home.overline();
+        if (reader.viewingAs() != null) {
+            overline = "Vista previa como «" + reader.viewingAs() + "»";
+        }
+        return Form.builder()
+                .title("Hola, " + reader.name())
+                .overline(overline)
+                .subtitle(home.subtitle() == null ? Character.toUpperCase(today.charAt(0)) + today.substring(1)
+                        : home.subtitle())
+                .template(new WelcomePage(PortalComponents.TONE.name()))
+                .toolbarItem(Button.builder().label("Buscar en la intranet").buttonStyle(ButtonStyle.primary)
+                        .actionable(new RouteLink(Ui.PORTAL + "/buscar")).build())
+                .toolbarItem(Button.builder().label("Nueva solicitud")
+                        .actionable(new RouteLink(Ui.PORTAL + "/nuevaSolicitud")).build())
+                .content(List.of(DashboardLayout.builder().id("tiles").columns(3).items(home.panels()).build()))
+                .build();
+    }
+
+    PageRenderer.Home defaultHome(Reader reader) {
+        var panels = new ArrayList<Component>();
         if (reader.viewingAs() == null) {
             var pending = actions.pendingConfirmations(reader);
             if (!pending.isEmpty()) {
-                html.append(Ui.card("<h3 style=\"margin-top:0\">⚠️ Tienes " + pending.size()
-                        + " contenido(s) pendiente(s) de confirmar</h3>" + PageRenderer.list(pending)));
+                panels.add(panel("pendientes", "Pendiente de confirmar (" + pending.size() + ")",
+                        withLink(items(pending, ""), "Ver lo pendiente", Ui.PORTAL + "/pendientes"), 3));
+            }
+            var surveysToAnswer = surveys.pending(reader);
+            if (!surveysToAnswer.isEmpty()) {
+                panels.add(panel("encuestas", "Encuestas por responder (" + surveysToAnswer.size() + ")",
+                        withLink(SurveyPage.links(surveysToAnswer), "Ver las encuestas", Ui.PORTAL + "/encuestas"), 3));
             }
         }
-        String notices = cache.get(hash, language, "home-notices", () ->
-                PageRenderer.list(portal.latest(reader, new ContentQuery(Set.of(ItemType.NOTICE), null, null, null, 0, 5))));
-        String news = cache.get(hash, language, "home-news", () ->
-                PageRenderer.list(portal.latest(reader, new ContentQuery(Set.of(ItemType.ARTICLE, ItemType.PAGE), null,
-                        null, null, 0, 8))));
-        html.append("<div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem\">")
-                .append(Ui.card("<h3 style=\"margin-top:0\">📢 Avisos</h3>"
-                        + (notices.contains("<li") ? notices : "<p style=\"opacity:.7\">Sin avisos.</p>")))
-                .append(Ui.card("<h3 style=\"margin-top:0\">📰 Últimas noticias</h3>"
-                        + (news.contains("<li") ? news : "<p style=\"opacity:.7\">Sin noticias.</p>")))
-                .append("</div>");
-        return Html.block(html.toString());
+        panels.add(panel("avisos", "Avisos", withLink(items(portal.latest(reader,
+                new ContentQuery(Set.of(ItemType.NOTICE), null, null, null, 0, 5)), "Sin avisos."),
+                "Todos los avisos", Ui.PORTAL + "/avisos"), 1));
+        panels.add(panel("noticias", "Últimas noticias", withLink(items(portal.latest(reader,
+                new ContentQuery(Set.of(ItemType.ARTICLE, ItemType.PAGE), null, null, null, 0, 8)), "Sin noticias."),
+                "Todas las noticias", Ui.PORTAL + "/noticias"), 2));
+        return new PageRenderer.Home(null, null, panels);
     }
 }

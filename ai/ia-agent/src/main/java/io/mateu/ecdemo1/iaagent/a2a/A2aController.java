@@ -1,7 +1,10 @@
 package io.mateu.ecdemo1.iaagent.a2a;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mateu.ecdemo1.iaagent.config.AgentConfig;
 import io.mateu.ecdemo1.iaagent.config.AgentConfigClient;
+import io.mateu.ecdemo1.iaagent.config.AgentResolver;
+import io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,11 +48,27 @@ public class A2aController {
     private final boolean requireToken;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public A2aController(AgentConfigClient configClient, A2aAgentExecutor executor,
+    public A2aController(AgentConfigClient configClient, AgentResolver resolver, JwtIdentityReader identity,
+                         A2aAgentExecutor executor,
                          @Value("${ia.a2a.max-depth:2}") int maxDepth,
                          @Value("${ia.a2a.base-url:http://ia-agent:8095}") String baseUrl,
                          @Value("${ia.a2a.require-token:true}") boolean requireToken) {
-        this.server = new A2aServer(configClient::configOf, executor, maxDepth, baseUrl);
+        this.server = new A2aServer(new A2aServer.Configs() {
+            @Override
+            public AgentConfig configOf(String agentId) {
+                return configClient.configOf(agentId);
+            }
+
+            /** Asked per message and for this caller, unlike the card: a spent budget refuses here. */
+            @Override
+            public AgentConfig configFor(String agentId, String authorization) {
+                var resolution = resolver.resolveNamed(agentId, identity.read(authorization));
+                if (!resolution.allowed()) {
+                    throw new AgentConfigClient.Unavailable(resolution.deniedReason());
+                }
+                return resolution.config();
+            }
+        }, executor, maxDepth, baseUrl);
         this.requireToken = requireToken;
     }
 

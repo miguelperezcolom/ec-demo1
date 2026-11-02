@@ -23,7 +23,8 @@ One entry per file. The `kind` field (`llm` | `mcp` | `apimcp` | `rag` | `agent`
 `route`) says which catalogue it is; the schema keys everything else off that. Budgets cap token
 spend on a subject per window; routes pick which agent answers by the caller's context — role,
 tenant, locale, screen (`routePrefix`) and console (`channel`: `data-plane`, `control-plane` or
-`front-office`, which the gateway stamps from the host). With no route matching, the console's own
+`front-office`, which the gateway stamps from the host; `a2a` for a call that names the agent, where
+a route picks nothing and only brings its guardrails). With no route matching, the console's own
 default agent answers (the gateway stamps that too), else the catalogue's (`cp.default-agent-id`).
 Both reconcile under the same provenance rule as the rest.
 

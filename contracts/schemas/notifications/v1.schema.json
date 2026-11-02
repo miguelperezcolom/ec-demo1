@@ -2,12 +2,12 @@
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "$id" : "urn:ec-demo1:topic:notifications:v1",
   "title" : "notifications v1",
-  "description" : "A notification for the people who look after a hotel: a cause opened, a proposal ready, a write retrying too long… Deduplicated by dedupKey.",
+  "description" : "A notification for the people who look after a hotel: a cause opened, a proposal ready, a write retrying too long… Deduplicated by dedupKey. With addressees, for those people only (the intranet's: a new item, a confirmation due).",
   "x-topic" : "notifications",
   "x-version" : 1,
   "x-owner" : "communication-service",
   "x-key" : "dedupKey (none from pms-integration's retry watch)",
-  "x-producers" : [ "integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office" ],
+  "x-producers" : [ "integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office", "content-hub" ],
   "x-consumers" : [ "communication-service" ],
   "x-java-type" : "io.mateu.ecdemo1.integration.model.notification.NotificationRequested",
   "$ref" : "#/$defs/NotificationRequested",
@@ -42,6 +42,12 @@
         "requestedAt" : {
           "type" : [ "string", "null" ],
           "format" : "date-time"
+        },
+        "addressees" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string"
+          }
         }
       },
       "required" : [ "notificationId", "type", "hotelCode", "subject", "title", "body", "link", "dedupKey", "requestedAt" ],
@@ -49,7 +55,7 @@
     },
     "NotificationType" : {
       "type" : "string",
-      "enum" : [ "CAUSE_OPENED", "PROPOSAL_READY", "RETRYING_TOO_LONG", "PMS_REJECTED", "INTEGRATION_NEEDS_ATTENTION", "CHECK_IN_INCOMPLETE", "PLATFORM_ALERT", "PLATFORM_ALERT_CRITICAL" ]
+      "enum" : [ "CAUSE_OPENED", "PROPOSAL_READY", "RETRYING_TOO_LONG", "PMS_REJECTED", "INTEGRATION_NEEDS_ATTENTION", "CHECK_IN_INCOMPLETE", "PLATFORM_ALERT", "PLATFORM_ALERT_CRITICAL", "INTRANET_PUBLISHED", "INTRANET_CONFIRMATION_DUE" ]
     },
     "NotificationType-nullable" : {
       "anyOf" : [ {
@@ -69,5 +75,16 @@
     "link" : "/mapping/causes",
     "dedupKey" : "cause:MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING",
     "requestedAt" : "2026-11-12T09:30:00Z"
+  }, {
+    "notificationId" : "N-2",
+    "type" : "INTRANET_PUBLISHED",
+    "hotelCode" : null,
+    "subject" : "intranet/item/turnos-canarias/ana",
+    "title" : "Nuevos turnos de recepción",
+    "body" : "Aviso · Recepción. Los turnos de noviembre ya están publicados.",
+    "link" : "/intranet/noticias/turnos-canarias",
+    "dedupKey" : "intranet:published:turnos-canarias:v1:ana",
+    "requestedAt" : "2026-11-12T09:30:00Z",
+    "addressees" : [ "ana" ]
   } ]
 }

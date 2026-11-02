@@ -17,6 +17,7 @@ import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Colspan;
 import io.mateu.uidl.annotations.EditableOnlyWhenCreating;
+import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ReadOnly;
@@ -112,7 +113,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     LocalDateTime publishAt;
     @Label("Caduca el")
     LocalDateTime expireAt;
-    @Label("URL (enlace o documento; o media:id)")
+    @Label("URL (enlace, documento, fichero de Google Drive, Docs, Sheets o Slides; o media:id)")
     String url;
     @Label("Seguimiento de lectura")
     boolean readTracking;
@@ -122,6 +123,16 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     LocalDateTime confirmationDeadline;
     @Label("Al publicar, exigir reconfirmar")
     boolean requireReconfirmation;
+    @Label("Comentarios cerrados")
+    @io.mateu.uidl.annotations.Help("Nadie más puede comentar; los comentarios que hay se siguen viendo. Se aplica al guardar, sin esperar a publicar.")
+    boolean comentariosCerrados;
+
+    @Label("Notificar a los lectores al publicar")
+    @Help("Por defecto, los avisos notifican y el resto de contenidos no.")
+    @Stereotype(FieldStereotype.select)
+    String notificar = NOTIFY_BY_TYPE;
+    @Label("Importante (avisar también por correo)")
+    boolean importante;
 
     @Section("Bloques (solo páginas)")
     @Label("Bloques")
@@ -143,6 +154,28 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Colspan(2)
     String warnings;
 
+    @Section("Cifras")
+    @ReadOnly
+    @HiddenInCreate
+    @Label("Vistas")
+    String vistas;
+    @ReadOnly
+    @HiddenInCreate
+    @Label("Lectores únicos")
+    String lectoresUnicos;
+    @ReadOnly
+    @HiddenInCreate
+    @Label("Confirmaciones")
+    String confirmaciones;
+    @ReadOnly
+    @HiddenInCreate
+    @Label("Lectores notificados")
+    String notificados;
+
+    static final String NOTIFY_BY_TYPE = "POR_TIPO";
+    static final String NOTIFY_YES = "SI";
+    static final String NOTIFY_NO = "NO";
+
     final ItemCommands commands;
     final ItemRepository items;
     final ContentIndex index;
@@ -151,11 +184,15 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     final Readers readers;
     final io.mateu.ecdemo1.contenthub.application.out.Translator translator;
     final io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer;
+    final io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration;
+    final io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics;
 
     public ItemForm(ItemCommands commands, ItemRepository items, ContentIndex index, AudienceCommands audienceCommands,
                     NamedAudiences namedAudiences, Readers readers,
                     io.mateu.ecdemo1.contenthub.application.out.Translator translator,
-                    io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer) {
+                    io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer,
+                    io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration,
+                    io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics) {
         this.commands = commands;
         this.items = items;
         this.index = index;
@@ -164,10 +201,13 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         this.readers = readers;
         this.translator = translator;
         this.renderer = renderer;
+        this.collaboration = collaboration;
+        this.analytics = analytics;
     }
 
-    public ItemForm load(Item item) {
+    public ItemForm load(Item item, boolean commentsClosed) {
         id = item.id();
+        comentariosCerrados = commentsClosed;
         type = item.type();
         defaultLanguage = item.defaultLanguage();
         var c = item.draft();
@@ -190,9 +230,16 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         readTracking = c.readTracking();
         confirmationRequired = c.confirmationRequired();
         confirmationDeadline = Ui.local(c.confirmationDeadline());
+        notificar = c.notifyReaders() == null ? NOTIFY_BY_TYPE : c.notifyReaders() ? NOTIFY_YES : NOTIFY_NO;
+        importante = c.important();
         blocks = new ArrayList<>(c.blocks().stream().map(BlockForm::of).toList());
         audience(c.audience(), audienceCommands, namedAudiences);
         estado = status(item);
+        var figures = analytics.ofItem(item.id(), item.confirmationVersion());
+        vistas = String.valueOf(figures.views());
+        lectoresUnicos = String.valueOf(figures.uniqueReaders());
+        confirmaciones = String.valueOf(figures.confirmations());
+        notificados = String.valueOf(figures.notified());
         applied = item.latestVersion().map(v -> index.applied(item.id())
                 .map(a -> a.version() >= v.number() ? "Sí — versión " + v.number() + " aplicada el " + Ui.when(a.at())
                         : "Aplicando la versión " + v.number() + "…")
@@ -228,15 +275,23 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         return new ItemContent(sectionId == null || sectionId.isBlank() ? null : sectionId, audience(), translations,
                 type == ItemType.PAGE && blocks != null ? blocks.stream().map(BlockForm::toBlock).toList() : List.of(),
                 Ui.instant(publishAt), Ui.instant(expireAt), readTracking, confirmationRequired,
-                Ui.instant(confirmationDeadline), url == null || url.isBlank() ? null : url.trim());
+                Ui.instant(confirmationDeadline), url == null || url.isBlank() ? null : url.trim())
+                .withNotification(NOTIFY_YES.equals(notificar) ? Boolean.TRUE : NOTIFY_NO.equals(notificar) ? Boolean.FALSE : null,
+                        importante);
     }
 
     public String create(HttpRequest httpRequest) {
-        return commands.create(readers.of(httpRequest), type, defaultLanguage, content());
+        var editor = readers.of(httpRequest);
+        var created = commands.create(editor, type, defaultLanguage, content());
+        collaboration.closeComments(editor, created, comentariosCerrados);
+        return created;
     }
 
     public void save(HttpRequest httpRequest) {
-        commands.edit(readers.of(httpRequest), id, content());
+        var editor = readers.of(httpRequest);
+        commands.edit(editor, id, content());
+        // kept with the item's comments, not in its content: it acts at once, without a new version
+        collaboration.closeComments(editor, id, comentariosCerrados);
     }
 
     /**
@@ -258,7 +313,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
                 continue;
             }
             try {
-                set(to, translator.translate(source, from, to));
+                set(to, translator.translate(source, from, to, httpRequest.getHeaderValue("Authorization")));
                 done.add(to);
             } catch (RuntimeException e) {
                 return Message.error("No se ha podido traducir a «" + to + "»: " + e.getMessage());
@@ -385,6 +440,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Override
     public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
         return "sectionId".equals(fieldName) || "defaultLanguage".equals(fieldName) || "medioAInsertar".equals(fieldName)
+                || "notificar".equals(fieldName)
                 || super.supports(fieldType, fieldName, formType);
     }
 
@@ -394,6 +450,8 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             case "sectionId" -> Catalog.get().sections();
             case "defaultLanguage" -> Catalog.languages();
             case "medioAInsertar" -> Catalog.get().media();
+            case "notificar" -> List.of(new Option(NOTIFY_BY_TYPE, "Según el tipo (los avisos, sí)"),
+                    new Option(NOTIFY_YES, "Sí"), new Option(NOTIFY_NO, "No"));
             default -> super.options(fieldName, httpRequest);
         };
     }

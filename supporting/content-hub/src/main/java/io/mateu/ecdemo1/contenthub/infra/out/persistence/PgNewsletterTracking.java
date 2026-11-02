@@ -24,6 +24,15 @@ public class PgNewsletterTracking implements NewsletterTracking {
     }
 
     @Override
+    public List<EditionStats> recentEditions(int limit) {
+        return jdbc.query("select * from (select e.edition_id, coalesce(max(n.doc->>'title'), e.edition_id), "
+                        + "count(*) filter (where e.kind = 'OPEN'), count(*) filter (where e.kind = 'CLICK'), max(e.at) as last "
+                        + "from ch_newsletter_event e left join ch_newsletter n on n.id = e.edition_id "
+                        + "group by e.edition_id order by last desc limit ?) recent order by last",
+                (rs, i) -> new EditionStats(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getLong(4)), limit);
+    }
+
+    @Override
     public List<GroupStats> stats(String editionId) {
         var opens = new LinkedHashMap<String, Long>();
         var clicks = new LinkedHashMap<String, Map<String, Long>>();

@@ -72,6 +72,19 @@ class UserTest {
     }
 
     @Test
+    void the_intranets_header_has_the_bell_and_no_demo_banner() {
+        var header = UserWidget.withBell(request(Map.of("Authorization", ANA)));
+
+        var content = ((HorizontalLayout) header.get(0)).content();
+        assertThat(content).hasSize(2);
+        assertThat(content.get(0)).isInstanceOfSatisfying(io.mateu.uidl.data.MicroFrontend.class, bell -> {
+            assertThat(bell.baseUrl()).isEqualTo("/_inbox");
+            assertThat(bell.route()).isEqualTo("/badge");
+        });
+        assertThat(UserWidget.withBell(request(Map.of()))).isEmpty();
+    }
+
+    @Test
     void every_header_carries_the_demos_banner_first() {
         var signedIn = request(Map.of("Authorization", ANA));
         for (var header : List.of(UserWidget.withInboxBadge(signedIn), UserWidget.withDemoBanner(signedIn))) {

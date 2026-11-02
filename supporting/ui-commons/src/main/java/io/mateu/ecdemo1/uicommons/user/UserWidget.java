@@ -118,6 +118,18 @@ public final class UserWidget {
                 .orElse(List.of());
     }
 
+    /** The intranet's header: the inbox badge and the greeting, with no console's banner. */
+    public static List<Component> withBell(HttpRequest httpRequest) {
+        return DisplayOnlyTokenClaims.of(httpRequest)
+                .map(claims -> List.<Component>of(HorizontalLayout.builder()
+                        .content(List.of(
+                                MicroFrontend.builder().baseUrl("/_inbox").route("/badge").build(),
+                                popover(claims)))
+                        .style("align-items: center; gap: 4px; --mateu-content-gutter: 0px;") // no gutter: see withInboxBadge
+                        .build()))
+                .orElse(List.of());
+    }
+
     /** "Hola, name", opening the email, this browser's notifications and Logout. */
     public static Popover popover(Map<String, Object> claims) {
         return Popover.builder()

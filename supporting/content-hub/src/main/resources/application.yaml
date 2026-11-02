@@ -83,11 +83,40 @@ content-hub:
   embeddings:
     url: ${EMBEDDINGS_URL:http://embeddings}
     model: ${EMBEDDINGS_MODEL:intfloat/multilingual-e5-small}
+  # The portal's search: a passage further than this (cosine distance) is no match by meaning.
+  search:
+    max-distance: ${SEARCH_MAX_DISTANCE:0.3}
+    # «Respuesta de la IA»: the IA control plane's agent, over A2A, with the reader's token.
+    agent-url: ${INTRANET_AGENT_URL:http://ia-agent:8095/a2a/intranet-agent}
+    agent-timeout: ${INTRANET_AGENT_TIMEOUT:PT30S}
+  # «Traducir con IA»: the same, with the editor's token.
+  translation:
+    agent-url: ${INTRANET_TRANSLATOR_URL:http://ia-agent:8095/a2a/intranet-translator}
+    agent-timeout: ${INTRANET_TRANSLATOR_TIMEOUT:PT60S}
+  # Optional: without a service account key file the Drive references work from the URL alone, with no metadata.
+  drive:
+    credentials-file: ${GOOGLE_DRIVE_CREDENTIALS_FILE:}
+    impersonate: ${GOOGLE_DRIVE_IMPERSONATE:}
   newsletter:
     from: ${NEWSLETTER_FROM:intranet@ec1.mateu.io}
     # The demo's employees are made up: every newsletter goes here, saying whom it was for.
     redirect-to: ${NEWSLETTER_REDIRECT_TO:}
   portal-url: ${PORTAL_URL:http://ec1.localhost:8800/intranet}
+  surveys:
+    # Keys who answered an anonymous survey (with each survey's salt): set it, and the database alone
+    # cannot tell whether someone answered. Changing it lets everyone answer the open ones once more.
+    secret: ${SURVEY_SECRET:${MEDIA_SECRET:}}
+  # What is published reaches its readers through communication-service (the bell, Web Push) and, if
+  # important, by mail (the newsletter's relay and redirect, above).
+  notifications:
+    # Something that became effective longer ago than this, however it was missed, is no longer news.
+    catch-up: ${NOTIFICATIONS_CATCH_UP:PT24H}
+    reminder-before: ${NOTIFICATIONS_REMINDER_BEFORE:P2D}
+    close-after: ${NOTIFICATIONS_CLOSE_AFTER:P30D}
+    batch-size: ${NOTIFICATIONS_BATCH_SIZE:200}
+  analytics:
+    # How long raw usage events are kept; the daily figures stay. Never less than 30 days (the longest window).
+    retention: ${ANALYTICS_RETENTION:P90D}
   seed:
     enabled: ${CONTENT_SEED:true}
 

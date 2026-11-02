@@ -36,7 +36,7 @@ public class ApprovalsListing implements Listing<ApprovalRow>, Navigable<Approva
         portal.reader(httpRequest);
         var rows = requests.approvals(httpRequest.getHeaderValue("Authorization")).stream()
                 .map(a -> new ApprovalRow(a.task().id(), a.request().employeeName(), a.request().type().label(),
-                        RequestHtml.dates(a.request()), a.hr() ? "RRHH" : "Responsable",
+                        RequestComponents.dates(a.request()), a.hr() ? "RRHH" : "Responsable",
                         a.task().dueDate() == null ? "" : a.task().dueDate().substring(0, Math.min(10, a.task().dueDate().length()))))
                 .toList();
         return new ListingData<>(new Page<>("", Math.max(20, rows.size()), 0, rows.size(), rows), "Nada que aprobar");

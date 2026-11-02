@@ -30,6 +30,7 @@ public class ItemsCrud extends Crud<ItemForm, ItemForm, ItemForm, NoFilters, Ite
 
     final ObjectProvider<ItemForm> forms;
     final ItemRepository items;
+    final io.mateu.ecdemo1.contenthub.application.out.DiscussionRepository discussions;
 
     @Override
     public ListingData<ItemRow> search(SearchRequest request, HttpRequest httpRequest) {
@@ -59,7 +60,7 @@ public class ItemsCrud extends Crud<ItemForm, ItemForm, ItemForm, NoFilters, Ite
 
     @Override
     public ItemForm view(String id, HttpRequest httpRequest) {
-        return forms.getObject().load(items.find(id).orElseThrow());
+        return forms.getObject().load(items.find(id).orElseThrow(), discussions.get(id).closed());
     }
 
     @Override

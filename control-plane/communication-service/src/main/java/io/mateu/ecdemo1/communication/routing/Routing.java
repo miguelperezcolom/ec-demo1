@@ -19,4 +19,13 @@ public class Routing {
     public Plan plan(String type, String hotel) {
         return Plan.of(recipients.findAll(), type, hotel, chat.webhooks().size());
     }
+
+    /**
+     * The plan for an item addressed to these people (comma-separated, as kept): theirs alone. None, the
+     * recipients' plan for its type and hotel.
+     */
+    public Plan plan(String type, String hotel, String addressees) {
+        var people = io.mateu.ecdemo1.communication.store.Recipient.split(addressees);
+        return people.isEmpty() ? plan(type, hotel) : Plan.addressedTo(people);
+    }
 }

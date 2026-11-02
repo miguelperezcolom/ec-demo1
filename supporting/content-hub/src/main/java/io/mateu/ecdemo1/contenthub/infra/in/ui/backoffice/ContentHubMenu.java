@@ -31,6 +31,18 @@ public class ContentHubMenu {
     NewsletterCrud newsletter;
 
     @Menu
+    @Label("Encuestas")
+    SurveysCrud encuestas;
+
+    @Menu
+    @Label("Respuestas de encuestas")
+    SurveyAnswersListing respuestas;
+
+    @Menu
+    @Label("Comentarios")
+    CommentsListing comentarios;
+
+    @Menu
     @Label("Ver como")
     ViewAsPage verComo;
 
@@ -41,4 +53,8 @@ public class ContentHubMenu {
     @Menu
     @Label("Pendientes de confirmar")
     PendingConfirmationsListing pendientes;
+
+    @Menu
+    @Label("Analítica")
+    AnalyticsPage analitica;
 }

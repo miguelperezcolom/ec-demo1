@@ -54,12 +54,12 @@ for (const console_ of CONSOLES) {
             await expect
                 .poll(async () => {
                     const { ok } = await screenRendered(page)
-                    return ok && await page.locator('text=Mark as seen').count() > 0
+                    return ok && await page.locator('text=Marcar como visto').count() > 0
                 }, { message: 'the badge never opened the inbox', timeout: 60_000 })
                 .toBe(true)
             await page.reload({ waitUntil: 'domcontentloaded' })
             await expect
-                .poll(async () => await page.locator('text=Mark as seen').count() > 0,
+                .poll(async () => await page.locator('text=Marcar como visto').count() > 0,
                       { message: 'a reload on the inbox did not resolve it', timeout: 60_000 })
                 .toBe(true)
         })
@@ -71,7 +71,7 @@ for (const console_ of CONSOLES) {
             await signIn(page, console_)
             await page.goto(`${SCHEME}://${console_.host}/_inbox`, { waitUntil: 'domcontentloaded' })
             await expect
-                .poll(async () => await page.locator('text=Mark as seen').count() > 0,
+                .poll(async () => await page.locator('text=Marcar como visto').count() > 0,
                       { message: '/_inbox did not open the inbox', timeout: 90_000 })
                 .toBe(true)
             expect(page.url()).toContain('/inbox/pending')

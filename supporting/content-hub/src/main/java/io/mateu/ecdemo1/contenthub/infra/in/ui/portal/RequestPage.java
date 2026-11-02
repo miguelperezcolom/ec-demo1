@@ -1,33 +1,23 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
 import io.mateu.ecdemo1.contenthub.application.usecases.RequestService;
-import io.mateu.ecdemo1.uicommons.html.Html;
-import io.mateu.uidl.annotations.Colspan;
-import io.mateu.uidl.annotations.Hidden;
-import io.mateu.uidl.annotations.Label;
+import io.mateu.uidl.data.EmptyState;
 import io.mateu.uidl.fluent.Component;
+import io.mateu.uidl.fluent.Form;
+import io.mateu.uidl.interfaces.ComponentTreeSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.Callable;
+import java.util.List;
 
 /** One of the reader's requests: what, where it is, and what happened to it. Only their own. */
 @Service
 @Scope("prototype")
-public class RequestPage implements Identifiable {
+public class RequestPage implements ComponentTreeSupplier, Identifiable {
 
-    @Hidden
     String id;
-    @Hidden
-    String title;
-    @Hidden
-    String html;
-
-    @Label("")
-    @Colspan(2)
-    Callable<Component> content = () -> Html.block(html == null ? "" : html);
 
     final PortalSupport portal;
     final RequestService requests;
@@ -38,17 +28,26 @@ public class RequestPage implements Identifiable {
     }
 
     public RequestPage load(String id, HttpRequest httpRequest) {
-        var reader = portal.reader(httpRequest);
         this.id = id;
+        return this;
+    }
+
+    @Override
+    public Component component(HttpRequest httpRequest) {
+        if (id == null) {
+            id = httpRequest.lastPathItem();
+        }
+        var reader = portal.reader(httpRequest);
         var r = requests.find(id).filter(x -> x.employeeId().equals(reader.userId())).orElse(null);
         if (r == null) {
-            title = "No encontrada";
-            html = "<p>Esa solicitud no existe o no es tuya.</p>";
-            return this;
+            return Form.builder().title("No encontrada")
+                    .content(List.of(EmptyState.builder().title("Esa solicitud no existe o no es tuya").build()))
+                    .build();
         }
-        title = r.type().label();
-        html = RequestHtml.summary(r) + RequestHtml.history(r);
-        return this;
+        return Form.builder().title(RequestComponents.title(r)).subtitle(RequestComponents.subtitle(r))
+                .badge(RequestComponents.status(r))
+                .content(RequestComponents.sections(r))
+                .build();
     }
 
     @Override
@@ -58,6 +57,6 @@ public class RequestPage implements Identifiable {
 
     @Override
     public String toString() {
-        return title == null ? "Solicitud" : title;
+        return "Solicitud";
     }
 }

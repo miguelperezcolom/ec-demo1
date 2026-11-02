@@ -1,6 +1,6 @@
 ---
 title: Arquitectura de la intranet
-description: content-hub, el servicio de contenido con visibilidad por audiencia — componentes, la única función de visibilidad, el modelo por agregados, eventos, almacenamiento, seguridad, RAG y las decisiones tomadas.
+description: content-hub, el servicio de contenido con visibilidad por audiencia — componentes, la única función de visibilidad, el modelo por agregados, eventos, almacenamiento, seguridad, RAG, notificaciones, analítica y las decisiones tomadas.
 ---
 
 La intranet es el primer consumidor de **`content-hub`** (`supporting/content-hub`), un servicio de
@@ -21,8 +21,8 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 
 | Componente | Dónde | Qué hace |
 | :--------- | :---- | :------- |
-| **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, personas y organigrama (`People`, `PeopleListing`, `PersonPage`, `OrgChartPage`), favoritos, pendientes |
-| **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, ver como y confirmaciones |
+| **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, personas y organigrama (`People`, `PeopleListing`, `PersonPage`, `OrgChartPage`), favoritos, pendientes; comentarios y «Me gusta» en `ItemPage`, encuestas (`SurveysListing`, `SurveyPage`) |
+| **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, encuestas y sus respuestas, moderación de comentarios, ver como y confirmaciones |
 | **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal, sin *Editorial*; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
 | **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, directorio y visibilidad |
 | **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea: contenido (`preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`) y directorio (`buscar_personas`, `ficha_persona`) |
@@ -32,7 +32,9 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **`embed.js`** | `GET /_intranet/embed.js` | Convierte los marcadores de vídeo y PDF en reproductores (ver [Seguridad](#seguridad)) |
 | **Solicitudes** | `RequestService`; portal `NewRequestPage`, `MyRequestsListing`, `ApprovalsListing`/`ApprovalPage` | Las solicitudes de los empleados las decide el proceso `solicitud-empleado` de EventConductor (ec-definitions). El content-hub lo arranca por su outbox (`process-creation-requested` en `upstream`, clave `solicitud:<id>`). Sigue su estado en el topic `solicitudes` (`RequestEventsListener`). Aprobar o rechazar completa la tarea del motor de formularios por REST con el token del propio usuario (`FormsHumanTasks`), que el motor acepta (`WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN`) |
 | **Directorio** | `EmployeeDirectoryListener` | Copia local de los empleados —atributos, responsable (`managerId`), teléfono y etiquetas de los códigos— desde `employee-directory`. De ella salen las audiencias, la newsletter y el directorio de personas |
-| **Trabajos** | `ContentJobs` | Cruces de fechas, newsletter, embeddings del RAG y limpieza de perfiles huérfanos |
+| **Búsqueda** | `IntranetSearch`; portal `SearchPage` | Híbrida (palabras y significado), con la respuesta de la IA y el grupo de personas (ver [Búsqueda](#búsqueda-híbrida-y-respuesta-de-la-ia)) |
+| **Google Drive** | `DriveDocuments`; portal `DriveFilesListing`, `ItemPage` | Referencias a ficheros, nunca copias, y sus metadatos (ver [Google Drive](#google-drive)) |
+| **Trabajos** | `ContentJobs`, `NotificationJobs` | Cruces de fechas, newsletter, embeddings del RAG, metadatos de Drive y limpieza de perfiles huérfanos; reparto de notificaciones, recordatorios y agregados diarios de uso |
 
 Portal y trabajo editorial son la misma UI, en `ec1.mateu.io`, donde trabajan los empleados y los
 editores; **la configuración** —cómo funciona la intranet, no lo que publica— va en la consola de control,
@@ -52,6 +54,8 @@ flowchart LR
   CH -- content-events --> K[("Kafka")]
   CH -- SMTP --> PF["postfix"]
   CH -- "/v1/embeddings" --> EMB["embeddings (TEI)"]
+  CH -- "A2A + token del usuario" --> AG
+  CH -- "Drive API v3 (metadatos)" --> GD["Google Drive"]
   CH --- DB[("cp-postgres<br/>content_hub + pgvector")]
 ```
 
@@ -75,7 +79,7 @@ flowchart TB
   P["Publicar / retirar item<br/>Redefinir audiencia<br/>Publicar variante de slot"] --> E["evento de dominio"]
   E -- after commit --> L["ProjectionListener"]
   L --> PR["Projection<br/>(VisibilityPolicy evalúa<br/>sobre el universo de perfiles)"]
-  PR --> T[("ch_item_doc / ch_block_doc /<br/>ch_slot_variant_doc<br/>hashes text[]")]
+  PR --> T[("ch_item_doc / ch_block_doc /<br/>ch_slot_variant_doc / ch_survey_doc<br/>hashes text[]")]
   R["Petición de un lector"] --> V["Visibility"]
   V -- "¿hash conocido?<br/>si no: materialise()" --> PR
   V -- "hashes && array[hash,'TODOS']<br/>+ estado y fechas" --> T
@@ -113,6 +117,12 @@ Reglas que salen de ahí:
 Los medios siguen la misma regla: un fichero se sirve solo a quien ve un item publicado que lo usa
 (`ch_item_media`, cruzado con la proyección).
 
+Las **encuestas** son un sujeto más de la proyección (`ch_survey_doc`): `Visibility.openSurveys` filtra por hash,
+estado y fechas en la consulta, y el recálculo y la materialización de un hash nuevo las cubren como a cualquier
+sujeto. Se reproyectan al publicarlas, cambiarlas o cerrarlas (`SurveyProjection`), en línea tras el commit. Los
+**comentarios y «Me gusta»** no son sujetos: comentar, reaccionar o leerlos pregunta antes a `Visibility.isVisible`
+por el item (`Collaboration`), y un contenido retirado o caducado deja de admitirlos.
+
 ### Las audiencias
 
 Una audiencia es un árbol `AND`/`OR` cuyas hojas son `atributo IN (valores)`, o una **audiencia con
@@ -122,7 +132,7 @@ empleados. Los atributos son una lista cerrada: `company`, `country`, `region`, 
 
 ## Modelo de dominio
 
-Ocho agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
+Doce agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
 
 | Agregado | Contenido | Invariantes |
 | :------- | :-------- | :---------- |
@@ -134,6 +144,10 @@ Ocho agregados, referenciados entre sí solo por id, y un servicio de dominio (`
 | **Empleado** (`domain/employee`) | Atributos y hash; responsable, teléfono y etiquetas de los códigos (para el directorio) | Solo lo escribe el consumidor del directorio |
 | **Favoritos** (`domain/favorites`) | Uno por empleado, items por id | Sin duplicados |
 | **Acuse** (`domain/ack`) | (item, versión, empleado, tipo `READ`/`CONFIRMATION`) | Idempotente |
+| **Conversación** (`domain/collaboration/Discussion`) | Los comentarios de un item y si está cerrado a comentarios | Texto no vacío, hasta 2.000 caracteres; cerrada no admite más; un comentario no se borra: se oculta, con quién y cuándo |
+| **Me gusta** (`domain/collaboration/Likes`) | Quién ha dado «Me gusta» a un item | Uno por lector |
+| **Encuesta** (`domain/survey/Survey`) | Título, descripción, audiencia, fechas, anónima o no, preguntas (`DRAFT → PUBLISHED → CLOSED`) | Publicar exige preguntas y cierre futuro; publicada, no cambia preguntas ni anonimato; las respuestas se comprueban aquí (abierta, obligatorias, opciones válidas, valoración de 1 a 5) |
+| **Respuesta** (`domain/survey/SurveyResponse`) | Las respuestas de un lector; en una anónima, sin quién y con el día en lugar del instante | Solo se construye si la encuesta la acepta |
 
 ### El workflow de un item
 
@@ -174,7 +188,9 @@ que pone el gateway; sin esa cabecera (el gateway no pudo preguntar), un usuario
 | :---- | :------ | :-------- |
 | `employee-directory` | users → content-hub | `EmployeeUpserted` (el empleado entero: nombre, email, activo, `managerId` y `phone` si los tiene, atributos como códigos del catálogo e idioma, `labels` con la etiqueta de cada código) y `EmployeeRemoved`; clave el id de usuario |
 | `employee-directory-requests` | content-hub → users | `{"requestId", "requestedBy"}`: pide una copia completa del directorio. Se manda al arrancar con el directorio vacío, o a mano desde *Visibilidad* |
-| `content-events` | content-hub → quien quiera | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`. Clave el sujeto. Hoy nadie los consume fuera del servicio |
+| `content-events` | content-hub → quien quiera | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`, y los de colaboración (`CollaborationEvents`): `CommentPosted`, `CommentModerated`, `ItemLiked`, `SurveyPublished`, `SurveyUpdated`, `SurveyClosed`, `SurveyAnswered` (este nunca dice quién). Clave el sujeto. Hoy nadie los consume fuera del servicio |
+| `notifications` | content-hub → communication-service | `NotificationRequested` con `addressees` (un lector), tipo `INTRANET_PUBLISHED` o `INTRANET_CONFIRMATION_DUE`. Ver [Notificaciones](#notificaciones) |
+| `notification-resolutions` | content-hub → communication-service | `NotificationResolved`: lo que cierra esas notificaciones en la bandeja |
 
 Todo sale por el **outbox** de `supporting/messaging`, en la misma transacción que el cambio, y
 `employee-directory` entra por el **inbox** (cada mensaje una vez, por su `eventId`). En el servicio de
@@ -201,6 +217,12 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | `ch_item_doc`, `ch_block_doc`, `ch_slot_variant_doc` | **La proyección**: cada traducción publicada, bloque y variante con sus `hashes text[]` (GIN) |
 | `ch_item_media`, `ch_projection_state` | Qué medios usa cada item; qué versión está ya aplicada |
 | `ch_chunk` | Los pasajes del RAG con su `vector(384)` |
+| `ch_discussion`, `ch_likes` | Comentarios y «Me gusta», un documento por item, aparte de él |
+| `ch_survey`, `ch_survey_doc` | Las encuestas, y su proyección con los `hashes text[]` que las ven |
+| `ch_survey_participation`, `ch_survey_response` | Quién ha respondido y qué se ha respondido, en dos tablas que no se apuntan entre sí |
+| `ch_notification_job`, `ch_notification_sent`, `ch_notification_pref` | Los repartos pendientes, qué se ha dicho a quién (item, versión, lector, tipo, canal) y cómo quiere cada uno que se le avise |
+| `ch_usage_event`, `ch_usage_daily`, `ch_item_reader` | El uso: eventos en crudo (con retención), sus agregados por día y las vistas por item y lector |
+| `ch_drive_file` | Lo último que Drive dijo de cada fichero referenciado (documento JSON): metadatos, nunca el fichero |
 
 La **búsqueda de texto** es el FTS de PostgreSQL: `ch_item_doc.tsv` (configuración `simple`, índice GIN),
 consulta por **prefijo** («vacac» encuentra «vacaciones»), filtrada por visibilidad en la misma consulta:
@@ -233,6 +255,13 @@ páginas y contadores solo cuentan lo visible.
   editor solo se guardan el proveedor y el id: el reproductor se construye desde ellos, nunca desde lo
   pegado.
 - **El HTML de los cuerpos se sanea** al guardarlo (`HtmlSanitizer`).
+- **Anonimato de las encuestas.** Para no admitir dos respuestas, una encuesta anónima guarda en
+  `ch_survey_participation` un HMAC-SHA256 de encuesta y usuario (`ParticipationKey`), con la clave
+  `SURVEY_SECRET` (por defecto, `MEDIA_SECRET`) y la sal propia de la encuesta: la base de datos sola no dice quién
+  respondió. `ch_survey_response` no lleva ni esa clave, ni el usuario, ni la hora (solo el día), y `SurveyAnswered`
+  no dice quién. Los textos libres y la exportación van ordenados por su contenido, no por llegada. Cambiar la clave
+  permitiría responder otra vez a las encuestas abiertas. Quien tenga la clave y la base podría comprobar si alguien
+  concreto respondió, pero no qué respondió.
 - **MCP.** El servidor MCP no pasa por el gateway (es interno del clúster): aquí sí se verifica el token
   que reenvía `ia-agent` contra Keycloak (`KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI`) y una llamada sin él
   se rechaza. Cada herramienta lee como el usuario real (nunca como su "ver como").
@@ -258,6 +287,109 @@ páginas y contadores solo cuentan lo visible.
 El servidor se registra en el plano de control de IA como el MCP **`intranet`**
 (`gitops/example/ia/mcp/intranet.yaml`, SSE a `http://content-hub:8135`) y lo usa `console-agent`.
 
+## Búsqueda híbrida y respuesta de la IA
+
+`IntranetSearch` lanza dos búsquedas y las mezcla. Las dos pasan por `Visibility`, con el filtro dentro de la
+misma consulta:
+
+- **Por palabras**: el FTS de `ch_item_doc`, como siempre.
+- **Por significado**: la consulta se embebe y se buscan los pasajes más cercanos de `ch_chunk`, descartando
+  los que pasan de `content-hub.search.max-distance`.
+
+`HybridRanking` las une por **fusión de rangos recíprocos** (`Σ 1 / (60 + rango)`): rangos y no puntuaciones,
+porque `ts_rank` y la distancia coseno no están en la misma escala. Lo que aparece en las dos listas sube. Un item
+encontrado solo por significado se vuelve a pedir a `Visibility`. El subtítulo de cada resultado es el pasaje
+que coincidió, recortado alrededor de la palabra (`Snippets`). Sin el servicio de embeddings se busca solo por
+palabras (un timeout de 10 s para las preguntas, que tienen a alguien esperando) y la página lo dice.
+
+`SearchPage` es un `Form` con el template `MultimediaContentPage` y no un listado, porque respuesta, resultados
+y personas dependen de la misma consulta (`HeroSearchPage` trae en Redwood su propia caja, atada a un listado). No pagina: los 20 mejores.
+
+**Mateu llama a `component()` más de una vez por petición** (para localizar el botón de la acción y para
+dibujar), así que la página guarda lo calculado por consulta en un campo `final`: sin eso cada búsqueda llamaba
+dos veces al agente, a cuenta del presupuesto del lector.
+
+### La respuesta
+
+**Se calcula en la misma petición** cuando la consulta parece una pregunta (`looksLikeQuestion`: signo de
+interrogación, partícula interrogativa al principio o seis palabras o más): resultados y respuesta llegan
+juntos, a costa de esperar al agente, 30 s como máximo. Para el resto, un botón **Preguntar a la IA**: ninguna
+llamada que nadie haya pedido. Es lo sencillo para la demo; a escala real convendría cargar la respuesta aparte
+para no retrasar los resultados.
+
+1. content-hub recupera hasta 6 pasajes cercanos **entre los visibles** (sin embeddings, el texto de los items
+   encontrados por palabras, visibles también). El agente no tiene herramientas: **lo único que conoce es lo que
+   se le manda**, así que la regla de visibilidad se cumple aquí y no depende de él.
+2. Los manda numerados por A2A, escapados para que su texto no pueda cerrar la etiqueta:
+
+   ```text
+   <passages>
+   <passage number="1" item="ID" title="TÍTULO">
+   TEXTO
+   </passage>
+   </passages>
+
+   <question>PREGUNTA</question>
+   ```
+
+3. La respuesta es texto con citas `[n]`. `IntranetSearch.cited` traduce cada número al item del pasaje, las
+   renumera por orden de aparición (dos pasajes de un item son una cita) y **tira cualquier número que no se
+   mandó**. Cada cita es un enlace a `/intranet/noticias/{id}`.
+
+Cualquier fallo (sin token, agente fuera del catálogo, error JSON-RPC, timeout, respuesta vacía) acaba en el
+mismo aviso breve; el motivo va al log.
+
+## La IA por el plano de control
+
+content-hub no llama a ningún modelo ni tiene clave. `A2aClient` manda un mensaje de texto a `ia-agent`
+(`message/send`, bloqueante), y de ahí salen el LLM, la credencial y la auditoría:
+
+- **El token es el de la persona que pulsa**, leído de la cabecera `Authorization` de la petición de Mateu, la
+  misma con la que `ApprovalPage` completa tareas. Sin él no se llama: **nunca se sustituye por uno de servicio**,
+  porque el consumo se carga a quien llama.
+- **Cada llamada es una conversación nueva** (sin `contextId`): el texto de un lector no entra en el historial
+  de otro. Va con `X-A2A-No-Delegation`.
+- **Un agente por tarea**, porque el prompt de sistema es distinto: `intranet-agent` e `intranet-translator`.
+
+**Lo que el plano aplica y lo que no por esta vía** (leído en el código de `ia-agent`): el consumo se registra a
+nombre de quien llama, y con eso cuenta para sus presupuestos, pero **no se rechaza por presupuesto antes de
+gastar ni corren los guardarraíles**. Ambas cosas están en la resolución del chat (`IaAgentController`); el
+endpoint A2A pide la configuración por id, sin identidad.
+
+### Traducir con IA
+
+`AgentTranslator` manda un JSON por idioma (`from`, `to`, `title`, `summary`, `body`), que lleva el HTML sin
+ningún escapado propio, y espera otro con `title`, `summary` y `body`. El modelo lo decide el plano y **no
+garantiza el formato**, así que la respuesta se lee con tolerancia (bloques de código, comentarios alrededor,
+saltos de línea dentro de las cadenas) y se comprueba con dureza. Es un fallo, y el formulario no cambia:
+
+- que no haya un objeto JSON con título y cuerpo;
+- que el cuerpo venga vacío cuando el original no lo estaba;
+- que cambien las marcas `[[media:…]]`;
+- que cambien las etiquetas, su orden o los `href` y `src` del cuerpo, comparados tras sanearlos.
+
+El cuerpo se sanea como cualquier contenido, y el editor revisa y guarda: nada se publica desde aquí.
+
+## Google Drive
+
+El agregado de medios ya admitía URL externas. `DriveFileRef` entiende lo que pega un editor (`file/d/…`,
+`open?id=`, `uc?id=`, los editores de Docs, Sheets, Slides, Forms y Drawings, con `/u/N/` o `/a/dominio/`, sin
+esquema o dentro de un `<iframe>`) y rechaza carpetas y copias «publicadas en la web». De un fichero se guarda
+la referencia, **nunca una copia**: una sola versión, la de Drive.
+
+- **Sin configurar**: vista previa `drive.google.com/file/d/{id}/preview` por `embed.js`, y enlaces a Drive y
+  al editor (`docs.google.com/{tipo}/d/{id}/edit`). La vista previa va con la sesión de Google del lector.
+- **Con cuenta de servicio** (`GoogleDriveClient`, detrás del puerto `DriveClient`): `ContentJobs` refresca los
+  metadatos de cada fichero referenciado con `files.get` de la API v3. Se firma un JWT con la clave de
+  `GOOGLE_DRIVE_CREDENTIALS_FILE` y se cambia por un token con el alcance `drive.metadata.readonly`, que no da
+  acceso al contenido. `sub` solo se manda si hay `GOOGLE_DRIVE_IMPERSONATE`. Sin librería de Google: son dos
+  llamadas HTTP. La configuración de despliegue está en [Operación](./operacion/#google-drive).
+
+*Documentos de Drive* lista los ficheros de los items que devuelve la función de visibilidad
+(`visibleGoogleUrls`: la URL del item o un medio externo que use). El trabajo, en cambio, refresca **todo** lo
+referenciado, también borradores: son metadatos de una caché que solo se enseñan a través de un item visible. Lo
+que no controla la intranet es quién abre el fichero en Google: eso lo deciden los permisos de Drive.
+
 ## Newsletter
 
 Para cada edición se agrupan los destinatarios (empleados activos con email que cumplen la audiencia de
@@ -266,6 +398,73 @@ qué items de la edición ve, y se manda **un correo por grupo** con solo esos i
 que no ve ninguno no recibe nada. Cada grupo queda registrado por separado: uno que falla se reintenta en
 la siguiente pasada (cada 30 s) sin reenviar a los demás. Sale por el relay `postfix`; como los empleados
 son ficticios, en la demo todo va a `NEWSLETTER_REDIRECT_TO`, con el grupo y el idioma en el asunto.
+
+## Notificaciones
+
+Cuando un item se hace efectivo —se publica, o cruza su fecha de publicación— se avisa a sus lectores por
+el **mismo contrato que el resto de la plataforma**: `NotificationRequested` en el topic `notifications`,
+que `communication-service` convierte en la bandeja (la campana) y en Web Push. Solo hay una novedad en el
+contrato, aditiva: el campo opcional **`addressees`**. Con él la notificación es para esas personas y nadie
+más: su bandeja y sus navegadores, sin pasar por la tabla de destinatarios, que dice quién cuida de un hotel
+y no quién lee qué.
+
+```mermaid
+flowchart LR
+  J["NotificationJobs<br/>cada 30 s"] --> N["ItemNotifications"]
+  N -- "¿quién lo ve?<br/>una vez por perfil e idioma" --> V["Visibility"]
+  N -- "en lotes: fila + mensaje<br/>en la misma transacción" --> O[("ch_notification_sent<br/>outbox")]
+  O -- notifications --> C["communication-service<br/>bandeja y Web Push"]
+  N -- "solo «importante»" --> M["Mailer<br/>(redirección de la demo)"]
+```
+
+- **Quién.** Los empleados activos a los que `Visibility` les deja ver el item; se pregunta una vez por
+  perfil e idioma, y el título y el resumen van en el idioma de cada uno.
+- **Cuándo.** Cada 30 s se miran las fechas, no los eventos que las cruzan: un cruce ocurrido con el servicio
+  caído se encuentra igual, dentro de `catch-up` (24 h). Lo que se hizo efectivo antes ya no es novedad, y por
+  eso activar esto no anuncia todo lo ya publicado. El reparto **espera a la proyección**: mientras la versión
+  no está aplicada, nadie «puede verla» y se saltaría a todos.
+- **Sin duplicados.** Hay un trabajo por versión y una fila por item, versión, lector, tipo y canal, cuya
+  clave primaria es la idempotencia: quien consigue escribirla es quien envía. Fila y mensaje del outbox van en
+  la transacción de cada lote (200 lectores), así que un reparto cortado sigue donde iba. Además, cada mensaje
+  lleva una `dedupKey` por versión y lector, que `communication-service` respeta. Publicar una versión nueva de
+  un item que notifica **vuelve a avisar**: para una errata, el editor pone *Notificar* en *No* antes de publicar.
+- **Qué notifica.** Por defecto, solo los **avisos** (`NOTICE`): lo que alguien debe saber. Una noticia o una
+  página puede esperar a que la lean, y un enlace o un documento no suele ser noticia. El editor lo decide por
+  item (*Notificar a los lectores*: según el tipo, sí o no); la semilla de la demo no notifica.
+- **Correo.** Un item *importante* también se envía por correo, por el `Mailer` de la newsletter (mismo relay y
+  misma redirección `NEWSLETTER_REDIRECT_TO`): un mensaje por lote e idioma, en Bcc. Se envía y luego se anota:
+  un relay caído se reintenta sin repetir la campana (hasta 20 pasadas); el precio es un posible repetido si el
+  servicio muere justo entre las dos cosas.
+- **Recordatorio.** Quien ve un item de confirmación obligatoria y no lo ha confirmado recibe **un** aviso cuando
+  faltan menos de `reminder-before` (2 días) para la fecha límite, por versión de confirmación. Va aunque el item
+  no notificara al publicarse: es algo que tiene que hacer. Se mira cada 15 minutos.
+- **Preferencias.** Cada lector apaga cada canal en *Mis preferencias* (`ch_notification_pref`; sin fila, todos).
+- **Qué las cierra.** Las notificaciones son por lector (`subject` `intranet/item/{id}/{usuario}` o
+  `intranet/confirmation/{id}/{usuario}`, sin versión) y se cierran con `NotificationResolved`: al abrir el item
+  (nunca en «ver como»), al confirmarlo (el recordatorio), cuando deja de poder leerse, o a los `close-after`
+  (30 días). La bandeja es para lo que sigue esperando.
+- **Dónde se ven.** En la campana de los shells de datos, de control y de la propia intranet
+  (`consoles/intranet-shell`, sin el banner de la demo, que es de las consolas). El enlace,
+  `/intranet/noticias/{id}`, resuelve en los hosts de datos y de la intranet, no en la consola de control. La
+  bandeja es la de cada persona: quien además tiene un rol operativo ve ahí también sus tareas, y esos enlaces
+  solo resuelven en las consolas.
+
+## Analítica
+
+`UsageTracker` anota lo que hacen los lectores en `ch_usage_event`: **cada apertura de un item** (no solo los de
+seguimiento de lectura), **cada búsqueda** y **cada visita al inicio**. Un editor en «ver como» no cuenta, pulsar
+un botón de la página no es otra visita, y un fallo aquí nunca llega a la pantalla. Una búsqueda guarda el texto
+normalizado, cuántos resultados dio y el hash de perfil, **nunca quién**.
+
+- **Agregados.** Cada 15 minutos `UsageAnalytics` recalcula por día (de Madrid) desde el último agregado, hoy
+  incluido, en `ch_usage_daily`: es idempotente, y lo que dibujan los gráficos lleva como mucho ese retraso.
+- **Retención.** Los eventos en crudo se borran a los `ANALYTICS_RETENTION` (90 días; nunca menos de 30, la ventana
+  más larga); los agregados se quedan. Los textos de búsqueda se quedan en los agregados, sin nadie detrás.
+- **Lectores activos y adopción** son personas, que no se suman entre días: se cuentan sobre los eventos en crudo,
+  con quien ha abierto un item o el inicio. La adopción cruza eso con los atributos del directorio.
+- **Por item.** `ch_item_reader` guarda las vistas por item y lector, y de ahí salen *Vistas* y *Lectores únicos*
+  desde que existe el item. **No caduca con la retención**: es un dato por persona, como los acuses de `ch_ack`.
+- El panel es `AnalyticsPage`, el arquetipo `Dashboard` de Mateu con `MetricCard` y `Chart`.
 
 ## Slots
 
@@ -293,14 +492,40 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 | La base en `cp-postgres` | Es la que tiene pgvector, que necesita el RAG |
 | Medios en la base de datos, con límite de 20 MB | Una sola copia de seguridad y la misma visibilidad; lo grande va a YouTube, Vimeo o Drive por URL |
 | Marcadores + `embed.js` en vez de iframes | El saneador de Mateu quita los iframes; la lista cerrada de hosts mantiene fuera el HTML arbitrario |
+| Una encuesta se responde una vez, sin editar | Editar exigiría poder volver a encontrar la respuesta de alguien, que es justo lo que una anónima no debe permitir |
+| Comentarios y «Me gusta» aparte del item, con el cierre de comentarios en la conversación | Comentar no compite con el borrador de un editor, y cerrarlos actúa al momento, sin una versión nueva |
+| Un candado consultivo (`pg_advisory_xact_lock`) por item al comentar o reaccionar | Son un solo documento por item: dos a la vez se pisarían; y el primero no tiene aún fila que bloquear |
+| Notificaciones por `notifications` con `addressees`, no un canal propio | La campana y Web Push ya existen y son de `communication-service`; una notificación por lector, y no una por audiencia, deja cerrar la de cada uno cuando la lee, y los `users` de la bandeja no crecen sin límite |
+| Mirar las fechas para notificar, no escuchar `ItemBecameEffective` | Ese evento se pierde si el servicio está caído al cruzar la fecha, y el reparto tiene que esperar a la proyección de todos modos |
+| Búsqueda híbrida por rangos recíprocos | `ts_rank` y la distancia coseno no se pueden comparar; los rangos no necesitan calibrarse |
+| La IA por A2A y no con una clave propia | El LLM, la credencial, el consumo y la auditoría se gobiernan en un solo sitio, por persona |
+| El agente sin herramientas: content-hub le manda los pasajes | La visibilidad se decide en un solo sitio y no depende de lo que haga el modelo |
+| Drive por referencia, con cuenta de servicio y sin delegación por defecto | Una sola versión; lo mínimo para funcionar compartiendo ficheros, sin pedir permisos de dominio |
 | Slots por REST provisional | El microfrontend de Mateu aún no está; el contrato (clave, identidad, caché por hash) es el mismo |
 
 ## Pruebas
 
 - `ItemTest`: el workflow y las invariantes del item.
+- `NotificationsTest` (Testcontainers): a quién llega (visibilidad, activos, idioma), por tipo y por decisión del
+  editor, una vez por versión, programados y caídas, espera a la proyección, preferencias por canal, lotes que
+  fallan y se reanudan, relay caído, recordatorio y qué cierra cada cosa.
+- `AnalyticsTest` (Testcontainers): lo que se anota y lo que no, agregados por día de Madrid e idempotentes,
+  retención, indicadores del panel, adopción, cifras por item y totales de la newsletter.
+- `NotificationContractTest`: lo que sale por el outbox, contra los esquemas de `contracts/schemas`.
 - `VisibilityPolicyPropertiesTest` (jqwik): con expresiones y perfiles generados, **la proyección es igual a
   evaluar cada expresión para cada perfil**.
+- `DiscussionTest`, `SurveyTest`: las reglas de comentarios, moderación, «Me gusta» y encuestas (una respuesta por
+  lector, obligatorias, cerrada, anonimato, resultados).
+- `CollaborationConsumersTest` (Testcontainers): nadie comenta, reacciona ni responde lo que no puede ver, audiencias
+  y fechas de las encuestas en la consulta, y que una respuesta anónima no deja en la base nada que diga de quién es.
 - `ConsumersTest` (Testcontainers con `pgvector/pgvector`): los criterios de aceptación de la spec —un item
   que el lector no cumple no aparece en ningún consumidor, bloques, programados y caducados sin job,
   secciones vacías, paginación, idioma de fallback, cambio de atributos y caché compartida, favoritos, slots,
-  newsletter, reconfirmación, editor sin publicar, hash desconocido y proyección desde cero.
+  newsletter, reconfirmación, editor sin publicar, hash desconocido y proyección desde cero; y también que la
+  búsqueda, los pasajes que recibe el agente y la lista de Drive son solo lo que el lector puede ver.
+- `HybridRankingTest`, `SnippetsTest`, `IntranetSearchTest`: la mezcla, los subtítulos, las citas y cada
+  degradación de la búsqueda.
+- `AgentAnswersTest`, `AgentTranslatorTest` (contra un endpoint A2A falso): el mensaje exacto, el token reenviado,
+  los fallos, y que una traducción mal formada o sin el formato del cuerpo nunca se aplica.
+- `DriveFileRefTest`, `DriveDocumentsTest` (con un Drive falso), `GoogleDriveClientTest` (contra un servidor local
+  que hace de Google): las formas de URL, el trabajo de metadatos, el JWT firmado y un fichero que no se puede ver.

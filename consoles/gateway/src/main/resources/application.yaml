@@ -100,8 +100,8 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_forms/**
 
-        # A person's inbox — notifications and tasks — in every shell: the data plane's and the
-        # control console's. Filtered by the caller's roles in the service; only signed-in users.
+        # A person's inbox — notifications and tasks — in every shell: the data plane's, the control
+        # console's and the intranet's. Filtered by the caller's roles in the service; only signed-in users.
         #
         # The service's own path typed in the address bar (/_inbox) is sent to the shell's route
         # for the inbox (/inbox/pending), like /_api-usage/apis below: a GET with no token, which
@@ -110,7 +110,7 @@ spring:
         - id: inbox-page
           uri: no://op
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
             - Path=/_inbox,/_inbox/
             - Method=GET
           filters:
@@ -118,7 +118,7 @@ spring:
         - id: inbox
           uri: ${COMMUNICATION_URL:http://communication-service:8125}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io},${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
             - Path=/_inbox/**
 
         # How much of Salesforce and Opera is spent — the page behind the home pages' tiles, in every shell

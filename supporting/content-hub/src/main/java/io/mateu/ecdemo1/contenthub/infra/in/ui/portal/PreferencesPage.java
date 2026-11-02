@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
 import io.mateu.ecdemo1.contenthub.application.out.NavigationRepository;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences;
+import io.mateu.ecdemo1.contenthub.application.out.NotificationPreferences;
 import io.mateu.ecdemo1.contenthub.application.visibility.Visibility;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Help;
@@ -27,7 +28,7 @@ import java.util.List;
 /**
  * What the reader wants from the newsletter: whether to receive it, and which sections. Only narrows:
  * the sections offered are those with something the reader can see, and nobody is ever sent anything
- * their audience hides from them.
+ * their audience hides from them. And how they want to hear of what is published: per channel.
  */
 @Service
 @Scope("prototype")
@@ -43,6 +44,15 @@ public class PreferencesPage implements OptionsSupplier, Hydratable {
     @Stereotype(FieldStereotype.multiSelect)
     List<String> secciones = new ArrayList<>();
 
+    @Section("Notificaciones")
+    @Label("Avisarme en la aplicación")
+    @Help("La campana y las notificaciones del navegador: lo nuevo que puedes ver y lo que debes confirmar.")
+    boolean enApp = true;
+
+    @Label("Avisarme por correo")
+    @Help("Solo de lo que se publica como importante.")
+    boolean porCorreo = true;
+
     /** Set once the reader's saved preferences are in the fields: an action's round trip keeps what they typed. */
     @Hidden
     boolean loaded;
@@ -51,13 +61,15 @@ public class PreferencesPage implements OptionsSupplier, Hydratable {
     final NewsletterPreferences preferences;
     final NavigationRepository navigation;
     final Visibility visibility;
+    final NotificationPreferences notifications;
 
     public PreferencesPage(PortalSupport portal, NewsletterPreferences preferences, NavigationRepository navigation,
-                           Visibility visibility) {
+                           Visibility visibility, NotificationPreferences notifications) {
         this.portal = portal;
         this.preferences = preferences;
         this.navigation = navigation;
         this.visibility = visibility;
+        this.notifications = notifications;
     }
 
     /** The reader's saved preferences, the first time the page is drawn for them. */
@@ -69,6 +81,9 @@ public class PreferencesPage implements OptionsSupplier, Hydratable {
         var p = preferences.of(portal.reader(httpRequest).userId());
         recibir = p.subscribed();
         secciones = new ArrayList<>(p.sections());
+        var told = notifications.of(portal.reader(httpRequest).userId());
+        enApp = told.inApp();
+        porCorreo = told.email();
         loaded = true;
     }
 
@@ -84,9 +99,10 @@ public class PreferencesPage implements OptionsSupplier, Hydratable {
         var chosen = new HashSet<String>(secciones == null ? List.of() : secciones);
         chosen.retainAll(allowed);
         preferences.save(reader.userId(), new NewsletterPreferences.Preference(recibir, chosen));
-        return Message.success(!recibir ? "No recibirás la newsletter"
+        notifications.save(reader.userId(), new NotificationPreferences.Preference(enApp, porCorreo));
+        return Message.success("Preferencias guardadas. " + (!recibir ? "No recibirás la newsletter"
                 : chosen.isEmpty() ? "Recibirás la newsletter de todas las secciones"
-                : "Recibirás la newsletter de " + chosen.size() + " sección(es)");
+                : "Recibirás la newsletter de " + chosen.size() + " sección(es)"));
     }
 
     @Override

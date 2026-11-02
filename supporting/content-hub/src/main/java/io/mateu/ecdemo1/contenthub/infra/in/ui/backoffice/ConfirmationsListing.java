@@ -60,9 +60,4 @@ public class ConfirmationsListing implements Listing<ConfirmationsListing.Row> {
     public boolean csvExportable() {
         return true;
     }
-
-    @Override
-    public boolean excelExportable() {
-        return true;
-    }
 }

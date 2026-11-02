@@ -116,7 +116,7 @@ class ConsumersTest {
     void wire() {
         for (var t : List.of("ch_item", "ch_navigation", "ch_slot", "ch_named_audience", "ch_newsletter", "ch_favorites",
                 "ch_ack", "ch_employee", "ch_profile", "ch_item_doc", "ch_block_doc", "ch_slot_variant_doc",
-                "ch_item_media", "ch_projection_state", "ch_chunk")) {
+                "ch_item_media", "ch_projection_state", "ch_chunk", "ch_drive_file")) {
             jdbc.update("delete from " + t);
         }
         clock = new MutableClock(Instant.parse("2026-10-31T10:00:00Z"));
@@ -514,6 +514,93 @@ class ConsumersTest {
         assertThat(visibility.isVisible(newcomer, id)).isTrue();
         assertThat(jdbc.queryForObject("select count(*) from ch_profile where hash = ?", Long.class, newcomer.hash())).isOne();
         assertThat(visibility.isVisible(ANA, id)).isFalse();
+    }
+
+    /** The search and the agent's sources over the real store: what the reader may not see never leaves it. */
+    @Test
+    void the_search_and_the_passages_sent_to_the_agent_are_only_what_the_reader_may_see() {
+        var secret = publish(ItemType.ARTICLE, "nominas", RECEPCION_CANARIAS, "Turnos de recepción",
+                "<p>Calendario de turnos de recepción en Canarias</p>");
+        var open = publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Turnos de cocina",
+                "<p>Calendario de turnos de cocina para todos</p>");
+        questions.embedPending(100);
+        var sent = new ArrayList<io.mateu.ecdemo1.contenthub.application.out.AnswerGenerator.Source>();
+        var search = new io.mateu.ecdemo1.contenthub.application.search.IntranetSearch(visibility,
+                (texts, query) -> texts.stream().map(ConsumersTest::vector).toList(),
+                new io.mateu.ecdemo1.contenthub.application.out.AnswerGenerator() {
+                    @Override
+                    public boolean available() {
+                        return true;
+                    }
+
+                    @Override
+                    public String answer(String question, List<Source> sources, String authorization) {
+                        sent.addAll(sources);
+                        return "Respuesta [1].";
+                    }
+                }, 2.0);
+
+        assertThat(search.search(KLAUS, "turnos", 10).items()).extracting(r -> r.item().itemId()).containsExactly(open);
+        assertThat(search.search(ANA, "turnos", 10).items()).extracting(r -> r.item().itemId())
+                .containsExactlyInAnyOrder(open, secret);
+
+        var answer = search.answer(KLAUS, "¿turnos de recepción?", "Bearer klaus");
+        assertThat(sent).isNotEmpty().extracting(s -> s.itemId()).containsOnly(open);
+        assertThat(sent).noneMatch(s -> s.text().contains("Canarias"));
+        assertThat(answer.citations()).extracting(c -> c.itemId()).containsOnly(open);
+
+        sent.clear();
+        search.answer(ANA, "¿turnos de recepción?", "Bearer ana");
+        assertThat(sent).extracting(s -> s.itemId()).contains(secret);
+    }
+
+    @Test
+    void the_drive_files_listed_are_those_of_the_items_the_reader_sees() {
+        var doc = "https://docs.google.com/document/d/secretFile_123/edit";
+        var open = "https://drive.google.com/file/d/openFile_12345/view";
+        var media = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgMediaRepository(jdbc);
+        media.save(io.mateu.ecdemo1.contenthub.domain.media.MediaAsset.external("mDrive", "Hoja",
+                "https://docs.google.com/spreadsheets/d/sheetFile_1234/edit", "eva", clock.instant()), null);
+        document(RECEPCION_CANARIAS, "Secreto", doc);
+        var visibleToAll = document(Audience.EVERYONE, "Abierto", open);
+        var viaMedium = document(Audience.EVERYONE, "Con medio", "media:mDrive");
+        publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Sin Drive", "<p>x</p>");
+
+        var files = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgDriveFiles(jdbc);
+        var documents = new io.mateu.ecdemo1.contenthub.application.drive.DriveDocuments(visibility, files,
+                new io.mateu.ecdemo1.contenthub.application.out.DriveClient() {
+                    @Override
+                    public boolean configured() {
+                        return true;
+                    }
+
+                    @Override
+                    public io.mateu.ecdemo1.contenthub.domain.drive.DriveFile.Metadata metadata(String fileId) {
+                        return new io.mateu.ecdemo1.contenthub.domain.drive.DriveFile.Metadata("Nombre de " + fileId,
+                                null, clock.instant(), "Ana", null, null);
+                    }
+                }, media, new PgItemRepository(jdbc), clock);
+
+        assertThat(documents.visibleTo(KLAUS)).extracting(d -> d.ref().fileId())
+                .containsExactlyInAnyOrder("openFile_12345", "sheetFile_1234");
+        assertThat(documents.visibleTo(ANA)).extracting(d -> d.ref().fileId())
+                .containsExactlyInAnyOrder("openFile_12345", "sheetFile_1234", "secretFile_123");
+        assertThat(documents.visibleTo(KLAUS)).extracting(d -> d.itemId()).containsExactlyInAnyOrder(visibleToAll, viaMedium);
+
+        // the job: everything referenced, drafts' and restricted items' too; the metadata in the real table
+        assertThat(documents.referencedFileIds()).contains("openFile_12345", "sheetFile_1234", "secretFile_123");
+        assertThat(documents.refresh()).isGreaterThanOrEqualTo(3);
+        assertThat(documents.visibleTo(KLAUS)).extracting(d -> d.name()).contains("Nombre de openFile_12345");
+        assertThat(files.find("openFile_12345").orElseThrow().lastModifiedBy()).isEqualTo("Ana");
+        media.delete("mDrive");
+    }
+
+    String document(Audience audience, String title, String url) {
+        var id = itemCommands.create(EDITOR, ItemType.DOCUMENT, "es", new ItemContent("noticias", audience,
+                Map.of("es", new Translation(title, "", "")), List.of(), null, null, false, false, null, url));
+        itemCommands.submitForReview(EDITOR, id);
+        itemCommands.publish(PUBLISHER, id, false);
+        return id;
     }
 
     @Test

@@ -45,6 +45,7 @@ public class AgentResolver {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final AgentConfigClient configClient;
+    private final String baseUrl;
     private final String url;
     private final TraceHeaders traceHeaders;
 
@@ -53,7 +54,8 @@ public class AgentResolver {
                          TraceHeaders traceHeaders) {
         this.configClient = configClient;
         this.traceHeaders = traceHeaders;
-        this.url = controlPlaneUrl.replaceAll("/+$", "") + "/internal/agents/resolve";
+        this.baseUrl = controlPlaneUrl.replaceAll("/+$", "") + "/internal/agents/";
+        this.url = baseUrl + "resolve";
     }
 
     /** A resolved configuration, or a refusal to be shown to the user. Never both. */
@@ -87,10 +89,25 @@ public class AgentResolver {
         var id = caller == null ? CallerIdentity.anonymous() : caller;
         var channelSaid = blankToNull(channel);
         var defaultSaid = blankToNull(defaultAgentId);
+        return post(url, new ResolveRequest(id.userId(), id.username(), id.roles(), id.tenant(), locale, route,
+                channelSaid, defaultSaid), defaultSaid);
+    }
+
+    /**
+     * The agent an A2A call names, for this caller: no routing, but the same budgets, and the
+     * guardrails of the route that covers it over A2A. The answers read as {@link #resolve} reads them.
+     */
+    public Resolution resolveNamed(String agentId, CallerIdentity caller) {
+        var id = caller == null ? CallerIdentity.anonymous() : caller;
+        return post(baseUrl + java.net.URLEncoder.encode(agentId, java.nio.charset.StandardCharsets.UTF_8) + "/resolve",
+                new ResolveRequest(id.userId(), id.username(), id.roles(), id.tenant(), null, null, null, null),
+                agentId);
+    }
+
+    private Resolution post(String target, ResolveRequest request, String agentIfNoAnswer) {
         try {
-            var body = mapper.writeValueAsString(new ResolveRequest(id.userId(), id.username(),
-                    id.roles(), id.tenant(), locale, route, channelSaid, defaultSaid));
-            var response = http.send(traceHeaders.applyTo(HttpRequest.newBuilder(URI.create(url)))
+            var body = mapper.writeValueAsString(request);
+            var response = http.send(traceHeaders.applyTo(HttpRequest.newBuilder(URI.create(target)))
                             .timeout(Duration.ofSeconds(5))
                             .header("Content-Type", "application/json")
                             .header("Accept", "application/json")
@@ -99,7 +116,8 @@ public class AgentResolver {
             if (response.statusCode() == 200) {
                 var config = mapper.readValue(response.body(), AgentConfig.class);
                 configClient.remember(config);
-                log.debug("Resolved agent {} (channel {}, default {})", config.agentId(), channelSaid, defaultSaid);
+                log.debug("Resolved agent {} (channel {}, default {})", config.agentId(), request.channel(),
+                        request.defaultAgentId());
                 return Resolution.allow(config);
             }
             if (response.statusCode() == 409) {
@@ -111,11 +129,11 @@ public class AgentResolver {
             }
             log.warn("Resolve answered {} — falling back to the last good configuration.",
                     response.statusCode());
-            return fallback(defaultSaid);
+            return fallback(agentIfNoAnswer);
         } catch (Exception e) {
             log.warn("Resolve unreachable ({}) — falling back to the last good configuration.",
                     e.toString());
-            return fallback(defaultSaid);
+            return fallback(agentIfNoAnswer);
         }
     }
 

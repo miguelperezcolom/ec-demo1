@@ -35,15 +35,58 @@ espera a que exista); la imagen es
 | `NEWSLETTER_FROM` | — | `intranet@ec1.mateu.io` | Remitente |
 | `NEWSLETTER_REDIRECT_TO` | `newsletter-demo@example.com` | vacío | **Todo** correo de newsletter va aquí, con el grupo y el idioma en el asunto. Vacío: a los empleados de verdad |
 | `EMBEDDINGS_URL`, `EMBEDDINGS_MODEL` | `http://embeddings`, — | `http://embeddings`, `intfloat/multilingual-e5-small` | El RAG (`/v1/embeddings`) |
+| `NOTIFICATIONS_CATCH_UP` | — | `PT24H` | Lo que se hizo efectivo hace más de esto ya no se notifica |
+| `NOTIFICATIONS_REMINDER_BEFORE` | — | `P2D` | Cuánto antes de la fecha límite se recuerda confirmar |
+| `NOTIFICATIONS_CLOSE_AFTER` | — | `P30D` | A partir de cuánto se cierra sola una notificación |
+| `NOTIFICATIONS_BATCH_SIZE` | — | `200` | Lectores por transacción del reparto, y destinatarios por correo |
+| `ANALYTICS_RETENTION` | — | `P90D` | Cuánto se guardan los eventos de uso en crudo (nunca menos de 30 días) |
 | `PORTAL_URL` | `https://ec1.mateu.io/intranet` | `http://ec1.localhost:8800/intranet` | Los enlaces de la newsletter y el mensaje de «ver como» |
 | `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWKS_URI` | `https://auth.ec1.mateu.io/realms/ec-demo1`, `http://keycloak:8080/…/certs` | iguales | Verificar el token de las llamadas MCP |
 | `MEDIA_SECRET` | — | vacío | Firma las URL de los medios. Vacío: una clave aleatoria por arranque (las URL ya dibujadas dejan de valer al reiniciar) |
 | `MEDIA_MAX_BYTES` | — | `20971520` (20 MB) | Tamaño máximo de un fichero subido |
 | `PROJECTION_ASYNC` | — | `true` | Recalcular la visibilidad fuera del hilo de la petición (`false` en las pruebas) |
 | `CONTENT_SEED` | — | `true` | La semilla de contenido de demo |
+| `SEARCH_MAX_DISTANCE` | — | `0.3` | Distancia coseno máxima para que un pasaje cuente como coincidencia por significado |
+| `INTRANET_AGENT_URL`, `INTRANET_AGENT_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-agent`, — | igual, `PT30S` | El agente de la «Respuesta de la IA» |
+| `INTRANET_TRANSLATOR_URL`, `INTRANET_TRANSLATOR_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-translator`, — | igual, `PT60S` | El agente de «Traducir con IA» |
+| `GOOGLE_DRIVE_CREDENTIALS_FILE` | `/etc/google-drive/credentials.json` | vacío | El fichero de clave de la cuenta de servicio de Drive. Sin él, o si no se puede leer, Drive queda apagado |
+| `GOOGLE_DRIVE_IMPERSONATE` | (Secret `ec-google-drive`, opcional) | vacío | Usuario de Workspace por el que actuar con delegación de dominio. Vacío: la cuenta ve lo compartido con su propia dirección |
 
 Los trabajos programados se ajustan con `content-hub.jobs.crossings` (`PT30S`), `.newsletter` (`PT30S`),
-`.embeddings` (`PT15S`) y `.orphans` (`PT1H`).
+`.embeddings` (`PT15S`), `.orphans` (`PT1H`) y `.drive` (`PT15M`).
+
+### La IA: agentes del plano de control
+
+content-hub **no tiene clave de ningún modelo**. La «Respuesta de la IA» y «Traducir con IA» llaman por A2A a
+`ia-agent` (`POST /a2a/{agente}`, `message/send`) con el **token de la persona que pregunta**, nunca con uno de
+servicio. Hacen falta dos agentes sin herramientas en el catálogo del plano de control, `intranet-agent` e
+`intranet-translator`. Mientras no existan, o si fallan, el usuario ve un aviso breve; los resultados de la
+búsqueda siguen funcionando y el formulario del editor no cambia. El motivo queda en el log, en `INFO`.
+
+### Google Drive
+
+Sin configurar nada, un editor puede pegar la URL de un fichero: referencia, vista previa y enlaces funcionan
+solo con ella. Lo que añade la cuenta de servicio es el nombre actual y «Modificado por X el …»:
+
+1. Crea en Google Cloud una cuenta de servicio con la API de Drive activada y descarga su clave JSON. Se pide
+   solo el alcance `drive.metadata.readonly`: puede leer los metadatos, no el contenido.
+2. Crea el Secret, con la clave **`credentials.json`**, y reinicia el pod (los ficheros de un Secret opcional
+   se montan al crearse el pod):
+
+   ```bash
+   kubectl -n ec-demo1 create secret generic ec-google-drive --from-file=credentials.json=clave.json
+   kubectl -n ec-demo1 rollout restart deployment/content-hub
+   ```
+
+3. **Comparte cada fichero con la dirección de la cuenta de servicio** (`client_email` de la clave). Es el modo
+   por defecto. La **delegación de dominio es opcional**: si la tienes autorizada en Workspace, añade al Secret
+   `GOOGLE_DRIVE_IMPERSONATE` con el usuario por el que actuar, y la cuenta verá lo que vea ese usuario.
+
+Un trabajo cada 15 minutos (y al minuto de arrancar) pregunta a Drive por cada fichero referenciado. **Un
+fichero que la cuenta no puede ver no es un error para nadie**: referencia, vista previa y enlaces siguen
+funcionando, solo falta el «Modificado por…», y el motivo queda en los detalles del medio y en el log, en
+`INFO`. Un fallo posterior conserva lo último que se supo. La miniatura se guarda si Drive la da, pero la
+respuesta suele traerla vacía y ninguna pantalla la usa.
 
 ## En local
 
@@ -126,6 +169,16 @@ llamada se rechaza.
   puede tardar un instante en aparecer.
 - **El MCP solo existe dentro del clúster** y pide el token del usuario: no es para clientes externos ni
   para llamadas de servicio a servicio sin usuario.
+- **Vista previa de Drive**: la dibuja Google en un iframe, con la sesión de Google del navegador del lector.
+  Sin acceso al fichero, el iframe muestra el aviso de Google; los enlaces siguen ahí. No se usa la cuenta de
+  servicio para esto.
+- **El umbral de `SEARCH_MAX_DISTANCE`** depende del modelo de embeddings y del contenido: demasiado alto trae
+  resultados que no vienen a cuento; demasiado bajo no encuentra nada por significado. Ajústalo con contenido real.
+- **La búsqueda no pagina**: mezclar dos clasificaciones da los 20 mejores, sin más páginas.
+- **Por A2A, `ia-agent` no aplica los guardarraíles ni rechaza por presupuesto antes de gastar**: lee la
+  configuración del agente sin saber quién llama (`/internal/agents/{id}/config`) y los guardarraíles solo corren
+  en el chat (`IaAgentController`). Sí registra el consumo a nombre de la persona. Ver
+  [Arquitectura](./arquitectura/#la-ia-por-el-plano-de-control).
 - **Apellido en Keycloak**: ver el aviso de [Datos de demo](#datos-de-demo).
 - **Slots por REST provisional.** `GET /_intranet/api/slots/{key}` sustituye al microfrontend resuelto en
   servidor y `@ContentSlot` de Mateu, que aún no se han publicado; los descriptores de las aplicaciones
@@ -139,6 +192,13 @@ llamada se rechaza.
 - **Consistencia eventual**: entre publicar (o redefinir una audiencia) y verlo pasan unos segundos; el
   formulario del item dice cuándo está aplicado. El chat tarda unos segundos más (los embeddings).
 - **Medios en la base de datos**, hasta 20 MB cada uno: lo grande va por URL externa.
+- **Notificaciones**: `select * from ch_notification_job where done_at is null` dice qué reparto está pendiente y
+  con cuántos intentos; `outcome` dice cómo acabó cada uno. Dependen de `communication-service`: se acumulan en el
+  outbox si Kafka no está, y nada se pierde. Hay una fila abierta en su `inbox_item` por lector y notificación, y
+  su bandeja carga todas las abiertas en memoria en cada refresco de la campana: a la escala de la demo no se nota,
+  a miles de empleados habría que filtrar en la consulta.
+- **El reset de la demo no toca** las notificaciones ni la analítica de la intranet: las bandejas las vacía
+  `communication-service`, pero lo enviado y las cifras se quedan.
 - **El reset de la demo no la restaura todavía**: la semilla de contenido solo corre con la tabla de
   items vacía, y `supporting/demo-reset` no incluye content-hub.
 - **Los atributos no están en el token**: un empleado que aún no está en el directorio (evento en camino)

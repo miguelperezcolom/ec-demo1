@@ -8,6 +8,7 @@ import io.mateu.ecdemo1.iaagent.config.RagToolFactory;
 import io.mateu.ecdemo1.iaagent.identity.JwtIdentityReader;
 import io.mateu.ecdemo1.iaagent.observability.PromptObservations;
 import io.mateu.ecdemo1.iaagent.usage.UsageReporter;
+import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,15 @@ import java.util.regex.Pattern;
  *
  * <p>Usage is reported for the agent that answered, with the caller's identity from the forwarded
  * token, so a delegated prompt counts against the same person's budgets and shows up under the
- * agent that spent it.
+ * agent that spent it. Those budgets have already been consulted when this runs: see
+ * {@link A2aController}.
+ *
+ * <p><strong>Guardrails run where the call comes in from outside the agents</strong>, as they do
+ * around the chat panel: on a call with nothing on its chain. An agent's call to a peer is inside
+ * that perimeter, and a guardrail is what guards it, so running them there as well would not add a
+ * check — and past the first hop would fail, the guardrail's own call being over the depth limit. A
+ * refusal is {@link A2aServer.Blocked}: an error to the caller, never text it could take for the
+ * agent's work. A blocked answer has been paid for, so its usage is reported all the same.
  */
 @Component
 public class A2aAgentExecutor implements A2aServer.Executor {
@@ -56,12 +65,14 @@ public class A2aAgentExecutor implements A2aServer.Executor {
     private final JwtIdentityReader jwtIdentityReader;
     private final PromptObservations prompts;
     private final ObservationRegistry observationRegistry;
+    private final GuardrailRunner guardrails;
 
     public A2aAgentExecutor(PerRequestMcpClientFactory mcpFactory, RagToolFactory ragTools,
                             PeerToolFactory peerTools, AgentTurn agentTurn,
                             ConversationStore conversationStore, UsageReporter usageReporter,
                             JwtIdentityReader jwtIdentityReader, PromptObservations prompts,
-                            ObservationRegistry observationRegistry) {
+                            ObservationRegistry observationRegistry, GuardrailRunner guardrails) {
+        this.guardrails = guardrails;
         this.mcpFactory = mcpFactory;
         this.ragTools = ragTools;
         this.peerTools = peerTools;
@@ -82,6 +93,9 @@ public class A2aAgentExecutor implements A2aServer.Executor {
                 hop.depth());
         try (var scope = observation.openScope()) {
             PromptObservations.tagAgent(observation, config);
+            var guarded = hop.chain().isEmpty() && !hop.noDelegation();
+            var message = guarded ? checked(GuardrailRunner.Side.INPUT, observation, config, text, authorization, hop)
+                    : text;
             try (var mcp = mcpFactory.createTools(config.mcpUrls(), authorization)) {
                 var peers = peerTools.toolsFor(config, authorization, hop);
                 var tools = new ArrayList<ToolCallback>(List.of(mcp.getCallbacks()));
@@ -102,24 +116,43 @@ public class A2aAgentExecutor implements A2aServer.Executor {
                 system.append("\n\n").append(A2A_NOTE);
 
                 var turn = agentTurn.call(config, system.toString(), conversationStore.getHistory(sessionId),
-                        text, tools.toArray(new ToolCallback[0]));
-                var content = turn.content() == null || turn.content().isBlank()
+                        message, tools.toArray(new ToolCallback[0]));
+                var answer = turn.content() == null || turn.content().isBlank()
                         ? "(sin respuesta)" : NAVIGATE.matcher(turn.content()).replaceAll("").trim();
-                conversationStore.addExchange(sessionId, text, content);
                 usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),
                         turn.inputTokens(), turn.outputTokens(), turn.totalTokens(),
                         jwtIdentityReader.read(authorization), sessionId);
+                var content = guarded
+                        ? checked(GuardrailRunner.Side.OUTPUT, observation, config, answer, authorization, hop)
+                        : answer;
+                conversationStore.addExchange(sessionId, message, content);
                 log.info("A2A answer from {}: {} chars, tokens={}/{}/{}", config.agentId(), content.length(),
                         turn.inputTokens(), turn.outputTokens(), turn.totalTokens());
                 prompts.tagResponse(observation, content);
                 PromptObservations.outcome(observation, "success");
                 return content;
             }
+        } catch (A2aServer.Blocked e) {
+            throw e; // a decision, already recorded on the observation: not a failure
         } catch (RuntimeException e) {
             observation.error(e);
             throw e;
         } finally {
             observation.stop();
         }
+    }
+
+    /** The text the route's guardrails leave on this side, or the refusal if they stop it. */
+    private String checked(GuardrailRunner.Side side, Observation observation, AgentConfig config, String text,
+                           String authorization, A2aHop hop) {
+        var outcome = guardrails.check(side, config, text, authorization, hop);
+        if (!outcome.blocked()) {
+            return outcome.text();
+        }
+        var refusal = GuardrailRunner.refusal(side, outcome);
+        prompts.tagResponse(observation, refusal);
+        PromptObservations.outcome(observation,
+                side == GuardrailRunner.Side.INPUT ? "blocked_input" : "blocked_output");
+        throw new A2aServer.Blocked(refusal);
     }
 }

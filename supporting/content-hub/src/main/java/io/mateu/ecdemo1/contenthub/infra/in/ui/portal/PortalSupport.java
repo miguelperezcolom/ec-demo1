@@ -33,6 +33,16 @@ public class PortalSupport {
     final NavigationRepository navigation;
     final ProjectionCache cache;
 
+    /**
+     * Whether this call draws the page because someone opened it, not because they pressed one of its
+     * buttons: an action's round trip is not another visit.
+     */
+    public static boolean opening(HttpRequest request) {
+        var action = request == null ? null : request.runActionRq();
+        return action == null || action.actionId() == null || action.actionId().isBlank()
+                || "__load__".equals(action.actionId());
+    }
+
     public Reader reader(HttpRequest request) {
         return readers.of(request);
     }

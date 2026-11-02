@@ -7,6 +7,6 @@ public class InboxMenu {
 
     /** Named "pending", not "inbox": an entry named as its section resolves to the section. */
     @Menu
-    @Label("Pending")
+    @Label("Pendientes")
     InboxPage pending;
 }
