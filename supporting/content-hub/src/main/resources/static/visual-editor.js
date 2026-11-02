@@ -127,7 +127,8 @@
     .grid img, .grid .ph { width:100%; height:90px; object-fit:cover; border-radius:6px; background:var(--ve-soft);
       display:flex; align-items:center; justify-content:center; font-size:1.6rem; }
     .grid span { font-size:.8rem; }
-    .untr { position:absolute; left:.25rem; top:.25rem; z-index:2; font-size:.7rem; padding:0 .45rem; border-radius:999px;
+    /* in the flow, above the block's content (never over its title or text) */
+    .untr { display:inline-block; margin:.15rem 0 .1rem; font-size:.7rem; line-height:1.4; padding:0 .45rem; border-radius:999px;
       background:rgba(178,106,0,.9); color:#fff; pointer-events:none; }
     .blk.untranslated .ttl, .blk.untranslated .body { opacity:.75; }
     .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
@@ -297,7 +298,9 @@
       if (s.busy) return;
       this.syncEditing();
       s.busy = true;
+      s.messages = []; // a new attempt: earlier errors and successes no longer hold
       this.renderBar();
+      this.renderMessages();
       try {
         const data = await this.call('PUT', '/' + this.resource + '/' + encodeURIComponent(this.pageId) + '/blocks',
           { blocks: this.wire(), updatedAt: s.page && s.page.updatedAt, language: s.language });
@@ -337,6 +340,7 @@
       if (s.busy) return;
       this.syncEditing();
       s.busy = true;
+      s.messages = []; // a new attempt: what earlier ones said (an error, a success) no longer holds
       this.renderBar();
       this.message('info', 'Traduciendo con IA al «' + s.language + '»…');
       try {
