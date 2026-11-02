@@ -426,6 +426,13 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         return io.mateu.uidl.data.UICommand.navigateTo(VisualEditorPage.route(id));
     }
 
+    /** Every step of the item, two of its states compared, an earlier one restored (HistoryPage). */
+    @Toolbar
+    @Action
+    public Object historial(HttpRequest httpRequest) {
+        return io.mateu.uidl.data.UICommand.navigateTo(HistoryPage.route(id));
+    }
+
     @Toolbar
     @Action
     public Object enviarARevision(HttpRequest httpRequest) {
@@ -471,7 +478,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             return true;
         }
         if (id == null) {
-            return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina").contains(fieldName);
+            return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina", "historial").contains(fieldName);
         }
         if ("editarSobreLaPagina".equals(fieldName)) {
             return type != ItemType.PAGE;
