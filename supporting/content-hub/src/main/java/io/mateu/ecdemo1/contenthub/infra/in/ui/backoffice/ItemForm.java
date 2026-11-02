@@ -382,6 +382,13 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         }
     }
 
+    /** A page, edited on the page itself: the visual editor (VisualEditorPage). Saving there replaces the draft's blocks. */
+    @Toolbar
+    @Action
+    public Object editarSobreLaPagina(HttpRequest httpRequest) {
+        return io.mateu.uidl.data.UICommand.navigateTo(VisualEditorPage.route(id));
+    }
+
     @Toolbar
     @Action
     public Object enviarARevision(HttpRequest httpRequest) {
@@ -421,7 +428,10 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             return !translator.available();
         }
         if (id == null) {
-            return List.of("enviarARevision", "publicar", "rechazar", "retirar").contains(fieldName);
+            return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina").contains(fieldName);
+        }
+        if ("editarSobreLaPagina".equals(fieldName)) {
+            return type != ItemType.PAGE;
         }
         var item = items.find(id).orElse(null);
         if (item == null) {
