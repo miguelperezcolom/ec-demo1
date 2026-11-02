@@ -95,6 +95,57 @@ class ResolveGuardrailsTest {
     }
 
     @Test
+    void aNamedAgentKeepsItsIdAndTakesTheGuardrailsOfTheRouteThatCoversItOverA2a() {
+        agent("pii");
+        agent("toxicity");
+        // A console's route is not about A2A; another agent's route is not about this one.
+        routes.save(Route.of(new RouteId("console"), new Name("console"), 1, null, null, null, null, "data-plane", "front",
+                new Guardrails(List.of("toxicity"), List.of(), null)));
+        routes.save(Route.of(new RouteId("other"), new Name("other"), 2, null, null, null, null, "a2a", "default",
+                new Guardrails(List.of("toxicity"), List.of(), null)));
+        routes.save(Route.of(new RouteId("a2a"), new Name("a2a"), 3, null, null, null, null, "a2a", "front",
+                new Guardrails(List.of("pii"), List.of(), null)));
+
+        var resolved = resolve.handleNamed("front", new ResolveByContextUseCase.RequestContext("u", List.of(), null, null,
+                null, null));
+
+        assertThat(resolved.agentId()).isEqualTo("front");
+        assertThat(resolved.guardrails().input()).extracting(ResolveAgentConfigUseCase.ResolvedGuardrail::id)
+                .containsExactly("pii");
+    }
+
+    @Test
+    void aNamedAgentIsNotRoutedAwayAndHasNoGuardrailsWithoutARoute() {
+        routes.save(Route.of(new RouteId("r"), new Name("r"), 1, null, null, null, null, null, "front",
+                new Guardrails(List.of("front-guard"), List.of(), null)));
+
+        var resolved = resolve.handleNamed("default", new ResolveByContextUseCase.RequestContext("u", List.of(), null,
+                null, null, null));
+
+        assertThat(resolved.agentId()).isEqualTo("default");
+        assertThat(resolved.guardrails()).isEqualTo(ResolveAgentConfigUseCase.ResolvedGuardrails.none());
+    }
+
+    @Test
+    void aSpentBudgetRefusesANamedAgent() {
+        var refusing = new CheckBudgetUseCase(null, null) {
+            @Override
+            public Verdict check(String agentId, String llmId, String userId, String tenant) {
+                return new Verdict(false, new Exceeded("b", "daily", io.mateu.ecdemo1.iacp.domain.aggregates.budget.vo.BudgetScope.USER,
+                        userId, io.mateu.ecdemo1.iacp.domain.aggregates.budget.vo.BudgetPeriod.DAY, 10, 10));
+            }
+        };
+        var config = new ResolveAgentConfigUseCase(agents, llms, new InMemoryRepositories.Mcps(),
+                new InMemoryRepositories.Rags(), InMemoryRepositories.CIPHER);
+        var strict = new ResolveByContextUseCase(routes, config, refusing, agents);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> strict.handleNamed("default",
+                        new ResolveByContextUseCase.RequestContext("u", List.of(), null, null, null, null)))
+                .isInstanceOf(ResolveByContextUseCase.BudgetExceededException.class)
+                .hasMessageContaining("daily");
+    }
+
+    @Test
     void noMatchingRouteNoGuardrails() {
         routes.save(Route.of(new RouteId("r"), new Name("r"), 1, "support", null, null, null, null, "front",
                 new Guardrails(List.of("front-guard"), List.of(), null)));

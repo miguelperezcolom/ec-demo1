@@ -59,13 +59,29 @@ public class AgentConfigController {
      */
     @PostMapping("/resolve")
     public ResponseEntity<?> resolve(@RequestBody ResolveRequest request) {
-        var agentId = request.defaultAgentId();
+        return answer(request.defaultAgentId(), () -> resolveByContext.handle(context(request)));
+    }
+
+    /**
+     * As {@code /resolve} for a caller that names the agent — an A2A call: no routing, the same
+     * budgets, and the guardrails of the route that covers that agent over A2A.
+     */
+    @PostMapping("/{agentId}/resolve")
+    public ResponseEntity<?> resolveNamed(@PathVariable("agentId") String agentId,
+                                          @RequestBody ResolveRequest request) {
+        return answer(agentId, () -> resolveByContext.handleNamed(agentId, context(request)));
+    }
+
+    private static ResolveByContextUseCase.RequestContext context(ResolveRequest request) {
+        return new ResolveByContextUseCase.RequestContext(
+                request.userId(), request.roles() == null ? List.of() : request.roles(),
+                request.tenant(), request.locale(), request.route(), request.channel(),
+                request.defaultAgentId());
+    }
+
+    private ResponseEntity<?> answer(String agentId, java.util.function.Supplier<?> resolve) {
         try {
-            var resolved = resolveByContext.handle(new ResolveByContextUseCase.RequestContext(
-                    request.userId(), request.roles() == null ? List.of() : request.roles(),
-                    request.tenant(), request.locale(), request.route(), request.channel(),
-                    request.defaultAgentId()));
-            return ResponseEntity.ok(resolved);
+            return ResponseEntity.ok(resolve.get());
         } catch (ResolveByContextUseCase.BudgetExceededException e) {
             log.warn("Resolve refused (budget) for default agent {}: {}", agentId, e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new Problem(agentId, e.getMessage()));

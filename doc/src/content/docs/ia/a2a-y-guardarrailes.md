@@ -99,9 +99,34 @@ bloque de código o una frase alrededor).
 Ejemplo de guardarraíl:
 [`gitops/example/ia/agents/content-guardrail.yaml`](https://github.com/miguelperezcolom/ec-demo1/blob/master/gitops/example/ia/agents/content-guardrail.yaml).
 
+### Por A2A
+
+Una llamada A2A nombra a su agente, así que ninguna ruta lo cambia. Se gobierna igual que un prompt del
+chat, con `POST /internal/agents/{id}/resolve`:
+
+- **Presupuestos**: se consultan por mensaje y para quien llama, también entre agentes. Uno agotado
+  devuelve el error JSON-RPC `-32052` con su motivo y el agente no llega a gastar.
+- **Guardarraíles**: los de la primera ruta activa que tiene ese `targetAgent` y coincide con quien
+  llama en el canal `a2a`. Sirve una ruta con `channel: a2a` o una sin canal; una con el canal de una
+  consola no se aplica aquí. Sin ninguna ruta así, no hay guardarraíles.
+- **Dónde se aplican**: solo en la entrada, en una llamada sin agentes en `X-A2A-Chain`. Un par queda
+  dentro de ese perímetro, y la propia llamada a un guardarraíl tampoco se revisa.
+- **Un bloqueo es un error**: `-32053` con el motivo, no un texto. Quien llama podría tomar un texto por el
+  trabajo del agente y, por ejemplo, publicar una negativa como si fuera una traducción. Una respuesta
+  bloqueada ya se ha pagado y cuenta en el consumo.
+- **Si el plano de control no responde**, se sirve la última configuración buena, como en el chat: en ese
+  rato no se comprueba el presupuesto.
+
+```yaml
+kind: route
+id: intranet-agent-guarded
+channel: a2a
+targetAgent: intranet-agent
+inputGuardrails: [content-guardrail]
+```
+
 ## Lo que queda abierto
 
-- Una llamada A2A no pasa por la comprobación previa de presupuesto: el consumo se registra y descuenta
-  después, pero no se corta en el momento.
-- Los guardarraíles se aplican al chat del usuario, no a las llamadas entre agentes.
+- Los guardarraíles de una llamada A2A se aplican al entrar desde fuera, no entre agentes: ver
+  [Por A2A](#por-a2a).
 - El consumo de un guardarraíl se apunta al agente guardarraíl, no al de la ruta.

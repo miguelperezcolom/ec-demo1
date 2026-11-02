@@ -30,8 +30,11 @@ import java.util.UUID;
  * A2A specification 0.3.0: {@code kind} discriminators, {@code messageId}, {@code contextId},
  * {@code parts}.
  *
- * <p>Two refusals are this deployment's own and use the JSON-RPC server-error range: a call past
- * the maximum A2A depth, and a call that would close a cycle ({@link A2aHop}).
+ * <p>The refusals of this deployment's own use the JSON-RPC server-error range: a call past the
+ * maximum A2A depth, one that would close a cycle ({@link A2aHop}), an agent that may not answer
+ * this caller (disabled, or a budget spent) and a text a guardrail stopped ({@link Blocked}). They
+ * are errors and not answers: a caller may take an answer for the agent's work, and a refusal put
+ * in a translation or a summary would be published as if it were one.
  */
 public class A2aServer {
 
@@ -54,12 +57,25 @@ public class A2aServer {
     public static final int DEPTH_EXCEEDED = -32050;
     public static final int CYCLE = -32051;
     public static final int AGENT_UNAVAILABLE = -32052;
+    public static final int GUARDRAIL_BLOCKED = -32053;
 
     private static final Set<String> STREAMING = Set.of("message/stream", "tasks/resubscribe");
 
     /** An agent's configuration by id. Throws {@link AgentConfigClient.Unavailable} with the reason. */
     public interface Configs {
         AgentConfig configOf(String agentId);
+
+        /** The configuration to answer this caller's message with: where a budget can say no. */
+        default AgentConfig configFor(String agentId, String authorization) {
+            return configOf(agentId);
+        }
+    }
+
+    /** A guardrail stopped the text. The message is the sentence the caller should show. */
+    public static class Blocked extends RuntimeException {
+        public Blocked(String message) {
+            super(message);
+        }
     }
 
     /** Runs one turn of an agent and returns its text answer. */
@@ -186,7 +202,7 @@ public class A2aServer {
         }
         AgentConfig config;
         try {
-            config = configs.configOf(agentId);
+            config = configs.configFor(agentId, authorization);
         } catch (AgentConfigClient.Unavailable e) {
             return error(id, AGENT_UNAVAILABLE, "Agent '" + agentId + "' is not available: " + e.getMessage());
         }
@@ -197,6 +213,8 @@ public class A2aServer {
         String answer;
         try {
             answer = executor.run(config, text.toString(), contextId, authorization, hop);
+        } catch (Blocked e) {
+            return error(id, GUARDRAIL_BLOCKED, e.getMessage());
         } catch (Exception e) {
             log.error("A2A call to {} failed: {}", agentId, e.toString(), e);
             return error(id, INTERNAL_ERROR, "Internal error: " + e.getClass().getSimpleName()
