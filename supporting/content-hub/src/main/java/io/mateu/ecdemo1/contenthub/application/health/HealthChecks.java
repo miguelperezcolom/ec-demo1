@@ -17,6 +17,8 @@ import io.mateu.ecdemo1.contenthub.domain.item.ItemStatus;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.domain.media.MediaAsset;
 import io.mateu.ecdemo1.contenthub.domain.media.MediaKind;
+import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue;
+import io.mateu.ecdemo1.contenthub.domain.site.Site;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -92,12 +94,15 @@ public final class HealthChecks {
                 case MEDIA -> media.containsKey(r.value()) ? Optional.<String>empty()
                         : Optional.of("el medio «" + r.value() + "» no existe");
                 case ITEM -> itemProblem(s, r.value());
-                case SECTION -> s.sectionIds().contains(r.value()) ? Optional.<String>empty()
-                        : Optional.of("la sección «" + r.value() + "» no existe");
+                case SECTION -> s.section(r.siteId(), r.value()) ? Optional.<String>empty()
+                        : Optional.of("la sección «" + r.value() + "» no existe en «" + s.siteName(Site.of(r.siteId())) + "»");
                 case BUILTIN -> PortalFunction.byKey(r.value()).isPresent() ? Optional.<String>empty()
                         : Optional.of("la función del portal «" + r.value() + "» no existe");
-                case REMOTE -> s.uiSourceIds().contains(r.value()) ? Optional.<String>empty()
-                        : Optional.of("la interfaz «" + r.value() + "» no está (o ya no está) en el registro de UIs");
+                case REMOTE -> s.uiSources().containsKey(r.value())
+                        ? (s.uiSources().get(r.value()) ? Optional.<String>empty()
+                        : Optional.of("la UI externa «" + r.value() + "» está desactivada: nadie la ve"))
+                        : Optional.of("la UI externa «" + r.value() + "» no está (o ya no está) en el registro de UIs");
+                case ISSUE -> issueProblem(s, r.value());
                 case IMG_NO_ALT -> Optional.<String>empty();
             };
             problem.ifPresent(p -> add(out, HealthCheck.BROKEN_LINKS, r, r.value(), describe(r) + ": " + p));
@@ -117,12 +122,15 @@ public final class HealthChecks {
         }
         var parts = path.substring("/intranet/".length()).split("/");
         var missing = Optional.of("la página " + path + " no existe en el portal");
+        if (parts[0].equals("n") && parts.length >= 2) {
+            return newsletterPath(s, path, parts);
+        }
         return switch (parts.length) {
             case 1 -> PortalFunction.byKey(parts[0]).isPresent() ? Optional.empty() : missing;
             case 2 -> switch (parts[0]) {
                 case "noticias" -> s.itemState(parts[1]) == ItemState.EXPIRED ? Optional.of(EXPIRED + parts[1])
                         : itemProblem(s, parts[1]);
-                case "secciones" -> s.sectionIds().contains(parts[1]) ? Optional.empty()
+                case "secciones" -> s.section(Site.INTRANET, parts[1]) ? Optional.empty()
                         : Optional.of("la sección «" + parts[1] + "» no existe");
                 case "personas" -> s.personIds().contains(parts[1]) ? Optional.empty()
                         : Optional.of("no hay nadie con el id «" + parts[1] + "» en el directorio");
@@ -135,6 +143,36 @@ public final class HealthChecks {
                     && s.menus().stream().anyMatch(m -> m.siteId().equals(parts[1]) && m.find(parts[2]).isPresent())
                     ? Optional.empty() : missing;
             default -> missing;
+        };
+    }
+
+    static Optional<String> issueProblem(ContentSnapshot s, String id) {
+        var issue = s.issue(id).orElse(null);
+        if (issue == null) {
+            return Optional.of("el número «" + id + "» no existe");
+        }
+        return issue.status() == NewsletterIssue.Status.SENT ? Optional.empty()
+                : Optional.of("el número " + issue.number() + " aún no se ha enviado: no tiene página");
+    }
+
+    /** A newsletter site's route: /intranet/n/{site}[/p/{id} | /secciones/{id} | /archivo | /numeros/{id}]. */
+    static Optional<String> newsletterPath(ContentSnapshot s, String path, String[] parts) {
+        var site = parts[1];
+        if (!s.sites().containsKey(site)) {
+            return Optional.of("el sitio «" + site + "» no existe");
+        }
+        if (parts.length == 2 || (parts.length == 3 && parts[2].equals("archivo"))) {
+            return Optional.empty();
+        }
+        if (parts.length != 4) {
+            return Optional.of("la página " + path + " no existe en el portal");
+        }
+        return switch (parts[2]) {
+            case "p" -> s.itemState(parts[3]) == ItemState.EXPIRED ? Optional.of(EXPIRED + parts[3]) : itemProblem(s, parts[3]);
+            case "secciones" -> s.section(site, parts[3]) ? Optional.empty()
+                    : Optional.of("la sección «" + parts[3] + "» no existe en «" + s.siteName(site) + "»");
+            case "numeros" -> issueProblem(s, parts[3]);
+            default -> Optional.of("la página " + path + " no existe en el portal");
         };
     }
 
@@ -214,7 +252,7 @@ public final class HealthChecks {
                 var days = Math.max(0, Duration.between(s.now(), expireAt).toDays());
                 var f = Finding.of(HealthCheck.EXPIRY, Subject.ITEM, item.id(), ContentSnapshot.title(item), "expira",
                         "Caduca el " + day(expireAt) + (days == 0 ? " (hoy)" : " (en " + days + (days == 1 ? " día)" : " días)"))
-                                + ": amplía la fecha si debe seguir viéndose", Fix.EDIT_ITEM);
+                                + ": amplía la fecha si debe seguir viéndose", Fix.EDIT_ITEM).inSite(item.siteId());
                 out.put(f.key(), f);
             }
         }
@@ -252,14 +290,14 @@ public final class HealthChecks {
             if (last != null && last.isBefore(limit) && settings.freshnessMatters(content.sectionId())) {
                 out.add(Finding.of(HealthCheck.STALE, Subject.ITEM, item.id(), ContentSnapshot.title(item), "sin-actualizar",
                         "Publicado por última vez el " + day(last) + ", hace más de " + settings.staleMonths()
-                                + " meses: revisa si sigue siendo cierto", Fix.EDIT_ITEM));
+                                + " meses: revisa si sigue siendo cierto", Fix.EDIT_ITEM).inSite(item.siteId()));
             }
             var first = item.versions().isEmpty() ? null : item.versions().getFirst().publishedAt();
             if (window.isPresent() && item.type() == ItemType.PAGE && first != null && !first.isAfter(window.get())
-                    && !s.viewedItemIds().contains(item.id()) && !s.homePageIds().contains(item.id())) {
+                    && !s.viewedItemIds().contains(item.id()) && s.homes().values().stream().noneMatch(h -> h.contains(item.id()))) {
                 out.add(Finding.of(HealthCheck.STALE, Subject.ITEM, item.id(), ContentSnapshot.title(item), "sin-visitas",
                         "Nadie ha abierto esta página desde el " + day(window.get())
-                                + ": ¿sigue haciendo falta, o no se encuentra?", Fix.EDIT_ITEM));
+                                + ": ¿sigue haciendo falta, o no se encuentra?", Fix.EDIT_ITEM).inSite(item.siteId()));
             }
         }
         return out;
@@ -283,11 +321,16 @@ public final class HealthChecks {
     // ---- shared -------------------------------------------------------------------------------------------
 
     static void add(Map<String, Finding> out, HealthCheck check, Reference r, String target, String problem) {
-        var fix = r.subject() == Subject.ITEM ? Fix.EDIT_ITEM : Fix.CONFIGURE;
-        var f = Finding.of(check, r.subject(), r.subjectId(), r.subjectTitle(), target, problem, fix);
+        var fix = switch (r.subject()) {
+            case ITEM -> Fix.EDIT_ITEM;
+            case ISSUE -> Fix.EDIT_ISSUE;
+            default -> Fix.CONFIGURE;
+        };
+        var f = Finding.of(check, r.subject(), r.subjectId(), r.subjectTitle(), target, problem, fix)
+                .inSite(r.siteId() == null ? null : Site.of(r.siteId()));
         out.merge(f.key(), f, (a, b) -> a.problem().contains(r.where()) ? a
                 : new Finding(a.key(), a.check(), a.subject(), a.subjectId(), a.subjectTitle(), a.target(),
-                a.problem() + "; también en " + r.where(), a.fix(), a.size()));
+                a.problem() + "; también en " + r.where(), a.fix(), a.size(), a.siteId()));
     }
 
     static String describe(Reference r) {
@@ -298,7 +341,8 @@ public final class HealthChecks {
             case ITEM -> "Contenido «" + r.value() + "»";
             case SECTION -> "Sección «" + r.value() + "»";
             case BUILTIN -> "Función «" + r.value() + "»";
-            case REMOTE -> "Interfaz «" + r.value() + "»";
+            case REMOTE -> "UI externa «" + r.value() + "»";
+            case ISSUE -> "Número «" + r.value() + "»";
         };
         return what + " (" + r.where() + ")";
     }

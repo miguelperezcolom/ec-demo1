@@ -144,21 +144,12 @@ class ContentHealthTest {
             }
         };
         var settings = HealthSettings.defaults();
-        var noSources = new UiSources() {
-            @Override
-            public Optional<UiSource> find(String sourceId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public List<UiSource> all() {
-                return List.of();
-            }
-        };
+        var noSources = UiSources.NONE;
         health = new ContentHealth(new ContentHealth.Sources(items, media, descriptions, new PgSlotRepository(jdbc),
                 new PgHomePages(jdbc), new PgNavigationRepository(jdbc), new PgMenuRepository(jdbc), noSources,
                 new PgEmployeeDirectory(jdbc), new PgSurveyRepository(jdbc), new PgNewsletterRepository(jdbc),
-                new PgUsageRepository(jdbc)), store, new LinkChecker(probe, store, settings, clock, d -> { }), ai,
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterIssueRepository(jdbc),
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgSiteRepository(jdbc), new PgUsageRepository(jdbc)), store, new LinkChecker(probe, store, settings, clock, d -> { }), ai,
                 settings, Set.of("ec1.localhost"), clock, Runnable::run);
     }
 

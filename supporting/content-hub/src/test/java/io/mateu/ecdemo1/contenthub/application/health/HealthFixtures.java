@@ -78,7 +78,10 @@ final class HealthFixtures {
         final Map<String, String> alts = new HashMap<>();
         final List<Slot> slots = new ArrayList<>();
         final List<String> homes = new ArrayList<>();
+        final Map<String, List<String>> otherHomes = new HashMap<>();
         final List<SiteMenu> menus = new ArrayList<>();
+        final List<io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue> issues = new ArrayList<>();
+        final Map<String, Boolean> uiSources = new HashMap<>(Map.of("crs", true));
         Set<String> viewed = Set.of();
         Instant analyticsSince;
         Instant now = NOW;
@@ -94,8 +97,11 @@ final class HealthFixtures {
         }
 
         ContentSnapshot build() {
-            return new ContentSnapshot(now, items, media, alts, slots, homes, Set.of("s1", "s2"), menus,
-                    Set.of("crs"), Set.of("ana.perez"), Set.of("enc1"), List.of(), Set.of(HOST), viewed, analyticsSince);
+            var allHomes = new HashMap<>(otherHomes);
+            allHomes.put("intranet", homes);
+            return new ContentSnapshot(now, items, media, alts, slots, Map.of("intranet", "Intranet", "boletin", "Boletín"),
+                    allHomes, Map.of("intranet", Set.of("s1", "s2"), "boletin", Set.of("nl1")), menus, issues, Map.of(),
+                    uiSources, Set.of("ana.perez"), Set.of("enc1"), Set.of(HOST), viewed, analyticsSince);
         }
     }
 

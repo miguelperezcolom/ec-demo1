@@ -16,13 +16,14 @@ import java.util.HexFormat;
  * @param problem what to tell the editor
  * @param fix     the obvious way to fix it, which the screen offers
  * @param size    bytes, for an orphan medium; 0 otherwise
+ * @param siteId  the site it is about (intranet, a newsletter); null for what all sites share (the media library)
  */
 public record Finding(String key, HealthCheck check, Subject subject, String subjectId, String subjectTitle,
-                      String target, String problem, Fix fix, long size) {
+                      String target, String problem, Fix fix, long size, String siteId) {
 
     /** What a finding is about, and so where its link goes. */
     public enum Subject {
-        ITEM("Contenido"), MEDIA("Medio"), SLOT("Slot"), HOMES("Inicios"), MENU("Menú");
+        ITEM("Contenido"), MEDIA("Medio"), SLOT("Slot"), HOMES("Inicios"), MENU("Menú"), ISSUE("Número de newsletter");
 
         private final String label;
 
@@ -39,6 +40,8 @@ public record Finding(String key, HealthCheck check, Subject subject, String sub
     public enum Fix {
         /** Open the item's form. */
         EDIT_ITEM,
+        /** Open the newsletter issue's form (while it can still be edited). */
+        EDIT_ISSUE,
         /** Open the medium in the library. */
         OPEN_MEDIA,
         /** Ask the AI for a text alternative, to review and apply. */
@@ -57,11 +60,15 @@ public record Finding(String key, HealthCheck check, Subject subject, String sub
     public static Finding of(HealthCheck check, Subject subject, String subjectId, String subjectTitle, String target,
                              String problem, Fix fix) {
         return new Finding(key(check, subject, subjectId, target), check, subject, subjectId, subjectTitle, target,
-                problem, fix, 0);
+                problem, fix, 0, null);
     }
 
     public Finding withSize(long bytes) {
-        return new Finding(key, check, subject, subjectId, subjectTitle, target, problem, fix, bytes);
+        return new Finding(key, check, subject, subjectId, subjectTitle, target, problem, fix, bytes, siteId);
+    }
+
+    public Finding inSite(String site) {
+        return new Finding(key, check, subject, subjectId, subjectTitle, target, problem, fix, size, site);
     }
 
     /** Stable and short: the first 16 hex digits of SHA-256 of what the finding is. */

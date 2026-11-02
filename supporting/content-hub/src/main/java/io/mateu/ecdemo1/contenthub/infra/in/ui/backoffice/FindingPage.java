@@ -119,7 +119,8 @@ public class FindingPage implements Identifiable, VisibilitySupplier {
         fix = f.fix().name();
         reviewed = view.reviewed();
         comprobacion = f.check().label();
-        donde = f.subject().label() + ": " + f.subjectTitle() + " (" + f.subjectId() + ")";
+        donde = f.subject().label() + ": " + f.subjectTitle() + " (" + f.subjectId() + ")"
+                + (f.siteId() == null ? "" : " · sitio «" + f.siteId() + "»");
         problema = f.problem();
         arreglo = howTo(f);
         desde = Ui.when(view.stored().firstSeen());
@@ -135,6 +136,7 @@ public class FindingPage implements Identifiable, VisibilitySupplier {
     static String howTo(Finding f) {
         return switch (f.fix()) {
             case EDIT_ITEM -> "Abre el contenido («Abrir el contenido»), corrígelo y vuelve a publicarlo.";
+            case EDIT_ISSUE -> "Abre el número («Abrir el número») y corrígelo antes de enviarlo.";
             case OPEN_MEDIA -> "Abre el medio en la biblioteca.";
             case SUGGEST_ALT -> "Escribe abajo el texto alternativo, o pide uno a la IA y revísalo; después «Aplicar el texto alternativo».";
             case DELETE_MEDIA -> "Si de verdad no hace falta, un administrador de contenido puede borrarlo («Borrar el medio»). Nunca se borra solo.";
@@ -159,6 +161,12 @@ public class FindingPage implements Identifiable, VisibilitySupplier {
     @Action
     public Object abrirElContenido(HttpRequest httpRequest) {
         return UICommand.navigateTo(VisualEditorPage.formRoute(subjectId));
+    }
+
+    @Toolbar
+    @Action
+    public Object abrirElNumero(HttpRequest httpRequest) {
+        return UICommand.navigateTo("/editorial/numeros/" + subjectId);
     }
 
     @Toolbar
@@ -220,6 +228,7 @@ public class FindingPage implements Identifiable, VisibilitySupplier {
         return switch (fieldName) {
             case "abrirElContenido" -> !"ITEM".equals(subject);
             case "abrirElMedio" -> !isMedia;
+            case "abrirElNumero" -> !"ISSUE".equals(subject);
             case "textoAlternativo", "aplicarElTextoAlternativo" -> !"SUGGEST_ALT".equals(fix) || !canEdit;
             case "sugerirTextoAlternativoConIA" -> !"SUGGEST_ALT".equals(fix) || !canEdit || !health.altTextAvailable();
             case "vistaPrevia" -> !isMedia;

@@ -72,10 +72,12 @@ public class HealthListing implements Listing<HealthListing.Row>, Navigable<Find
         Set<Comprobacion> comprobacion;
         @Label("Estado")
         Set<Estado> estado;
+        @Label("Sitio")
+        String sitio;
     }
 
     public record Row(@Hidden String id, @Label("Problema") @PrimaryColumn(caption = "subject") String problem,
-                      @Hidden @Label("Dónde") String subject, @Label("Comprobación") Status check,
+                      @Hidden @Label("Dónde") String subject, @Label("Sitio") String site, @Label("Comprobación") Status check,
                       @Label("Desde") String since, @Label("Estado") Status state) {
     }
 
@@ -92,15 +94,22 @@ public class HealthListing implements Listing<HealthListing.Row>, Navigable<Find
         var states = filters == null || filters.estado == null || filters.estado.isEmpty() ? Set.of(Estado.PENDIENTE)
                 : filters.estado;
         var text = request == null || request.searchText() == null ? "" : request.searchText().trim().toLowerCase(Locale.ROOT);
+        var names = health.siteNames();
+        var site = filters == null || filters.sitio == null || filters.sitio.isBlank() ? null
+                : filters.sitio.trim().toLowerCase(Locale.ROOT);
         var rows = health.views().stream()
+                .filter(v -> site == null || siteLabel(names, v.finding().siteId()).toLowerCase(Locale.ROOT).contains(site)
+                        || (v.finding().siteId() != null && v.finding().siteId().toLowerCase(Locale.ROOT).contains(site)))
                 .filter(v -> checks == null || checks.contains(v.finding().check()))
                 .filter(v -> states.contains(v.reviewed() ? Estado.REVISADO : Estado.PENDIENTE))
                 .filter(v -> text.isEmpty() || (v.finding().problem() + " " + v.finding().subjectTitle()).toLowerCase(Locale.ROOT).contains(text))
-                .sorted(Comparator.comparing((ContentHealth.View v) -> v.finding().check().ordinal())
+                .sorted(Comparator.comparing((ContentHealth.View v) -> siteLabel(names, v.finding().siteId()))
+                        .thenComparing(v -> v.finding().check().ordinal())
                         .thenComparing(v -> v.finding().subjectTitle(), Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(v -> {
                     var f = v.finding();
                     return new Row(f.key(), f.problem(), f.subject().label() + ": " + f.subjectTitle(),
+                            siteLabel(names, f.siteId()),
                             new Status(color(f.check()), f.check().label()), Ui.day(v.stored().firstSeen()),
                             v.reviewed() ? new Status(StatusType.NONE, "Revisado hasta el " + Ui.day(v.snooze().until()))
                                     : new Status(StatusType.WARNING, "Pendiente"));
@@ -108,6 +117,11 @@ public class HealthListing implements Listing<HealthListing.Row>, Navigable<Find
         var empty = health.summary().lastRun().isEmpty() ? "Aún no se ha comprobado nada: pulsa «Comprobar ahora»"
                 : "Nada que revisar con estos filtros";
         return new ListingData<>(new Page<>(text, Math.max(20, rows.size()), 0, rows.size(), rows), empty);
+    }
+
+    /** A finding's site, by name; the media library is every site's. */
+    static String siteLabel(java.util.Map<String, String> names, String siteId) {
+        return siteId == null ? "(todos: biblioteca y slots)" : names.getOrDefault(siteId, siteId);
     }
 
     static StatusType color(HealthCheck check) {

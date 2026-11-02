@@ -65,7 +65,9 @@ public class ContentHealth {
     public record Sources(ItemRepository items, MediaRepository media, MediaDescriptions descriptions,
                           SlotRepository slots, HomePages homes, NavigationRepository navigation,
                           MenuRepository menus, UiSources uiSources, EmployeeDirectory directory,
-                          SurveyRepository surveys, NewsletterRepository newsletters, UsageRepository usage) {
+                          SurveyRepository surveys, NewsletterRepository newsletters,
+                          io.mateu.ecdemo1.contenthub.application.out.NewsletterIssueRepository issues,
+                          io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites, UsageRepository usage) {
     }
 
     /** A finding as the screen shows it: with its «revisado» mark while it lasts. */
@@ -187,12 +189,25 @@ public class ContentHealth {
                         LocalDate.ofInstant(start, HealthChecks.ZONE), 1_000_000).stream()
                 .filter(r -> r.value() > 0).map(UsageRepository.Ranked::key).collect(Collectors.toSet()))
                 .orElse(Set.of());
+        // every site: the intranet always (it may have no row yet), and each one stored
+        var sites = new java.util.LinkedHashMap<String, String>();
+        sites.put(io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET, "Intranet");
+        s.sites().findAll().forEach(site -> sites.put(site.id(), site.name()));
+        var homes = new java.util.LinkedHashMap<String, List<String>>();
+        var sections = new java.util.LinkedHashMap<String, Set<String>>();
+        for (var site : sites.keySet()) {
+            homes.put(site, s.homes().pageIds(site));
+            sections.put(site, s.navigation().get(site).sections().stream().map(Section::id).collect(Collectors.toSet()));
+        }
+        var layouts = new java.util.LinkedHashMap<String, List<io.mateu.ecdemo1.contenthub.domain.item.Block>>();
+        s.newsletters().findAll().forEach(n -> layouts.put(n.id(), n.settings() == null || n.settings().layout() == null
+                ? List.of() : n.settings().layout()));
+        var uiSources = new java.util.LinkedHashMap<String, Boolean>();
+        s.uiSources().all().forEach(u -> uiSources.put(u.id(), u.active()));
         return new ContentSnapshot(now, s.items().findAll(), media, s.descriptions().all(), s.slots().findAll(),
-                s.homes().pageIds(), s.navigation().get().sections().stream().map(Section::id).collect(Collectors.toSet()),
-                menus, s.uiSources().all().stream().map(UiSources.UiSource::id).collect(Collectors.toSet()),
+                sites, homes, sections, menus, s.issues().findAll(), layouts, uiSources,
                 s.directory().all().stream().map(Employee::userId).collect(Collectors.toSet()),
                 s.surveys().findAll().stream().map(x -> x.id()).collect(Collectors.toSet()),
-                s.newsletters().findAll().stream().map(e -> e.intro()).filter(Objects::nonNull).toList(),
                 internalHosts, viewed, analyticsSince);
     }
 
@@ -218,6 +233,14 @@ public class ContentHealth {
             var snooze = snoozes.get(f.finding().key());
             return new View(f, snooze != null && snooze.until().isAfter(now) ? snooze : null);
         }).toList();
+    }
+
+    /** Each site's name, by id: the intranet's and each newsletter's. */
+    public Map<String, String> siteNames() {
+        var out = new LinkedHashMap<String, String>();
+        out.put(io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET, "Intranet");
+        sources.sites().findAll().forEach(s -> out.put(s.id(), s.name()));
+        return out;
     }
 
     public Optional<View> view(String key) {

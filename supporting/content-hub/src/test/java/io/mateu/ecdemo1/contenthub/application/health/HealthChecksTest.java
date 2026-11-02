@@ -8,7 +8,14 @@ import io.mateu.ecdemo1.contenthub.domain.health.HealthCheck;
 import io.mateu.ecdemo1.contenthub.domain.health.LinkStatus;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
 import io.mateu.ecdemo1.contenthub.domain.item.BlockType;
+import io.mateu.ecdemo1.contenthub.domain.item.Item;
+import io.mateu.ecdemo1.contenthub.domain.item.ItemContent;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
+import io.mateu.ecdemo1.contenthub.domain.item.Translation;
+import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue;
+import io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi;
+import io.mateu.ecdemo1.contenthub.application.menu.NewsletterTargets;
+import java.time.LocalDate;
 import io.mateu.ecdemo1.contenthub.domain.media.MediaAsset;
 import io.mateu.ecdemo1.contenthub.domain.menu.MenuTarget;
 import io.mateu.ecdemo1.contenthub.domain.menu.SiteMenu;
@@ -162,7 +169,8 @@ class HealthChecksTest {
                     .satisfies(f -> assertThat(f.problem()).contains("«sin-inicio» no existe"));
             assertThat(findings).filteredOn(f -> f.subject() == Subject.MENU).extracting(Finding::subjectId)
                     .containsExactlyInAnyOrder("intranet/e1", "intranet/e2", "intranet/e4");
-            assertThat(findings).anyMatch(f -> f.problem().contains("«vieja» no está (o ya no está) en el registro"));
+            assertThat(findings).anyMatch(f -> f.problem().contains("la UI externa «vieja» no está (o ya no está) en el registro"));
+            assertThat(findings).allMatch(f -> f.subject() == Subject.SLOT ? f.siteId() == null : "intranet".equals(f.siteId()));
         }
 
         @Test
@@ -171,6 +179,98 @@ class HealthChecksTest {
                     List.of(), NOW.minus(Duration.ofDays(1))), NOW.minus(Duration.ofDays(30)));
             var s = snapshot().item(draft("d", "D", "<a href=\"/intranet/noticias/x\">x</a>")).item(expired).build();
             assertThat(of(HealthCheck.BROKEN_LINKS, s)).isEmpty();
+        }
+    }
+
+    @Nested
+    class Sites {
+
+        static Item inNewsletter(String id, ItemType type, ItemContent content) {
+            var item = Item.create(id, "boletin", type, "eva", "es", content, NOW.minus(Duration.ofDays(2)));
+            item.publish("pablo", true, false, NOW.minus(Duration.ofDays(2)));
+            return item;
+        }
+
+        static NewsletterIssue issue(String id, int number, NewsletterIssue.Status status, List<Block> blocks) {
+            return NewsletterIssue.imported(id, "boletin", number, LocalDate.of(2026, 11, number), null, "Nº " + number,
+                    blocks, Map.of(), status, null, null, List.of(), NOW);
+        }
+
+        @Test
+        void every_site_is_checked_against_its_own_sections_and_routes_and_its_findings_say_which_site() {
+            var s = snapshot()
+                    .item(inNewsletter("nlp", ItemType.ARTICLE, titled("Del boletín", "nl1", "<a href=\"/intranet/n/boletin/p/nadie\">x</a>"
+                            + "<a href=\"/intranet/n/boletin/secciones/nl1\">ok</a><a href=\"/intranet/n/boletin/secciones/s1\">no</a>"
+                            + "<a href=\"/intranet/n/boletin/archivo\">ok</a><a href=\"/intranet/n/otro\">no</a>"
+                            + "<a href=\"/intranet/n/boletin/numeros/n1\">sin enviar</a><a href=\"/intranet/n/boletin/numeros/n2\">ok</a>",
+                            List.of(), null)))
+                    .item(published("intra", ItemType.ARTICLE, content("nl1", "", List.of(), null), NOW.minus(Duration.ofDays(2))));
+            s.issues.add(issue("n1", 1, NewsletterIssue.Status.DRAFT, List.of()));
+            s.issues.add(issue("n2", 2, NewsletterIssue.Status.SENT, List.of()));
+
+            var findings = of(HealthCheck.BROKEN_LINKS, s.build());
+
+            assertThat(findings).filteredOn(f -> f.subjectId().equals("nlp")).allMatch(f -> "boletin".equals(f.siteId()))
+                    .extracting(Finding::problem)
+                    .hasSize(4)
+                    .anyMatch(p -> p.contains("el contenido «nadie» no existe"))
+                    .anyMatch(p -> p.contains("la sección «s1» no existe en «Boletín»"))
+                    .anyMatch(p -> p.contains("el sitio «otro» no existe"))
+                    .anyMatch(p -> p.contains("el número 1 aún no se ha enviado"));
+            assertThat(findings).filteredOn(f -> f.subjectId().equals("intra")).singleElement().satisfies(f -> {
+                assertThat(f.siteId()).isEqualTo("intranet");
+                assertThat(f.problem()).contains("la sección «nl1» no existe en «Intranet»");
+            });
+        }
+
+        @Test
+        void newsletter_issues_still_to_be_sent_have_their_blocks_checked_and_sent_ones_do_not() {
+            var broken = List.of(new Block("b", BlockType.QUICK_LINKS, Audience.EVERYONE, "Enlaces", "<img src=\"https://cdn.example/x.png\">",
+                    null, null, 3, List.of(new Block.Link("Viejo", "/intranet/noticias/nadie")), null));
+            var s = snapshot();
+            s.issues.add(issue("n1", 1, NewsletterIssue.Status.DRAFT, broken));
+            s.issues.add(issue("n2", 2, NewsletterIssue.Status.SENT, broken));
+            var menu = SiteMenu.empty("boletin");
+            menu.add("e1", null, Map.of("es", "Último"), new MenuTarget(NewsletterTargets.ISSUE, "n1"), null, true);
+            menu.add("e2", null, Map.of("es", "Archivo"), new MenuTarget(NewsletterTargets.ARCHIVE, "boletin"), null, true);
+            s.menus.add(menu);
+
+            var built = s.build();
+            assertThat(of(HealthCheck.BROKEN_LINKS, built)).filteredOn(f -> f.subject() == Subject.ISSUE).singleElement()
+                    .satisfies(f -> {
+                        assertThat(f.subjectId()).isEqualTo("n1");
+                        assertThat(f.fix()).isEqualTo(Fix.EDIT_ISSUE);
+                        assertThat(f.siteId()).isEqualTo("boletin");
+                        assertThat(f.subjectTitle()).isEqualTo("Número 1 de «Boletín»: Nº 1");
+                    });
+            assertThat(of(HealthCheck.BROKEN_LINKS, built)).filteredOn(f -> f.subject() == Subject.MENU).singleElement()
+                    .satisfies(f -> assertThat(f.problem()).contains("el número 1 aún no se ha enviado"));
+            assertThat(of(HealthCheck.MISSING_ALT, built)).singleElement().satisfies(f -> assertThat(f.subjectId()).isEqualTo("n1"));
+        }
+
+        @Test
+        void remote_blocks_pages_and_menu_entries_need_an_active_source_of_the_registry() {
+            var s = snapshot()
+                    .item(published("p", ItemType.PAGE, content("s1", "", List.of(
+                            new Block("ok", BlockType.REMOTE, Audience.EVERYONE, "CRS", null, null, null, null, List.of(), null,
+                                    RemoteUi.of("crs", "/bookings")),
+                            new Block("off", BlockType.REMOTE, Audience.EVERYONE, "Fidelidad", null, null, null, null, List.of(), null,
+                                    RemoteUi.of("loyalty", ""))), null), NOW.minus(Duration.ofDays(1))))
+                    .item(published("rp", ItemType.REMOTE_PAGE, new ItemContent("s1", Audience.EVERYONE,
+                            Map.of("es", new Translation("Pantalla", "", "")), List.of(), null, null, false, false, null,
+                            RemoteUi.of("borrada", "/x").uri()), NOW.minus(Duration.ofDays(1))));
+            s.uiSources.put("loyalty", false);
+            var menu = SiteMenu.empty(SiteMenu.INTRANET);
+            menu.add("e", null, Map.of("es", "Fidelidad"), MenuTarget.remote("loyalty", ""), null, true);
+            s.menus.add(menu);
+
+            var findings = of(HealthCheck.BROKEN_LINKS, s.build());
+
+            assertThat(findings).extracting(Finding::subjectId).containsExactlyInAnyOrder("p", "rp", "intranet/e");
+            assertThat(findings).filteredOn(f -> !f.subjectId().equals("rp"))
+                    .allMatch(f -> f.problem().contains("la UI externa «loyalty» está desactivada"));
+            assertThat(findings).filteredOn(f -> f.subjectId().equals("rp")).singleElement()
+                    .satisfies(f -> assertThat(f.problem()).contains("«borrada» no está (o ya no está) en el registro"));
         }
     }
 
