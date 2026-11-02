@@ -84,7 +84,9 @@ public class ItemCommands {
     public String createInSite(Reader reader, String siteId, ItemType type, String defaultLanguage, ItemContent content) {
         reader.require(EditorialPermission.EDIT);
         var id = UUID.randomUUID().toString().substring(0, 8);
-        items.save(Item.create(id, siteId, type, reader.userId(), defaultLanguage, sanitized(content), clock.instant()));
+        var item = Item.create(id, siteId, type, reader.userId(), defaultLanguage, sanitized(content), clock.instant());
+        items.save(item);
+        record(item, HistoryAction.CREATED, reader.userId(), null, item.draft());
         return id;
     }
 
@@ -92,7 +94,9 @@ public class ItemCommands {
     @Transactional
     public void createWithIdInSite(String id, String siteId, String author, ItemType type, String defaultLanguage,
                                    ItemContent content) {
-        items.save(Item.create(id, siteId, type, author, defaultLanguage, sanitized(content), clock.instant()));
+        var item = Item.create(id, siteId, type, author, defaultLanguage, sanitized(content), clock.instant());
+        items.save(item);
+        record(item, HistoryAction.CREATED, author, null, item.draft());
     }
 
     /** As {@link #create}, with the id given — the seed's items keep theirs across resets. */

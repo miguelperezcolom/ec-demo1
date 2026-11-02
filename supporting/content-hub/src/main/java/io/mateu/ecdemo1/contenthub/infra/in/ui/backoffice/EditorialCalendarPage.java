@@ -3,6 +3,8 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 import io.mateu.core.infra.declarative.orchestrators.calendar.CalendarPage;
 import io.mateu.ecdemo1.contenthub.application.calendar.CalendarEntry;
 import io.mateu.ecdemo1.contenthub.application.calendar.EditorialCalendar;
+import io.mateu.ecdemo1.contenthub.application.calendar.NewsletterIssuesCalendarSource;
+import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemStatus;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
@@ -130,6 +132,7 @@ public class EditorialCalendarPage extends CalendarPage {
         var types = new ArrayList<Option>();
         types.add(new Option(null, "Todos los tipos"));
         Arrays.stream(ItemType.values()).forEach(t -> types.add(new Option(t.name(), t.label())));
+        types.add(new Option(NewsletterIssuesCalendarSource.TYPE, "Números de newsletter"));
         var sections = new ArrayList<Option>();
         sections.add(new Option(null, "Todas las secciones"));
         var catalog = Catalog.get();
@@ -139,6 +142,8 @@ public class EditorialCalendarPage extends CalendarPage {
         var statuses = new ArrayList<Option>();
         statuses.add(new Option(null, "Todos los estados (sin retirados)"));
         Arrays.stream(ItemStatus.values()).forEach(s -> statuses.add(new Option(s.name(), s.label())));
+        statuses.add(new Option(NewsletterIssue.Status.SCHEDULED.name(), "Número programado"));
+        statuses.add(new Option(NewsletterIssue.Status.SENT.name(), "Número enviado"));
         return VerticalLayout.builder()
                 .content(List.of(row("_type", _type, types), row("_section", _section, sections),
                         row("_status", _status, statuses)))

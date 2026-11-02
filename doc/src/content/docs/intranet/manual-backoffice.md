@@ -203,7 +203,8 @@ contenido), abre `/editorial/historial/{id}`:
   ya pasada se quita (se publicará al publicarla); si su caducidad o su fecha límite de confirmación ya pasaron,
   avisa para que las cambies antes de publicar.
 
-Ver el historial y comparar es para cualquier permiso editorial.
+Ver el historial y comparar es para cualquier permiso editorial. Vale para los contenidos de cualquier sitio
+(la intranet o una newsletter).
 
 ### Calendario editorial
 
@@ -215,6 +216,8 @@ Ver el historial y comparar es para cualquier permiso editorial.
 | **Caduca · título** | rojo | Su *Caduca el* |
 | **Confirmar · título** | ámbar | Su *Confirmar antes del*, si exige confirmación |
 | **Revisión · título** | azul | El día en que se envió a revisión, mientras espera a un publicador |
+| **Envío · newsletter nº N** | morado | Cuándo sale un número programado (abre el número) |
+| **Enviado · newsletter nº N** | gris | Cuándo salió un número enviado |
 
 De un contenido publicado salen las fechas de lo que se ve (su última versión). De un borrador nunca publicado,
 las que planea, marcadas *(previsto)*; de uno publicado con cambios sin publicar, solo las fechas que cambia,

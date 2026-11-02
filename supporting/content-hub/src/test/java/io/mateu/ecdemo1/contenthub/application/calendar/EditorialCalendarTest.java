@@ -142,6 +142,34 @@ class EditorialCalendarTest {
     }
 
     @Test
+    void newsletter_issues_scheduled_and_sent_open_the_issue() {
+        var issues = mock(io.mateu.ecdemo1.contenthub.application.out.NewsletterIssueRepository.class);
+        var scheduled = io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue.imported("i45", "boletin", 45,
+                LocalDate.of(2026, 11, 9), null, "Semana 45", List.of(), Map.of(),
+                io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue.Status.SCHEDULED, at("2026-11-09T08:00:00Z"), null,
+                List.of(), T0);
+        var sent = io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue.imported("i44", "boletin", 44,
+                LocalDate.of(2026, 11, 2), null, "Semana 44", List.of(), Map.of(),
+                io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue.Status.SENT, null, at("2026-11-02T08:00:00Z"),
+                List.of(), T0);
+        var draft = io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue.imported("i46", "boletin", 46,
+                LocalDate.of(2026, 11, 16), null, "Semana 46", List.of(), Map.of(),
+                io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue.Status.DRAFT, null, null, List.of(), T0);
+        when(issues.findAll()).thenReturn(List.of(scheduled, sent, draft));
+        var sites = mock(io.mateu.ecdemo1.contenthub.application.out.SiteRepository.class);
+        when(sites.find(org.mockito.ArgumentMatchers.any())).thenReturn(java.util.Optional.empty());
+        sources.add(new NewsletterIssuesCalendarSource(issues, sites));
+
+        var entries = calendar.entries(EDITOR, NOV1, NOV30, EditorialCalendar.Filter.NONE);
+        assertThat(entries).extracting(CalendarEntry::title, CalendarEntry::date, CalendarEntry::target).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("Enviado · boletin nº 44 · Semana 44", LocalDate.of(2026, 11, 2), "/editorial/numeros/i44"),
+                org.assertj.core.groups.Tuple.tuple("Envío · boletin nº 45 · Semana 45", LocalDate.of(2026, 11, 9), "/editorial/numeros/i45"));
+        assertThat(calendar.entries(EDITOR, NOV1, NOV30, new EditorialCalendar.Filter(NewsletterIssuesCalendarSource.TYPE, null, "SCHEDULED")))
+                .extracting(CalendarEntry::id).containsExactly("NEWSLETTER_SEND:i45");
+        assertThat(calendar.entries(EDITOR, NOV1, NOV30, new EditorialCalendar.Filter("NOTICE", null, null))).isEmpty();
+    }
+
+    @Test
     void only_for_editorial_permissions() {
         var nobody = new Reader("lola", "Lola", EmployeeAttributes.NONE, EnumSet.noneOf(EditorialPermission.class), null);
         assertThatThrownBy(() -> calendar.entries(nobody, NOV1, NOV30, null)).isInstanceOf(SecurityException.class);

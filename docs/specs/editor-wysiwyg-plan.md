@@ -510,9 +510,9 @@ editorial. Rama `feat/history-calendar`.
 | V3 | **Restaurar esta versión** (`content:edit`): al borrador, nunca publica; queda en el historial | hecho: `ItemHistory.restore`; una fecha de publicación pasada se quita, caducidad o límite pasados se avisan |
 | V4 | Pantalla `HistoryPage` (`/editorial/historial/{id}`), botón *Historial* en el formulario, *Editorial → Historial de versiones* | hecho |
 | V5 | **Calendario editorial** (`/editorial/calendario`) con el arquetipo `CalendarPage` de Mateu: mes, semana y lista; publica, caduca, confirmar antes de, en revisión; filtros por tipo, sección y estado; pulsar abre el contenido | hecho: `EditorialCalendar`, `ItemsCalendarSource`, `EditorialCalendarPage` |
-| V6 | **Punto de extensión** `CalendarSource` para que las ediciones programadas de las newsletters (y otros) añadan entradas | hecho el interfaz; la fuente de ediciones, cuando las ediciones con envío programado estén en master |
+| V6 | **Punto de extensión** `CalendarSource` para que las ediciones programadas de las newsletters (y otros) añadan entradas | hecho: `NewsletterIssuesCalendarSource` (números programados y enviados, abren `/editorial/numeros/{id}`) |
 | V7 | Tests (diff por palabras y de HTML, diferencias, restaurar, agregación del calendario, store) y documentación (manual del backoffice, arquitectura) | hecho |
-| V8 | Desplegar en local y probarlo en Vaadin y Redwood | pendiente (sin desplegar por ahora) |
+| V8 | Probar en local en Vaadin | primera prueba del coordinador: el calendario fallaba (lector sin permisos: Mateu evaluaba el campo sin petición) y los selects del historial eran de solo lectura (ficha de un listado). Corregido: lector desde la petición en curso; selects como `FormField` en `detailContent`. Falta volver a probarlo, y Redwood |
 
 ## Cómo retomar
 

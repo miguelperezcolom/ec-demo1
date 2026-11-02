@@ -227,7 +227,10 @@ stateDiagram-v2
   pendiente, porque el borrador es otro— y anota *Restaurado* con su copia. Una fecha de publicación ya pasada se
   quita (se publica al publicar); caducidad o fecha límite pasadas se avisan.
 - Pantalla: `HistoryPage` (`/editorial/historial/{id}`, desde el botón *Historial* del formulario o desde
-  `HistoryListing`). Un solo `Element` por pantalla (`Html`), así que historial y diferencias se pintan juntos.
+  `HistoryListing`). La abre un listado, así que Mateu la pinta como ficha de solo lectura: los selects son
+  `FormField` fluidos en su `detailContent` (como `ApprovalPage`), ligados a campos ocultos que leen las acciones
+  *Comparar* y *Restaurar esta versión*. Un solo `Element` por pantalla (`Html`): diferencias e historial juntos.
+  El historial va por id de item, así que vale para los items de cualquier sitio.
 
 ### Calendario editorial
 
@@ -239,12 +242,15 @@ título, color, la ruta del backoffice que lo abre y las tres facetas que miran 
 - `ItemsCalendarSource`: de lo publicado, las fechas de su última versión (publica, caduca, confirmar antes de);
   de un borrador nunca publicado, las previstas; de uno publicado con cambios, solo las fechas que cambia; y
   *En revisión* el día en que se envió (mientras espera, `updatedAt` es ese momento).
-- **Punto de extensión**: otra fuente es un `@Component` que implementa `CalendarSource` —p. ej. los envíos
-  programados de las ediciones de una newsletter, con `type` = `NEWSLETTER` y sin sección—; nada más cambia.
+- `NewsletterIssuesCalendarSource`: los números de las newsletters — uno programado en su `scheduledAt`, uno
+  enviado en su `sentAt` (borradores y cancelados no tienen fecha), con `type` = `NEWSLETTER`, el estado del
+  número y sin sección; abre `/editorial/numeros/{id}`.
+- **Punto de extensión**: otra fuente es un `@Component` que implementa `CalendarSource`; nada más cambia.
 - Pantalla: `EditorialCalendarPage` extiende el arquetipo **`CalendarPage`** de Mateu (vistas mes, semana y
   lista; pulsar una entrada navega a su `target`). Los filtros son filas de botones encima del calendario (el
   arquetipo pinta sus campos primero: como campos de formulario quedarían debajo), con el estado en campos
-  ocultos.
+  ocultos. Mateu puede evaluar el campo del calendario antes de darle la petición a la página: entonces el lector
+  sale de la petición que se está sirviendo (`RequestContextHolder`), para no perder sus permisos.
 
 ### Permisos editoriales
 
