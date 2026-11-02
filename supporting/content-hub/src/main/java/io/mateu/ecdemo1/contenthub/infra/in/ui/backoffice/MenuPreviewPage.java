@@ -139,6 +139,7 @@ public class MenuPreviewPage implements OptionsSupplier {
     @Toolbar
     @Action(confirmationRequired = true, confirmationTitle = "¿Volver al menú inicial?",
             confirmationMessage = "Se pierden las entradas y el orden configurados para este sitio. En la intranet, vuelve el menú de siempre.")
+    @Label("Volver al menú inicial")
     public Object volverAlMenuInicial(HttpRequest httpRequest) {
         menus.reset(readers.of(httpRequest), siteId());
         return Message.success("El menú de «" + siteId() + "» vuelve a ser el inicial");

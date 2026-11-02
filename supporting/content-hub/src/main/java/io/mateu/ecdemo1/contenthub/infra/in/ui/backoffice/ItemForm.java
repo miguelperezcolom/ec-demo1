@@ -354,6 +354,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
      */
     @io.mateu.uidl.annotations.Button
     @Action
+    @Label("Traducir con IA")
     public Object traducirConIA(HttpRequest httpRequest) {
         readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
         var from = defaultLanguage == null ? "es" : defaultLanguage;
@@ -468,6 +469,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     /** A page, edited on the page itself: the visual editor (VisualEditorPage). Saving there replaces the draft's blocks. */
     @Toolbar
     @Action
+    @Label("Editar sobre la página")
     public Object editarSobreLaPagina(HttpRequest httpRequest) {
         return io.mateu.uidl.data.UICommand.navigateTo(VisualEditorPage.route(id));
     }
@@ -506,6 +508,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
 
     @Toolbar
     @Action
+    @Label("Enviar a revisión")
     public Object enviarARevision(HttpRequest httpRequest) {
         commands.submitForReview(readers.of(httpRequest), id);
         return Message.success("Enviado a revisión");

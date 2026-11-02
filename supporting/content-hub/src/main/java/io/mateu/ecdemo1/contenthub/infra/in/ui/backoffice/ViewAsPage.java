@@ -147,6 +147,7 @@ public class ViewAsPage implements OptionsSupplier {
 
     @Toolbar
     @Action
+    @Label("Ver la intranet así")
     public Object verLaIntranetAsi(HttpRequest httpRequest) {
         var attrs = chosen();
         if (attrs == null) {

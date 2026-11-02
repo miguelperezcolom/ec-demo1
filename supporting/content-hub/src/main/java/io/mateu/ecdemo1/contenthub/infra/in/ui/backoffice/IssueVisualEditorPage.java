@@ -58,6 +58,7 @@ public class IssueVisualEditorPage implements Identifiable {
     /** Subject, items, schedule and stats stay in the issue's form. */
     @Toolbar
     @Action
+    @Label("Volver al número")
     public Object volverAlNumero(HttpRequest httpRequest) {
         return UICommand.navigateTo(NewsletterIssuesCrud.route(id));
     }

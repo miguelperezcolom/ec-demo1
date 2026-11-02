@@ -281,6 +281,7 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
     /** What was published since the issue was opened, added to its sections. */
     @Toolbar
     @Action
+    @Label("Añadir lo nuevo")
     public Object anadirLoNuevo(HttpRequest httpRequest) {
         var added = editorial.addNew(readers.of(httpRequest), id);
         return List.of(load(id), added == 0 ? Message.warning("Nada nuevo desde que se abrió el número")
@@ -324,6 +325,7 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
     /** The blocks edited on the issue itself, as on a page. */
     @Toolbar
     @Action
+    @Label("Editar sobre el número")
     public Object editarSobreElNumero(HttpRequest httpRequest) {
         return UICommand.navigateTo(IssueVisualEditorPage.route(id));
     }

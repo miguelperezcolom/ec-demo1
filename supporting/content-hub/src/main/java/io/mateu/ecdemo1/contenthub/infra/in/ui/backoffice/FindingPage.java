@@ -172,6 +172,7 @@ public class FindingPage implements Identifiable, VisibilitySupplier {
 
     @Toolbar
     @Action
+    @Label("Abrir el número")
     public Object abrirElNumero(HttpRequest httpRequest) {
         return UICommand.navigateTo("/editorial/numeros/" + subjectId);
     }
@@ -185,6 +186,7 @@ public class FindingPage implements Identifiable, VisibilitySupplier {
     /** Asks the AI; the text lands in the field, for the editor to read. Nothing is saved. */
     @Button
     @Action
+    @Label("Sugerir texto alternativo con IA")
     public Object sugerirTextoAlternativoConIA(HttpRequest httpRequest) {
         try {
             textoAlternativo = health.suggestAlt(readers.of(httpRequest), subjectId, httpRequest.getHeaderValue("Authorization"));
