@@ -12,7 +12,7 @@ consultado el clúster ni ha ejecutado llamadas a Opera, Salesforce o los LLM.
 
 | Componente | Versión | Fuente |
 | :--------- | :------ | :----- |
-| Mateu | `3.0-beta.39` | `mateu.version` en los POM con interfaz |
+| Mateu | `3.0-beta.40` | `mateu.version` en los POM con interfaz |
 | Librerías de EventConductor | `2.37.0` | `eventconductor.version` en los módulos que las usan |
 | Orquestador | `2.37.0` | `orchestrator.imageTag` en `deploy/values/eventconductor.yaml` |
 | Formularios | `2.37.0` | `forms.imageTag` en el mismo fichero |
