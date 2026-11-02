@@ -42,6 +42,25 @@ class ContentDiffTest {
     }
 
     @Test
+    void a_blocks_text_is_compared_language_by_language() {
+        var t = Map.of("es", new Translation("T", "", ""));
+        var links = new Block("l1", BlockType.QUICK_LINKS, null, "Enlaces", null, null, null, null,
+                List.of(new Block.Link("Buscar", "/buscar")), null);
+        var before = content(t, List.of(html("b1", "Hola", "<p>hola</p>")
+                .withText("en", "es", new Block.BlockText("Hello", null, null)), links), Audience.EVERYONE, null, null);
+        var after = content(t, List.of(html("b1", "Hola", "<p>hola</p>")
+                        .withText("en", "es", new Block.BlockText("Hi", "<p>hi</p>", null))
+                        .withText("de", "es", new Block.BlockText("Hallo", null, null)),
+                links.withText("en", "es", new Block.BlockText(null, null, Map.of("/buscar", "Search")))),
+                Audience.EVERYONE, null, null);
+        assertThat(diff(before, after)).extracting(Change::field).containsExactly(
+                "Bloque «Hola» · título (de)", "Bloque «Hola» · título (en)", "Bloque «Hola» · contenido (en)",
+                "Bloque «Enlaces» · textos de los enlaces (en)");
+        assertThat(diff(before, after).getLast().after()).isEqualTo("Search → /buscar");
+        assertThat(diff(after, after)).isEmpty();
+    }
+
+    @Test
     void texts_per_field_and_language() {
         var a = content(Map.of("es", new Translation("Turnos", "", "<p>Lunes</p>")), List.of(), Audience.EVERYONE, null, null);
         var b = content(Map.of("es", new Translation("Turnos de verano", "", "<p>Martes</p>"),

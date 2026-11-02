@@ -227,6 +227,24 @@ public record Block(String id, BlockType type, Audience audience, String title, 
     }
 
     /**
+     * The same block in a holder whose default language is {@code to} instead of {@code from} (a page made from a
+     * template, a template made from a page): its own text becomes {@code to}'s — that language's where it has
+     * it, the old default's where not — and the old default's text a translation, so nothing is lost.
+     */
+    public Block rebased(String from, String to) {
+        if (from == null || to == null || from.equals(to)) {
+            return this;
+        }
+        var old = textIn(from, from);
+        var shown = in(to, from);
+        var texts = new LinkedHashMap<>(translations);
+        texts.remove(to);
+        texts.put(from, old);
+        return new Block(id, type, audience, shown.title(), shown.html(), itemId, sectionId, limit, shown.links(), mediaId,
+                remote, texts);
+    }
+
+    /**
      * A block as an editor working in {@code language} left it — {@code edited} carries everything, its text being
      * that language's — over what was stored ({@code stored}; null for a new block). The structure (type, links,
      * audience…) is the edited one; the text in the other languages, the stored one. A part the editor was shown
