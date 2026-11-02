@@ -89,6 +89,44 @@ un listado, su sección y cuántos), además de la audiencia.
 Cada bloque puede restringirse a unos **departamentos, hoteles o puestos**. Esa audiencia **solo
 estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple ambas, *Avisos* lo dice.
 
+### Editar una página sobre la propia página (editor visual)
+
+Una **página** también se edita viéndola como la verán sus lectores. Se abre desde:
+
+- el formulario de la página: botón **«Editar sobre la página»** (solo aparece en las páginas ya creadas);
+- o **Editorial → Editor visual**, que lista las páginas: clic en una.
+
+Lo que se ve es el **borrador** de la página, con sus bloques dibujados como en el portal.
+
+- **Seleccionar un bloque**: al pasar el ratón se marca; un clic lo selecciona. Encima aparecen su tipo
+  (y su restricción de audiencia, si tiene) y los botones ⠿ (arrastrar), ↑ ↓ (mover) y ✕ (eliminar,
+  pide confirmación).
+- **Texto en el sitio**: en los bloques **HTML** y **Banner** el título y el texto se escriben
+  directamente. La barra del bloque seleccionado tiene negrita, cursiva, enlace, listas, título (H2),
+  subtítulo (H3), párrafo, quitar formato e **🖼 Medio**, que abre la biblioteca de medios con
+  miniaturas y lo inserta donde está el cursor. Los medios se ven dibujados; se guardan como
+  `[[media:id]]`. Al **pegar** desde Word o una web solo se conservan párrafos, listas, títulos,
+  negrita/cursiva y enlaces.
+- **Panel lateral** del bloque seleccionado: su **tipo**, su **título** y los campos de ese tipo (los
+  mismos del formulario: el item de un destacado, la sección y cuántos de un listado, los enlaces de
+  unos enlaces rápidos, el medio de un bloque de medio…). Los bloques que no son de texto se vuelven a
+  dibujar al cambiarlos.
+- **Quién lo ve**: el panel dice a quién va la página («La página la ven: …, N empleados») y deja
+  marcar **departamentos, hoteles y puestos** para que el bloque, *además*, solo lo vean esos. Debajo,
+  cuántos empleados lo verán (la audiencia de la página **y** la del bloque); si nadie, lo avisa.
+- **Añadir**: el **«+»** entre dos bloques (o «Añadir el primer bloque») ofrece los tipos.
+- **Ver como…**: el desplegable de arriba dibuja la página como la vería un perfil del directorio (lo
+  no guardado incluido): los bloques que ese perfil no ve aparecen tachados como «No lo ve este perfil».
+  «Volver a editar» regresa.
+- **Guardar** guarda los bloques en el **borrador** (los textos, la audiencia y las fechas de la página
+  no se tocan). Mientras hay cambios sin guardar se ve «● Cambios sin guardar»; salir por el menú, por
+  otro botón o cerrando la pestaña pide confirmación. Si otra persona guardó la página mientras tanto,
+  no se pisa: avisa y hay que recargar.
+- **Revisión y publicación** siguen en el formulario: botón **«Volver al formulario»** → *Enviar a
+  revisión* o *Publicar*.
+
+Necesita un permiso editorial; guardar, `content:edit`.
+
 ### El workflow
 
 | Botón | Quién | Qué hace |

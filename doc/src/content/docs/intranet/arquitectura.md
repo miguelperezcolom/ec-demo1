@@ -59,6 +59,38 @@ flowchart LR
   CH --- DB[("cp-postgres<br/>content_hub + pgvector")]
 ```
 
+### El editor visual
+
+Editar una página sobre la propia página (Editorial → Editor visual, `/editorial/visual/{id}`, o
+«Editar sobre la página» en su formulario):
+
+- **Alojamiento**: `VisualEditorPage` es una pantalla de Mateu con un único `Element`
+  `<ec-visual-editor page-id="…" api="/_intranet/api/editor">`: la vía de escape de Mateu para un web
+  component, que dibujan igual los dos renderers (Vaadin y Redwood).
+- **Código**: `static/visual-editor.js`, JS sin framework, en su propio shadow root; toma los colores del
+  shell (claro u oscuro). No es público en el gateway: `embed.js` (que cargan los shells y que el
+  `Element` nombra como `import`) ve la etiqueta y lo pide a `GET /_intranet/api/editor/visual-editor.js`
+  con el token del usuario (el que la página de arranque guarda en `localStorage`), solo para editores.
+- **API** (`VisualEditorController`, bajo `/_intranet/**`, así que el gateway exige sesión y añade
+  `X-User-Scopes`; no se enruta en el host de la intranet):
+
+| Método y ruta | Qué hace | Permiso |
+| :--- | :--- | :--- |
+| `GET /_intranet/api/editor/pages/{id}` | Bloques del borrador, el HTML de cada uno, audiencia de la página y cuántos la ven, catálogos (tipos y sus campos, items, secciones, medios, departamentos/hoteles/puestos), perfiles para «ver como» | editorial |
+| `POST /_intranet/api/editor/pages/{id}/preview` | Dibuja bloques sin guardar, como el editor o como un perfil (`viewAs`): HTML, visible o no, y cuántos empleados lo ven | editorial |
+| `PUT /_intranet/api/editor/pages/{id}/blocks` | Guarda los bloques en el borrador (`ItemCommands.editBlocks`); `updatedAt` evita pisar cambios ajenos (409) | `content:edit` |
+| `GET /_intranet/api/editor/media/{id}` | Un medio dibujado, para insertarlo en un texto | editorial |
+| `GET /_intranet/api/editor/visual-editor.js` | El código del componente | editorial |
+
+- **Dibujo**: `PageRenderer.draftHtml` pinta un bloque del borrador con las mismas fuentes que el portal
+  (la función de visibilidad para listados y destacado) como HTML, con los medios firmados para el
+  editor (`MediaUrls.EDITOR`): un borrador puede llevar medios que ningún lector puede pedir aún.
+- **Guardar** pasa por `BlockForm.toBlock` (la conversión del formulario) y `ItemCommands.editBlocks`
+  (el mismo saneado). La audiencia de un bloque llega solo como departamentos/hoteles/puestos, con
+  valores del directorio, y `Block.isNarrowing` rechaza cualquier otra cosa (un OR, una audiencia con
+  nombre): un bloque **estrecha** la audiencia de su página, nunca la ensancha (además, la efectiva es
+  siempre página **y** bloque).
+
 ## La visibilidad
 
 ### El perfil y su hash
