@@ -28,7 +28,8 @@ public record ItemContent(String sectionId, Audience audience, Map<String, Trans
     public ItemContent {
         audience = audience == null ? Audience.EVERYONE : audience;
         translations = translations == null ? Map.of() : Map.copyOf(new TreeMap<>(translations));
-        blocks = blocks == null ? List.of() : List.copyOf(blocks);
+        // a block the store could not read (a type of a newer version) is left out, not a failure
+        blocks = blocks == null ? List.of() : blocks.stream().filter(java.util.Objects::nonNull).toList();
     }
 
     /** Without a say on notifications: as the type says, and not important. */

@@ -24,6 +24,8 @@ import java.util.Optional;
 public class Item extends AggregateRoot {
 
     private String id;
+    /** The site it belongs to (null: the intranet, as everything written before sites existed). */
+    private String siteId;
     private ItemType type;
     private String author;
     private String defaultLanguage;
@@ -52,6 +54,20 @@ public class Item extends AggregateRoot {
         item.versions = new ArrayList<>();
         item.updatedAt = now;
         return item;
+    }
+
+    /** As {@link #create}, in a site other than the intranet: a newsletter's page or article. */
+    public static Item create(String id, String siteId, ItemType type, String author, String defaultLanguage,
+                              ItemContent content, Instant now) {
+        var item = create(id, type, author, defaultLanguage, content, now);
+        var site = io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId);
+        item.siteId = io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET.equals(site) ? null : site;
+        return item;
+    }
+
+    /** The site it belongs to: the intranet unless it was written for another. */
+    public String siteId() {
+        return io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId);
     }
 
     public boolean hasVersions() {

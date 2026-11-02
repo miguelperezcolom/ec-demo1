@@ -29,7 +29,7 @@ public class ContentJobs {
     final ItemRepository items;
     final DomainEvents events;
     final NewsletterService newsletter;
-    final io.mateu.ecdemo1.contenthub.application.usecases.WeeklyNewsletter weekly;
+    final io.mateu.ecdemo1.contenthub.application.usecases.NewsletterEditorial newsletters;
     final ContentQuestions questions;
     final Projection projection;
     final TransactionTemplate transactions;
@@ -58,8 +58,20 @@ public class ContentJobs {
         });
     }
 
+    /**
+     * The newsletters: first the draft of every issue whose cadence slot has come (scheduled at once for a
+     * newsletter that sends without review), then the sending of what is due.
+     */
     @Scheduled(fixedDelayString = "${content-hub.jobs.newsletter:PT30S}", initialDelayString = "PT30S")
     public void newsletters() {
+        try {
+            var opened = newsletters.createDue(clock.instant());
+            if (!opened.isEmpty()) {
+                log.info("Newsletter: issues opened {}", opened);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Newsletter issues pass failed: {}", e.getMessage());
+        }
         try {
             var sent = newsletter.sendDue();
             if (sent > 0) {
@@ -69,28 +81,6 @@ public class ContentJobs {
             log.warn("Newsletter pass failed: {}", e.getMessage());
         }
     }
-
-    /**
-     * The weekly newsletter (Mondays at 9, Madrid time, by default): composed from the week's content.
-     * A draft for an editor to review unless {@code content-hub.newsletter.weekly.send} is true.
-     */
-    @Scheduled(cron = "${content-hub.newsletter.weekly.cron:0 0 9 * * MON}", zone = "Europe/Madrid")
-    public void weeklyNewsletter() {
-        if (!weeklyEnabled) {
-            return;
-        }
-        try {
-            weekly.compose(clock.instant(), weeklySend);
-        } catch (RuntimeException e) {
-            log.warn("Weekly newsletter failed: {}", e.getMessage());
-        }
-    }
-
-    @org.springframework.beans.factory.annotation.Value("${content-hub.newsletter.weekly.enabled:true}")
-    boolean weeklyEnabled;
-
-    @org.springframework.beans.factory.annotation.Value("${content-hub.newsletter.weekly.send:false}")
-    boolean weeklySend;
 
     @Scheduled(fixedDelayString = "${content-hub.jobs.embeddings:PT15S}", initialDelayString = "PT25S")
     public void embeddings() {

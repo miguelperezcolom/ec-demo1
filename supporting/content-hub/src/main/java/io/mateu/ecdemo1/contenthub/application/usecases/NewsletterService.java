@@ -3,9 +3,11 @@ package io.mateu.ecdemo1.contenthub.application.usecases;
 import io.mateu.ecdemo1.contenthub.application.out.ContentQuery;
 import io.mateu.ecdemo1.contenthub.application.out.EmployeeDirectory;
 import io.mateu.ecdemo1.contenthub.application.out.Mailer;
+import io.mateu.ecdemo1.contenthub.application.out.NavigationRepository;
+import io.mateu.ecdemo1.contenthub.application.out.NewsletterIssueRepository;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterLinks;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences;
-import io.mateu.ecdemo1.contenthub.application.out.NewsletterRepository;
+import io.mateu.ecdemo1.contenthub.application.out.SiteRepository;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
 import io.mateu.ecdemo1.contenthub.application.security.EditorialPermission;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
@@ -14,7 +16,11 @@ import io.mateu.ecdemo1.contenthub.application.visibility.Visibility;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.employee.Employee;
 import io.mateu.ecdemo1.contenthub.domain.employee.EmployeeAttributes;
-import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterEdition;
+import io.mateu.ecdemo1.contenthub.domain.item.Block;
+import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
+import io.mateu.ecdemo1.contenthub.domain.navigation.Section;
+import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue;
+import io.mateu.ecdemo1.contenthub.domain.site.Site;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,182 +28,331 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Composes and sends newsletter editions. Recipients are grouped by profile hash and language; which of
- * the edition's items each group sees is asked of the visibility function once per group; one email
- * goes per group, and a group that sees none of the items gets nothing.
+ * Sends the issues, and draws them for whoever reads them. Recipients are the enabled employees with an
+ * email whom the newsletter site's audience admits and who did not unsubscribe from THAT newsletter; they
+ * are grouped by profile hash, language and what they want of it; which blocks and items each group sees
+ * is asked of the visibility function once per group, and one email goes per group — a group that sees
+ * nothing gets nothing. The web version draws the same issue for one reader.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class NewsletterService {
 
-    final NewsletterRepository editions;
+    final NewsletterIssueRepository issues;
+    final SiteRepository sites;
+    final NavigationRepository navigation;
     final EmployeeDirectory directory;
     final Visibility visibility;
     final NamedAudiences namedAudiences;
     final Mailer mailer;
     final Clock clock;
     final NewsletterPreferences preferences;
+    final io.mateu.ecdemo1.contenthub.application.out.ItemRepository items;
 
     @Value("${content-hub.portal-url:http://localhost:8800/intranet}")
-    String portalUrl;
+    String portalUrl = "http://localhost:8800/intranet";
 
     /** The tracked links (open pixel, item clicks); none outside Spring (tests) or when not wired. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     NewsletterLinks links = NewsletterLinks.NONE;
 
+    /** What a REMOTE block becomes in an e-mail (the remote UIs' fallback); the renderer's own link without it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    io.mateu.ecdemo1.contenthub.application.out.RemoteBlockFallback remoteFallback;
+
     /**
-     * A group of recipients: everyone with the same profile who reads the same language and wants the
-     * same from the newsletter. {@code hash} names the group: the profile's hash, followed by the
-     * sections wanted when they are not all ({@code abc123~noticias,rrhh}).
+     * A group of recipients: everyone with the same profile who reads it in the same language and wants the
+     * same from it. {@code hash} names the group: the profile's hash, followed by the sections wanted when
+     * they are not all ({@code abc123~editorial,noticias}).
      */
     public record Group(String hash, String language, EmployeeAttributes profile, List<Employee> recipients,
                         NewsletterPreferences.Preference preference) {
-
-        public Group(String hash, String language, EmployeeAttributes profile, List<Employee> recipients) {
-            this(hash, language, profile, recipients, NewsletterPreferences.Preference.DEFAULT);
-        }
     }
 
-    @Transactional
-    public String compose(Reader reader, String title, String intro, List<String> itemIds, Audience audience) {
-        reader.require(EditorialPermission.EDIT);
-        var id = "n" + UUID.randomUUID().toString().substring(0, 8);
-        editions.save(NewsletterEdition.compose(id, title, intro, itemIds, audience));
-        return id;
+    Site site(NewsletterIssue issue) {
+        return sites.find(issue.newsletterId())
+                .orElseThrow(() -> new IllegalStateException("No existe la newsletter " + issue.newsletterId()));
     }
 
-    @Transactional
-    public void edit(Reader reader, String id, String title, String intro, List<String> itemIds, Audience audience) {
-        reader.require(EditorialPermission.EDIT);
-        var e = editions.find(id).orElseThrow();
-        e.edit(title, intro, itemIds, audience);
-        editions.save(e);
-    }
-
-    /** Sending is publishing: it needs the same permission. */
-    @Transactional
-    public void schedule(Reader reader, String id, Instant at) {
-        reader.require(EditorialPermission.PUBLISH);
-        var e = editions.find(id).orElseThrow();
-        e.schedule(at == null ? clock.instant() : at);
-        editions.save(e);
-    }
-
-    /** The edition's recipients, grouped: enabled employees with an email whom the edition's audience admits. */
-    public List<Group> groups(NewsletterEdition edition) {
+    /** The issue's recipients, grouped. */
+    public List<Group> groups(NewsletterIssue issue) {
+        var site = site(issue);
         var policy = namedAudiences.policy();
         var byKey = new LinkedHashMap<String, Group>();
         for (var e : directory.all()) {
-            if (!e.enabled() || e.email() == null || e.email().isBlank()
-                    || !policy.admits(edition.audience(), e.attributes())) {
+            if (!e.enabled() || e.email() == null || e.email().isBlank() || !policy.admits(site.audience(), e.attributes())) {
                 continue;
             }
-            var preference = preferences.of(e.userId());
+            var preference = preferences.of(e.userId(), site.id());
             if (!preference.subscribed()) {
-                continue; // unsubscribed: nothing, whatever the edition
+                continue; // unsubscribed from this newsletter: nothing of it
             }
+            var language = site.languageFor(e.attributes().language());
             var hash = preference.key().isEmpty() ? e.hash() : e.hash() + "~" + preference.key();
-            var key = NewsletterEdition.groupKey(hash, e.attributes().language());
-            byKey.computeIfAbsent(key, k -> new Group(hash, e.attributes().language(), e.attributes(),
+            var key = NewsletterIssue.groupKey(hash, language);
+            byKey.computeIfAbsent(key, k -> new Group(hash, language, e.attributes().withLanguage(language),
                     new ArrayList<>(), preference)).recipients().add(e);
         }
         return List.copyOf(byKey.values());
     }
 
-    /** The items of the edition a group gets: those its profile sees, of the sections it wants. */
-    public List<VisibleItem> itemsFor(NewsletterEdition edition, Group group) {
-        return itemsFor(edition, group.profile()).stream().filter(i -> group.preference().wants(i.sectionId())).toList();
-    }
-
-    /** The items of the edition a profile sees, in the edition's order and in its language. */
-    public List<VisibleItem> itemsFor(NewsletterEdition edition, EmployeeAttributes profile) {
-        if (edition.itemIds().isEmpty()) {
-            return List.of();
+    /** Per section of the newsletter, the issue's items a profile sees and wants, in the issue's order. */
+    public Map<String, List<VisibleItem>> itemsFor(NewsletterIssue issue, EmployeeAttributes profile,
+                                                   NewsletterPreferences.Preference preference) {
+        var out = new LinkedHashMap<String, List<VisibleItem>>();
+        var ids = issue.itemIds();
+        if (ids.isEmpty()) {
+            return out;
         }
-        var visible = visibility.visibles(profile, ContentQuery.ids(edition.itemIds())).content();
-        return visible.stream().sorted(Comparator.comparingInt(i -> edition.itemIds().indexOf(i.itemId()))).toList();
+        var visible = visibility.visibles(profile, ContentQuery.ids(ids)).content().stream()
+                .collect(Collectors.toMap(VisibleItem::itemId, i -> i, (a, b) -> a));
+        issue.sections().forEach((key, list) -> {
+            if (preference == null || preference.wants(key)) {
+                out.put(key, list.stream().map(visible::get).filter(java.util.Objects::nonNull).toList());
+            }
+        });
+        return out;
     }
 
-    /** Sends every edition that is due; a failed group is retried on the next pass, the others are not resent. */
+    /** Whether a profile sees a block: the newsletter's audience AND the block's. */
+    public boolean sees(Site site, Block block, EmployeeAttributes profile) {
+        return namedAudiences.policy().admits(Audience.effective(site.audience(), block.audience()), profile);
+    }
+
+    /** What an intranet listing block of the issue shows a profile. */
+    public List<VisibleItem> listing(Block b, EmployeeAttributes profile) {
+        return switch (b.type()) {
+            case FEATURED -> b.itemId() == null ? List.of() : visibility.item(profile, b.itemId()).map(List::of).orElse(List.of());
+            case NOTICES -> visibility.visibles(profile, new ContentQuery(Set.of(ItemType.NOTICE), b.sectionId(), null, null,
+                    0, limit(b))).content();
+            case LATEST -> visibility.visibles(profile, new ContentQuery(Set.of(ItemType.ARTICLE, ItemType.PAGE),
+                    b.sectionId(), null, null, 0, limit(b))).content();
+            case AUTOMATIC_LISTING -> visibility.visibles(profile, new ContentQuery(Set.of(), b.sectionId(), null, null, 0,
+                    limit(b))).content();
+            default -> List.of();
+        };
+    }
+
+    static int limit(Block b) {
+        return b.limit() == null ? 5 : b.limit();
+    }
+
+    /** The newsletter's section names, in a language. */
+    public Map<String, String> sectionNames(String siteId, String language) {
+        return navigation.get(siteId).sections().stream().collect(Collectors.toMap(Section::id, s -> s.name(language),
+                (a, b) -> a, LinkedHashMap::new));
+    }
+
+    /** Draws an issue for a profile — a group's email, or one reader's web version — with the given links. */
+    public String render(NewsletterIssue issue, EmployeeAttributes profile, NewsletterPreferences.Preference preference,
+                         NewsletterRenderer.Mode mode, String greeting, NewsletterRenderer.Links links) {
+        var site = site(issue);
+        var language = site.languageFor(profile.language());
+        var p = profile.withLanguage(language);
+        return NewsletterRenderer.render(new NewsletterRenderer.View(site, issue, mode, language,
+                itemsFor(issue, p, preference), b -> listing(b, p), b -> sees(site, b, p),
+                sectionNames(site.id(), language), greeting, links));
+    }
+
+    /** Whether a group gets anything of the issue: a block it sees that shows something. */
+    boolean anythingFor(NewsletterIssue issue, Group group) {
+        var site = site(issue);
+        var items = itemsFor(issue, group.profile(), group.preference());
+        return issue.blocks().stream().filter(b -> sees(site, b, group.profile())).anyMatch(b -> switch (b.type()) {
+            case NEWSLETTER_SECTION -> !items.getOrDefault(io.mateu.ecdemo1.contenthub.domain.newsletter.Newsletter.sectionOf(b),
+                    List.of()).isEmpty();
+            case HTML, BANNER -> b.html() != null && !b.html().isBlank();
+            case FEATURED, AUTOMATIC_LISTING, LATEST, NOTICES -> !listing(b, group.profile()).isEmpty();
+            case MEDIA -> b.mediaId() != null;
+            case QUICK_LINKS -> !b.links().isEmpty();
+            case REMOTE -> b.remote() != null;
+            default -> false; // greeting, pending, and any block type a newsletter does not draw
+        });
+    }
+
+    /** The ids of the items a group gets, for the record. */
+    List<String> itemIdsFor(NewsletterIssue issue, Group group) {
+        return itemsFor(issue, group.profile(), group.preference()).values().stream().flatMap(List::stream)
+                .map(VisibleItem::itemId).distinct().toList();
+    }
+
+    // ── links ───────────────────────────────────────────────────────────────────────────────────
+
+    /** The portal's base: {@code https://host/intranet}. */
+    public String portalUrl() {
+        return portalUrl;
+    }
+
+    /** The newsletter site's page in the portal (its home: subscribe and unsubscribe there). */
+    public String siteUrl(String siteId) {
+        return portalUrl + "/n/" + siteId;
+    }
+
+    public String permalink(NewsletterIssue issue) {
+        return siteUrl(issue.newsletterId()) + "/numeros/" + issue.id();
+    }
+
+    /** An item's page: the newsletter's own items under its site, the intranet's where they always are. */
+    public static String itemPath(String base, VisibleItem item, String ownSite, java.util.function.Predicate<String> isOwn) {
+        return isOwn.test(item.itemId()) ? base + "/n/" + ownSite + "/p/" + item.itemId() : base + "/noticias/" + item.itemId();
+    }
+
+    /** The email's links: absolute, through the tracker when it is a group's real send. */
+    NewsletterRenderer.Links emailLinks(NewsletterIssue issue, String group, java.util.function.Predicate<String> isOwn) {
+        var tracked = group == null ? NewsletterLinks.NONE : links;
+        var permalink = permalink(issue);
+        var site = issue.newsletterId();
+        var logo = site(issue).definition().logoMediaId() == null ? null
+                : portalUrl.replaceFirst("/intranet/?$", "") + "/_intranet/n/logo/" + site;
+        return new NewsletterRenderer.Links() {
+            @Override
+            public String item(VisibleItem item) {
+                return tracked.click(issue.id(), group, item.itemId(), itemPath(portalUrl, item, site, isOwn));
+            }
+
+            @Override
+            public String rich(String html) {
+                return NewsletterRenderer.emailRich(html, permalink);
+            }
+
+            @Override
+            public String medium(String mediaId) {
+                return null;
+            }
+
+            @Override
+            public String permalink() {
+                return permalink;
+            }
+
+            @Override
+            public String unsubscribe() {
+                return siteUrl(site);
+            }
+
+            @Override
+            public String logo() {
+                return logo;
+            }
+
+            @Override
+            public String pixel() {
+                return tracked.open(issue.id(), group);
+            }
+
+            @Override
+            public String remote(Block block) {
+                return remoteFallback == null ? null : remoteFallback.html(block, permalink);
+            }
+        };
+    }
+
+    /** Whether an item is one of a newsletter site's own (its page is under the site). */
+    public boolean isOwnItem(String siteId, String itemId) {
+        return items.find(itemId).map(i -> siteId.equals(i.siteId())).orElse(false);
+    }
+
+    /** Whether an item is one of the newsletter site's own (else the intranet's). */
+    java.util.function.Predicate<String> ownItems(NewsletterIssue issue) {
+        var ids = issue.itemIds();
+        if (ids.isEmpty()) {
+            return id -> false;
+        }
+        var own = new java.util.HashSet<String>();
+        for (var id : ids) {
+            items.find(id).filter(i -> issue.newsletterId().equals(i.siteId())).ifPresent(i -> own.add(id));
+        }
+        return own::contains;
+    }
+
+    // ── sending ─────────────────────────────────────────────────────────────────────────────────
+
+    /** Sends every issue that is due; a failed group is retried on the next pass, the others are not resent. */
     public int sendDue() {
         var sent = 0;
-        for (var edition : editions.due(clock.instant())) {
-            sent += send(edition.id());
+        for (var issue : issues.due(clock.instant())) {
+            try {
+                sent += send(issue.id());
+            } catch (RuntimeException e) {
+                log.warn("Newsletter issue {} not sent: {}", issue.id(), e.getMessage());
+            }
         }
         return sent;
     }
 
     @Transactional
-    public int send(String editionId) {
-        var edition = editions.find(editionId).orElseThrow();
-        if (mailer.redirected()) {
-            return sendDigest(edition);
+    public int send(String issueId) {
+        var issue = issues.find(issueId).orElseThrow();
+        if (issue.status() != NewsletterIssue.Status.SCHEDULED) {
+            return 0;
         }
+        if (mailer.redirected()) {
+            return sendDigest(issue);
+        }
+        var own = ownItems(issue);
         var emails = 0;
         var failed = false;
-        for (var group : groups(edition)) {
-            if (edition.groupSent(group.hash(), group.language())) {
+        var subject = issue.subject();
+        for (var group : groups(issue)) {
+            if (issue.groupSent(group.hash(), group.language())) {
                 continue;
             }
-            var items = itemsFor(edition, group);
-            if (items.isEmpty()) {
-                edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
-                        group.recipients().size(), List.of(), clock.instant(), null));
+            if (!anythingFor(issue, group)) {
+                issue.recordGroup(new NewsletterIssue.GroupSend(group.hash(), group.language(), group.recipients().size(),
+                        List.of(), clock.instant(), null));
                 continue;
             }
+            var key = NewsletterIssue.groupKey(group.hash(), group.language());
             try {
-                mailer.send(group.recipients().stream().map(Employee::email).toList(),
-                        edition.title() + " [" + group.language() + " · " + group.hash() + "]",
-                        render(edition, items, group.language(), NewsletterEdition.groupKey(group.hash(), group.language())));
-                edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
-                        group.recipients().size(), items.stream().map(VisibleItem::itemId).toList(), clock.instant(),
-                        null));
+                mailer.send(group.recipients().stream().map(Employee::email).toList(), subject,
+                        render(issue, group.profile(), group.preference(), NewsletterRenderer.Mode.EMAIL,
+                                "es".equals(group.language()) ? "Hola," : "Hello,", emailLinks(issue, key, own)));
+                issue.recordGroup(new NewsletterIssue.GroupSend(group.hash(), group.language(), group.recipients().size(),
+                        itemIdsFor(issue, group), clock.instant(), null));
                 emails++;
             } catch (RuntimeException e) {
-                log.warn("Newsletter {} group {}/{} not sent: {}", editionId, group.hash(), group.language(),
-                        e.getMessage());
-                edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
-                        group.recipients().size(), List.of(), null, e.getMessage()));
+                log.warn("Newsletter issue {} group {}/{} not sent: {}", issueId, group.hash(), group.language(), e.getMessage());
+                issue.recordGroup(new NewsletterIssue.GroupSend(group.hash(), group.language(), group.recipients().size(),
+                        List.of(), null, e.getMessage()));
                 failed = true;
             }
         }
         if (!failed) {
-            edition.markSent();
+            issue.markSent(clock.instant());
         }
-        editions.save(edition);
+        issues.save(issue);
         return emails;
     }
 
     /**
-     * The demo's way: every message would land in the same mailbox, so the edition goes as ONE message
-     * with a section per group — the version each group gets, and whom it was for — instead of one per
-     * group. Each group is still recorded as sent (or failed) on its own, as the real sending does.
+     * The demo's way: every message would land in the same mailbox, so the issue goes as ONE message with a
+     * part per group — the version each group gets, and whom it was for — instead of one per group. Each
+     * group is still recorded as sent (or failed) on its own, as the real sending does.
      */
-    int sendDigest(NewsletterEdition edition) {
+    int sendDigest(NewsletterIssue issue) {
+        var own = ownItems(issue);
         var pending = new ArrayList<Group>();
-        var itemsByGroup = new LinkedHashMap<Group, List<VisibleItem>>();
-        for (var group : groups(edition)) {
-            if (edition.groupSent(group.hash(), group.language())) {
+        for (var group : groups(issue)) {
+            if (issue.groupSent(group.hash(), group.language())) {
                 continue;
             }
-            var items = itemsFor(edition, group);
-            if (items.isEmpty()) {
-                edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
-                        group.recipients().size(), List.of(), clock.instant(), null));
+            if (!anythingFor(issue, group)) {
+                issue.recordGroup(new NewsletterIssue.GroupSend(group.hash(), group.language(), group.recipients().size(),
+                        List.of(), clock.instant(), null));
                 continue;
             }
             pending.add(group);
-            itemsByGroup.put(group, items);
         }
         var emails = 0;
         var failed = false;
@@ -205,87 +360,123 @@ public class NewsletterService {
             var html = new StringBuilder("<div style=\"font-family:sans-serif;max-width:680px\">")
                     .append("<p style=\"background:#e8f0fe;padding:8px\">Demo: ").append(pending.size())
                     .append(" grupos de destinatarios en un solo correo. Fuera de la demo, cada grupo recibe solo")
-                    .append(" su sección, en su idioma.</p>");
+                    .append(" su parte, en su idioma.</p>");
             var n = 0;
             for (var group : pending) {
                 n++;
                 html.append("<hr><p style=\"color:#555;font-size:13px\"><b>Grupo ").append(n).append(" de ")
-                        .append(pending.size()).append("</b> · ").append(esc(group.language())).append(" · ")
-                        .append(esc(describe(group.profile()))).append(" · ").append(group.recipients().size())
-                        .append(" destinatario(s): ").append(esc(group.recipients().stream().map(Employee::name)
-                                .collect(java.util.stream.Collectors.joining(", ")))).append("</p>")
-                        .append(render(edition, itemsByGroup.get(group), group.language(),
-                                NewsletterEdition.groupKey(group.hash(), group.language())));
+                        .append(pending.size()).append("</b> · ").append(NewsletterRenderer.esc(group.language())).append(" · ")
+                        .append(NewsletterRenderer.esc(describe(group.profile()))).append(" · ").append(group.recipients().size())
+                        .append(" destinatario(s): ").append(NewsletterRenderer.esc(group.recipients().stream().map(Employee::name)
+                                .collect(Collectors.joining(", ")))).append("</p>")
+                        .append(render(issue, group.profile(), group.preference(), NewsletterRenderer.Mode.EMAIL,
+                                "es".equals(group.language()) ? "Hola," : "Hello,",
+                                emailLinks(issue, NewsletterIssue.groupKey(group.hash(), group.language()), own)));
             }
             html.append("</div>");
             var recipients = pending.stream().flatMap(g -> g.recipients().stream()).map(Employee::email).toList();
             String error = null;
             try {
-                mailer.send(recipients, edition.title() + " [" + pending.size() + " grupos]", html.toString());
+                mailer.send(recipients, issue.subject() + " [" + pending.size() + " grupos]", html.toString());
                 emails = 1;
             } catch (RuntimeException e) {
-                log.warn("Newsletter {} not sent: {}", edition.id(), e.getMessage());
+                log.warn("Newsletter issue {} not sent: {}", issue.id(), e.getMessage());
                 error = e.getMessage();
                 failed = true;
             }
             for (var group : pending) {
-                edition.recordGroup(new NewsletterEdition.GroupSend(group.hash(), group.language(),
-                        group.recipients().size(), error == null
-                                ? itemsByGroup.get(group).stream().map(VisibleItem::itemId).toList() : List.of(),
-                        error == null ? clock.instant() : null, error));
+                issue.recordGroup(new NewsletterIssue.GroupSend(group.hash(), group.language(), group.recipients().size(),
+                        error == null ? itemIdsFor(issue, group) : List.of(), error == null ? clock.instant() : null, error));
             }
         }
         if (!failed) {
-            edition.markSent();
+            issue.markSent(clock.instant());
         }
-        editions.save(edition);
+        issues.save(issue);
         return emails;
+    }
+
+    /**
+     * «Enviar prueba»: the issue as the editor would get it — their profile, all its sections — to their own
+     * address (in the demo, to the redirect mailbox, like every message). Nothing is recorded.
+     */
+    public String sendTest(Reader reader, String issueId) {
+        reader.require(EditorialPermission.EDIT);
+        var issue = issues.find(issueId).orElseThrow();
+        var me = directory.find(reader.userId()).orElse(null);
+        var email = me == null ? null : me.email();
+        if ((email == null || email.isBlank()) && !mailer.redirected()) {
+            throw new IllegalStateException("No tienes email en el directorio: no hay adónde enviar la prueba");
+        }
+        var profile = reader.attributes();
+        mailer.send(List.of(email == null || email.isBlank() ? reader.userId() + "@prueba" : email),
+                "[Prueba] " + issue.subject(), render(issue, profile, NewsletterPreferences.Preference.DEFAULT,
+                        NewsletterRenderer.Mode.EMAIL, "Hola, " + reader.name(), emailLinks(issue, null, ownItems(issue))));
+        return email == null ? "el buzón de la demo" : email;
+    }
+
+    public static String esc(String s) {
+        return NewsletterRenderer.esc(s);
     }
 
     /** A group's profile, for the digest: its attributes, in their canonical order. */
     static String describe(EmployeeAttributes profile) {
         return profile.values().isEmpty() ? "sin atributos" : new java.util.TreeMap<>(profile.values()).entrySet()
                 .stream().map(e -> e.getKey().name().toLowerCase() + "=" + e.getValue())
-                .collect(java.util.stream.Collectors.joining(" · "));
+                .collect(Collectors.joining(" · "));
     }
 
-    public String render(NewsletterEdition edition, List<VisibleItem> items, String language) {
-        return render(edition, items, language, null);
+    // ── reading, in the portal ──────────────────────────────────────────────────────────────────
+
+    /** The newsletters a reader is in the audience of (active ones), with what they want of each. */
+    public List<Subscription> newslettersOf(Reader reader) {
+        var policy = namedAudiences.policy();
+        var mine = preferences.of(reader.userId());
+        return sites.findAll().stream().filter(s -> s.kind() == Site.Kind.NEWSLETTER && s.active())
+                .filter(s -> policy.admits(s.audience(), reader.attributes()))
+                .map(s -> new Subscription(s, mine.getOrDefault(s.id(), NewsletterPreferences.Preference.DEFAULT),
+                        latestSent(s.id()).orElse(null)))
+                .toList();
     }
 
-    /** The email for a group: its items' links and the open pixel go through the tracker, for that group. */
-    public String render(NewsletterEdition edition, List<VisibleItem> items, String language, String group) {
-        var tracked = group == null ? NewsletterLinks.NONE : links;
-        var html = new StringBuilder("<div style=\"font-family:sans-serif;max-width:640px\">")
-                .append("<h1>").append(esc(edition.title())).append("</h1>");
-        if (!edition.intro().isBlank()) {
-            // written in the rich text editor (HTML, sanitised like any content); an older edition's
-            // plain text is one paragraph
-            html.append(edition.intro().contains("<") ? HtmlSanitizer.sanitize(edition.intro())
-                    : "<p>" + esc(edition.intro()) + "</p>");
+    public record Subscription(Site site, NewsletterPreferences.Preference preference, NewsletterIssue latest) {
+    }
+
+    /** A newsletter site the reader may read: active and for them. */
+    public Optional<Site> readable(Reader reader, String siteId) {
+        return sites.find(siteId).filter(s -> s.kind() == Site.Kind.NEWSLETTER && s.active())
+                .filter(s -> namedAudiences.policy().admits(s.audience(), reader.attributes()));
+    }
+
+    /** The sent issues of a newsletter, the latest first: its archive. */
+    public List<NewsletterIssue> archive(String siteId) {
+        return issues.ofNewsletter(siteId).stream().filter(i -> i.status() == NewsletterIssue.Status.SENT)
+                .sorted(Comparator.comparing(NewsletterIssue::number).reversed()).toList();
+    }
+
+    public Optional<NewsletterIssue> latestSent(String siteId) {
+        return archive(siteId).stream().findFirst();
+    }
+
+    /** A sent issue of a newsletter the reader may read. */
+    public Optional<NewsletterIssue> readableIssue(Reader reader, String siteId, String issueId) {
+        return readable(reader, siteId).flatMap(s -> issues.find(issueId))
+                .filter(i -> i.newsletterId().equals(siteId) && i.status() == NewsletterIssue.Status.SENT);
+    }
+
+    public NewsletterPreferences.Preference preference(Reader reader, String siteId) {
+        return preferences.of(reader.userId(), siteId);
+    }
+
+    /** Subscribes or unsubscribes, and chooses sections (only ever narrows). Not while viewing as another profile. */
+    public void subscribe(Reader reader, String siteId, boolean subscribed, Set<String> sections) {
+        if (reader.viewingAs() != null) {
+            throw new IllegalStateException("Estás viendo la intranet como otro perfil: tus suscripciones no se tocan");
         }
-        for (var item : items) {
-            var direct = portalUrl + "/noticias/" + item.itemId();
-            html.append("<h2><a href=\"").append(esc(tracked.click(edition.id(), group, item.itemId(), direct)))
-                    .append("\">").append(esc(item.title())).append("</a></h2>")
-                    .append("<p>").append(esc(item.summary())).append("</p>");
-        }
-        html.append("<p style=\"color:#888;font-size:12px\">").append("es".equals(language)
-                ? "Recibes este correo como empleado. Solo incluye lo que puedes ver en la intranet."
-                : "You receive this email as an employee. It only includes what you can see on the intranet.")
-                .append("</p>");
-        var pixel = tracked.open(edition.id(), group);
-        if (pixel != null) {
-            html.append("<img src=\"").append(esc(pixel)).append("\" width=\"1\" height=\"1\" alt=\"\">");
-        }
-        return html.append("</div>").toString();
-    }
-
-    static String esc(String s) {
-        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
-    }
-
-    public Map<String, Object> stats() {
-        return Map.of("editions", editions.findAll().size());
+        readable(reader, siteId).orElseThrow(() -> new IllegalArgumentException("Esa newsletter no es para ti"));
+        var known = navigation.get(siteId).sections().stream().map(Section::id).collect(Collectors.toSet());
+        var chosen = new java.util.HashSet<>(sections == null ? Set.of() : sections);
+        chosen.retainAll(known);
+        preferences.save(reader.userId(), siteId, new NewsletterPreferences.Preference(subscribed, chosen));
     }
 }

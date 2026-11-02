@@ -141,7 +141,7 @@ class SiteMenusTest {
                 .containsExactlyElementsOf(Arrays.stream(PortalFunction.values()).map(PortalFunction::key).toList());
         assertThat(labels(shown(SiteMenu.INTRANET, KITCHEN, Set.of()))).containsExactly("Inicio", "Noticias", "Avisos",
                 "Documentos", "Secciones", "Personas", "Organigrama", "Buscar", "Documentos de Drive", "Mis favoritos",
-                "Pendientes", "Nueva solicitud", "Mis solicitudes", "Por aprobar", "Encuestas", "Mis preferencias");
+                "Pendientes", "Nueva solicitud", "Mis solicitudes", "Por aprobar", "Encuestas", "Newsletters", "Mis preferencias");
         assertThat(shown(SiteMenu.INTRANET, KITCHEN, Set.of())).allSatisfy(e ->
                 assertThat(e.link()).isEqualTo(new MenuLink.Function(e.id())));
     }

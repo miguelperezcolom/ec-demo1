@@ -174,7 +174,9 @@ Trece agregados, referenciados entre sí solo por id, y un servicio de dominio (
 | **Menú de un sitio** (`domain/menu/SiteMenu`) | El menú entero de un sitio (`intranet`, o una newsletter): árbol ordenado de entradas —enlaces con destino o submenús—, textos por idioma, audiencia y activa | Cuelga de la raíz o de un submenú del mismo menú, sin ciclos, orden único entre hermanas, texto en el idioma por defecto; un submenú con entradas no recibe destino |
 | **Slot** (`domain/slot`) | Clave `aplicacion.pantalla.nombre`, descripción, fallback, variantes con audiencia y prioridad | Clave inmutable, prioridad única, huérfano en vez de borrado |
 | **Audiencia con nombre** (`domain/audience`) | Nombre y expresión | No se refiere a sí misma |
-| **Edición de newsletter** (`domain/newsletter`) | Título, intro, items en orden, audiencia, fecha, envío por grupo | No se modifica una vez enviada |
+| **Sitio** (`domain/site`) | Id, tipo (intranet o newsletter), identidad, audiencia, idiomas | La intranet es el sitio por defecto |
+| **Newsletter** (`domain/newsletter`) | Maqueta, fuentes de cada sección, periodicidad, envío sin revisión, numeración, último slot | Un slot abre un solo número |
+| **Número de newsletter** (`domain/newsletter`) | Número, fecha, asunto, bloques, items por sección, estado, envío por grupo | No se modifica enviado o cancelado |
 | **Empleado** (`domain/employee`) | Atributos y hash; responsable, teléfono y etiquetas de los códigos (para el directorio) | Solo lo escribe el consumidor del directorio |
 | **Favoritos** (`domain/favorites`) | Uno por empleado, items por id | Sin duplicados |
 | **Acuse** (`domain/ack`) | (item, versión, empleado, tipo `READ`/`CONFIRMATION`) | Idempotente |
@@ -425,14 +427,82 @@ la referencia, **nunca una copia**: una sola versión, la de Drive.
 referenciado, también borradores: son metadatos de una caché que solo se enseñan a través de un item visible. Lo
 que no controla la intranet es quién abre el fichero en Google: eso lo deciden los permisos de Drive.
 
-## Newsletter
+## Sitios
 
-Para cada edición se agrupan los destinatarios (empleados activos con email que cumplen la audiencia de
-la edición) por **(hash de perfil, idioma)**; se pregunta a la función de visibilidad **una vez por grupo**
-qué items de la edición ve, y se manda **un correo por grupo** con solo esos items, en su idioma. Un grupo
-que no ve ninguno no recibe nada. Cada grupo queda registrado por separado: uno que falla se reintenta en
-la siguiente pasada (cada 30 s) sin reenviar a los demás. Sale por el relay `postfix`; como los empleados
-son ficticios, en la demo todo va a `NEWSLETTER_REDIRECT_TO`, con el grupo y el idioma en el asunto.
+content-hub aloja **varios sitios**. La intranet es el sitio por defecto (`intranet`); cada newsletter es
+otro, de tipo `NEWSLETTER`, con la misma maquinaria acotada a él: **su árbol de secciones**
+(`ch_navigation`, una fila por sitio; la de la intranet sigue siendo `main`), **sus items y páginas**
+(`ch_item.site_id`, `ch_item_doc.site_id`) y **sus inicios** (`ch_site_home_page`; los de la intranet siguen
+en `ch_home_page`). Un sitio (`domain/site/Site`, `ch_site`) tiene identidad (nombre, logo, colores,
+cabecera, pie), audiencia e idiomas.
+
+Todo lo anterior a los sitios es de la intranet: las columnas tienen `intranet` por defecto, y
+`SiteBootstrap` guarda la intranet como sitio al arrancar (idempotente). Los listados, secciones,
+búsqueda, el RAG del chat y la lista de Drive preguntan por un sitio —la intranet, salvo que la consulta
+(`ContentQuery.in(site)`) diga otro—, así que la intranet se comporta igual que antes; una consulta por ids
+(favoritos, un destacado, los items de un número) cruza sitios. La visibilidad es la misma función para
+todos.
+
+## Newsletters
+
+Lo único propio de una newsletter son **sus números**. `Newsletter` (`ch_nl_newsletter`, con el id de su
+sitio) guarda la maqueta (bloques), de qué secciones de la intranet toma cada sección suya, la
+periodicidad (`Cadence`: ninguna, semanal o mensual a una hora de Madrid) y si envía sin revisión; numera
+los números y recuerda el último **momento** (slot) para el que abrió uno. `NewsletterIssue`
+(`ch_nl_issue`, únicos `(newsletter_id, number)` y `(newsletter_id, slot)`) tiene número, fecha, asunto,
+**bloques** (los `Block` de las páginas, con audiencia por bloque, más `NEWSLETTER_SECTION`), los items de
+cada sección, estado (`DRAFT → SCHEDULED → SENT`, o `CANCELLED`) y los envíos por grupo.
+
+- **Números que se crean solos.** `ContentJobs.newsletters` (cada 30 s) llama a
+  `NewsletterEditorial.createDue`: para cada newsletter activa cuyo último slot no tenga número, abre el
+  borrador (programado si envía sin revisión). Un slot nunca abre dos números: lo recuerda la newsletter y
+  lo impide el índice único; tras una parada larga se abre uno, el del último slot.
+- **Contenido automático** (`AutomaticContent`): lo publicado desde que se abrió el número anterior (o en el
+  último periodo, para el primero), sin caducar, que ve alguien de la audiencia (una pregunta a la
+  visibilidad por perfil de la audiencia): los artículos y avisos del propio sitio en su sección, y lo de
+  la intranet (noticias, avisos, páginas que no son inicios) en la sección que toma esa sección o una
+  antecesora.
+- **Envío** (`NewsletterService`): destinatarios = empleados activos con email que cumplen la audiencia del
+  sitio y no se dieron de baja de **esa** newsletter (`ch_nl_subscription`, sin fila: suscrito); se
+  agrupan por **(hash de perfil, idioma, secciones elegidas)** —el idioma es el del lector si el sitio se
+  escribe en él, si no el primero del sitio—; por grupo se pregunta una vez qué bloques (audiencia del
+  sitio Y del bloque) e items ve, y sale **un correo por grupo**; un grupo sin nada no recibe nada. Cada
+  grupo se registra aparte (un fallo se reintenta solo); con todos, `SENT` y `sentAt`. Por el relay
+  `postfix`; en la demo todo va a `NEWSLETTER_REDIRECT_TO`, en un solo mensaje con una parte por grupo.
+- **Dos dibujos del mismo número** (`NewsletterRenderer`): el **correo**, HTML apto para correo (tablas y
+  estilos en línea; un medio es un enlace a la versión web; píxel y enlaces firmados), y la **versión web**
+  (`NewsletterSitePage`), los mismos bloques con los medios en la página. El correo lleva el enlace
+  permanente (`/intranet/n/{sitio}/numeros/{número}`) y la baja de esa newsletter (`/intranet/n/{sitio}`).
+  El logo se sirve sin firma en `/_intranet/n/logo/{sitio}` (solo el logo de una newsletter).
+- **El sitio en el portal**: `PortalRoutes` lleva `/intranet/n/{sitio}[/archivo|/numeros/{id}|/secciones/{id}|/p/{id}]`
+  a `NewsletterSitePage`, dibujado sobre su propio papel claro (sus colores, como el correo, son para fondo
+  blanco, también con el tema oscuro). Su menú es el **menú configurable de su sitio** (`SiteMenus`, dueño
+  el id del sitio): `NewsletterMenus` lo siembra la primera vez (al crearla, o al arrancar para las que ya
+  había) con su inicio, sus secciones de primer nivel, su archivo y sus páginas, y «Nueva página» añade la
+  página al final; desde entonces se edita en *Configuración → Menús* (`content:admin`), que lista los
+  sitios de las newsletters. `NewsletterNavigation` lo dibuja (`SiteMenus.shown`) como la barra del sitio,
+  dentro de su página. Destinos propios (`NewsletterTargets`, solo en sitios de newsletter):
+  `NEWSLETTER_HOME`, `ARCHIVE` e `ISSUE` (un número, cuando ha salido); `PAGE` y `SECTION` son los de siempre,
+  ahora por sitio, con las rutas de `SiteAwareRoutes` (`@Primary SiteRoutes`: `/intranet/n/{sitio}/p/{id}`,
+  `…/secciones/{id}`).
+- **Bloques que no se conocen**: un bloque de un tipo que esta versión no sabe leer (de una versión más
+  nueva) se anota en el log y se deja fuera al leer un item, un número o una maqueta (`Json.KnownBlocks`),
+  en vez de romper todos los listados que lo leen. Un bloque `REMOTE` en el correo es el enlace a la web de
+  `RemoteUiRenderer.fallbackHtml`.
+- **Editor visual** de un número: el mismo `<ec-visual-editor>` con `resource="issues"`, contra
+  `/_intranet/api/editor/issues/{id}` (`IssueEditorController`, que reutiliza el de páginas).
+- **Aperturas y clics**: `ch_newsletter_event` por número y grupo (su columna sigue llamándose
+  `edition_id`). Un clic en un item propio del sitio redirige a su página en el sitio.
+
+**Migración** (`NewsletterMigration`, en cada arranque, idempotente): las ediciones de antes
+(`ch_newsletter`) pasan a ser números de **«Boletín de la intranet»** (`boletin-intranet`): audiencia la de
+la edición más reciente, semanal los lunes a las 9 si el boletín semanal estaba activo
+(`content-hub.newsletter.weekly.enabled`; `…weekly.send` = enviar sin revisión), una sección «Lo más
+destacado» que toma todas las secciones de primer nivel de la intranet. Se numeran por fecha, conservan su
+id —y con él sus aperturas y clics—, su estado y sus envíos; la intro es un bloque HTML y los items van a
+esa sección; una `w-AAAA-Wnn` ocupa el slot de su lunes. Las preferencias (`ch_newsletter_pref`) son su
+suscripción (las secciones elegidas, que eran de la intranet, no se trasladan). Las tablas viejas no se
+tocan.
 
 ## Notificaciones
 

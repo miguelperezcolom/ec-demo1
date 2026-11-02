@@ -400,6 +400,25 @@ El usuario pidió las cuatro mejoras (2026-11-01):
 | N3 | **Aperturas y clics**. Píxel de apertura y enlaces con redirección firmada (HMAC como los medios, `/_intranet/n/{edición}/{destinatario}/…`), guardados por edición y destinatario. Informe por hotel y departamento en el backoffice. Los empleados ficticios de la demo van al email del usuario: contar por destinatario original. | hecho (79263d1b): por GRUPO, no por persona (el correo de un grupo es uno para todos): `NewsletterTracking`, `NewsletterLinksSigner`, `NewsletterTrackingController`, informe en `NewsletterForm`; gateway deja pasar `/_intranet/n/**` |
 | N4 | **Suscripción personal**: en el portal (p. ej. "Mis preferencias") cada empleado elige las secciones que quiere recibir y la frecuencia, dentro de lo que su audiencia le deja ver. `NewsletterService` filtra por ella; el default es todo. | hecho (4f15abb1): `NewsletterPreferences`/`ch_newsletter_pref`, `PreferencesPage` (Hydratable) |
 
+## N5 — Newsletters y números (2026-11-02)
+
+El usuario pidió partir la newsletter en NEWSLETTERS y sus NÚMEROS, y luego: «la newsletter en realidad es
+como un sitio web», «es como una intranet, con sus páginas», «es como una intranet más». Así que:
+**sitios** (la intranet es el de por defecto; cada newsletter, otro) y, encima, los números.
+
+| # | Paso | Estado |
+|---|---|---|
+| N5.1 | **Sitios**: `Site` (`ch_site`), `site_id` en items (`ch_item`, `ch_item_doc`), árbol de secciones por sitio (`ch_navigation`, la intranet sigue en `main`), inicios por sitio (`ch_site_home_page`); listados, secciones, búsqueda, RAG y Drive acotados a un sitio (la intranet por defecto). Todo lo existente es de la intranet | hecho (66761ba8) |
+| N5.2 | **Newsletter** (por sitio): maqueta, fuentes por sección, periodicidad (ninguna/semanal/mensual), envío sin revisión (por defecto, borrador); numeración; un slot = un número | hecho (bd0db49a) |
+| N5.3 | **Números**: bloques (los de las páginas + «Sección de la newsletter»), items por sección, `DRAFT → SCHEDULED → SENT`/`CANCELLED`, contenido automático desde el número anterior, envío por grupo, prueba, estadísticas por número | hecho (bd0db49a) |
+| N5.4 | **Suscripción por newsletter** (`ch_nl_subscription`) con secciones; baja por newsletter en el correo; «Mis preferencias» las lista | hecho (bd0db49a) |
+| N5.5 | **Portal**: «Newsletters» y el sitio de cada una en `/intranet/n/{id}` (inicio, archivo, número, sección, páginas), su menú tras una costura (`NewsletterNavigation`) | hecho (bd0db49a); falta probarlo en el navegador (Vaadin y Redwood, móvil) |
+| N5.6 | **Backoffice**: Newsletters (identidad, audiencia, secciones, maqueta, periodicidad, sus números y páginas), Números de newsletter (formulario, prueba, programar/cancelar, estadísticas, vista previa), editor visual sobre un número | hecho (bd0db49a); falta probarlo en el navegador |
+| N5.7 | **Migración** de las ediciones a «Boletín de la intranet» (idempotente, al arrancar), eventos y preferencias conservados | hecho (bd0db49a); probado en arranque contra un Postgres vacío con una edición |
+| N5.8 | Menú configurable de la newsletter (dueño: el id de su sitio) en lugar del derivado: sembrado (inicio, secciones, archivo, páginas), destinos `NEWSLETTER_HOME`/`ARCHIVE`/`ISSUE`, `PAGE`/`SECTION` por sitio (`SiteAwareRoutes`), editable en Configuración → Menús | hecho (tras #279) |
+| N5.10 | Revisión en el navegador (Vaadin, tema oscuro): el número y la barra del sitio ilegibles sobre fondo oscuro → el sitio sobre papel claro; un item con un bloque de tipo desconocido rompía el listado → se lee sin él | hecho |
+| N5.9 | Desplegar en local y probar en el navegador | pendiente (lo despliega el agente principal) |
+
 ## H — Inicios por audiencia (home configurable)
 
 Hoy `portal/HomePage` es fijo e igual para todos: saludo, pendientes de confirmar, 5 avisos y 8 noticias. Lo que cambia por persona es solo qué contenidos salen (cada uno filtrado por su audiencia). El usuario pidió (2026-11-01) poder definir **un inicio distinto por usuario o grupo**, con los mismos criterios que los contenidos.

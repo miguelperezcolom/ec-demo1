@@ -39,7 +39,9 @@ public class PortalRoutes implements RouteResolver {
             "/intranet/encuestas/[^/]+", SurveyPage.class,
             // what a menu entry opens when the menu cannot: an external link, a hosted UI (MenuEntryPage)
             "/intranet/enlace/[^/]+/[^/]+", MenuEntryPage.class,
-            "/intranet/ui/[^/]+/[^/]+", MenuEntryPage.class);
+            "/intranet/ui/[^/]+/[^/]+", MenuEntryPage.class,
+            // a newsletter's site: its home, archive, issues, sections and pages (NewsletterSitePage)
+            "/intranet/n/[^/]+(/.*)?", NewsletterSitePage.class);
 
     @Override
     public Class<?> resolveRoute(String route, String consumedRoute, HttpRequest httpRequest) {

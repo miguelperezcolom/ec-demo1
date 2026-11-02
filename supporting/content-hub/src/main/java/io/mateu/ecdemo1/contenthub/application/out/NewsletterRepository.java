@@ -1,18 +1,16 @@
 package io.mateu.ecdemo1.contenthub.application.out;
 
-import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterEdition;
+import io.mateu.ecdemo1.contenthub.domain.newsletter.Newsletter;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+/** The newsletters — what makes a site a newsletter —, by their site's id. */
 public interface NewsletterRepository {
 
-    Optional<NewsletterEdition> find(String id);
+    Optional<Newsletter> find(String siteId);
 
-    void save(NewsletterEdition edition);
+    void save(Newsletter newsletter);
 
-    List<NewsletterEdition> findAll();
-
-    List<NewsletterEdition> due(Instant now);
+    List<Newsletter> findAll();
 }

@@ -74,7 +74,13 @@ public interface ContentIndex {
     boolean isVisible(String itemId, String hash, Instant now);
 
     /** The sections that directly hold something visible. */
-    Set<String> sectionsWithVisibleContent(String hash, Instant now);
+    /** The intranet's sections with something the hash sees. */
+    default Set<String> sectionsWithVisibleContent(String hash, Instant now) {
+        return sectionsWithVisibleContent(hash, now, io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET);
+    }
+
+    /** A site's sections with something the hash sees. */
+    Set<String> sectionsWithVisibleContent(String hash, Instant now, String siteId);
 
     /** The page's blocks visible to the hash, in their order. */
     List<String> visibleBlockIds(String itemId, String hash);

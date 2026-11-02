@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 @Repository
@@ -14,20 +16,32 @@ public class PgNewsletterPreferences implements NewsletterPreferences {
     final JdbcTemplate jdbc;
 
     @Override
-    public Preference of(String userId) {
-        return jdbc.query("select subscribed, sections from ch_newsletter_pref where user_id = ?",
-                (rs, i) -> new Preference(rs.getBoolean(1), Set.of((String[]) rs.getArray(2).getArray())), userId)
+    public Preference of(String userId, String newsletterId) {
+        return jdbc.query("select subscribed, sections from ch_nl_subscription where user_id = ? and newsletter_id = ?",
+                        (rs, i) -> new Preference(rs.getBoolean(1), Set.of((String[]) rs.getArray(2).getArray())),
+                        userId, newsletterId)
                 .stream().findFirst().orElse(Preference.DEFAULT);
     }
 
     @Override
-    public void save(String userId, Preference p) {
-        jdbc.update("insert into ch_newsletter_pref (user_id, subscribed, sections) values (?, ?, ?) "
-                        + "on conflict (user_id) do update set subscribed = excluded.subscribed, sections = excluded.sections",
+    public Map<String, Preference> of(String userId) {
+        var out = new LinkedHashMap<String, Preference>();
+        jdbc.query("select newsletter_id, subscribed, sections from ch_nl_subscription where user_id = ?", rs -> {
+            out.put(rs.getString(1), new Preference(rs.getBoolean(2), Set.of((String[]) rs.getArray(3).getArray())));
+        }, userId);
+        return out;
+    }
+
+    @Override
+    public void save(String userId, String newsletterId, Preference p) {
+        jdbc.update("insert into ch_nl_subscription (user_id, newsletter_id, subscribed, sections) values (?, ?, ?, ?) "
+                        + "on conflict (user_id, newsletter_id) do update set subscribed = excluded.subscribed, "
+                        + "sections = excluded.sections",
                 ps -> {
                     ps.setString(1, userId);
-                    ps.setBoolean(2, p.subscribed());
-                    ps.setArray(3, ps.getConnection().createArrayOf("text", p.sections().toArray()));
+                    ps.setString(2, newsletterId);
+                    ps.setBoolean(3, p.subscribed());
+                    ps.setArray(4, ps.getConnection().createArrayOf("text", p.sections().toArray()));
                 });
     }
 }

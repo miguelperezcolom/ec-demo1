@@ -57,7 +57,28 @@ public class Catalog {
     }
 
     public List<Option> sections() {
-        var nav = navigation.get();
+        return sections(io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET);
+    }
+
+    /**
+     * What a block's section can be: the intranet's sections (listings) and, for a newsletter section block,
+     * every newsletter's sections as {@code nl:<id>}.
+     */
+    public List<Option> sectionsForBlocks() {
+        var out = new java.util.ArrayList<>(sections());
+        for (var site : jdbc.queryForList("select id, name from ch_site where kind = 'NEWSLETTER' order by name")) {
+            var siteId = String.valueOf(site.get("id"));
+            for (var o : sections(siteId)) {
+                out.add(new Option(io.mateu.ecdemo1.contenthub.domain.newsletter.Newsletter.SECTION_PREFIX + o.value(),
+                        site.get("name") + " · " + o.label()));
+            }
+        }
+        return out;
+    }
+
+    /** A site's sections. */
+    public List<Option> sections(String siteId) {
+        var nav = navigation.get(siteId);
         return nav.sections().stream().map(s -> new Option(s.id(),
                 "  ".repeat(nav.ancestors(s.id()).size()) + s.name("es"))).toList();
     }

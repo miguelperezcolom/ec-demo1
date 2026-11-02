@@ -13,7 +13,6 @@ import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.ItemCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.NavigationCommands;
 import io.mateu.ecdemo1.contenthub.application.out.Mailer;
-import io.mateu.ecdemo1.contenthub.application.usecases.NewsletterService;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.application.usecases.SlotCommands;
 import io.mateu.ecdemo1.contenthub.application.visibility.ContentQuestions;
@@ -38,7 +37,6 @@ import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgFavoritesRepository;
 import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgItemRepository;
 import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNamedAudienceRepository;
 import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNavigationRepository;
-import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterRepository;
 import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgSlotRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -85,10 +83,8 @@ class ConsumersTest {
     AudienceCommands audiences;
     SlotCommands slots;
     ReaderActions readerActions;
-    NewsletterService newsletter;
     ContentQuestions questions;
     DirectoryUpdates directory;
-    PgNewsletterRepository editions;
     final List<String> mails = new ArrayList<>();
 
     static final Reader PUBLISHER = new Reader("pablo", "Pablo", EmployeeAttributes.NONE,
@@ -123,7 +119,6 @@ class ConsumersTest {
         var items = new PgItemRepository(jdbc);
         var slotRepo = new PgSlotRepository(jdbc);
         var audienceRepo = new PgNamedAudienceRepository(jdbc);
-        editions = new PgNewsletterRepository(jdbc);
         var favorites = new PgFavoritesRepository(jdbc);
         var acks = new PgAcknowledgementRepository(jdbc);
         var employees = new PgEmployeeDirectory(jdbc);
@@ -139,9 +134,6 @@ class ConsumersTest {
         audiences = new AudienceCommands(audienceRepo, named, employees, events);
         slots = new SlotCommands(slotRepo, events);
         readerActions = new ReaderActions(visibility, favorites, acks, items, clock);
-        newsletter = new NewsletterService(editions, employees, visibility, named,
-                (to, subject, html) -> mails.add(subject + " → " + to), clock,
-                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterPreferences(jdbc));
         Embeddings fake = (texts, query) -> texts.stream().map(ConsumersTest::vector).toList();
         questions = new ContentQuestions(index, fake, projection, clock);
         directory = new DirectoryUpdates(employees, projection, events);
@@ -189,22 +181,6 @@ class ConsumersTest {
 
     static final Audience RECEPCION_CANARIAS = Audience.allOf(Audience.in(Attribute.DEPARTMENT, "RECEPCION"),
             Audience.in(Attribute.REGION, "CANARIAS"));
-
-    @Test
-    void the_weekly_newsletter_composes_itself_once_a_week_with_what_was_published() {
-        var weekly = new io.mateu.ecdemo1.contenthub.application.usecases.WeeklyNewsletter(editions,
-                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgItemRepository(jdbc),
-                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgHomePages(jdbc));
-        publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Semana de la sostenibilidad", "<p>x</p>");
-        var now = clock.instant().plus(java.time.Duration.ofMinutes(1));
-
-        var id = weekly.compose(now, false).orElseThrow();
-        var edition = editions.find(id).orElseThrow();
-        assertThat(edition.status()).isEqualTo(io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterEdition.Status.DRAFT);
-        assertThat(edition.itemIds()).isNotEmpty();
-        // once a week: the same week composes nothing more
-        assertThat(weekly.compose(now, false)).isEmpty();
-    }
 
     @Test
     void a_request_starts_its_process_and_follows_what_the_process_announces() {
@@ -294,11 +270,8 @@ class ConsumersTest {
         slots.putVariant(PUBLISHER, "fo.home.destacado", new SlotVariant("v1", RECEPCION_CANARIAS, 10, "Turnos", "<p>x</p>", null));
         assertThat(visibility.slot(KLAUS, "fo.home.destacado")).isEmpty();
         assertThat(visibility.slot(ANA, "fo.home.destacado")).isPresent();
-        // newsletter
-        var editionId = newsletter.compose(PUBLISHER, "Boletín", "", List.of(secret), Audience.EVERYONE);
-        var edition = editions.find(editionId).orElseThrow();
-        assertThat(newsletter.itemsFor(edition, KLAUS)).isEmpty();
-        assertThat(newsletter.itemsFor(edition, ANA)).extracting(VisibleItem::itemId).containsExactly(secret);
+        // newsletter: the issue's items go through the same function (NewslettersTest)
+        assertThat(visibility.visibles(KLAUS, ContentQuery.ids(List.of(secret))).content()).isEmpty();
         // MCP / the chat's RAG
         questions.embedPending(100);
         assertThat(questions.passagesFor(KLAUS, "turnos de recepción", 5)).isEmpty();
@@ -329,6 +302,43 @@ class ConsumersTest {
         clock.advance(Duration.ofHours(2));
         assertThat(visibility.isVisible(ANA, later)).isTrue();
         assertThat(visibility.isVisible(ANA, expiring)).isFalse();
+    }
+
+    /** Another site's content stays in it: the intranet's listings, sections, search and chat behave as before. */
+    @Test
+    void another_sites_content_stays_out_of_the_intranet() {
+        var intranet = publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Noticia de la intranet", "<p>faro</p>");
+        var nav = new PgNavigationRepository(jdbc);
+        var boletin = nav.get("boletin");
+        boletin.add("editorial", null, Map.of("es", "Editorial"));
+        nav.save("boletin", boletin);
+        var own = itemCommands.createInSite(EDITOR, "boletin", ItemType.ARTICLE, "es", new ItemContent("editorial",
+                Audience.EVERYONE, Map.of("es", new Translation("Artículo del boletín", "", "<p>faro</p>")), List.of(),
+                null, null, false, false, null, null));
+        itemCommands.submitForReview(EDITOR, own);
+        itemCommands.publish(PUBLISHER, own, false);
+
+        assertThat(new PgItemRepository(jdbc).find(own).orElseThrow().siteId()).isEqualTo("boletin");
+        assertThat(new PgItemRepository(jdbc).find(intranet).orElseThrow().siteId()).isEqualTo("intranet");
+        // the intranet, as before: no listing, section or search of it shows the other site's article
+        assertThat(visibility.visibles(ANA, ContentQuery.latest(50)).content()).extracting(VisibleItem::itemId)
+                .contains(intranet).doesNotContain(own);
+        assertThat(visibility.visibles(ANA, ContentQuery.search("faro", 0, 50)).content()).extracting(VisibleItem::itemId)
+                .containsExactly(intranet);
+        assertThat(visibility.sectionsWithVisibleContent(ANA)).doesNotContain("editorial");
+        assertThat(nav.get().find("editorial")).isEmpty();
+        // the site, its own
+        assertThat(visibility.visibles(ANA, ContentQuery.latest(50).in("boletin")).content()).extracting(VisibleItem::itemId)
+                .containsExactly(own);
+        assertThat(visibility.sectionsWithVisibleContent(ANA, "boletin")).containsExactly("editorial");
+        // by id, wherever it is (a newsletter issue links both)
+        assertThat(visibility.item(ANA, own)).isPresent();
+        // homes, apart
+        var homes = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgHomePages(jdbc);
+        homes.save("boletin", List.of(own));
+        assertThat(homes.pageIds("boletin")).containsExactly(own);
+        assertThat(homes.pageIds()).doesNotContain(own);
+        homes.save("boletin", List.of());
     }
 
     @Test
@@ -404,36 +414,6 @@ class ConsumersTest {
     }
 
     @Test
-    void the_newsletter_goes_once_per_hash_and_language_and_skips_groups_with_nothing() {
-        var rc = publish(ItemType.ARTICLE, "noticias", RECEPCION_CANARIAS, "Solo recepción", "");
-        var editionId = newsletter.compose(PUBLISHER, "Boletín", "Hola", List.of(rc), Audience.EVERYONE);
-        newsletter.schedule(PUBLISHER, editionId, clock.instant());
-        assertThat(newsletter.sendDue()).isEqualTo(2); // ana (es) and jonas (de): same hash, two languages; klaus nothing
-        assertThat(mails).hasSize(2);
-        assertThat(editions.find(editionId).orElseThrow().status().name()).isEqualTo("SENT");
-        assertThat(newsletter.sendDue()).isZero();
-    }
-
-    @Test
-    void the_newsletter_respects_who_unsubscribed_and_who_wants_only_some_sections() {
-        var prefs = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterPreferences(jdbc);
-        var news = publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Para todos", "");
-        var hr = publish(ItemType.ARTICLE, "nominas", Audience.EVERYONE, "Nóminas de noviembre", "");
-        prefs.save("klaus", new io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference(false, java.util.Set.of()));
-        prefs.save("jonas", new io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference(true, java.util.Set.of("nominas")));
-        var edition = editions.find(newsletter.compose(PUBLISHER, "Boletín", "Hola", List.of(news, hr), Audience.EVERYONE)).orElseThrow();
-
-        var groups = newsletter.groups(edition);
-        assertThat(groups).noneMatch(g -> g.recipients().stream().anyMatch(e -> e.userId().equals("klaus")));
-        var jonas = groups.stream().filter(g -> g.recipients().stream().anyMatch(e -> e.userId().equals("jonas"))).findFirst().orElseThrow();
-        assertThat(newsletter.itemsFor(edition, jonas)).extracting(i -> i.itemId()).containsExactly(hr);
-        var ana = groups.stream().filter(g -> g.recipients().stream().anyMatch(e -> e.userId().equals("ana"))).findFirst().orElseThrow();
-        assertThat(newsletter.itemsFor(edition, ana)).extracting(i -> i.itemId()).containsExactly(news, hr);
-        prefs.save("klaus", io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference.DEFAULT);
-        prefs.save("jonas", io.mateu.ecdemo1.contenthub.application.out.NewsletterPreferences.Preference.DEFAULT);
-    }
-
-    @Test
     void newsletter_opens_and_clicks_count_per_group_only_with_a_valid_signature() {
         var signer = new io.mateu.ecdemo1.contenthub.infra.in.web.NewsletterLinksSigner("s3cret", "http://ec1.localhost:8800/intranet");
         var store = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterTracking(jdbc);
@@ -452,32 +432,6 @@ class ConsumersTest {
         assertThat(stats).hasSize(1);
         assertThat(stats.get(0).opens()).isEqualTo(1);
         assertThat(stats.get(0).clicks()).isEqualTo(1);
-    }
-
-    @Test
-    void redirected_the_newsletter_goes_as_one_digest_with_a_section_per_group() {
-        var sent = new ArrayList<String>();
-        var digest = new NewsletterService(editions, new PgEmployeeDirectory(jdbc), visibility,
-                new NamedAudiences(new PgNamedAudienceRepository(jdbc)), new Mailer() {
-            @Override
-            public void send(List<String> to, String subject, String html) {
-                sent.add(subject + "\n" + html);
-            }
-
-            @Override
-            public boolean redirected() {
-                return true;
-            }
-        }, clock, new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterPreferences(jdbc));
-        var rc = publish(ItemType.ARTICLE, "noticias", RECEPCION_CANARIAS, "Solo recepción", "");
-        var editionId = digest.compose(PUBLISHER, "Boletín", "Hola", List.of(rc), Audience.EVERYONE);
-        digest.schedule(PUBLISHER, editionId, clock.instant());
-        // the same two groups as one per group (ana es, jonas de; klaus nothing), in ONE message
-        assertThat(digest.sendDue()).isEqualTo(1);
-        assertThat(sent).singleElement().satisfies(m -> assertThat(m)
-                .startsWith("Boletín [2 grupos]").contains("Grupo 1 de 2").contains("Grupo 2 de 2"));
-        assertThat(editions.find(editionId).orElseThrow().status().name()).isEqualTo("SENT");
-        assertThat(digest.sendDue()).isZero();
     }
 
     @Test

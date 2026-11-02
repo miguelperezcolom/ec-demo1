@@ -26,6 +26,7 @@ public enum PortalFunction {
     SOLICITUDES("solicitudes", "Mis solicitudes"),
     POR_APROBAR("porAprobar", "Por aprobar"),
     ENCUESTAS("encuestas", "Encuestas"),
+    NEWSLETTERS("newsletters", "Newsletters"),
     PREFERENCIAS("preferencias", "Mis preferencias");
 
     private final String key;

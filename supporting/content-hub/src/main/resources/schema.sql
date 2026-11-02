@@ -126,3 +126,26 @@ create table if not exists ch_item_reader (item_id text not null, user_id text n
 -- file — refreshed by a job only when GOOGLE_DRIVE_* is configured.
 create table if not exists ch_drive_file (
     file_id text primary key, doc jsonb not null, refreshed_at timestamptz);
+
+-- Sites (2026-11): content-hub hosts several. The intranet is the default one ('intranet'); each newsletter
+-- is another, with its own sections (ch_navigation, one row per site — the intranet's stays 'main'), items
+-- and homes. Everything written before sites existed is the intranet's: the columns default to it.
+create table if not exists ch_site (id text primary key, kind text not null, name text, doc jsonb not null);
+alter table ch_item add column if not exists site_id text not null default 'intranet';
+alter table ch_item_doc add column if not exists site_id text not null default 'intranet';
+create index if not exists ch_item_doc_site on ch_item_doc (site_id, publish_at desc);
+-- the homes of a site other than the intranet (the intranet's stay in ch_home_page)
+create table if not exists ch_site_home_page (site_id text not null, position int not null, item_id text not null,
+    primary key (site_id, position));
+
+-- Newsletters as sites (2026-11): what makes a site a newsletter (layout, sources, cadence), its numbered
+-- issues — never two with the same number, nor two for the same cadence slot — and each reader's
+-- subscription to each. The editions of before (ch_newsletter) and the one preference (ch_newsletter_pref)
+-- are left as they were: NewsletterMigration copies them, once, into «Boletín de la intranet».
+create table if not exists ch_nl_newsletter (id text primary key, doc jsonb not null);
+create table if not exists ch_nl_issue (id text primary key, newsletter_id text not null, number int not null,
+    status text not null, scheduled_at timestamptz, slot timestamptz, doc jsonb not null);
+create unique index if not exists ch_nl_issue_number on ch_nl_issue (newsletter_id, number);
+create unique index if not exists ch_nl_issue_slot on ch_nl_issue (newsletter_id, slot);
+create table if not exists ch_nl_subscription (user_id text not null, newsletter_id text not null,
+    subscribed boolean not null, sections text[] not null, primary key (user_id, newsletter_id));

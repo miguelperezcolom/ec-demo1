@@ -139,7 +139,8 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
     public List<Option> options(String fieldName, HttpRequest httpRequest) {
         return switch (fieldName) {
             case "itemId" -> Catalog.get().publishedItems();
-            case "sectionId" -> Catalog.get().sections();
+            // the intranet's sections, and the newsletters' (nl:<section>) for a newsletter section block
+            case "sectionId" -> Catalog.get().sectionsForBlocks();
             case "mediaId" -> Catalog.get().media();
             case "remoteSourceId" -> Catalog.get().uiSources();
             default -> AudienceFields.options(fieldName);
@@ -158,7 +159,8 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
             java.util.Map.entry(BlockType.PENDING, java.util.Set.of()),
             java.util.Map.entry(BlockType.NOTICES, java.util.Set.of("limit")),
             java.util.Map.entry(BlockType.LATEST, java.util.Set.of("sectionId", "limit")),
-            java.util.Map.entry(BlockType.REMOTE, java.util.Set.of("remoteSourceId", "remoteRoute", "remoteAttributes")));
+            java.util.Map.entry(BlockType.REMOTE, java.util.Set.of("remoteSourceId", "remoteRoute", "remoteAttributes")),
+            java.util.Map.entry(BlockType.NEWSLETTER_SECTION, java.util.Set.of("sectionId")));
 
     /** The type's own fields, in the form's order — what the visual editor's side panel shows for it. */
     public static List<String> fieldsOf(BlockType type) {

@@ -139,6 +139,8 @@
 
     get api() { return this.getAttribute('api') || '/_intranet/api/editor'; }
     get pageId() { return this.getAttribute('page-id') || ''; }
+    /** What is edited: 'pages' (a page of a site) or 'issues' (a newsletter issue) — the same blocks either way. */
+    get resource() { return this.getAttribute('resource') === 'issues' ? 'issues' : 'pages'; }
 
     connectedCallback() {
       window.addEventListener('beforeunload', this.onBeforeUnload);
@@ -192,7 +194,7 @@
 
     async load() {
       try {
-        const data = await this.call('GET', '/pages/' + encodeURIComponent(this.pageId));
+        const data = await this.call('GET', '/' + this.resource + '/' + encodeURIComponent(this.pageId));
         this.take(data);
         this.state.dirty = false;
         this.render();
@@ -258,7 +260,7 @@
       const s = this.state;
       const seq = (this.previewSeq = (this.previewSeq || 0) + 1);
       try {
-        const data = await this.call('POST', '/pages/' + encodeURIComponent(this.pageId) + '/preview',
+        const data = await this.call('POST', '/' + this.resource + '/' + encodeURIComponent(this.pageId) + '/preview',
           { blocks: this.wire(), viewAs: s.viewAs || null });
         if (seq !== this.previewSeq) return;
         s.rendered = {};
@@ -282,7 +284,7 @@
       s.busy = true;
       this.renderBar();
       try {
-        const data = await this.call('PUT', '/pages/' + encodeURIComponent(this.pageId) + '/blocks',
+        const data = await this.call('PUT', '/' + this.resource + '/' + encodeURIComponent(this.pageId) + '/blocks',
           { blocks: this.wire(), updatedAt: s.page && s.page.updatedAt });
         this.take(data);
         s.dirty = false;
