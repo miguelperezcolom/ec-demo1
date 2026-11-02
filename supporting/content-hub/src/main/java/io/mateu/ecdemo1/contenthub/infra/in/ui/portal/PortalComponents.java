@@ -73,8 +73,17 @@ public final class PortalComponents {
     }
 
     /** A Drive file: who last touched it, as far as Drive said, and the ways to it, which open Google's. */
+    /**
+     * Under Google's preview. The iframe is Google's, inside another site: with third-party cookies blocked it
+     * does not see the reader's session and asks them to sign in, and nothing on this side can tell or help.
+     */
+    static final String DRIVE_PREVIEW_HELP = "¿La vista previa te pide iniciar sesión aunque ya la hayas iniciado? "
+            + "Tu navegador no deja usar tu sesión de Google dentro de la intranet: usa «Ver en otra ventana».";
+
     public static Component driveFile(DriveDocuments.Document d) {
         var links = new ArrayList<Component>();
+        // the same preview, but as a page of its own it has the reader's Google session
+        links.add(new Anchor("Ver en otra ventana", d.ref().previewUrl(), "_blank", "", ""));
         links.add(new Anchor("Abrir en Drive", d.ref().openUrl(), "_blank", "", ""));
         d.ref().editUrl().ifPresent(edit -> links.add(new Anchor("Editar en Drive", edit, "_blank", "", "")));
         var content = new ArrayList<Component>();
@@ -83,6 +92,7 @@ public final class PortalComponents {
             content.add(small(line));
         }
         content.add(HorizontalLayout.builder().spacing(true).wrap(true).content(links).build());
+        content.add(small(DRIVE_PREVIEW_HELP));
         return column(content);
     }
 

@@ -79,7 +79,9 @@ con un enlace a su ficha.
 Un contenido puede enlazar un fichero de Google Drive, Docs, Sheets o Slides. La intranet guarda solo la
 referencia, nunca una copia, así que **siempre ves la versión que hay en Drive**. Al abrir el contenido:
 
-- verás la **vista previa** de Google, si tu cuenta de Google tiene acceso al fichero;
+- verás la **vista previa** de Google, si tu cuenta de Google tiene acceso al fichero. Si te pide iniciar sesión
+  aunque ya la hayas iniciado, tu navegador no deja usar tu sesión de Google dentro de la intranet: usa **Ver en
+  otra ventana**;
 - **Abrir en Drive** lo abre en Google, y **Editar en Drive** en su editor (Docs, Sheets y Slides; un PDF u
   otro fichero solo se abre);
 - si el despliegue está conectado a Drive, verás también **«Modificado por X el …»** y el nombre actual.

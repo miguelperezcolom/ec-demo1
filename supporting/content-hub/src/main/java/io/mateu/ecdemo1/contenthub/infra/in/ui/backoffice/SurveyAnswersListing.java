@@ -27,7 +27,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * Every answer to every survey, one row each, to search and to export to CSV or Excel. Sorted by
+ * Every answer to every survey, one row each, to search and to export to CSV. Sorted by
  * survey, question and answer, so that the rows of an anonymous survey cannot be put back together
  * into one person's answers; those rows say neither who nor when.
  */
@@ -88,11 +88,6 @@ public class SurveyAnswersListing implements Listing<SurveyAnswersListing.Row> {
 
     @Override
     public boolean csvExportable() {
-        return true;
-    }
-
-    @Override
-    public boolean excelExportable() {
         return true;
     }
 }

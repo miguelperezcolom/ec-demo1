@@ -262,7 +262,7 @@ Para los items con **confirmación obligatoria**:
   lo ven), cuántos han confirmado en la versión que cuenta, y el porcentaje.
 - **Pendientes de confirmar** — quién falta, con su email, hotel y departamento: la lista para reclamar.
 
-Las dos se **exportan** a CSV o Excel desde el propio listado.
+Las dos se **exportan** a CSV, que Excel abre, desde el propio listado.
 
 ## Comentarios
 
@@ -295,7 +295,7 @@ encuesta cerrada ya no se modifica. Llegar a la fecha de cierre deja de admitir 
 (con su media), con el recuento y el porcentaje sobre quienes respondieron esa pregunta, y los textos libres,
 por orden alfabético.
 
-*Editorial → Respuestas de encuestas* da cada respuesta en una fila, para buscar y **exportar a CSV o Excel**. Las
+*Editorial → Respuestas de encuestas* da cada respuesta en una fila, para buscar y **exportar a CSV**, que Excel abre. Las
 de una encuesta anónima no dicen quién ni cuándo, y las filas van ordenadas por respuesta para que no se puedan
 reconstruir las respuestas de una misma persona.
 
