@@ -24,6 +24,8 @@ public class ContentRenderer {
 
     final MediaRepository media;
     final MediaUrls urls;
+    // an image's text alternative, when an editor gave it one («Salud del contenido»); else its title
+    final io.mateu.ecdemo1.contenthub.application.out.MediaDescriptions descriptions;
 
     /**
      * An item body or an HTML block, with its media marks expanded. Already sanitised when stored; here
@@ -50,7 +52,7 @@ public class ContentRenderer {
     public String medium(MediaAsset a, String base, String hash) {
         var title = Html.escape(a.title());
         return switch (a.kind()) {
-            case IMAGE -> "<figure style=\"margin:1rem 0\"><img src=\"" + src(a, base, hash) + "\" alt=\"" + title
+            case IMAGE -> "<figure style=\"margin:1rem 0\"><img src=\"" + src(a, base, hash) + "\" alt=\"" + Html.escape(descriptions.altText(a.id()).orElse(a.title()))
                     + "\" style=\"max-width:100%;border-radius:8px\"/><figcaption style=\"opacity:.7;font-size:.85rem\">"
                     + title + "</figcaption></figure>";
             case AUDIO -> "<figure style=\"margin:1rem 0\"><figcaption>" + title + "</figcaption><audio controls "
