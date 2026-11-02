@@ -428,7 +428,7 @@ class NewslettersTest {
     void an_item_with_a_block_of_an_unknown_type_is_read_without_it() {
         var id = publish(null, "noticias", Audience.EVERYONE, "Con bloque raro");
         jdbc.update("update ch_item set doc = jsonb_set(doc, '{draft,blocks}', "
-                + "'[{\"id\":\"r1\",\"type\":\"REMOTE\"},{\"id\":\"h1\",\"type\":\"HTML\",\"html\":\"<p>x</p>\"}]'::jsonb) where id = ?", id);
+                + "'[{\"id\":\"r1\",\"type\":\"FROM_A_NEWER_VERSION\"},{\"id\":\"h1\",\"type\":\"HTML\",\"html\":\"<p>x</p>\"}]'::jsonb) where id = ?", id);
         var item = new PgItemRepository(jdbc).find(id).orElseThrow();
         assertThat(item.draft().blocks()).extracting(Block::id).containsExactly("h1");
         assertThat(new PgItemRepository(jdbc).findAll()).extracting(i -> i.id()).contains(id);

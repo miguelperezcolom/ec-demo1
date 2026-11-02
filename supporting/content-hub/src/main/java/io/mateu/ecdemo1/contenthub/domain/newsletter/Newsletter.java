@@ -137,7 +137,7 @@ public class Newsletter extends AggregateRoot {
         var date = (slot != null ? slot : now).atZone(Cadence.ZONE).toLocalDate();
         var n = issued;
         var blocks = settings.layout().stream().map(b -> new Block(b.id() + "-" + n, b.type(), b.audience(), b.title(),
-                b.html(), b.itemId(), b.sectionId(), b.limit(), b.links(), b.mediaId())).toList();
+                b.html(), b.itemId(), b.sectionId(), b.limit(), b.links(), b.mediaId(), b.remote())).toList();
         return NewsletterIssue.draft(issueId, id, issued, date, slot, name + " · nº " + issued, blocks,
                 items == null ? Map.of() : items, now);
     }

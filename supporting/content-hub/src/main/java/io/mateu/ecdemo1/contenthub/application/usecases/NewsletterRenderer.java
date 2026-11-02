@@ -45,6 +45,11 @@ public final class NewsletterRenderer {
         /** The logo's URL, or null. */
         String logo();
 
+        /** A block showing another UI, where it cannot run: its fallback (a link to the web); null for the default. */
+        default String remote(Block block) {
+            return null;
+        }
+
         /** The open pixel's URL, or null. */
         default String pixel() {
             return null;
@@ -167,6 +172,12 @@ public final class NewsletterRenderer {
                     title = v.sectionNames().getOrDefault(key, key);
                 }
                 yield items(v, list);
+            }
+            // another UI cannot run in an e-mail: its fallback, a link to see it on the web
+            case REMOTE -> {
+                var r = v.links().remote(b);
+                yield r != null ? r : "<p style=\"margin:1rem 0\"><a href=\"" + esc(v.links().permalink()) + "\">"
+                        + esc(title.isBlank() ? "Contenido" : title) + " — ver en la web</a></p>";
             }
             // a block type a newsletter does not draw (one added since: another UI…): nothing in the issue
             default -> null;

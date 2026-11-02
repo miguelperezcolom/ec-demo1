@@ -475,9 +475,20 @@ cada sección, estado (`DRAFT → SCHEDULED → SENT`, o `CANCELLED`) y los env�
   permanente (`/intranet/n/{sitio}/numeros/{número}`) y la baja de esa newsletter (`/intranet/n/{sitio}`).
   El logo se sirve sin firma en `/_intranet/n/logo/{sitio}` (solo el logo de una newsletter).
 - **El sitio en el portal**: `PortalRoutes` lleva `/intranet/n/{sitio}[/archivo|/numeros/{id}|/secciones/{id}|/p/{id}]`
-  a `NewsletterSitePage`. Su menú sale de **una sola costura**, `NewsletterNavigation.menu` (inicio,
-  secciones, archivo, páginas publicadas que ve el lector, en orden fijo), que pasará a leer el menú
-  configurable (`feat/configurable-menus`, dueño `NEWSLETTER:<id>`) cuando esté.
+  a `NewsletterSitePage`, dibujado sobre su propio papel claro (sus colores, como el correo, son para fondo
+  blanco, también con el tema oscuro). Su menú es el **menú configurable de su sitio** (`SiteMenus`, dueño
+  el id del sitio): `NewsletterMenus` lo siembra la primera vez (al crearla, o al arrancar para las que ya
+  había) con su inicio, sus secciones de primer nivel, su archivo y sus páginas, y «Nueva página» añade la
+  página al final; desde entonces se edita en *Configuración → Menús* (`content:admin`), que lista los
+  sitios de las newsletters. `NewsletterNavigation` lo dibuja (`SiteMenus.shown`) como la barra del sitio,
+  dentro de su página. Destinos propios (`NewsletterTargets`, solo en sitios de newsletter):
+  `NEWSLETTER_HOME`, `ARCHIVE` e `ISSUE` (un número, cuando ha salido); `PAGE` y `SECTION` son los de siempre,
+  ahora por sitio, con las rutas de `SiteAwareRoutes` (`@Primary SiteRoutes`: `/intranet/n/{sitio}/p/{id}`,
+  `…/secciones/{id}`).
+- **Bloques que no se conocen**: un bloque de un tipo que esta versión no sabe leer (de una versión más
+  nueva) se anota en el log y se deja fuera al leer un item, un número o una maqueta (`Json.KnownBlocks`),
+  en vez de romper todos los listados que lo leen. Un bloque `REMOTE` en el correo es el enlace a la web de
+  `RemoteUiRenderer.fallbackHtml`.
 - **Editor visual** de un número: el mismo `<ec-visual-editor>` con `resource="issues"`, contra
   `/_intranet/api/editor/issues/{id}` (`IssueEditorController`, que reutiliza el de páginas).
 - **Aperturas y clics**: `ch_newsletter_event` por número y grupo (su columna sigue llamándose

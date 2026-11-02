@@ -415,7 +415,8 @@ como un sitio web», «es como una intranet, con sus páginas», «es como una i
 | N5.5 | **Portal**: «Newsletters» y el sitio de cada una en `/intranet/n/{id}` (inicio, archivo, número, sección, páginas), su menú tras una costura (`NewsletterNavigation`) | hecho (bd0db49a); falta probarlo en el navegador (Vaadin y Redwood, móvil) |
 | N5.6 | **Backoffice**: Newsletters (identidad, audiencia, secciones, maqueta, periodicidad, sus números y páginas), Números de newsletter (formulario, prueba, programar/cancelar, estadísticas, vista previa), editor visual sobre un número | hecho (bd0db49a); falta probarlo en el navegador |
 | N5.7 | **Migración** de las ediciones a «Boletín de la intranet» (idempotente, al arrancar), eventos y preferencias conservados | hecho (bd0db49a); probado en arranque contra un Postgres vacío con una edición |
-| N5.8 | Menú configurable de la newsletter (`feat/configurable-menus`, dueño `NEWSLETTER:<id>`) en lugar del derivado | pendiente, cuando se fusionen las dos ramas |
+| N5.8 | Menú configurable de la newsletter (dueño: el id de su sitio) en lugar del derivado: sembrado (inicio, secciones, archivo, páginas), destinos `NEWSLETTER_HOME`/`ARCHIVE`/`ISSUE`, `PAGE`/`SECTION` por sitio (`SiteAwareRoutes`), editable en Configuración → Menús | hecho (tras #279) |
+| N5.10 | Revisión en el navegador (Vaadin, tema oscuro): el número y la barra del sitio ilegibles sobre fondo oscuro → el sitio sobre papel claro; un item con un bloque de tipo desconocido rompía el listado → se lee sin él | hecho |
 | N5.9 | Desplegar en local y probar en el navegador | pendiente (lo despliega el agente principal) |
 
 ## H — Inicios por audiencia (home configurable)

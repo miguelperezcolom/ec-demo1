@@ -67,6 +67,10 @@ public class NewsletterService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     NewsletterLinks links = NewsletterLinks.NONE;
 
+    /** What a REMOTE block becomes in an e-mail (the remote UIs' fallback); the renderer's own link without it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    io.mateu.ecdemo1.contenthub.application.out.RemoteBlockFallback remoteFallback;
+
     /**
      * A group of recipients: everyone with the same profile who reads it in the same language and wants the
      * same from it. {@code hash} names the group: the profile's hash, followed by the sections wanted when
@@ -172,6 +176,7 @@ public class NewsletterService {
             case FEATURED, AUTOMATIC_LISTING, LATEST, NOTICES -> !listing(b, group.profile()).isEmpty();
             case MEDIA -> b.mediaId() != null;
             case QUICK_LINKS -> !b.links().isEmpty();
+            case REMOTE -> b.remote() != null;
             default -> false; // greeting, pending, and any block type a newsletter does not draw
         });
     }
@@ -244,6 +249,11 @@ public class NewsletterService {
             @Override
             public String pixel() {
                 return tracked.open(issue.id(), group);
+            }
+
+            @Override
+            public String remote(Block block) {
+                return remoteFallback == null ? null : remoteFallback.html(block, permalink);
             }
         };
     }

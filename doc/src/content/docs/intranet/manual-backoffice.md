@@ -384,6 +384,11 @@ abrir una:
 - **Números y páginas**: sus números (número, fecha, asunto, estado, aperturas, clics), cada uno con su
   enlace, y sus páginas.
 
+**Su menú** (el de su sitio en el portal) empieza con su inicio, sus secciones, sus números anteriores y sus
+páginas; una página creada con «Nueva página» se añade al final. Para reordenarlo, quitar o añadir entradas
+(otra página, un número concreto, un enlace…): *Configuración → Menús* (consola de control,
+`content:admin`), eligiendo el sitio de la newsletter.
+
 Acciones: **Nuevo número** (lo abre ya relleno: la maqueta y lo publicado desde el número anterior en cada
 sección que vea alguien de su audiencia, lo más reciente primero), **Nueva página** (una página del sitio
 de la newsletter, que se escribe, revisa y publica como cualquier contenido —también *Editar sobre la

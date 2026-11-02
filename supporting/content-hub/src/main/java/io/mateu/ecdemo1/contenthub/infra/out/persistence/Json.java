@@ -63,7 +63,12 @@ public final class Json {
                 LOG.warn("Block {} of unknown type {} left out", node == null ? null : node.get("id"), type);
                 return null;
             }
-            return BLOCKS.treeToValue(node, io.mateu.ecdemo1.contenthub.domain.item.Block.class);
+            try {
+                return BLOCKS.treeToValue(node, io.mateu.ecdemo1.contenthub.domain.item.Block.class);
+            } catch (RuntimeException | java.io.IOException e) { // a block its own type no longer accepts
+                LOG.warn("Block {} could not be read, left out: {}", node.get("id"), e.getMessage());
+                return null;
+            }
         }
     }
 
