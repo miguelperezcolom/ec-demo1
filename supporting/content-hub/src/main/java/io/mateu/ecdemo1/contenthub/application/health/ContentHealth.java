@@ -135,7 +135,14 @@ public class ContentHealth {
         }
         var runId = newRunId();
         store.startRun(runId, "ON_DEMAND", reader.userId(), clock.instant());
-        background.execute(() -> execute(runId));
+        log.info("Content health: run {} requested by {}", runId, reader.userId());
+        background.execute(() -> {
+            try {
+                execute(runId);
+            } catch (Throwable t) { // nothing escapes a background thread unseen
+                log.error("Content health run {} died: {}", runId, t.toString(), t);
+            }
+        });
         return true;
     }
 
@@ -152,6 +159,7 @@ public class ContentHealth {
             store.finishRun(runId, Map.of(), "ya había otra comprobación en marcha", clock.instant());
             return;
         }
+        log.info("Content health: run {} started", runId);
         try {
             var snapshot = snapshot();
             var external = links.check(HealthChecks.externalUrls(snapshot));
@@ -162,9 +170,9 @@ public class ContentHealth {
                 counts.put(check.name(), (int) findings.stream().filter(f -> f.check() == check).count());
             }
             store.finishRun(runId, counts, null, clock.instant());
-            log.info("Content health: {} findings {}", findings.size(), counts);
+            log.info("Content health: run {} finished, {} findings {}", runId, findings.size(), counts);
         } catch (RuntimeException e) {
-            log.warn("Content health run failed: {}", e.toString(), e);
+            log.warn("Content health run {} failed: {}", runId, e.toString(), e);
             store.finishRun(runId, Map.of(), String.valueOf(e.getMessage()), clock.instant());
         } finally {
             running.set(false);

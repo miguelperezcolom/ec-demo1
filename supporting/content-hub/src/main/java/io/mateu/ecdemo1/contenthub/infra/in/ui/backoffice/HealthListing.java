@@ -151,44 +151,43 @@ public class HealthListing implements Listing<HealthListing.Row>, Navigable<Find
         return pages.getObject().load(id, httpRequest);
     }
 
-    /** Runs the checks now, in the background; the list is searched again when asked. */
+    /**
+     * The event the crud Mateu puts around this listing listens to, to search again. A Navigable listing is
+     * bridged into a crud (CapabilityCrud): its toolbar buttons arrive as {@code action-on-row-<method>} and
+     * the METHOD is invoked — an override of {@code handleAction} is never asked, which is why these methods
+     * do the work themselves (with no-op methods the button "worked" and nothing ran).
+     */
+    static final String CRUD_LISTING_CHANGED = "mateu-crud:listing-changed";
+
+    /** Runs the checks now, in the background; the list searches again (and again when asked). */
     @ListToolbarButton(rowsSelectedRequired = false)
     @Label("Comprobar ahora")
-    public void comprobarAhora() {
-        // handled in handleAction, like every action of this listing
+    public Object comprobarAhora(HttpRequest httpRequest) {
+        var reader = readers.of(httpRequest);
+        if (!reader.may(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT)) {
+            return Message.warning("Para comprobar hace falta el permiso content:edit");
+        }
+        var started = health.startNow(reader);
+        return List.of(started
+                        ? Message.success("Comprobación en marcha: los enlaces externos tardan un poco. Vuelve a buscar en unos segundos.")
+                        : Message.warning("Ya hay una comprobación en marcha"),
+                UICommand.dispatchEvent(CRUD_LISTING_CHANGED), UICommand.dispatchEvent(CHANGED));
     }
 
     /** Marks the selected findings as reviewed for 30 days. */
     @ListToolbarButton
     @Label("Marcar como revisados (30 días)")
-    public void marcarComoRevisados() {
-        // handled in handleAction
-    }
-
-    @Override
-    public boolean supportsAction(String actionId) {
-        return "comprobarAhora".equals(actionId) || "marcarComoRevisados".equals(actionId)
-                || Listing.super.supportsAction(actionId);
-    }
-
-    @Override
-    public Object handleAction(String actionId, HttpRequest httpRequest) {
-        if ("comprobarAhora".equals(actionId)) {
-            var started = health.startNow(readers.of(httpRequest));
-            return List.of(started ? Message.success("Comprobando: los enlaces externos tardan un poco. Vuelve a buscar en unos segundos.")
-                    : Message.warning("Ya hay una comprobación en marcha"), UICommand.dispatchEvent(CHANGED));
+    @SuppressWarnings("rawtypes") // the selected rows as the client sends them (maps), like Mateu's own delete
+    public Object marcarComoRevisados(List<java.util.Map> selection, HttpRequest httpRequest) {
+        var reader = readers.of(httpRequest);
+        var ids = (selection == null ? List.<java.util.Map>of() : selection).stream().map(row -> row.get("id"))
+                .filter(Objects::nonNull).map(String::valueOf).toList();
+        if (ids.isEmpty()) {
+            return Message.warning("Selecciona primero los avisos");
         }
-        if ("marcarComoRevisados".equals(actionId)) {
-            var reader = readers.of(httpRequest);
-            var ids = httpRequest.getListOfMaps("crud_selected_items").stream()
-                    .map(row -> row.get("id")).filter(Objects::nonNull).map(String::valueOf).toList();
-            if (ids.isEmpty()) {
-                return Message.warning("Selecciona primero los avisos");
-            }
-            ids.forEach(id -> health.snooze(reader, id, 30, "marcado desde la lista"));
-            return List.of(Message.success(ids.size() + (ids.size() == 1 ? " aviso marcado" : " avisos marcados")
-                    + " como revisado durante 30 días"), UICommand.dispatchEvent(CHANGED));
-        }
-        return Listing.super.handleAction(actionId, httpRequest);
+        ids.forEach(id -> health.snooze(reader, id, 30, "marcado desde la lista"));
+        return List.of(Message.success(ids.size() + (ids.size() == 1 ? " aviso marcado" : " avisos marcados")
+                        + " como revisado durante 30 días"),
+                UICommand.dispatchEvent(CRUD_LISTING_CHANGED), UICommand.dispatchEvent(CHANGED));
     }
 }
