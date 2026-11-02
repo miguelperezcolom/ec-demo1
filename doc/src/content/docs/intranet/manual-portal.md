@@ -152,13 +152,13 @@ Nunca te llegará nada que no puedas ver en la intranet, elijas lo que elijas.
 
 También decides **cómo se te avisa** de lo que se publica para ti:
 
-- **Avisarme en la aplicación**: la campana de la consola y las notificaciones del navegador, si las has
+- **Avisarme en la aplicación**: la campana de la cabecera y las notificaciones del navegador, si las has
   activado. Llegan los avisos nuevos que puedes ver, lo que un editor haya marcado para notificar y el
   recordatorio de lo que debes confirmar, unos dos días antes de la fecha límite.
 - **Avisarme por correo**: solo lo que se publica como *importante*.
 
 Un aviso se cierra solo cuando abres el contenido, y el recordatorio cuando lo confirmas. Solo se te avisa de lo
-que puedes ver. La campana está en `ec1.mateu.io`; en `intranet.ec1.mateu.io` no la hay.
+que puedes ver.
 
 ## Comentarios y «Me gusta»
 

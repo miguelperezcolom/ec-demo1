@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.intranetshell.infra.in.ui;
 import io.mateu.ecdemo1.uicommons.user.UserWidget;
 import io.mateu.uidl.annotations.App;
 import io.mateu.uidl.annotations.FavIcon;
+import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.KeycloakSecured;
 import io.mateu.uidl.annotations.Logo;
 import io.mateu.uidl.annotations.Menu;
@@ -31,6 +32,8 @@ import java.util.List;
 @Title("Intranet")
 @PageTitle("Intranet" + Renderer.TITLE_SUFFIX)
 @KeycloakSecured(url = "https://auth.ec1.mateu.io", realm = "ec-demo1", clientId = "demo")
+// The bell's way in and Web Push: the inbox's script, as in the consoles. Public at the gateway.
+@Script(src = "/_inbox/push/push.js")
 // The portal's embeds: YouTube/Vimeo/Drive players and PDFs drawn as placeholders (the renderers'
 // sanitiser drops iframes). content-hub serves it; public at the gateway on this host too.
 @Script(src = "/_intranet/embed.js")
@@ -51,9 +54,18 @@ public class IntranetShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu portal = new RemoteMenu("/_portal").withLabel("Intranet");
 
-    /** Who is signed in. No inbox badge: the inbox is the consoles', not the intranet's. */
+    /**
+     * The inbox, hidden from the bar: the bell in the widgets below is the way in. It is where a reader
+     * finds what the intranet tells them — a publication, a reading to confirm. Declared so that the
+     * bell's route, a deep link and a reload on /inbox/... resolve.
+     */
+    @Menu
+    @Hidden
+    RemoteMenu inbox = new RemoteMenu("/_inbox");
+
+    /** The bell and who is signed in; the demo's banner is about the consoles, and stays out. */
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {
-        return UserWidget.of(httpRequest);
+        return UserWidget.withBell(httpRequest);
     }
 }

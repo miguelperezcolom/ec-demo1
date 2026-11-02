@@ -443,10 +443,11 @@ flowchart LR
   `intranet/confirmation/{id}/{usuario}`, sin versión) y se cierran con `NotificationResolved`: al abrir el item
   (nunca en «ver como»), al confirmarlo (el recordatorio), cuando deja de poder leerse, o a los `close-after`
   (30 días). La bandeja es para lo que sigue esperando.
-- **Dónde se ven.** En la campana de los shells de datos y de control. **Los shells propios de la intranet
-  (`consoles/intranet-shell`) no la tienen** —ni la ruta `/_inbox` en el gateway, ni `push.js`—: quien solo entra
-  por `intranet.ec1.mateu.io` recibe el correo de lo importante y ve lo demás en el portal, pero no la campana. El
-  enlace, `/intranet/noticias/{id}`, resuelve en los hosts de datos, no en la consola de control.
+- **Dónde se ven.** En la campana de los shells de datos, de control y de la propia intranet
+  (`consoles/intranet-shell`, sin el banner de la demo, que es de las consolas). El enlace,
+  `/intranet/noticias/{id}`, resuelve en los hosts de datos y de la intranet, no en la consola de control. La
+  bandeja es la de cada persona: quien además tiene un rol operativo ve ahí también sus tareas, y esos enlaces
+  solo resuelven en las consolas.
 
 ## Analítica
 
