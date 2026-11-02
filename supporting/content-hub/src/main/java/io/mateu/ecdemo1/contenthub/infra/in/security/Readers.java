@@ -77,14 +77,22 @@ public class Readers {
                 viewing = hash;
             }
         }
-        return new Reader(userId, name, attributes, permissions, viewing);
+        return new Reader(userId, name, attributes, permissions, viewing, scopes(headers.apply(SCOPES_HEADER)));
+    }
+
+    /** Every scope the gateway says the caller holds; none when it did not say (a UI source requiring one is then out of reach). */
+    static Set<String> scopes(String scopesHeader) {
+        if (scopesHeader == null || scopesHeader.isBlank()) {
+            return Set.of();
+        }
+        return Set.copyOf(Arrays.asList(scopesHeader.trim().split("\\s+")));
     }
 
     @SuppressWarnings("unchecked")
     static Set<EditorialPermission> permissions(String scopesHeader, Map<String, Object> claims) {
         var out = EnumSet.noneOf(EditorialPermission.class);
         if (scopesHeader != null) {
-            var scopes = Set.of(scopesHeader.trim().split("\\s+"));
+            var scopes = Set.copyOf(Arrays.asList(scopesHeader.trim().split("\\s+")));
             for (var p : EditorialPermission.values()) {
                 if (scopes.contains(p.scope())) {
                     out.add(p);

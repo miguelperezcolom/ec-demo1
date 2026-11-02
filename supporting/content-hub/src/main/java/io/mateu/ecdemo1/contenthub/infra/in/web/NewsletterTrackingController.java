@@ -29,12 +29,50 @@ public class NewsletterTrackingController {
     final NewsletterLinksSigner signer;
     final NewsletterTracking tracking;
     final String portalUrl;
+    /** Where an item lives (a newsletter's own items, under its site); null in tests: the intranet's page. */
+    final io.mateu.ecdemo1.contenthub.application.out.ItemRepository items;
+    final io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites;
+    final io.mateu.ecdemo1.contenthub.application.out.MediaRepository media;
 
     public NewsletterTrackingController(NewsletterLinksSigner signer, NewsletterTracking tracking,
                                         @Value("${content-hub.portal-url:http://ec1.localhost:8800/intranet}") String portalUrl) {
+        this(signer, tracking, portalUrl, null, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public NewsletterTrackingController(NewsletterLinksSigner signer, NewsletterTracking tracking,
+                                        @Value("${content-hub.portal-url:http://ec1.localhost:8800/intranet}") String portalUrl,
+                                        io.mateu.ecdemo1.contenthub.application.out.ItemRepository items,
+                                        io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites,
+                                        io.mateu.ecdemo1.contenthub.application.out.MediaRepository media) {
         this.signer = signer;
         this.tracking = tracking;
         this.portalUrl = portalUrl;
+        this.items = items;
+        this.sites = sites;
+        this.media = media;
+    }
+
+    /**
+     * A newsletter's logo, for its email and its web version: the image of the library the newsletter names.
+     * No signature (an email is read weeks later, and the logo is the newsletter's public face); only a
+     * newsletter's logo, nothing else of the library.
+     */
+    @GetMapping("/_intranet/n/logo/{site}")
+    public ResponseEntity<byte[]> logo(@PathVariable String site) {
+        if (sites == null || media == null || !site.matches("[a-z0-9-]{1,60}")) {
+            return ResponseEntity.notFound().build();
+        }
+        var mediaId = sites.find(site).filter(s -> s.kind() == io.mateu.ecdemo1.contenthub.domain.site.Site.Kind.NEWSLETTER)
+                .map(s -> s.definition().logoMediaId()).orElse(null);
+        var asset = mediaId == null ? null : media.find(mediaId).orElse(null);
+        var bytes = asset == null || asset.kind() != io.mateu.ecdemo1.contenthub.domain.media.MediaKind.IMAGE ? null
+                : media.bytes(mediaId).orElse(null);
+        if (bytes == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(asset.contentType()))
+                .cacheControl(CacheControl.maxAge(java.time.Duration.ofHours(1))).body(bytes);
     }
 
     @GetMapping("/_intranet/n/o/{edition}/{group}/{signature}.gif")
@@ -55,7 +93,10 @@ public class NewsletterTrackingController {
         if (signer.valid(edition, group, item, signature)) {
             tracking.record(new NewsletterTracking.Event(edition, group, NewsletterTracking.Kind.CLICK, item));
         }
-        var target = portalUrl.replaceFirst("/intranet/?$", "") + Ui.itemLink(item);
+        var site = items == null ? null : items.find(item).map(i -> i.siteId()).orElse(null);
+        var path = site == null || io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET.equals(site) ? Ui.itemLink(item)
+                : Ui.PORTAL + "/n/" + site + "/p/" + item;
+        var target = portalUrl.replaceFirst("/intranet/?$", "") + path;
         return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, URI.create(target).toString()).build();
     }
 }

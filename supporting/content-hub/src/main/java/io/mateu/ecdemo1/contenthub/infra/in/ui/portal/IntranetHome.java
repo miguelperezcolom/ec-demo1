@@ -29,7 +29,7 @@ public class IntranetHome implements HomeRouteSupplier {
 
     @Menu
     @Label("Intranet")
-    IntranetMenu intranet;
+    IntranetMenu intranet = new IntranetMenu(); // a MenuSupplier: Mateu asks the instance for the entries
 
     @Menu
     @Label("Editorial")

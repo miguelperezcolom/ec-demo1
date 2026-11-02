@@ -67,6 +67,8 @@ public class ViewAsPage implements OptionsSupplier {
     final Visibility visibility;
     final Readers readers;
     final io.mateu.ecdemo1.contenthub.application.out.HomePages homes;
+    final io.mateu.ecdemo1.contenthub.application.menu.SiteMenus menus;
+    final io.mateu.ecdemo1.contenthub.application.menu.SiteRoutes routes;
 
     // Final, like the dependencies above: a non-final field is form state to Mateu, and was drawn as
     // a "Portal url" input.
@@ -75,6 +77,8 @@ public class ViewAsPage implements OptionsSupplier {
     public ViewAsPage(EmployeeDirectory directory, AudienceCommands audiences, NamedAudienceRepository namedAudiences,
                       NavigationRepository navigation, Visibility visibility, Readers readers,
                       io.mateu.ecdemo1.contenthub.application.out.HomePages homes,
+                      io.mateu.ecdemo1.contenthub.application.menu.SiteMenus menus,
+                      io.mateu.ecdemo1.contenthub.application.menu.SiteRoutes routes,
                       @Value("${content-hub.portal-url:http://ec1.localhost:8800/intranet}") String portalUrl) {
         this.directory = directory;
         this.audiences = audiences;
@@ -83,6 +87,8 @@ public class ViewAsPage implements OptionsSupplier {
         this.visibility = visibility;
         this.readers = readers;
         this.homes = homes;
+        this.menus = menus;
+        this.routes = routes;
         this.portalUrl = portalUrl;
     }
 
@@ -117,11 +123,17 @@ public class ViewAsPage implements OptionsSupplier {
         var home = homes.pageIds().stream().map(id -> visibility.item(attrs, id)).flatMap(java.util.Optional::stream)
                 .findFirst().map(i -> "<a href=\"" + Ui.itemLink(i.itemId()) + "\">" + Ui.esc(i.title()) + "</a>")
                 .orElse("el inicio por defecto");
+        // the intranet's menu as this profile gets it (Configuración → Menús)
+        var site = io.mateu.ecdemo1.contenthub.domain.menu.SiteMenu.INTRANET;
+        var shownMenu = menus.shown(new io.mateu.ecdemo1.contenthub.application.menu.MenuContext(site,
+                new io.mateu.ecdemo1.contenthub.application.security.Reader("preview", "Ver como", attrs,
+                        java.util.Set.of(), null), java.util.Set.of()));
         return Html.block("<p><b>Perfil:</b> " + Ui.esc(attrs.canonical().replace(";", " · ")) + " · idioma "
                 + attrs.language() + " · hash <code>" + attrs.hash() + "</code></p>"
                 + "<p><b>Su inicio:</b> " + home + "</p>"
                 + "<div style=\"display:grid;grid-template-columns:1fr 2fr;gap:1rem\">"
-                + Ui.card("<h3 style=\"margin-top:0\">Menú</h3>" + (menu.isEmpty() ? "<i>sin secciones</i>" : menu))
+                + Ui.card("<h3 style=\"margin-top:0\">Menú</h3>" + MenuPreviewPage.html(site, shownMenu, routes)
+                + "<h3>Secciones</h3>" + (menu.isEmpty() ? "<i>sin secciones</i>" : menu))
                 + Ui.card("<h3 style=\"margin-top:0\">Contenido visible (" + items.total() + ")</h3>"
                 + PageRenderer.list(items.content())) + "</div>");
     }
@@ -135,6 +147,7 @@ public class ViewAsPage implements OptionsSupplier {
 
     @Toolbar
     @Action
+    @Label("Ver la intranet así")
     public Object verLaIntranetAsi(HttpRequest httpRequest) {
         var attrs = chosen();
         if (attrs == null) {

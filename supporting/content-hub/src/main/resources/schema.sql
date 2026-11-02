@@ -4,9 +4,15 @@
 create table if not exists ch_item (
     id text primary key, doc jsonb not null, type text, status text, title text, author text,
     updated_at timestamptz, pending_changes boolean, in_review boolean);
+-- Each item's history (created, edited, sent to review, published, rejected, retired, restored): who
+-- and when, and for a save or a restore the draft it left (a publication's content is its version).
+create table if not exists ch_item_history (item_id text not null, seq int not null, action text not null,
+    at timestamptz not null, by_user text, version int, note text, snapshot jsonb, primary key (item_id, seq));
 create table if not exists ch_navigation (id text primary key, doc jsonb not null);
 create table if not exists ch_slot (key text primary key, doc jsonb not null);
 create table if not exists ch_named_audience (id text primary key, name text, doc jsonb not null);
+-- The registry of external UIs (UiSource): what remote pages and «Componente remoto» blocks may show
+create table if not exists ch_ui_source (id text primary key, name text, doc jsonb not null);
 create table if not exists ch_newsletter (
     id text primary key, doc jsonb not null, status text, scheduled_at timestamptz);
 create table if not exists ch_favorites (user_id text primary key, doc jsonb not null);
@@ -38,6 +44,8 @@ create table if not exists ch_newsletter_pref (user_id text primary key, subscri
     sections text[] not null);
 -- The pages that are homes, in order: a reader's home is the first they can see.
 create table if not exists ch_home_page (position int primary key, item_id text not null);
+-- Each site's menu (the intranet's, a newsletter's…), as one document: an ordered tree of entries.
+create table if not exists ch_menu (site_id text primary key, doc jsonb not null);
 create table if not exists ch_profile (hash text primary key, attributes jsonb not null, canonical text,
     first_seen timestamptz);
 
@@ -122,3 +130,52 @@ create table if not exists ch_item_reader (item_id text not null, user_id text n
 -- file — refreshed by a job only when GOOGLE_DRIVE_* is configured.
 create table if not exists ch_drive_file (
     file_id text primary key, doc jsonb not null, refreshed_at timestamptz);
+
+-- Sites (2026-11): content-hub hosts several. The intranet is the default one ('intranet'); each newsletter
+-- is another, with its own sections (ch_navigation, one row per site — the intranet's stays 'main'), items
+-- and homes. Everything written before sites existed is the intranet's: the columns default to it.
+create table if not exists ch_site (id text primary key, kind text not null, name text, doc jsonb not null);
+alter table ch_item add column if not exists site_id text not null default 'intranet';
+alter table ch_item_doc add column if not exists site_id text not null default 'intranet';
+create index if not exists ch_item_doc_site on ch_item_doc (site_id, publish_at desc);
+-- the homes of a site other than the intranet (the intranet's stay in ch_home_page)
+create table if not exists ch_site_home_page (site_id text not null, position int not null, item_id text not null,
+    primary key (site_id, position));
+
+-- Newsletters as sites (2026-11): what makes a site a newsletter (layout, sources, cadence), its numbered
+-- issues — never two with the same number, nor two for the same cadence slot — and each reader's
+-- subscription to each. The editions of before (ch_newsletter) and the one preference (ch_newsletter_pref)
+-- are left as they were: NewsletterMigration copies them, once, into «Boletín de la intranet».
+create table if not exists ch_nl_newsletter (id text primary key, doc jsonb not null);
+create table if not exists ch_nl_issue (id text primary key, newsletter_id text not null, number int not null,
+    status text not null, scheduled_at timestamptz, slot timestamptz, doc jsonb not null);
+create unique index if not exists ch_nl_issue_number on ch_nl_issue (newsletter_id, number);
+create unique index if not exists ch_nl_issue_slot on ch_nl_issue (newsletter_id, slot);
+create table if not exists ch_nl_subscription (user_id text not null, newsletter_id text not null,
+    subscribed boolean not null, sections text[] not null, primary key (user_id, newsletter_id));
+
+-- Page templates: where a new page starts from (its blocks and default audience), one JSON document each.
+create table if not exists ch_page_template (id text primary key, name text, doc jsonb not null,
+    updated_at timestamptz);
+-- Reviewer preview links: a draft shown, signed and expiring, to whoever logged in opens the link; the
+-- views go with the link. The signing key, made once, when MEDIA_SECRET does not give one.
+create table if not exists ch_preview_link (id text primary key, item_id text not null,
+    created_at timestamptz not null, doc jsonb not null);
+create index if not exists ch_preview_link_item on ch_preview_link (item_id, created_at desc);
+create table if not exists ch_preview_key (id int primary key, secret text not null);
+
+-- Content health («Salud del contenido»): each run (the night's claimed by its day, once), the findings of
+-- the last one (replaced by each run, keeping when each was first seen), the «revisado» marks, and what
+-- each external URL last answered (so it is not asked again for a while).
+create table if not exists ch_health_run (id text primary key, trigger text not null, nightly_day date,
+    started_by text, started_at timestamptz not null, finished_at timestamptz, counts jsonb, error text);
+create unique index if not exists ch_health_run_nightly on ch_health_run (nightly_day);
+create table if not exists ch_health_finding (key text primary key, doc jsonb not null, check_name text not null,
+    first_seen timestamptz not null, last_seen timestamptz not null);
+create table if not exists ch_health_snooze (key text primary key, until timestamptz not null, by_user text,
+    note text, at timestamptz not null);
+create table if not exists ch_health_link (url text primary key, outcome text not null, http_status int,
+    detail text, checked_at timestamptz not null);
+-- The images' text alternatives, apart from the medium (which is never modified).
+create table if not exists ch_media_alt (media_id text primary key, alt_text text not null, set_by text,
+    set_at timestamptz not null);

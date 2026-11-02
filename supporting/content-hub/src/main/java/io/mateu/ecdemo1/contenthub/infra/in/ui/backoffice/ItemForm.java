@@ -58,6 +58,9 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @HiddenInCreate
     @Label("Id")
     String id;
+    /** The site it belongs to (a newsletter's pages and articles are its own): its sections are that site's. */
+    @io.mateu.uidl.annotations.Hidden
+    String siteId;
     @ReadOnly
     @HiddenInCreate
     @Label("Aplicado a los lectores")
@@ -134,6 +137,17 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Label("Importante (avisar también por correo)")
     boolean importante;
 
+    @Section("Pantalla externa")
+    @Label("UI externa")
+    @Help("Una de las UIs registradas en Configuración → UIs externas. La página la muestra en vivo, en su propia URL.")
+    @Stereotype(FieldStereotype.select)
+    String uiSourceId;
+    @Label("Ruta (una UI de Mateu o un iframe: /loyalty/members…)")
+    String uiRoute;
+    @Label("Atributos (un web component: nombre=valor, uno por línea)")
+    @Stereotype(FieldStereotype.textarea)
+    String uiAttributes;
+
     @Section("Bloques (solo páginas)")
     @Label("Bloques")
     List<BlockForm> blocks = new ArrayList<>();
@@ -172,6 +186,14 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Label("Lectores notificados")
     String notificados;
 
+    static final java.util.Set<String> REMOTE_PAGE_FIELDS = java.util.Set.of("uiSourceId", "uiRoute", "uiAttributes");
+
+    @Section("Enlaces de vista previa")
+    @HiddenInCreate
+    @Label("")
+    @Colspan(2)
+    java.util.concurrent.Callable<io.mateu.uidl.fluent.Component> enlacesDeVistaPrevia = this::previewLinks;
+
     static final String NOTIFY_BY_TYPE = "POR_TIPO";
     static final String NOTIFY_YES = "SI";
     static final String NOTIFY_NO = "NO";
@@ -186,13 +208,19 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     final io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer;
     final io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration;
     final io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics;
+    final io.mateu.ecdemo1.contenthub.application.usecases.Templates templates;
+    final io.mateu.ecdemo1.contenthub.application.usecases.PreviewLinks previewLinks;
 
     public ItemForm(ItemCommands commands, ItemRepository items, ContentIndex index, AudienceCommands audienceCommands,
                     NamedAudiences namedAudiences, Readers readers,
                     io.mateu.ecdemo1.contenthub.application.out.Translator translator,
                     io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer,
                     io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration,
-                    io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics) {
+                    io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics,
+                    io.mateu.ecdemo1.contenthub.application.usecases.Templates templates,
+                    io.mateu.ecdemo1.contenthub.application.usecases.PreviewLinks previewLinks) {
+        this.templates = templates;
+        this.previewLinks = previewLinks;
         this.commands = commands;
         this.items = items;
         this.index = index;
@@ -207,6 +235,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
 
     public ItemForm load(Item item, boolean commentsClosed) {
         id = item.id();
+        siteId = item.siteId();
         comentariosCerrados = commentsClosed;
         type = item.type();
         defaultLanguage = item.defaultLanguage();
@@ -227,12 +256,18 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         publishAt = Ui.local(c.publishAt());
         expireAt = Ui.local(c.expireAt());
         url = c.url();
+        io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.parse(c.url()).ifPresent(r -> {
+            uiSourceId = r.sourceId();
+            uiRoute = r.route();
+            uiAttributes = r.attributeLines();
+            url = null;
+        });
         readTracking = c.readTracking();
         confirmationRequired = c.confirmationRequired();
         confirmationDeadline = Ui.local(c.confirmationDeadline());
         notificar = c.notifyReaders() == null ? NOTIFY_BY_TYPE : c.notifyReaders() ? NOTIFY_YES : NOTIFY_NO;
         importante = c.important();
-        blocks = new ArrayList<>(c.blocks().stream().map(BlockForm::of).toList());
+        blocks = new ArrayList<>(c.blocks().stream().map(b -> BlockForm.of(b, item.defaultLanguage())).toList());
         audience(c.audience(), audienceCommands, namedAudiences);
         estado = status(item);
         var figures = analytics.ofItem(item.id(), item.confirmationVersion());
@@ -273,16 +308,35 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             translations.put("de", new Translation(titleDe, summaryDe, bodyDe));
         }
         return new ItemContent(sectionId == null || sectionId.isBlank() ? null : sectionId, audience(), translations,
-                type == ItemType.PAGE && blocks != null ? blocks.stream().map(BlockForm::toBlock).toList() : List.of(),
+                type == ItemType.PAGE && blocks != null ? blocks.stream().map(b -> b.toBlock(language())).toList() : List.of(),
                 Ui.instant(publishAt), Ui.instant(expireAt), readTracking, confirmationRequired,
-                Ui.instant(confirmationDeadline), url == null || url.isBlank() ? null : url.trim())
+                Ui.instant(confirmationDeadline), url())
                 .withNotification(NOTIFY_YES.equals(notificar) ? Boolean.TRUE : NOTIFY_NO.equals(notificar) ? Boolean.FALSE : null,
                         importante);
     }
 
+    /** The item's default language — its blocks' own text is this language's. */
+    String language() {
+        return defaultLanguage == null || defaultLanguage.isBlank() ? "es" : defaultLanguage;
+    }
+
+    /** The URL as stored: a remote page's is its UI (ui:source/route), the rest as typed. */
+    String url() {
+        if (type == ItemType.REMOTE_PAGE) {
+            if (uiSourceId == null || uiSourceId.isBlank()) {
+                throw new IllegalArgumentException("Elige la UI externa de la pantalla");
+            }
+            return new io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi(uiSourceId.trim(), uiRoute,
+                    io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.attributesOf(uiAttributes)).uri();
+        }
+        return url == null || url.isBlank() ? null : url.trim();
+    }
+
     public String create(HttpRequest httpRequest) {
         var editor = readers.of(httpRequest);
-        var created = commands.create(editor, type, defaultLanguage, content());
+        var created = siteId == null || io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET.equals(siteId)
+                ? commands.create(editor, type, defaultLanguage, content())
+                : commands.createInSite(editor, siteId, type, defaultLanguage, content());
         collaboration.closeComments(editor, created, comentariosCerrados);
         return created;
     }
@@ -300,6 +354,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
      */
     @io.mateu.uidl.annotations.Button
     @Action
+    @Label("Traducir con IA")
     public Object traducirConIA(HttpRequest httpRequest) {
         readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
         var from = defaultLanguage == null ? "es" : defaultLanguage;
@@ -319,12 +374,41 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
                 return Message.error("No se ha podido traducir a «" + to + "»: " + e.getMessage());
             }
         }
-        if (done.isEmpty()) {
-            return Message.warning("Todos los idiomas tienen ya título: vacía uno para traducirlo");
+        // a page's blocks: what each language lacks of them, from the default language's
+        var blocksDone = new java.util.ArrayList<String>();
+        if (type == ItemType.PAGE && blocks != null && !blocks.isEmpty()) {
+            var current = blocks.stream().map(b -> b.toBlock(from)).toList();
+            for (var to : List.of("es", "en", "de")) {
+                if (to.equals(from)) {
+                    continue;
+                }
+                try {
+                    var result = io.mateu.ecdemo1.contenthub.application.usecases.BlockTranslation.translate(current, from,
+                            to, source.title(), translator, httpRequest.getHeaderValue("Authorization"));
+                    if (result.parts() > 0) {
+                        current = result.blocks();
+                        blocksDone.add(to);
+                    }
+                } catch (RuntimeException e) {
+                    return Message.error("No se han podido traducir los bloques a «" + to + "»: " + e.getMessage());
+                }
+            }
+            blocks = new ArrayList<>(current.stream().map(b -> BlockForm.of(b, from)).toList());
+        }
+        if (done.isEmpty() && blocksDone.isEmpty()) {
+            return Message.warning("Todos los idiomas tienen ya título" + (type == ItemType.PAGE ? " y los bloques, su texto" : "")
+                    + ": vacía uno para traducirlo");
         }
         // the form with the translated fields (its state goes back only when the action returns it),
         // and the message
-        return List.of(this, Message.success("Traducido con IA a " + String.join(", ", done) + ". Revísalo y guarda."));
+        var what = new java.util.ArrayList<String>();
+        if (!done.isEmpty()) {
+            what.add("el contenido a " + String.join(", ", done));
+        }
+        if (!blocksDone.isEmpty()) {
+            what.add("los bloques a " + String.join(", ", blocksDone));
+        }
+        return List.of(this, Message.success("Traducido con IA " + String.join(" y ", what) + ". Revísalo y guarda."));
     }
 
     /** Puts the chosen medium at the end of the default language's body, where the editor moves it to. */
@@ -385,12 +469,46 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     /** A page, edited on the page itself: the visual editor (VisualEditorPage). Saving there replaces the draft's blocks. */
     @Toolbar
     @Action
+    @Label("Editar sobre la página")
     public Object editarSobreLaPagina(HttpRequest httpRequest) {
         return io.mateu.uidl.data.UICommand.navigateTo(VisualEditorPage.route(id));
     }
 
+    /** Every step of the item, two of its states compared, an earlier one restored (HistoryPage). */
     @Toolbar
     @Action
+    public Object historial(HttpRequest httpRequest) {
+        return io.mateu.uidl.data.UICommand.navigateTo(HistoryPage.route(id));
+    }
+
+    /** The draft, to a reviewer: this item's preview links (PreviewLinksPage), to make, follow and revoke. */
+    @Toolbar
+    @Action
+    @Label("Enlace de vista previa")
+    public Object enlaceDeVistaPrevia(HttpRequest httpRequest) {
+        return io.mateu.uidl.data.UICommand.navigateTo(PreviewLinksPage.route(id));
+    }
+
+    /** The page draft's blocks and audience as a new template (a publisher's); opens it to name and describe it. */
+    @Toolbar
+    @Publishers
+    @Action
+    @Label("Guardar como plantilla")
+    public Object guardarComoPlantilla(HttpRequest httpRequest) {
+        var title = titleEs != null && !titleEs.isBlank() ? titleEs : toString();
+        var created = templates.saveFromPage(readers.of(httpRequest), id, "Plantilla: " + title,
+                "Creada a partir de la página «" + title + "»");
+        return io.mateu.uidl.data.UICommand.navigateTo(TemplatesCrud.route(created));
+    }
+
+    io.mateu.uidl.fluent.Component previewLinks() {
+        return io.mateu.ecdemo1.uicommons.html.Html.block(PreviewLinksPage.list(previewLinks, id)
+                + "<p style=\"font-size:.85rem;opacity:.75\">Créalos y revócalos con «Enlace de vista previa».</p>");
+    }
+
+    @Toolbar
+    @Action
+    @Label("Enviar a revisión")
     public Object enviarARevision(HttpRequest httpRequest) {
         commands.submitForReview(readers.of(httpRequest), id);
         return Message.success("Enviado a revisión");
@@ -427,10 +545,17 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         if ("traducirConIA".equals(fieldName)) {
             return !translator.available();
         }
-        if (id == null) {
-            return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina").contains(fieldName);
+        if (REMOTE_PAGE_FIELDS.contains(fieldName)) {
+            return type != ItemType.REMOTE_PAGE;
         }
-        if ("editarSobreLaPagina".equals(fieldName)) {
+        if (("url".equals(fieldName) || "blocks".equals(fieldName)) && type == ItemType.REMOTE_PAGE) {
+            return true;
+        }
+        if (id == null) {
+            return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina", "historial",
+                    "guardarComoPlantilla", "enlaceDeVistaPrevia").contains(fieldName);
+        }
+        if ("editarSobreLaPagina".equals(fieldName) || "guardarComoPlantilla".equals(fieldName)) {
             return type != ItemType.PAGE;
         }
         var item = items.find(id).orElse(null);
@@ -450,16 +575,17 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Override
     public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
         return "sectionId".equals(fieldName) || "defaultLanguage".equals(fieldName) || "medioAInsertar".equals(fieldName)
-                || "notificar".equals(fieldName)
+                || "notificar".equals(fieldName) || "uiSourceId".equals(fieldName)
                 || super.supports(fieldType, fieldName, formType);
     }
 
     @Override
     public List<Option> options(String fieldName, HttpRequest httpRequest) {
         return switch (fieldName) {
-            case "sectionId" -> Catalog.get().sections();
+            case "sectionId" -> Catalog.get().sections(io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId));
             case "defaultLanguage" -> Catalog.languages();
             case "medioAInsertar" -> Catalog.get().media();
+            case "uiSourceId" -> Catalog.get().uiSources();
             case "notificar" -> List.of(new Option(NOTIFY_BY_TYPE, "Según el tipo (los avisos, sí)"),
                     new Option(NOTIFY_YES, "Sí"), new Option(NOTIFY_NO, "No"));
             default -> super.options(fieldName, httpRequest);

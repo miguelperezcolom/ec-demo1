@@ -28,13 +28,14 @@ public class PgItemRepository implements ItemRepository {
     @Override
     public void save(Item item) {
         var title = item.draft().in(item.defaultLanguage(), item.defaultLanguage()).title();
-        jdbc.update("insert into ch_item (id, doc, type, status, title, author, updated_at, pending_changes, in_review) "
-                        + "values (?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?) on conflict (id) do update set doc = excluded.doc, "
+        jdbc.update("insert into ch_item (id, doc, type, status, title, author, updated_at, pending_changes, in_review, site_id) "
+                        + "values (?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?) on conflict (id) do update set doc = excluded.doc, "
                         + "type = excluded.type, status = excluded.status, title = excluded.title, "
                         + "updated_at = excluded.updated_at, pending_changes = excluded.pending_changes, "
                         + "in_review = excluded.in_review",
                 item.id(), Json.write(item), item.type().name(), item.status().name(), title, item.author(),
-                Sql.ts(item.updatedAt()), item.hasVersions() && item.draftChanged(), item.awaitingPublication());
+                Sql.ts(item.updatedAt()), item.hasVersions() && item.draftChanged(), item.awaitingPublication(),
+                item.siteId());
     }
 
     @Override

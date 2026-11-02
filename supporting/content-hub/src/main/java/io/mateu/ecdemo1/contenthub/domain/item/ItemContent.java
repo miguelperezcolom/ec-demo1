@@ -28,7 +28,8 @@ public record ItemContent(String sectionId, Audience audience, Map<String, Trans
     public ItemContent {
         audience = audience == null ? Audience.EVERYONE : audience;
         translations = translations == null ? Map.of() : Map.copyOf(new TreeMap<>(translations));
-        blocks = blocks == null ? List.of() : List.copyOf(blocks);
+        // a block the store could not read (a type of a newer version) is left out, not a failure
+        blocks = blocks == null ? List.of() : blocks.stream().filter(java.util.Objects::nonNull).toList();
     }
 
     /** Without a say on notifications: as the type says, and not important. */
@@ -55,6 +56,18 @@ public record ItemContent(String sectionId, Audience audience, Map<String, Trans
      */
     public boolean notifies(ItemType type) {
         return notifyReaders != null ? notifyReaders : type == ItemType.NOTICE;
+    }
+
+    /**
+     * The item's audience as the visibility function projects it: the editor's, ANDed — for a remote page —
+     * with who may use the UI source it shows ({@link io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi}).
+     */
+    public Audience visibilityAudience(ItemType type) {
+        if (type != ItemType.REMOTE_PAGE) {
+            return audience;
+        }
+        return io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.parse(url)
+                .map(r -> Audience.effective(audience, r.audienceReference())).orElse(audience);
     }
 
     /** The text in a language, falling back to the default language's. */

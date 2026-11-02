@@ -50,6 +50,8 @@ public class PageRenderer {
     final ItemRepository items;
     final ContentRenderer renderer;
     final ReaderActions actions;
+    final io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis;
+    final io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote;
 
     /** A page as a reader's home: the welcome banner's overline and subtitle, and its tiles. */
     public record Home(String overline, String subtitle, List<Component> panels) {
@@ -75,7 +77,8 @@ public class PageRenderer {
             }
             var content = content(reader, b);
             if (content != null) {
-                panels.add(panel(b.id(), title(b), content, b.type() == BlockType.HTML || b.type() == BlockType.MEDIA ? 3 : 1));
+                panels.add(panel(b.id(), title(b), content, b.type() == BlockType.HTML || b.type() == BlockType.MEDIA
+                        || b.type() == BlockType.REMOTE ? 3 : 1));
             }
         }
         return new Home(overline, subtitle, panels);
@@ -123,13 +126,24 @@ public class PageRenderer {
         return card.build();
     }
 
-    List<Block> visibleBlocks(Reader reader, String pageId) {
+    /** The blocks of a page the reader sees (page AND block), in their language. */
+    public List<Block> visibleBlocks(Reader reader, String pageId) {
+        return visibleBlocks(reader, pageId, reader.attributes().language());
+    }
+
+    /**
+     * The blocks of a page the reader sees (page AND block), their text in {@code language} — part by part, the
+     * page's default language's where a block has none in it, as an item's text falls back.
+     */
+    public List<Block> visibleBlocks(Reader reader, String pageId, String language) {
         var visible = new HashSet<>(visibility.visibleBlockIds(reader.attributes(), pageId));
-        var page = items.find(pageId).flatMap(i -> i.latestVersion()).orElse(null);
+        var item = items.find(pageId).orElse(null);
+        var page = item == null ? null : item.latestVersion().orElse(null);
         if (page == null) {
             return List.of();
         }
-        return page.content().blocks().stream().filter(b -> visible.contains(b.id())).toList();
+        return page.content().blocks().stream().filter(b -> visible.contains(b.id()))
+                .map(b -> b.in(language, item.defaultLanguage())).toList();
     }
 
     /** What a block shows, or null when it shows nothing for this reader. */
@@ -163,6 +177,11 @@ public class PageRenderer {
                         null, null, 0, b.limit() == null ? 5 : b.limit())).content();
                 yield list.isEmpty() ? null : items(list, "");
             }
+            // a registered UI, live, if the reader may use its source (the remote then applies its own permissions)
+            // as a block: no breadcrumb or window title of its own; its page title hidden when the block has its own
+            case REMOTE -> remoteUis.usable(reader, b.remote()).map(s -> remote.component(s, b.remote(),
+                    io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer.Mode.BLOCK, !blank(b.title()))).orElse(null);
+            case NEWSLETTER_SECTION -> null; // a newsletter issue's (NewsletterRenderer)
         };
     }
 
@@ -175,7 +194,14 @@ public class PageRenderer {
      * at all (its audience) is the caller's call.
      */
     public String draftHtml(Reader reader, Block b) {
-        var hash = io.mateu.ecdemo1.contenthub.infra.in.render.MediaUrls.EDITOR;
+        return blockHtml(reader, b, io.mateu.ecdemo1.contenthub.infra.in.render.MediaUrls.EDITOR);
+    }
+
+    /**
+     * A block as markup for a reader, its media signed for {@code hash} — the visual editor's (EDITOR) or, on a
+     * newsletter site's page, the reader's own profile hash.
+     */
+    public String blockHtml(Reader reader, Block b, String hash) {
         String inner = switch (b.type()) {
             case HTML, BANNER -> blank(b.html()) ? null : renderer.body(b.html(), PORTAL_BASE, hash);
             case MEDIA -> b.mediaId() == null ? null : renderer.medium(b.mediaId(), PORTAL_BASE, hash);
@@ -202,6 +228,8 @@ public class PageRenderer {
                         null, null, 0, b.limit() == null ? 5 : b.limit())).content();
                 yield list.isEmpty() ? null : list(list);
             }
+            case REMOTE -> remote.editorHtml(b.remote());
+            case NEWSLETTER_SECTION -> null; // a newsletter issue's (NewsletterRenderer)
         };
         if (inner == null) {
             return "";

@@ -24,7 +24,9 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, personas y organigrama (`People`, `PeopleListing`, `PersonPage`, `OrgChartPage`), favoritos, pendientes; comentarios y «Me gusta» en `ItemPage`, encuestas (`SurveysListing`, `SurveyPage`) |
 | **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, encuestas y sus respuestas, moderación de comentarios, ver como y confirmaciones |
 | **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal, sin *Editorial*; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
-| **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, directorio y visibilidad |
+| **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, UIs externas, directorio y visibilidad |
+| **UIs externas** | `UiSource` (registro, `ch_ui_source`), `RemoteUis`, `RemoteUiRenderer`; `<ec-ui-source>` en `embed.js` | Pantallas de otras aplicaciones como páginas (`REMOTE_PAGE`) y bloques (`REMOTE`) de la intranet (ver [UIs externas](#uis-externas)) |
+| **Plantillas y vista previa** | `PageTemplate` (`ch_page_template`), `Templates`, `TemplatesCrud`/`TemplateForm`, `NewPageFromTemplatePage`, `TemplateSeeder`; `PreviewLink` (`ch_preview_link`), `PreviewLinks`, `PreviewLinksSigner`, `PreviewLinksPage`/`PreviewLinksListing` y, en el portal, `PreviewPage` (`/intranet/vista-previa/{id}.{firma}`) | Páginas nuevas a partir de plantillas (globales o de un sitio), y enlaces firmados y caducables con los que un revisor con sesión ve un borrador (ver [Plantillas y vista previa](#plantillas-y-vista-previa)) |
 | **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea: contenido (`preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`) y directorio (`buscar_personas`, `ficha_persona`) |
 | **Remoto de slots** | `GET /_intranet/api/slots/{key}` (`SlotController`) | La variante visible de un slot, como JSON (provisional). La consumen el inicio del data plane (`data-plane.inicio.novedades`), el del control plane (`control-plane.inicio.avisos`) y la bienvenida del front office (`front-office.bienvenida.destacado`), en servidor con el token del usuario (`ui-commons` `ContentSlots`) |
 | **Medios** | `GET /_intranet/media/{id}` (`MediaController`) | Los ficheros de la biblioteca, con URL firmada |
@@ -76,9 +78,10 @@ Editar una página sobre la propia página (Editorial → Editor visual, `/edito
 
 | Método y ruta | Qué hace | Permiso |
 | :--- | :--- | :--- |
-| `GET /_intranet/api/editor/pages/{id}` | Bloques del borrador, el HTML de cada uno, audiencia de la página y cuántos la ven, catálogos (tipos y sus campos, items, secciones, medios, departamentos/hoteles/puestos), perfiles para «ver como» | editorial |
-| `POST /_intranet/api/editor/pages/{id}/preview` | Dibuja bloques sin guardar, como el editor o como un perfil (`viewAs`): HTML, visible o no, y cuántos empleados lo ven | editorial |
-| `PUT /_intranet/api/editor/pages/{id}/blocks` | Guarda los bloques en el borrador (`ItemCommands.editBlocks`); `updatedAt` evita pisar cambios ajenos (409) | `content:edit` |
+| `GET /_intranet/api/editor/pages/{id}?language=` | Bloques del borrador en ese idioma (sin él, el por defecto; cada uno con `untranslated` si muestra el texto del idioma por defecto), el HTML de cada uno, idiomas, audiencia de la página y cuántos la ven, catálogos (tipos y sus campos, items, secciones, medios, departamentos/hoteles/puestos), perfiles para «ver como» | editorial |
+| `POST /_intranet/api/editor/pages/{id}/preview` | Dibuja bloques sin guardar, en su `language`, como el editor o como un perfil (`viewAs`): HTML, visible o no, y cuántos empleados lo ven | editorial |
+| `POST /_intranet/api/editor/pages/{id}/translate` | «Traducir con IA»: lo que a `language` le falta de los bloques enviados, traducido (`BlockTranslation`); no guarda | `content:edit` |
+| `PUT /_intranet/api/editor/pages/{id}/blocks` | Guarda los bloques —su texto, el de `language`— en el borrador (`ItemCommands.editBlocks`); `updatedAt` evita pisar cambios ajenos (409) | `content:edit` |
 | `GET /_intranet/api/editor/media/{id}` | Un medio dibujado, para insertarlo en un texto | editorial |
 | `GET /_intranet/api/editor/visual-editor.js` | El código del componente | editorial |
 
@@ -90,6 +93,39 @@ Editar una página sobre la propia página (Editorial → Editor visual, `/edito
   valores del directorio, y `Block.isNarrowing` rechaza cualquier otra cosa (un OR, una audiencia con
   nombre): un bloque **estrecha** la audiencia de su página, nunca la ensancha (además, la efectiva es
   siempre página **y** bloque).
+- **Idiomas**: el editor manda el texto de un idioma; `Block.edited` lo pone sobre el bloque guardado (mismo
+  id): la estructura (tipo, enlaces, audiencia…) es la enviada y el texto de los demás idiomas, el guardado. Lo
+  que se mostró como respaldo y vuelve igual —el HTML comparado tras sanearlo y normalizarlo
+  (`HtmlSanitizer.same`), porque el navegador lo reescribe a su manera— sigue sin traducir. Un bloque nuevo
+  escrito en otro idioma lleva ese texto también como el del idioma por defecto, para no quedar vacío.
+
+### Bloques en varios idiomas
+
+Un `Block` guarda su texto (`title`, `html`, el `label` de cada enlace) en el **idioma por defecto** de lo que
+lo contiene —el de la página, o el primero de la newsletter (`Site.defaultLanguage`) para la maqueta y los
+números— y en `translations` (`Map<idioma, BlockText>`) el de los demás: `BlockText(title, html, labels)`,
+con los textos de los enlaces **por URL** (las URL son del bloque, comunes a todos los idiomas; así reordenar o
+añadir enlaces no descoloca las traducciones). Cada parte puede faltar.
+
+- **Compatibilidad**: un bloque guardado antes no tiene `translations` y se lee igual —su texto es el del
+  idioma por defecto—, así que no hay migración (ni al arrancar ni perezosa); escribirlo y leerlo de nuevo da
+  lo mismo.
+- **Lectura**: `Block.in(idioma, porDefecto)` da el bloque como lo ve un lector de ese idioma, **parte a
+  parte**: lo que el idioma tiene, y lo que no, del idioma por defecto —la regla de los items (su idioma, si no
+  el por defecto), por partes—. Lo aplican `PageRenderer.visibleBlocks` (portal; en la página de una
+  newsletter, con `Site.languageFor`), `NewsletterRenderer.blocks` (número web y correo, en el idioma de cada
+  grupo) y el editor visual.
+- **Formulario**: `BlockForm` tiene título y contenido en Español/English/Deutsch y `LinkForm` el texto de cada
+  enlace en los tres; `BlockForm.of(bloque, porDefecto)` y `toBlock(porDefecto)` (si cambia el idioma por defecto
+  de la página, el del bloque cambia con él).
+- **Saneado y medios**: `Block.mapHtml` sanea el HTML de todos los idiomas; `MediaReferences` cuenta sus marcas.
+- **Historial**: `ContentDiff` compara los campos propios del bloque (idioma por defecto) y, además, cada
+  traducción: «· título (en)», «· contenido (en)», «· textos de los enlaces (en)».
+- **Plantillas**: el texto propio de los bloques de una plantilla es español (`PageTemplate.LANGUAGE`); una
+  página nueva en otro idioma toma el de su idioma como propio y el español queda como traducción
+  (`Block.rebased`), y al guardar una página como plantilla se hace al revés. La vista previa por enlace dibuja
+  los bloques en el idioma de quien la ve, como el resto del borrador.
+- **Traducir con IA** (`BlockTranslation`): ver abajo.
 
 ## La visibilidad
 
@@ -164,15 +200,18 @@ empleados. Los atributos son una lista cerrada: `company`, `country`, `region`, 
 
 ## Modelo de dominio
 
-Doce agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
+Trece agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
 
 | Agregado | Contenido | Invariantes |
 | :------- | :-------- | :---------- |
 | **Item** (`domain/item`) | Tipo (`ARTICLE`, `PAGE`, `NOTICE`, `LINK`, `DOCUMENT`), borrador (`ItemContent`: sección, audiencia, traducciones, bloques, fechas, flags, URL), versiones inmutables | Transiciones del workflow; título en el idioma por defecto; caducidad posterior a la publicación; enlaces y documentos con URL; solo las páginas tienen bloques; ids de bloque únicos |
 | **Navegación** (`domain/navigation`) | El árbol entero de secciones, con orden y nombres por idioma | Sin ciclos, orden único entre hermanas |
+| **Menú de un sitio** (`domain/menu/SiteMenu`) | El menú entero de un sitio (`intranet`, o una newsletter): árbol ordenado de entradas —enlaces con destino o submenús—, textos por idioma, audiencia y activa | Cuelga de la raíz o de un submenú del mismo menú, sin ciclos, orden único entre hermanas, texto en el idioma por defecto; un submenú con entradas no recibe destino |
 | **Slot** (`domain/slot`) | Clave `aplicacion.pantalla.nombre`, descripción, fallback, variantes con audiencia y prioridad | Clave inmutable, prioridad única, huérfano en vez de borrado |
 | **Audiencia con nombre** (`domain/audience`) | Nombre y expresión | No se refiere a sí misma |
-| **Edición de newsletter** (`domain/newsletter`) | Título, intro, items en orden, audiencia, fecha, envío por grupo | No se modifica una vez enviada |
+| **Sitio** (`domain/site`) | Id, tipo (intranet o newsletter), identidad, audiencia, idiomas | La intranet es el sitio por defecto |
+| **Newsletter** (`domain/newsletter`) | Maqueta, fuentes de cada sección, periodicidad, envío sin revisión, numeración, último slot | Un slot abre un solo número |
+| **Número de newsletter** (`domain/newsletter`) | Número, fecha, asunto, bloques, items por sección, estado, envío por grupo | No se modifica enviado o cancelado |
 | **Empleado** (`domain/employee`) | Atributos y hash; responsable, teléfono y etiquetas de los códigos (para el directorio) | Solo lo escribe el consumidor del directorio |
 | **Favoritos** (`domain/favorites`) | Uno por empleado, items por id | Sin duplicados |
 | **Acuse** (`domain/ack`) | (item, versión, empleado, tipo `READ`/`CONFIRMATION`) | Idempotente |
@@ -201,6 +240,52 @@ stateDiagram-v2
   confirmaciones. Al publicar una versión nueva, «exigir reconfirmar» la mueve a la nueva; si no, las
   confirmaciones anteriores siguen valiendo.
 - Los items **no se borran**: se retiran.
+
+### Historial, diferencias y restaurar
+
+- **Qué se guarda.** Cada paso del workflow (`ItemCommands`) se anota en `ch_item_history` (`ItemHistory`,
+  puerto `ItemHistoryRepository`): acción (`HistoryAction`: creado, editado, enviado a revisión, publicado,
+  rechazado, retirado, restaurado), quién, cuándo y, para crear, guardar y restaurar, **la copia del borrador**
+  que dejó (`snapshot`, el `ItemContent` en JSON; un guardado sin cambios no se anota). Una publicación no copia
+  nada: su contenido es su `ItemVersion`, que el item ya guarda. El historial va **aparte del agregado**: solo
+  crece, y no debe pesar en cada carga del item. Las publicaciones de antes de existir el historial se leen de
+  las versiones (`seq` 0). El número de cada paso lo da el `insert … select max(seq)+1` en la misma sentencia.
+- **Estados comparables**, por clave: `draft` (el borrador actual), `v<N>` (la versión N) y `h<seq>` (la copia
+  que dejó el paso). `ContentDiff` compara dos `ItemContent` campo a campo: textos por idioma con `TextDiff`
+  (diff por palabras con LCS, recortando antes prefijo y sufijo comunes; un cuerpo HTML se lee como su texto
+  —un párrafo, encabezado o elemento de lista por línea, imágenes como «[imagen: alt]», entidades decodificadas—,
+  así que nunca se ven etiquetas; si el texto es igual y el HTML no, dice «cambia el formato»), bloques por id
+  (añadidos, quitados, cambiados —tipo, título, contenido, audiencia, destacado, sección, cuántos, enlaces, medio—
+  y **movidos**: los que quedan fuera de la subsecuencia común más larga del orden), audiencia (`describe`) y
+  ventana de publicación. `DiffView` lo pinta (tachado en rojo, añadido en verde).
+- **Restaurar** (`content:edit`) copia el estado en el borrador con `editDraft` —nunca publica; anula una revisión
+  pendiente, porque el borrador es otro— y anota *Restaurado* con su copia. Una fecha de publicación ya pasada se
+  quita (se publica al publicar); caducidad o fecha límite pasadas se avisan.
+- Pantalla: `HistoryPage` (`/editorial/historial/{id}`, desde el botón *Historial* del formulario o desde
+  `HistoryListing`). La abre un listado, así que Mateu la pinta como ficha de solo lectura: los selects son
+  `FormField` fluidos en su `detailContent` (como `ApprovalPage`), ligados a campos ocultos que leen las acciones
+  *Comparar* y *Restaurar esta versión*. Un solo `Element` por pantalla (`Html`): diferencias e historial juntos.
+  El historial va por id de item, así que vale para los items de cualquier sitio.
+
+### Calendario editorial
+
+`EditorialCalendar` junta las entradas de todos los beans **`CalendarSource`** (`entries(from, to)`, días de
+Madrid), quita duplicados por id, filtra por tipo, sección (con sus subsecciones, por `Navigation.ancestors`) y
+estado (sin estado, fuera los retirados) y ordena por día y hora. Cada `CalendarEntry` lleva su clase (`kind`),
+título, color, la ruta del backoffice que lo abre y las tres facetas que miran los filtros.
+
+- `ItemsCalendarSource`: de lo publicado, las fechas de su última versión (publica, caduca, confirmar antes de);
+  de un borrador nunca publicado, las previstas; de uno publicado con cambios, solo las fechas que cambia; y
+  *En revisión* el día en que se envió (mientras espera, `updatedAt` es ese momento).
+- `NewsletterIssuesCalendarSource`: los números de las newsletters — uno programado en su `scheduledAt`, uno
+  enviado en su `sentAt` (borradores y cancelados no tienen fecha), con `type` = `NEWSLETTER`, el estado del
+  número y sin sección; abre `/editorial/numeros/{id}`.
+- **Punto de extensión**: otra fuente es un `@Component` que implementa `CalendarSource`; nada más cambia.
+- Pantalla: `EditorialCalendarPage` extiende el arquetipo **`CalendarPage`** de Mateu (vistas mes, semana y
+  lista; pulsar una entrada navega a su `target`). Los filtros son filas de botones encima del calendario (el
+  arquetipo pinta sus campos primero: como campos de formulario quedarían debajo), con el estado en campos
+  ocultos. Mateu puede evaluar el campo del calendario antes de darle la petición a la página: entonces el lector
+  sale de la petición que se está sirviendo (`RequestContextHolder`), para no perder sus permisos.
 
 ### Permisos editoriales
 
@@ -243,6 +328,8 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | Tablas | Qué guardan |
 | :----- | :---------- |
 | `ch_item`, `ch_navigation`, `ch_slot`, `ch_named_audience`, `ch_newsletter`, `ch_favorites` | Los agregados, como documento JSON (más las columnas por las que se lista) |
+| `ch_item_history` | El historial de cada item: un paso por fila (`item_id`, `seq`), con la copia del borrador en `snapshot` (JSON) cuando la hay |
+| `ch_menu` | El menú de cada sitio, un documento JSON por `site_id` |
 | `ch_ack` | Acuses de lectura y confirmación |
 | `ch_media` | La biblioteca de medios; los ficheros subidos, en `bytea` |
 | `ch_employee`, `ch_profile` | El directorio y el universo de perfiles (hash → atributos) |
@@ -254,6 +341,8 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | `ch_survey_participation`, `ch_survey_response` | Quién ha respondido y qué se ha respondido, en dos tablas que no se apuntan entre sí |
 | `ch_notification_job`, `ch_notification_sent`, `ch_notification_pref` | Los repartos pendientes, qué se ha dicho a quién (item, versión, lector, tipo, canal) y cómo quiere cada uno que se le avise |
 | `ch_usage_event`, `ch_usage_daily`, `ch_item_reader` | El uso: eventos en crudo (con retención), sus agregados por día y las vistas por item y lector |
+| `ch_page_template` | Las plantillas de página (documento JSON: bloques, audiencia por defecto, sitio o ninguno) |
+| `ch_preview_link`, `ch_preview_key` | Los enlaces de vista previa (documento JSON con sus vistas, las 200 últimas) y la clave con que se firman si no hay `MEDIA_SECRET` |
 | `ch_drive_file` | Lo último que Drive dijo de cada fichero referenciado (documento JSON): metadatos, nunca el fichero |
 
 La **búsqueda de texto** es el FTS de PostgreSQL: `ch_item_doc.tsv` (configuración `simple`, índice GIN),
@@ -294,6 +383,14 @@ páginas y contadores solo cuentan lo visible.
   no dice quién. Los textos libres y la exportación van ordenados por su contenido, no por llegada. Cambiar la clave
   permitiría responder otra vez a las encuestas abiertas. Quien tenga la clave y la base podría comprobar si alguien
   concreto respondió, pero no qué respondió.
+- **Enlaces de vista previa.** `…/intranet/vista-previa/{id}.{firma}` es una página del portal: el gateway
+  pide sesión antes de llegar aquí, y `PreviewLinks.open` rechaza a quien no trae usuario. La firma es la de la
+  newsletter (`NewsletterLinksSigner`: HMAC-SHA256, base64url, 22 caracteres) sobre `preview|id|item|caducidad`,
+  con `MEDIA_SECRET` o, sin él, una clave aleatoria creada una vez y guardada en `ch_preview_key` (un enlace
+  dura días y tiene que sobrevivir a un reinicio). Que el enlace siga valiendo lo dice su registro: caducidad,
+  revocación y publicación (guarda cuántas versiones tenía el item; publicar añade una). Enseña el borrador con
+  medios firmados `EDITOR` y sin acciones; lee como el usuario real o como el perfil del enlace, nunca con los
+  permisos editoriales de nadie.
 - **MCP.** El servidor MCP no pasa por el gateway (es interno del clúster): aquí sí se verifica el token
   que reenvía `ia-agent` contra Keycloak (`KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI`) y una llamada sin él
   se rechaza. Cada herramienta lee como el usuario real (nunca como su "ver como").
@@ -402,6 +499,13 @@ saltos de línea dentro de las cadenas) y se comprueba con dureza. Es un fallo, 
 
 El cuerpo se sanea como cualquier contenido, y el editor revisa y guarda: nada se publica desde aquí.
 
+**Bloques** (`BlockTranslation`): lo que a un idioma le falta de los bloques (títulos, HTML, textos de enlace;
+un enlace cuyo texto es su URL no cuenta) viaja en **una llamada por idioma**, el mismo mensaje y las mismas
+comprobaciones que un cuerpo: cada parte es un elemento del `body` —`<h3>` un título, `<section>` un HTML,
+`<p>` un texto de enlace— y vuelve por su posición. Si la respuesta no trae todas las partes, en orden y con la
+misma etiqueta, no cambia nada. Lo usan «Traducir con IA» del formulario de una página (`ItemForm`) y el del
+editor visual (`/translate`, páginas y números).
+
 ## Google Drive
 
 El agregado de medios ya admitía URL externas. `DriveFileRef` entiende lo que pega un editor (`file/d/…`,
@@ -422,14 +526,86 @@ la referencia, **nunca una copia**: una sola versión, la de Drive.
 referenciado, también borradores: son metadatos de una caché que solo se enseñan a través de un item visible. Lo
 que no controla la intranet es quién abre el fichero en Google: eso lo deciden los permisos de Drive.
 
-## Newsletter
+## Sitios
 
-Para cada edición se agrupan los destinatarios (empleados activos con email que cumplen la audiencia de
-la edición) por **(hash de perfil, idioma)**; se pregunta a la función de visibilidad **una vez por grupo**
-qué items de la edición ve, y se manda **un correo por grupo** con solo esos items, en su idioma. Un grupo
-que no ve ninguno no recibe nada. Cada grupo queda registrado por separado: uno que falla se reintenta en
-la siguiente pasada (cada 30 s) sin reenviar a los demás. Sale por el relay `postfix`; como los empleados
-son ficticios, en la demo todo va a `NEWSLETTER_REDIRECT_TO`, con el grupo y el idioma en el asunto.
+content-hub aloja **varios sitios**. La intranet es el sitio por defecto (`intranet`); cada newsletter es
+otro, de tipo `NEWSLETTER`, con la misma maquinaria acotada a él: **su árbol de secciones**
+(`ch_navigation`, una fila por sitio; la de la intranet sigue siendo `main`), **sus items y páginas**
+(`ch_item.site_id`, `ch_item_doc.site_id`) y **sus inicios** (`ch_site_home_page`; los de la intranet siguen
+en `ch_home_page`). Un sitio (`domain/site/Site`, `ch_site`) tiene identidad (nombre, logo, colores,
+cabecera, pie), audiencia e idiomas.
+
+Todo lo anterior a los sitios es de la intranet: las columnas tienen `intranet` por defecto, y
+`SiteBootstrap` guarda la intranet como sitio al arrancar (idempotente). Los listados, secciones,
+búsqueda, el RAG del chat y la lista de Drive preguntan por un sitio —la intranet, salvo que la consulta
+(`ContentQuery.in(site)`) diga otro—, así que la intranet se comporta igual que antes; una consulta por ids
+(favoritos, un destacado, los items de un número) cruza sitios. La visibilidad es la misma función para
+todos.
+
+## Newsletters
+
+Lo único propio de una newsletter son **sus números**. `Newsletter` (`ch_nl_newsletter`, con el id de su
+sitio) guarda la maqueta (bloques), de qué secciones de la intranet toma cada sección suya, la
+periodicidad (`Cadence`: ninguna, semanal o mensual a una hora de Madrid) y si envía sin revisión; numera
+los números y recuerda el último **momento** (slot) para el que abrió uno. `NewsletterIssue`
+(`ch_nl_issue`, únicos `(newsletter_id, number)` y `(newsletter_id, slot)`) tiene número, fecha, asunto,
+**bloques** (los `Block` de las páginas, con audiencia por bloque, más `NEWSLETTER_SECTION`), los items de
+cada sección, estado (`DRAFT → SCHEDULED → SENT`, o `CANCELLED`) y los envíos por grupo.
+
+- **Números que se crean solos.** `ContentJobs.newsletters` (cada 30 s) llama a
+  `NewsletterEditorial.createDue`: para cada newsletter activa cuyo último slot no tenga número, abre el
+  borrador (programado si envía sin revisión). Un slot nunca abre dos números: lo recuerda la newsletter y
+  lo impide el índice único; tras una parada larga se abre uno, el del último slot.
+- **Contenido automático** (`AutomaticContent`): lo publicado desde que se abrió el número anterior (o en el
+  último periodo, para el primero), sin caducar, que ve alguien de la audiencia (una pregunta a la
+  visibilidad por perfil de la audiencia): los artículos y avisos del propio sitio en su sección, y lo de
+  la intranet (noticias, avisos, páginas que no son inicios) en la sección que toma esa sección o una
+  antecesora.
+- **Envío** (`NewsletterService`): destinatarios = empleados activos con email que cumplen la audiencia del
+  sitio y no se dieron de baja de **esa** newsletter (`ch_nl_subscription`, sin fila: suscrito); se
+  agrupan por **(hash de perfil, idioma, secciones elegidas)** —el idioma es el del lector si el sitio se
+  escribe en él, si no el primero del sitio—; por grupo se pregunta una vez qué bloques (audiencia del
+  sitio Y del bloque) e items ve, y sale **un correo por grupo**; un grupo sin nada no recibe nada. Cada
+  grupo se registra aparte (un fallo se reintenta solo); con todos, `SENT` y `sentAt`. Por el relay
+  `postfix`; en la demo todo va a `NEWSLETTER_REDIRECT_TO`, en un solo mensaje con una parte por grupo.
+- **Dos dibujos del mismo número** (`NewsletterRenderer`): el **correo**, HTML apto para correo (tablas y
+  estilos en línea; un medio es un enlace a la versión web; píxel y enlaces firmados), y la **versión web**
+  (`NewsletterSitePage`), los mismos bloques con los medios en la página. El correo lleva el enlace
+  permanente (`/intranet/n/{sitio}/numeros/{número}`) y la baja de esa newsletter (`/intranet/n/{sitio}`).
+  El logo se sirve sin firma en `/_intranet/n/logo/{sitio}` (solo el logo de una newsletter).
+- **El sitio en el portal**: `PortalRoutes` lleva `/intranet/n/{sitio}[/archivo|/numeros/{id}|/secciones/{id}|/p/{id}]`
+  a `NewsletterSitePage`, que **sigue el tema de la consola** (claro u oscuro, Vaadin o Redwood): hereda el
+  color de texto y el fondo de la página; los colores de la newsletter van en sus bandas (cabecera, pestaña
+  activa, banners), con un texto que se lee sobre ellas (blanco o casi negro según su luminancia), y en
+  enlaces y títulos mezclados con el color del texto (`color-mix(…, currentColor)`: más oscuros en claro, más
+  claros en oscuro). Solo el **correo** usa colores fijos y claros, los que todo cliente de correo muestra
+  igual (`NewsletterRenderer.Palette`). Su menú es el **menú configurable de su sitio** (`SiteMenus`, dueño
+  el id del sitio): `NewsletterMenus` lo siembra la primera vez (al crearla, o al arrancar para las que ya
+  había) con su inicio, sus secciones de primer nivel, su archivo y sus páginas, y «Nueva página» añade la
+  página al final; desde entonces se edita en *Configuración → Menús* (`content:admin`), que lista los
+  sitios de las newsletters. `NewsletterNavigation` lo dibuja (`SiteMenus.shown`) como la barra del sitio,
+  dentro de su página. Destinos propios (`NewsletterTargets`, solo en sitios de newsletter):
+  `NEWSLETTER_HOME`, `ARCHIVE` e `ISSUE` (un número, cuando ha salido); `PAGE` y `SECTION` son los de siempre,
+  ahora por sitio, con las rutas de `SiteAwareRoutes` (`@Primary SiteRoutes`: `/intranet/n/{sitio}/p/{id}`,
+  `…/secciones/{id}`).
+- **Bloques que no se conocen**: un bloque de un tipo que esta versión no sabe leer (de una versión más
+  nueva) se anota en el log y se deja fuera al leer un item, un número o una maqueta (`Json.KnownBlocks`),
+  en vez de romper todos los listados que lo leen. Un bloque `REMOTE` en el correo es el enlace a la web de
+  `RemoteUiRenderer.fallbackHtml`.
+- **Editor visual** de un número: el mismo `<ec-visual-editor>` con `resource="issues"`, contra
+  `/_intranet/api/editor/issues/{id}` (`IssueEditorController`, que reutiliza el de páginas).
+- **Aperturas y clics**: `ch_newsletter_event` por número y grupo (su columna sigue llamándose
+  `edition_id`). Un clic en un item propio del sitio redirige a su página en el sitio.
+
+**Migración** (`NewsletterMigration`, en cada arranque, idempotente): las ediciones de antes
+(`ch_newsletter`) pasan a ser números de **«Boletín de la intranet»** (`boletin-intranet`): audiencia la de
+la edición más reciente, semanal los lunes a las 9 si el boletín semanal estaba activo
+(`content-hub.newsletter.weekly.enabled`; `…weekly.send` = enviar sin revisión), una sección «Lo más
+destacado» que toma todas las secciones de primer nivel de la intranet. Se numeran por fecha, conservan su
+id —y con él sus aperturas y clics—, su estado y sus envíos; la intro es un bloque HTML y los items van a
+esa sección; una `w-AAAA-Wnn` ocupa el slot de su lunes. Las preferencias (`ch_newsletter_pref`) son su
+suscripción (las secciones elegidas, que eran de la intranet, no se trasladan). Las tablas viejas no se
+tocan.
 
 ## Notificaciones
 
@@ -498,6 +674,198 @@ normalizado, cuántos resultados dio y el hash de perfil, **nunca quién**.
   desde que existe el item. **No caduca con la retención**: es un dato por persona, como los acuses de `ch_ack`.
 - El panel es `AnalyticsPage`, el arquetipo `Dashboard` de Mateu con `MetricCard` y `Chart`.
 
+## Menús configurables
+
+El menú del portal es **datos**: un `SiteMenu` por sitio (`ch_menu`), configurado en *Configuración → Menús*
+(`MenusCrud`, `MenuEntryForm`, `MenuPreviewPage`; `content:admin`) y dibujado **por petición** para cada
+lector. El dueño de un menú es un **id de sitio**: `intranet` hoy; cada newsletter será otro sitio con el
+suyo, con la misma pieza.
+
+**Las rutas no son datos.** Siguen saliendo de los campos de `IntranetMenu` (`/intranet/noticias`,
+`/intranet/buscar`…) y de `PortalRoutes` (`/intranet/noticias/{id}`, `/intranet/secciones/{id}`…). El menú
+solo decide qué se muestra, en qué orden, en qué submenús y con qué texto.
+
+```
+SiteMenu (ch_menu) ──► SiteMenus.shown(MenuContext) ──► PortalMenu ──► IntranetMenu (MenuSupplier) ──► Mateu
+                         │ audiencia (VisibilityPolicy)
+                         └ MenuTargetResolver por tipo: PAGE · SECTION · BUILTIN · URL · REMOTE · (los de otro sitio)
+```
+
+- **Destino** (`MenuTarget`: tipo + valor). El tipo es un código abierto: `PAGE` (una página → su ruta, si el
+  lector la ve), `SECTION` (si hay algo visible en ella o debajo), `BUILTIN` (una función del portal,
+  `PortalFunction`, cuya clave es el nombre del campo que la enruta), `URL` (ruta del portal o URL externa) y
+  `REMOTE` (otra interfaz del registro de interfaces: `sourceId` + ruta). Cada tipo lo resuelve un
+  `MenuTargetResolver`; un sitio nuevo añade los suyos declarando otro bean (y `appliesTo(siteId)` lo limita a
+  sus sitios).
+- **Quién ve qué** (`SiteMenus.shown`): una entrada sale si está activa, su audiencia admite al lector (la
+  misma `VisibilityPolicy` que el contenido, evaluada en memoria: un menú son unas decenas de entradas) **y** su
+  destino se resuelve para él. Lo que cuelga de una entrada oculta se oculta con ella; un submenú sin nada
+  visible desaparece. El texto, en el idioma del lector o, si no lo hay, en el del sitio (`es`).
+- **Dibujo** (`PortalMenu`): una función → el `FieldLink` a su campo (la misma entrada que hacía el `@Menu`);
+  una página, sección o ruta → un `RouteLink` a la ruta de siempre; un submenú → un `Menu` **sin path**, para
+  que lo que contiene conserve su ruta; una URL externa → `/intranet/enlace/{sitio}/{entrada}`
+  (`MenuEntryPage`, con el enlace a pestaña nueva: una entrada de menú de Mateu navega dentro de la app); otra
+  interfaz Mateu → un `RemoteMenu` federado; otra que no lo es → `/intranet/ui/{sitio}/{entrada}`, alojada como
+  una pantalla externa (`<ec-ui-source>`, ver [UIs externas](#uis-externas)). **Toda función que el menú no muestra en
+  su primer nivel se añade oculta** (`hidden`): enrutada pero no dibujada, así que mover una función a un
+  submenú o quitarla del menú no rompe su URL. La raíz, `/intranet`, abre el inicio del lector (`PortalRoutes`:
+  el grupo del `MenuSupplier` no tiene página propia y Mateu dibujaría un índice de sus entradas); solo en
+  `/_intranet` y `/_portal` (en `/_content-hub`, «intranet» es la configuración). `MenuEntryPage` vuelve a resolver la entrada para el lector:
+  quien no la ve en el menú tampoco la abre tecleando la URL.
+- **Siembra** (`MenuSeeder`, al arrancar): si el sitio `intranet` no tiene menú, se guarda el de siempre
+  (`DefaultMenus.intranet()`: las 16 funciones, en su orden y con sus textos) con `insert … on conflict do
+  nothing` —idempotente y seguro con varias réplicas—. Mientras no hay nada guardado, el portal dibuja ese mismo.
+- **Costuras** para otras ramas: `SiteRoutes` (dónde cuelgan las rutas de un sitio; por defecto `/intranet`
+  para todos; se sustituye con un bean `@Primary`, `MenuConfig`) y `UiSources`, que implementa el registro de
+  UIs externas (`PgUiSourceRepository`, ver [UIs externas](#uis-externas)): una entrada `REMOTE` sale si la
+  fuente está activa, su audiencia admite al lector y tiene los permisos que exige.
+- Las consolas guardan el menú de un remoto **por usuario** unos 30 s (`RemoteAppDescriptorCache` de Mateu):
+  un cambio de configuración o un «ver como» tarda eso en verse en el shell.
+
+## UIs externas
+
+La intranet puede mostrar interfaces de otras aplicaciones **registradas** en la configuración —nunca una URL
+que escriba un editor—: como una página (**pantalla externa**, `ItemType.REMOTE_PAGE`), como un bloque
+(**componente remoto**, `BlockType.REMOTE`) y, en la rama de menús configurables, como entrada de menú.
+
+### El modelo
+
+- **`UiSource`** (dominio, `domain/uisource`): `{id, name, kind, basePath, tagName, audience, requiredScopes,
+  active}`. `kind`:
+  - `MATEU_REMOTE`: `basePath` es el prefijo de un `@UI` en el gateway (`/_loyalty`);
+  - `WEB_COMPONENT`: la ruta de su script en el gateway (`/_inbox/push/push.js`) y `tagName`;
+  - `IFRAME`: una URL `https://`, cuyo origen debe estar en `content-hub.ui-sources.iframe-origins`.
+
+  El constructor rechaza cualquier otra cosa (otro host, `javascript:`, `//`, segmentos `..`, etiquetas
+  reservadas como `ec-visual-editor`); el origen del iframe se comprueba al registrar **y** al dibujar.
+- **`RemoteUi`**: un uso, `{sourceId, route, attributes}`. La ruta es solo un camino (sin `?`, `#`, `//`, `..`
+  ni `%`); los atributos, nombres en minúsculas que no empiezan por `on` (ni `style`, `class`, `id`, `is`,
+  `slot`), con valores que no son `javascript:`, `vbscript:` ni `data:`. Una pantalla externa lo guarda en su
+  URL: `ui:<sourceId><ruta>[?atributos]`.
+- **Puerto** `application/out/UiSources` —`Optional<UiSource> find(String id)`, `List<UiSource> all()`— (lo
+  que resuelven los menús), y `UiSourceRepository extends UiSources` con `save`/`delete`.
+- `UiSourceCommands` escribe el registro (`content:admin`); `ItemCommands` solo acepta usos de fuentes
+  registradas y que encajan (`RemoteUis.requireRegistered`: una UI de Mateu se elige por ruta, sin atributos).
+
+### Visibilidad: la audiencia de la fuente es una audiencia con nombre
+
+`NamedAudiences` resuelve, además de las audiencias con nombre, `ui-source:<id>` a la audiencia de cada
+fuente (o a **nadie** si está inactiva; una borrada tampoco resuelve). Lo que usa una fuente se proyecta con
+ella dentro:
+
+- un bloque: `página AND bloque AND ui-source:<id>` (`Block.visibilityAudience`);
+- una pantalla externa: `item AND ui-source:<id>` (`ItemContent.visibilityAudience`).
+
+Registrar, cambiar o borrar una fuente publica `AudienceRedefined("ui-source:<id>")` y la proyección se
+recalcula: lo que la usa aparece o desaparece de **todos** los consumidores (portal, listados, búsqueda,
+menús, newsletter) sin tocar los contenidos. El editor sigue editando solo la audiencia propia del bloque
+(`Block.isNarrowing`).
+
+Los **permisos que exige** no son atributos: se comprueban en la puerta, `RemoteUis.usable(reader, …)`, con
+los `X-User-Scopes` del lector (`Reader.scopes`; sin la cabecera, ninguno). Allí también: activa, la audiencia
+y el origen del iframe aún permitido.
+
+### Cómo se dibuja
+
+| Dónde | `MATEU_REMOTE` | `WEB_COMPONENT` | `IFRAME` |
+| :---- | :------------- | :-------------- | :------- |
+| Portal (Vaadin y Redwood) | `MicroFrontend {baseUrl: basePath, route}`: la federación de los shells; el renderer pide la ruta al remoto por el gateway, con el token del lector, y pinta su UIDL | `Element <ec-ui-source kind="web-component" src tag attrs>`: `embed.js` pide el script con el token del lector (el gateway exige uno en cada prefijo), espera a que defina la etiqueta y la pone con sus atributos (vuelve a filtrar `on*`) | `Element <ec-ui-source kind="iframe" src>`: `embed.js` pone un `<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups…">` solo si es `https:`; sin token |
+| Editor visual | Una tarjeta con la fuente y la ruta (`RemoteUiRenderer.editorHtml`): un remoto vivo robaría los clics que seleccionan bloques | igual | igual |
+| Correo (newsletter) | `RemoteUiRenderer.fallbackHtml(block, urlDeLaPágina)` / `fallbackText`: «… — ver en la web» | igual | igual |
+
+La pantalla externa la pinta `ItemPage` como un formulario con el título y el remoto a todo el ancho (sin
+plantilla de contenido multimedia ni comentarios), en la URL del item (`/intranet/noticias/{id}`): un enlace
+directo o una recarga llegan a ella. Un lector que no puede usar la fuente ve «No puedes usar esta
+aplicación».
+
+`embed.js` ya lo cargan los shells (`@Script`) y el `Element` lo nombra como `import`, igual que el editor
+visual. Los shells no cambian: un `MicroFrontend` lo pinta el renderer que cada uno carga.
+
+**Hosts**: el `basePath` de una UI de Mateu tiene que estar enrutado en el gateway en el host donde se lee el
+portal. En la consola de datos lo están los de sus `RemoteMenu`; en `intranet.*`, solo `/_portal`, `/_inbox`
+y los medios.
+
+**Los menús** usan el mismo registro: `UiSources` es uno solo, con el `UiSource` del dominio, y
+`PgUiSourceRepository` es su implementación (`@Primary`). Una entrada `REMOTE` de una UI de Mateu es un
+`RemoteMenu`; una de web component o iframe, `/intranet/ui/{sitio}/{entrada}` (`MenuEntryPage`), dibujada
+como una pantalla externa.
+
+### El cromo de una UI embebida
+
+Un `MicroFrontend` de Mateu dibuja la página del remoto como si fuera la de arriba: una **miga de pan
+automática**, calculada con el menú y la URL **del host** («Intranet › Noticias › Acumulaciones» dentro de un
+bloque), y su **título de ventana** (`SetWindowTitle`) en la pestaña. Mateu no tiene aún una opción de
+«embebido». Mientras tanto:
+
+- `RemoteUiRenderer.Mode`: `BLOCK` (un componente remoto) o `PAGE` (una pantalla externa o una entrada de menú
+  alojada). La isla lleva las clases `ec-remote-ui`, `ec-remote-block` o `ec-remote-page` y, en un bloque con
+  título propio, `ec-remote-notitle`.
+- `embed.js` mete en los shadow roots de cada isla un estilo que quita la miga de pan (`.breadcrumbs-bar`: la
+  de la página es la de la intranet) y, en un bloque con título, el título de la página remota
+  (`.form-header h2`: queda una cabecera compacta, con sus acciones). Vigila esos shadow roots para volver a
+  ponerlo cuando el remoto se repinta.
+- **Guarda del título**: si la pestaña pasa a llamarse como un encabezado dibujado dentro de un bloque remoto,
+  `embed.js` le devuelve el título que tenía (el de la página). Una pantalla externa sí puede dar nombre a la
+  ventana.
+
+Es CSS sobre clases internas del renderer Vaadin de Mateu (`.breadcrumbs-bar`, `.form-header h2`): si cambian,
+vuelve la miga. En Redwood un `MicroFrontend` es una superficie dentro de la página (sin miga propia); la
+guarda del título busca los encabezados dentro de `.ec-remote-ui`, que Redwood quizá no ponga.
+
+#### Lo que Mateu necesitaría
+
+Una opción en `MicroFrontend` —p. ej. `chrome(EmbeddedChrome.NONE | COMPACT | PAGE)`, o un `embedded`
+booleano— que:
+
+1. en el cliente (los dos renderers), para `NONE`/`COMPACT`: no aplique los comandos de ventana que traiga la
+   isla (`SetWindowTitle`, `PushStateToHistory`, `SetFavicon`), no calcule la miga automática
+   (`mateu-content-header.crumbsOf`: tratarla como `level > 0`, igual que hoy `noBreadcrumbs`) y, en `NONE`,
+   tampoco pinte el título de la página (en `COMPACT`, solo sus acciones); para `PAGE`: el título puede nombrar
+   la ventana, pero sin miga propia;
+2. en la petición al remoto, una marca (como la de `_embeddedMediator` que ya mira `CommandMapper`) para que el
+   servidor del remoto no mande esos comandos;
+3. lo mismo en `Resolve.SERVER` (que ya quita los comandos del primer pintado, `MicroFrontendServerResolver.
+   embeddable`), para las interacciones siguientes.
+
+Con eso, `RemoteUiRenderer` pondría la opción y `embed.js` dejaría de tocar el cromo.
+
+## Salud del contenido
+
+Cinco comprobaciones sobre **todos los sitios** (la intranet y cada newsletter), cada noche y a demanda, con sus
+avisos guardados (pantalla: *Editorial → Salud del contenido*).
+
+- **Una foto y funciones puras.** `ContentHealth.snapshot()` lee una vez items, medios, textos alternativos,
+  slots, sitios con sus inicios y secciones, menús, números y maquetas de newsletter, el registro de UIs,
+  directorio, encuestas y analítica (`ContentSnapshot`). `ContentReferences` saca de ahí a qué apunta lo vivo
+  —items publicados sin caducar, slots, inicios, entradas de menú activas, números aún sin enviar y plantillas de página—, cada
+  referencia con su sitio y dónde está. `HealthChecks` son funciones de la foto: sin E/S, y así se prueban.
+- **Qué es un enlace.** Una URL del host del portal (o una ruta, con o sin `/_intranet`/`/_portal`) es una ruta:
+  `/intranet/{función}`, `/intranet/noticias|secciones|personas|encuestas/{id}`, `/intranet/enlace|ui/{sitio}/{entrada}`
+  y las de una newsletter, `/intranet/n/{sitio}[/p/{id} | /secciones/{id} | /archivo | /numeros/{id}]`. Una
+  sección se busca en el sitio de quien la nombra. Un contenido caducado no es un enlace roto sino un aviso de
+  **caducidad**, con su fecha. `ui:<fuente>…` (pantallas externas, bloques «Componente remoto», menús `REMOTE`)
+  necesita una fuente del registro **activa**.
+- **Huérfanos, con prudencia.** Cuenta como uso cualquier borrador, cualquier versión (también las viejas), los
+  slots, todos los números y maquetas de newsletter (enviados o no) y las plantillas de página. Un enlace de vista previa enseña el borrador, que ya cuenta. Borrar lo hace un administrador, y antes se
+  vuelve a mirar.
+- **El aviso es lo que es, no cómo se dice.** Su clave es un hash de comprobación, sujeto y objetivo (la URL, el
+  medio, el contenido enlazado), nunca del texto: «caduca en 5 días» y «en 4» son el mismo aviso, y su
+  «revisado» (`ch_health_snooze`, hasta una fecha) sigue en él. Cada pasada sustituye los avisos y conserva
+  cuándo se vio cada uno por primera vez; uno que desaparece se lleva su marca.
+- **La noche, una vez.** `HealthJobs` (cron) llama a `ContentHealth.nightly(día)`, que la **reclama** con un
+  `insert … on conflict do nothing` sobre el día: idempotente con varios disparos, reinicios o réplicas. A
+  demanda va en un hilo virtual, y no se solapan dos pasadas en el proceso.
+- **Enlaces externos con educación** (`LinkChecker` sobre el puerto `HttpProbe`): caché (`ch_health_link`),
+  pausa por host, HEAD y luego GET, tope por pasada, User-Agent propio y **ninguna dirección interna**, tampoco
+  tras una redirección (que se siguen a mano). Ver [Operación](./operacion/#salud-del-contenido).
+- **Texto alternativo con IA**, por el mismo camino que «Traducir con IA»: `AgentAltText` manda por A2A al agente
+  `intranet-alt-text`, con el token del editor, el texto de la petición y **la imagen como parte `file` con sus
+  bytes**. `ia-agent` acepta esas partes (imágenes en línea, hasta 4 de 5 MB, sin SVG) y se las da al modelo como
+  `Media` de Spring AI solo en ese turno; un ejecutor que no ve imágenes responde *ContentTypeNotSupported*. La
+  respuesta se limpia (una línea, sin marcado ni comillas, hasta 250 caracteres) y queda en el formulario: el
+  editor la aplica, y entonces va a `ch_media_alt`, que `ContentRenderer` usa como `alt` de la imagen (antes, el
+  título).
+
 ## Slots
 
 Un **slot** es un hueco en la pantalla de otra aplicación donde va contenido editorial, con clave estable
@@ -509,6 +877,20 @@ Mientras Mateu no publique el microfrontend resuelto en servidor y `@ContentSlot
 repositorio de Mateu), el remoto es **REST provisional**: `GET /_intranet/api/slots/{key}` con el token del
 usuario devuelve `{key, variant, priority, title, html, link, cacheKey}` o **204** (la aplicación pinta el
 fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicación cachee por él.
+
+## Plantillas y vista previa
+
+- **Plantilla** (`PageTemplate`): nombre, descripción, `Block`s (los mismos de una página, con la regla de que
+  un bloque solo estrecha la audiencia) y audiencia por defecto opcional; `siteId` nulo es global, si no, solo
+  vale en ese sitio. `Templates.newPage` copia los bloques en un borrador `PAGE` nuevo vía `ItemCommands.create`
+  o `createInSite` (saneado y con autor como cualquiera). Usarla pide `content:edit`; definirla, guardar una
+  página como plantilla o borrarla, `content:publish` (o `content:admin`), como el contenido de los slots.
+  `TemplateSeeder` siembra tres por id, solo si faltan.
+- **Enlace de vista previa** (`PreviewLink`): item, quién y cuándo, caducidad (7 días por defecto, máximo 30),
+  perfil «ver como» opcional, revocación y vistas (quién y cuándo). Su estado se calcula, sin eventos ni jobs:
+  revocado, publicado después (`versions().size() > versionsAtCreation`), caducado o activo. Solo se crea si
+  hay borrador que enseñar. Crear y revocar piden un permiso editorial cualquiera; abrir, solo sesión. Una vista
+  se registra cuando se enseña el borrador y la página se abre (no en cada redibujado).
 
 ## Decisiones y por qué
 
@@ -531,13 +913,46 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 | Mirar las fechas para notificar, no escuchar `ItemBecameEffective` | Ese evento se pierde si el servicio está caído al cruzar la fecha, y el reparto tiene que esperar a la proyección de todos modos |
 | Búsqueda híbrida por rangos recíprocos | `ts_rank` y la distancia coseno no se pueden comparar; los rangos no necesitan calibrarse |
 | La IA por A2A y no con una clave propia | El LLM, la credencial, el consumo y la auditoría se gobiernan en un solo sitio, por persona |
+| Salud del contenido: avisos, nunca arreglos solos | Un enlace que «parece» roto, un medio que «parece» huérfano o una frase de la IA pueden estar mal: decide el editor; el sistema solo propone |
+| La imagen por A2A al plano de control, no una clave en content-hub | El mismo gobierno que el resto de la IA (consumo por persona, auditoría); hizo falta enseñar a `ia-agent` a aceptar imágenes en línea |
 | El agente sin herramientas: content-hub le manda los pasajes | La visibilidad se decide en un solo sitio y no depende de lo que haga el modelo |
 | Drive por referencia, con cuenta de servicio y sin delegación por defecto | Una sola versión; lo mínimo para funcionar compartiendo ficheros, sin pedir permisos de dominio |
+| El menú como datos, pero las rutas en código | El administrador decide qué se ve y cómo se llama; los enlaces del contenido, de las notificaciones y de la newsletter (`/intranet/noticias/{id}`) no pueden depender de él |
+| Destinos de menú con tipo abierto y un resolver por tipo | La newsletter (otro sitio) y el registro de interfaces añaden sus destinos sin tocar el modelo |
 | Slots por REST provisional | El microfrontend de Mateu aún no está; el contrato (clave, identidad, caché por hash) es el mismo |
+| UIs externas solo registradas, y por rutas del gateway | El token del usuario viaja como en los shells y cada aplicación aplica sus permisos; un editor no puede meter un host arbitrario ni un script |
+| La audiencia de una UI externa como audiencia con nombre (`ui-source:<id>`) | Entra en la proyección: lo que la usa desaparece de todos los consumidores, y desactivarla no exige tocar contenidos |
+| Una UI de Mateu como `MicroFrontend`; web components e iframes por `<ec-ui-source>` | Lo primero es la federación que ya usan los shells, en los dos renderers; lo segundo necesita cargar un script con token o un sandbox, que el saneador no deja en el HTML |
 
 ## Pruebas
 
 - `ItemTest`: el workflow y las invariantes del item.
+- `TextDiffTest`, `ContentDiffTest`, `ItemHistoryTest`, `ItemHistoryStoreTest` (Testcontainers): el diff por
+  palabras y el texto de un HTML, las diferencias por campo, idioma, bloque (añadido, quitado, movido, cambiado),
+  audiencia y fechas; los pasos que anota el workflow, las versiones anteriores al historial, comparar, y que
+  restaurar solo toca el borrador (fechas pasadas, revisión anulada, `content:edit`).
+- `EditorialCalendarTest`: las fechas de lo publicado, lo previsto, los cambios sin publicar y la revisión; los
+  filtros (sección con subsecciones, retirados fuera por defecto) y otra `CalendarSource` sumándose.
+- `SiteMenuTest`, `SiteMenusTest`, `PortalMenuTest`, `MenuStoreTest` (Testcontainers): las operaciones del árbol del
+  menú, lo que ve cada lector (audiencia, destinos que no puede abrir, submenús vacíos fuera, inactivas, idioma de
+  reserva), la siembra idempotente, un menú por sitio, el permiso `content:admin`, y lo que el `MenuSupplier`
+  devuelve a Mateu (las mismas entradas que antes con la siembra; toda función sigue enrutada);
+  `PortalMenuThroughMateuTest` pasa el menú por el mapeo de Mateu (lo que reciben los shells y cómo resuelve
+  un deep link).
+- `UiSourceTest`, `RemoteUiTest`: la validación del registro y de los usos (rutas del gateway, orígenes, atributos,
+  `javascript:`), y que la audiencia de la fuente solo estrecha.
+- `RemoteUisTest` (Testcontainers): el registro guardado y leído, solo `content:admin` registra, los editores solo
+  usan fuentes registradas, y una pantalla externa o un componente remoto los ve solo quien también cumple la
+  fuente —y nadie al desactivarla o borrarla—; permisos y orígenes en la puerta; el puerto `UiSources`.
+- `RemoteBlockRenderingTest`, `VisualEditorRemoteBlocksTest`: el dibujo en el portal (`MicroFrontend`,
+  `<ec-ui-source>`), la pantalla externa, la tarjeta del editor visual, el enlace del correo, y el bloque en el
+  formulario y en el editor visual (ida y vuelta, rechazos).
+- `BlockLanguagesTest`, `BlockLanguagesRenderingTest`, `BlockTranslationTest`, `AgentTranslatorBlocksTest`,
+  `VisualEditorLanguagesTest`: bloques en varios idiomas —un bloque guardado antes se lee igual, respaldo parte a
+  parte, lo dejado como respaldo sigue sin traducir, el formulario por idioma—; el portal y el número (web y
+  correo) en el idioma del lector o del grupo; «Traducir con IA» de bloques con un traductor de mentira (nunca la
+  IA real: marcas, formato, respuestas incompletas) y que el mensaje pasa las comprobaciones del agente; la API del
+  editor visual por idioma (leer, ver, traducir sin guardar, guardar solo ese idioma).
 - `NotificationsTest` (Testcontainers): a quién llega (visibilidad, activos, idioma), por tipo y por decisión del
   editor, una vez por versión, programados y caídas, espera a la proyección, preferencias por canal, lotes que
   fallan y se reanudan, relay caído, recordatorio y qué cierra cada cosa.
@@ -561,3 +976,11 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
   los fallos, y que una traducción mal formada o sin el formato del cuerpo nunca se aplica.
 - `DriveFileRefTest`, `DriveDocumentsTest` (con un Drive falso), `GoogleDriveClientTest` (contra un servidor local
   que hace de Google): las formas de URL, el trabajo de metadatos, el JWT firmado y un fichero que no se puede ver.
+- `HealthChecksTest`: cada comprobación de «Salud del contenido» sobre contenido construido con el dominio —rutas,
+  secciones por sitio, números, menús, UIs externas activas o no, huérfanos prudentes, `alt`, caducidad, desactualizado
+  y sin visitas— y que la clave de un aviso no cambia con su texto. `LinkCheckerTest` (cliente HTTP de mentira):
+  HEAD/GET, redirecciones, direcciones internas, caché, pausa por host y tope por pasada.
+- `ContentHealthTest` (Testcontainers): la noche se ejecuta una vez aunque el temporizador salte varias o lo
+  intenten dos réplicas a la vez; avisos estables entre pasadas; «revisado»; borrar un huérfano; y el texto
+  alternativo con una IA de mentira, que nunca se aplica solo. `AgentAltTextTest`: la imagen como parte `file`
+  y el token, contra un endpoint A2A falso.

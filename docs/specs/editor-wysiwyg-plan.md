@@ -116,7 +116,7 @@ Decidido con el usuario el 2026-11-02 (rama `feat/editor-visual`):
 - un web component propio (`<ec-visual-editor>`, JS sin framework) alojado como `Element` de Mateu en
   una ruta del backoffice, que funciona en los dos shells;
 - pinta los bloques del **borrador** con los datos del portal (`PageRenderer`), en el idioma por defecto
-  (los bloques son monolingües);
+  (los bloques eran monolingües; desde el paso 3.8, en el idioma que se elija);
 - texto de HTML/Banner editable en el sitio; panel lateral con el tipo, los campos del tipo y la
   audiencia del bloque como estrechamiento de la de la página, con el recuento;
 - guardar por el mismo servicio y validaciones que el formulario; la revisión y la publicación, en el
@@ -131,11 +131,13 @@ Decidido con el usuario el 2026-11-02 (rama `feat/editor-visual`):
 | 3.5 | Desplegar en local y probar sin navegador (API con token de `demo`, en una página de prueba) | hecho (2026-11-02): página de prueba «Prueba editor visual»; leer, preview, ver como, guardar, 400 con un valor que el directorio no tiene, 409 con una versión vieja |
 | 3.6 | Probar en el navegador, Vaadin (`ws.localhost:8800`) y Redwood (`rw.localhost:8800`) | hecho con Chromium sin cabeza (Playwright) en los dos: el componente carga, seleccionar, escribir, panel y recuento, ver como, guardar; falta una prueba a mano (arrastrar, pegar, insertar medio, tema oscuro) |
 | 3.7 | Manual del backoffice y arquitectura | hecho |
+| 3.8 | Bloques multilingües: `Block.translations` (título, HTML y textos de los enlaces por URL; los campos propios son el idioma por defecto, así que lo guardado antes se lee igual, sin migración); el lector los ve en su idioma con el respaldo de los items, parte a parte (portal, página de una newsletter, número web y correo por grupo); `BlockForm` con Español/English/Deutsch; selector de idioma en el editor visual (`?language=`, lo que no tiene texto propio sale en el idioma por defecto marcado «sin traducir» y, si no se toca, sigue sin traducir); «Traducir con IA» también para los bloques (formulario y editor visual), una llamada por idioma con las mismas comprobaciones que el cuerpo | hecho en la rama (tests con un traductor de mentira); también el historial (`ContentDiff` compara el texto de los bloques idioma a idioma), las plantillas (su texto propio es español; una página en otro idioma toma el suyo, `Block.rebased`) y la vista previa por enlace (en el idioma de quien la ve). Falta desplegar y probarlo en el navegador |
 
 Limitaciones conocidas:
 - el aviso de «cambios sin guardar» al salir cubre cerrar/recargar la pestaña y los clics en menús,
   botones y enlaces fuera del editor; no la tecla «atrás» del navegador;
-- el texto de los bloques solo en el idioma por defecto (los bloques no tienen traducciones);
+- ~~el texto de los bloques solo en el idioma por defecto (los bloques no tienen traducciones)~~ —
+  **resuelto** (rama `feat/multilingual-blocks`, paso 3.8);
 - en Safari, la selección dentro de un shadow root es limitada: probado en Chrome.
 
 ---
@@ -379,7 +381,7 @@ Los contenidos tienen español, inglés y alemán (`ItemForm` y sus secciones po
 |---|---|---|
 | F3.1 | Elegir de dónde sale el modelo (catálogo de IA o config propia) y la clave en local | hecho: la clave del secreto del clúster `ec-anthropic` (la misma que usa ia-control-plane), opcional; modelo `content-hub.translation.model` (por defecto `claude-opus-5-5`) |
 | F3.2 | Servicio `Translator` (aplicación) + adaptador Spring AI, con tests del contrato (HTML y marcas intactos) | hecho (ba8944e9): `Translator` + `ClaudeTranslator` con el SDK oficial `anthropic-java` 3.2.0 (no Spring AI): esfuerzo bajo, esquema JSON escrito a mano (la derivación del SDK choca con el jsonschema-generator de Spring AI), fallback de servidor ante rechazos, cuerpo saneado y marcas `[[media:…]]` verificadas; tests |
-| F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | hecho (ba8944e9): acción en `ItemForm` (solo si hay clave); bloques y variantes de slot, pendiente |
+| F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | hecho (ba8944e9): acción en `ItemForm` (solo si hay clave); bloques: hecho (paso 3.8, `BlockTranslation`, en el formulario y en el editor visual); variantes de slot, pendiente |
 | F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | hecho en local (2026-11-01, sin navegador: la acción del formulario): «bienvenida» traducida a en y de con el formato (`<b>`) y la marca `[[media:m1]]` intactos. Hizo falta devolver `List.of(this, Message…)`: un `Message` solo no devuelve el estado del formulario. Documentado en el manual del backoffice |
 
 ## N — Newsletter: recurrente, intro rica, aperturas y clics, suscripción
@@ -400,6 +402,25 @@ El usuario pidió las cuatro mejoras (2026-11-01):
 | N3 | **Aperturas y clics**. Píxel de apertura y enlaces con redirección firmada (HMAC como los medios, `/_intranet/n/{edición}/{destinatario}/…`), guardados por edición y destinatario. Informe por hotel y departamento en el backoffice. Los empleados ficticios de la demo van al email del usuario: contar por destinatario original. | hecho (79263d1b): por GRUPO, no por persona (el correo de un grupo es uno para todos): `NewsletterTracking`, `NewsletterLinksSigner`, `NewsletterTrackingController`, informe en `NewsletterForm`; gateway deja pasar `/_intranet/n/**` |
 | N4 | **Suscripción personal**: en el portal (p. ej. "Mis preferencias") cada empleado elige las secciones que quiere recibir y la frecuencia, dentro de lo que su audiencia le deja ver. `NewsletterService` filtra por ella; el default es todo. | hecho (4f15abb1): `NewsletterPreferences`/`ch_newsletter_pref`, `PreferencesPage` (Hydratable) |
 
+## N5 — Newsletters y números (2026-11-02)
+
+El usuario pidió partir la newsletter en NEWSLETTERS y sus NÚMEROS, y luego: «la newsletter en realidad es
+como un sitio web», «es como una intranet, con sus páginas», «es como una intranet más». Así que:
+**sitios** (la intranet es el de por defecto; cada newsletter, otro) y, encima, los números.
+
+| # | Paso | Estado |
+|---|---|---|
+| N5.1 | **Sitios**: `Site` (`ch_site`), `site_id` en items (`ch_item`, `ch_item_doc`), árbol de secciones por sitio (`ch_navigation`, la intranet sigue en `main`), inicios por sitio (`ch_site_home_page`); listados, secciones, búsqueda, RAG y Drive acotados a un sitio (la intranet por defecto). Todo lo existente es de la intranet | hecho (66761ba8) |
+| N5.2 | **Newsletter** (por sitio): maqueta, fuentes por sección, periodicidad (ninguna/semanal/mensual), envío sin revisión (por defecto, borrador); numeración; un slot = un número | hecho (bd0db49a) |
+| N5.3 | **Números**: bloques (los de las páginas + «Sección de la newsletter»), items por sección, `DRAFT → SCHEDULED → SENT`/`CANCELLED`, contenido automático desde el número anterior, envío por grupo, prueba, estadísticas por número | hecho (bd0db49a) |
+| N5.4 | **Suscripción por newsletter** (`ch_nl_subscription`) con secciones; baja por newsletter en el correo; «Mis preferencias» las lista | hecho (bd0db49a) |
+| N5.5 | **Portal**: «Newsletters» y el sitio de cada una en `/intranet/n/{id}` (inicio, archivo, número, sección, páginas), su menú tras una costura (`NewsletterNavigation`) | hecho (bd0db49a); falta probarlo en el navegador (Vaadin y Redwood, móvil) |
+| N5.6 | **Backoffice**: Newsletters (identidad, audiencia, secciones, maqueta, periodicidad, sus números y páginas), Números de newsletter (formulario, prueba, programar/cancelar, estadísticas, vista previa), editor visual sobre un número | hecho (bd0db49a); falta probarlo en el navegador |
+| N5.7 | **Migración** de las ediciones a «Boletín de la intranet» (idempotente, al arrancar), eventos y preferencias conservados | hecho (bd0db49a); probado en arranque contra un Postgres vacío con una edición |
+| N5.8 | Menú configurable de la newsletter (dueño: el id de su sitio) en lugar del derivado: sembrado (inicio, secciones, archivo, páginas), destinos `NEWSLETTER_HOME`/`ARCHIVE`/`ISSUE`, `PAGE`/`SECTION` por sitio (`SiteAwareRoutes`), editable en Configuración → Menús | hecho (tras #279) |
+| N5.10 | Revisión en el navegador (Vaadin, tema oscuro): el número y la barra del sitio ilegibles sobre fondo oscuro → primero sobre papel claro; luego (pedido del usuario) la versión web sigue el tema, claro u oscuro, y solo el correo es claro (fix/sites-visibility-and-dark); un item con un bloque de tipo desconocido rompía el listado → se lee sin él | hecho |
+| N5.9 | Desplegar en local y probar en el navegador | pendiente (lo despliega el agente principal) |
+
 ## H — Inicios por audiencia (home configurable)
 
 Hoy `portal/HomePage` es fijo e igual para todos: saludo, pendientes de confirmar, 5 avisos y 8 noticias. Lo que cambia por persona es solo qué contenidos salen (cada uno filtrado por su audiencia). El usuario pidió (2026-11-01) poder definir **un inicio distinto por usuario o grupo**, con los mismos criterios que los contenidos.
@@ -415,6 +436,129 @@ Hoy `portal/HomePage` es fijo e igual para todos: saludo, pendientes de confirma
 | H2 | **Bloques dinámicos**, para que una página pueda mostrar lo que hoy pinta el inicio: `GREETING` (saludo con el nombre), `PENDING` (pendientes de confirmar), `NOTICES` y `LATEST` (últimos avisos / noticias y páginas, cuántos, sección opcional). Opcional: `SLOT` (una clave de slot). Sirven en cualquier página, no solo en inicios. | hecho (f4c99699): `GREETING`, `PENDING`, `NOTICES`, `LATEST` en `PageRenderer`; `SLOT` no |
 | H3 | **Ver como…** del backoffice muestra también qué página de inicio le toca a ese perfil (o "el de por defecto"). | hecho (0396cc69) |
 | H4 | **Ejemplo en la seed**: la página "Inicio Recepción Canarias" (audiencia: departamento RECEPCION y región CANARIAS), con saludo, pendientes, enlaces rápidos a turnos y al procedimiento, y un banner, primera en la lista. Probar con Ana Pérez (TFS01, recepción), que la ve, frente a un chef de Cancún, que sigue con el inicio por defecto, en Vaadin y Redwood. Documentar en los manuales (portal, backoffice, configuración). | hecho (f4c99699, docs 0396cc69); falta probarlo en el despliegue |
+
+## M — Menús configurables
+
+Hasta ahora el menú del portal estaba en código (`IntranetMenu`, un `@Menu` por función). El usuario pidió
+(2026-11-02) hacerlo **configurable como datos y reutilizable**: la intranet lo usa ya; cada newsletter (que
+pasa a ser "un sitio más", rama `feat/newsletter-issues`) tendrá el suyo con la misma pieza; y una entrada
+puede llevar a **otra interfaz** del registro de interfaces (rama `feat/remote-uis`).
+
+**Diseño acordado:** un menú es un árbol ordenado de entradas, de un **sitio** (`intranet` o el id de otro
+sitio). Entrada: texto por idioma (es/en/de, reserva en el idioma del sitio), destino, audiencia ("quién lo
+verá", el mismo modelo que los items) y activa. Destinos: `PAGE`, `SECTION`, `BUILTIN` (las funciones del
+portal), `URL` (ruta o externa, pestaña nueva), `REMOTE` (otra interfaz) y los que añada otro tipo de sitio.
+El portal lo dibuja por petición con `MenuSupplier`; una entrada que el lector no ve no sale, ni un submenú
+vacío. Las rutas siguen saliendo de las páginas de siempre.
+
+| # | Paso | Estado |
+|---|---|---|
+| M1 | Dominio: `SiteMenu` (árbol: añadir, cambiar, mover, subir/bajar, meter/sacar de submenú, borrar con lo que cuelga; lo que ve un lector), `MenuEntry`, `MenuTarget` (tipo abierto), `MenuNode` | hecho: `domain/menu`, `SiteMenuTest` |
+| M2 | Aplicación: `SiteMenus` (por sitio, `content:admin`, `shown(MenuContext)`), un `MenuTargetResolver` por tipo (`StandardTargets`), `PortalFunction`, `DefaultMenus`; costuras `SiteRoutes` y `UiSources` | hecho: `application/menu`, `SiteMenusTest` |
+| M3 | Persistencia `ch_menu` (un documento por sitio) y siembra idempotente del menú de siempre (`MenuSeeder`) | hecho: `PgMenuRepository`, `MenuStoreTest` |
+| M4 | Portal: `IntranetMenu` como `MenuSupplier` (`PortalMenu`): funciones como `FieldLink`, páginas/secciones/rutas como `RouteLink`, submenús sin path, funciones fuera del primer nivel ocultas pero enrutadas; `MenuEntryPage` para enlaces externos e interfaces alojadas | hecho: `PortalMenuTest`; sin cambios en los shells |
+| M5 | Configuración → Menús (`MenusCrud`, `MenuEntryForm` con sitio, posición, textos, destino, quién lo verá, activa y subir/bajar/meter/sacar) y Menús: vista previa (`MenuPreviewPage`); *Ver como* enseña el menú configurado | hecho |
+| M6 | Probar en local en Vaadin (`intranet.localhost`) y Redwood (`rw-intranet.localhost`): el menú sembrado igual que antes, un submenú, una página con audiencia, un enlace externo; deep links | pendiente (despliegue lo coordina el agente principal) |
+| M7 | Newsletter: su menú con `SiteMenus` y sus destinos propios (`MenuTargetResolver` con `appliesTo`) | pendiente, en `feat/newsletter-issues` |
+| M8 | Registro de interfaces: implementación real de `UiSources` (`@Primary`) | hecho en `feat/remote-uis`: un solo `UiSources` con el `UiSource` del dominio; `PgUiSourceRepository` (`@Primary`), sin el bean vacío de `MenuConfig` |
+
+## R — UIs externas (registro y uso como páginas y bloques)
+
+Pedido el 2026-11-02 (rama `feat/remote-uis`). Diseño acordado con el usuario:
+- **Registro** (configuración, plano de control, `content:admin`): `UiSource {id, nombre, tipo, dónde está,
+  etiqueta, audiencia, permisos que exige, activa}`. Tipos: `MATEU_REMOTE` (el prefijo de una UI de Mateu en
+  el gateway, `/_loyalty`), `WEB_COMPONENT` (la ruta de su script en el gateway + su etiqueta), `IFRAME`
+  (una URL https de un origen permitido por el despliegue; último recurso). Nunca un host arbitrario,
+  `javascript:`, `..` ni `//`.
+- **Usos** (los editores solo eligen entre las registradas): una **pantalla externa** (`REMOTE_PAGE`: su URL
+  guarda `ui:<fuente><ruta>`) y el bloque **«Componente remoto»** (`REMOTE`: fuente + ruta o atributos).
+  Los **menús** (rama `feat/configurable-menus`) usan el registro por el puerto `UiSources`.
+- **Seguridad**: el token del usuario viaja por el gateway como siempre y la UI remota aplica sus permisos;
+  la audiencia de la fuente es una audiencia con nombre para la política (`ui-source:<id>`), así que lo que la
+  usa se proyecta con ella (AND) y desaparece de todo si se estrecha, desactiva o borra; los permisos se
+  miran en la puerta (`RemoteUis.usable`). Nada ensancha.
+
+| # | Paso | Estado |
+|---|---|---|
+| R1 | Dominio: `UiSource`, `RemoteUi`, `BlockType.REMOTE`, `ItemType.REMOTE_PAGE`; validación (rutas del gateway, orígenes permitidos, atributos sin `on*`/`javascript:`) y la audiencia de la fuente en la proyección (`Block.visibilityAudience`, `ItemContent.visibilityAudience`) | hecho (1551b214), con tests |
+| R2 | Registro: puerto `UiSources` (`find`, `all`), `PgUiSourceRepository` (`ch_ui_source`), `UiSourceCommands`, `RemoteUis`; Configuración → **UIs externas** (`UiSourcesCrud`/`UiSourceForm`, con el constructor de audiencias y «Dónde se usa») | hecho (1551b214) |
+| R3 | Dibujo: portal (`MicroFrontend` para Mateu, `<ec-ui-source>` de `embed.js` para web component e iframe), editor visual (una tarjeta), correo (`RemoteUiRenderer.fallbackHtml`/`fallbackText`: «ver en la web») | hecho (1551b214, 7aa42c0a) |
+| R4 | Editores: pantalla externa en `ItemForm`; campos del bloque en `BlockForm` y en el editor visual (el registro como lista) | hecho (7aa42c0a) |
+| R5 | Ejemplos en la semilla: Riu Class (`/_loyalty`) y `<ec-push-toggle>`; «Riu Class · socios» (pantalla externa) y «Herramientas» (página con dos componentes remotos) | hecho (fa73a62c) |
+| R6 | Desplegar en local y probar en el navegador, Vaadin y Redwood, en `ws.localhost:8800` (el gateway enruta `/_loyalty` en el plano de datos) | en parte: Vaadin, «Herramientas» con sus dos bloques (ver R10); Redwood y la pantalla externa, pendientes |
+| R7 | En el host propio de la intranet (`intranet.*`) el gateway solo enruta `/_portal`, `/_inbox` y los medios: una UI de Mateu de otro servicio necesita su ruta allí (decidir cuáles) | pendiente |
+| R8 | Manual del backoffice, arquitectura y operación | hecho |
+| R9 | Un menú con `REMOTE` (rama de menús, #279): un solo `UiSources` con el `UiSource` del dominio; `PgUiSourceRepository` `@Primary`, sin el bean vacío de `MenuConfig`; `MenuEntryPage` dibuja web components e iframes con `RemoteUiRenderer` | hecho (rebase sobre master con #279) |
+| R10 | Probado en el navegador (ws.localhost, Vaadin, ana.perez): «Herramientas» pinta los dos bloques remotos; pero la isla traía su cromo (miga «Intranet › Noticias › Acumulaciones» y el título de la pestaña). Arreglo en ec-demo1 (`RemoteUiRenderer.Mode`, clases `ec-remote-*`, estilo y guarda del título en `embed.js`) mientras Mateu no tenga una opción de «embebido» (lo que necesitaría: arquitectura → UIs externas) | hecho (8ed58aaa); falta volver a probarlo en el navegador (Vaadin y Redwood) |
+
+Limitaciones conocidas:
+- dentro de una pantalla externa, un enlace de la UI remota navega a su propia ruta (p. ej. `/loyalty/members/…`):
+  en la consola de datos la resuelve su `RemoteMenu`; en el host de la intranet, no;
+- los permisos que exige una fuente se miran al dibujar: un lector sin ellos ve la pantalla externa en los
+  listados, pero al abrirla le sale «No puedes usar esta aplicación» (la audiencia, en cambio, sí la oculta en
+  todo); con «ver como», los permisos son los del editor;
+- un web component `.mjs` cargado con token (blob) no resuelve imports relativos: que el script sea un bundle;
+- un iframe no lleva el token del usuario: el otro sitio inicia sesión por su cuenta.
+
+## V — Historial y calendario
+
+Pedido el 2026-11-02: (A) el historial de versiones de un contenido, con comparación y restaurar; (B) un calendario
+editorial. Rama `feat/history-calendar`.
+
+| # | Paso | Estado |
+|---|---|---|
+| V1 | **Historial**: cada paso del workflow (creado, editado, enviado a revisión, publicado, rechazado, retirado, restaurado) con quién y cuándo, en `ch_item_history`, aparte del item. Las versiones solo guardaban lo publicado: ahora cada guardado que cambia algo guarda también la copia del borrador (barato: un `ItemContent` en JSON). Las publicaciones previas al historial se leen de las versiones | hecho: `ItemHistory`, `HistoryEntry`/`HistoryAction`, `PgItemHistoryRepository`, anotado desde `ItemCommands` |
+| V2 | **Comparar** dos estados (versión, copia guardada o borrador actual): por campo y por idioma (título, resumen, cuerpo como texto —sin etiquetas— con lo añadido y quitado resaltado), bloques (añadidos, quitados, movidos, cambiados), audiencia y ventana de publicación | hecho: `TextDiff`, `ContentDiff`, `DiffView` |
+| V3 | **Restaurar esta versión** (`content:edit`): al borrador, nunca publica; queda en el historial | hecho: `ItemHistory.restore`; una fecha de publicación pasada se quita, caducidad o límite pasados se avisan |
+| V4 | Pantalla `HistoryPage` (`/editorial/historial/{id}`), botón *Historial* en el formulario, *Editorial → Historial de versiones* | hecho |
+| V5 | **Calendario editorial** (`/editorial/calendario`) con el arquetipo `CalendarPage` de Mateu: mes, semana y lista; publica, caduca, confirmar antes de, en revisión; filtros por tipo, sección y estado; pulsar abre el contenido | hecho: `EditorialCalendar`, `ItemsCalendarSource`, `EditorialCalendarPage` |
+| V6 | **Punto de extensión** `CalendarSource` para que las ediciones programadas de las newsletters (y otros) añadan entradas | hecho: `NewsletterIssuesCalendarSource` (números programados y enviados, abren `/editorial/numeros/{id}`) |
+| V7 | Tests (diff por palabras y de HTML, diferencias, restaurar, agregación del calendario, store) y documentación (manual del backoffice, arquitectura) | hecho |
+| V8 | Probar en local en Vaadin | primera prueba del coordinador: el calendario fallaba (lector sin permisos: Mateu evaluaba el campo sin petición) y los selects del historial eran de solo lectura (ficha de un listado). Corregido: lector desde la petición en curso; selects como `FormField` en `detailContent`. Falta volver a probarlo, y Redwood |
+
+## P — Plantillas y vista previa (2026-11-02)
+
+Pedido: (A) **plantillas de página** — nombre, descripción, bloques con textos de ejemplo y audiencia por
+defecto opcional; «Nueva página desde plantilla» y «Guardar como plantilla»; tres de ejemplo; por sitio si el
+concepto de sitio está —lo está (#281)—, con plantillas globales. (B) **enlaces de vista previa para
+revisores** — firmados, caducables (7 días), revocables, listados en el item; enseñan el BORRADOR como lo verán
+los lectores (opcionalmente «ver como» un perfil) a cualquiera con sesión, de solo lectura, marcados «Borrador —
+vista previa», registrando las vistas; revocar o publicar los anula.
+
+**Permisos (decididos):** usar una plantilla, `content:edit` (solo hace un borrador); definirlas, `content:publish`
+o `content:admin` (`@Publishers`), como el contenido de slots: son el punto de partida de todos. Enlaces: crear
+y revocar, cualquier permiso editorial; abrir, cualquier empleado con sesión.
+
+| # | Paso | Estado |
+|---|---|---|
+| P1 | Dominio `PageTemplate` (bloques que solo estrechan, audiencia por defecto, `siteId` o global, `fromPage`, `newPageContent`) y `PreviewLink` (`PreviewLinkStatus`: activo, caducado, revocado, publicado; vistas) | hecho: `domain/template`, `domain/preview`, tests de dominio |
+| P2 | `Templates` (CRUD con `content:publish`, `newPage` con `content:edit` en el sitio elegido, `saveFromPage`, `seed`) y `PreviewLinks` (`create`/`revoke` con permiso editorial, `open` con sesión y firma); `PgTemplateRepository`, `PgPreviewLinkRepository`, `ch_page_template`, `ch_preview_link`, `ch_preview_key`; `PreviewLinksSigner` (HMAC como `NewsletterLinksSigner`, clave persistida sin `MEDIA_SECRET`) | hecho: `TemplatesTest`, `PreviewLinksTest`, `TemplatePreviewJsonTest` |
+| P3 | Backoffice: *Plantillas* (`TemplatesCrud`, `@Publishers`), *Nueva página desde plantilla* (`/editorial/nuevaPagina`: sitio, plantilla, título, sección → formulario o editor visual), *Guardar como plantilla* en el formulario de una página; tres plantillas sembradas (`TemplateSeeder`) | hecho; falta probarlo en el navegador |
+| P4 | Vista previa: *Enlace de vista previa* en el formulario → `PreviewLinksPage` (`/editorial/vistaPrevia/{id}`: días, ver como, crear, lista con estado y vistas, revocar); lista de solo lectura en el formulario; *Enlaces de vista previa* en el menú; `PreviewPage` en el portal (`/intranet/vista-previa/{id}.{firma}`) | hecho: `PreviewPageTest` (sesión, firma, caducidad, revocación, publicación, ver como); falta probarlo en el navegador |
+| P5 | Números de newsletter: enlace de vista previa de un número, y plantillas como maqueta de número | pendiente (las páginas y artículos de una newsletter sí tienen ambas cosas: son items) |
+
+## S — Salud del contenido
+
+Pedido el 2026-11-02 (rama `feat/content-health`). Una pantalla en *Editorial* (verla: `content:edit|publish|admin`;
+actuar: `content:edit`; borrar medios: `content:admin`) con cinco comprobaciones sobre todos los sitios, cada
+noche y a demanda, sus avisos guardados, enlace a lo que hay que arreglar y «marcar como revisado». Nada se
+arregla ni se borra solo.
+
+| # | Paso | Estado |
+|---|---|---|
+| S1 | Comprobaciones puras sobre una foto del contenido (`ContentSnapshot`, `ContentReferences`, `HealthChecks`): enlaces rotos (contenidos, secciones, rutas, personas, encuestas, medios, URL firmadas, enlaces rápidos, slots, inicios, menús), huérfanos (con tamaño), imágenes sin `alt`, caducidad (pronto, y caducado aún enlazado), desactualizado y páginas sin visitas (con la analítica de master) | hecho, con tests |
+| S2 | Enlaces externos: `LinkChecker` (HEAD→GET, timeout, pausa por host, tope por pasada, caché 7 d / 1 d, User-Agent, sin direcciones internas ni redirecciones a ellas) y `JdkHttpProbe` | hecho, con tests (cliente HTTP de mentira) |
+| S3 | Guardado y noche: `ch_health_run` (la noche reclamada por su fecha), `ch_health_finding`, `ch_health_snooze`, `ch_health_link`; `HealthJobs` (03:15 Madrid) | hecho, con test de idempotencia (Testcontainers, dos réplicas a la vez) |
+| S4 | Texto alternativo con IA: `ia-agent` acepta imágenes en línea por A2A (partes `file` con bytes → `Media` de Spring AI); `AgentAltText` → agente `intranet-alt-text` con el token del editor; el editor revisa y aplica (`ch_media_alt`, que el renderer usa como `alt`) | hecho, con tests (IA de mentira; nunca la real) |
+| S5 | Pantalla: `HealthListing` (`/editorial/salud`: cuentas por comprobación en el subtítulo, filtros por comprobación, estado y sitio; «Comprobar ahora»; «Marcar como revisados») y `FindingPage` (abrir contenido / número / medio, sugerir y aplicar `alt`, borrar huérfano, revisado N días con nota) | hecho |
+| S6 | Todos los sitios (tras #279–#281): secciones e inicios por sitio, rutas de newsletter (`/intranet/n/{sitio}/…`), bloques de los números sin enviar, entradas de menú de cada sitio (también `ISSUE`), y UIs externas borradas o desactivadas en bloques `REMOTE`, pantallas externas y menús `REMOTE` | hecho, con tests |
+| S7 | Crear el agente `intranet-alt-text` en el catálogo del plano de control (modelo con visión; prompt en Operación) | pendiente (no se despliega en esta rama) |
+| S9 | Plantillas de página (#286): sus bloques se comprueban (enlaces, medios, `alt`, UIs externas; aviso «Plantilla», *Abrir la plantilla*) y sus medios cuentan como usados; los enlaces de vista previa enseñan el borrador, que ya contaba | hecho, con tests |
+| S8 | Desplegar en local y probar en el navegador (Vaadin y Redwood): la lista, el subtítulo con las cuentas, los filtros `Set<Enum>`, las acciones de la fila y la IA con un agente real | pendiente |
+
+Limitaciones conocidas:
+- los avisos de slots, inicios y menús dicen dónde arreglarlo (consola de control), pero no navegan allí: es otra UI;
+- «sin visitas» necesita al menos dos semanas de analítica y solo mira páginas (no inicios);
 
 ## Cómo retomar
 

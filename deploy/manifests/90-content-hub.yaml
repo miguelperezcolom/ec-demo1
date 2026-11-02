@@ -99,6 +99,8 @@ spec:
               value: http://ia-agent:8095/a2a/intranet-agent
             - name: INTRANET_TRANSLATOR_URL
               value: http://ia-agent:8095/a2a/intranet-translator
+            - name: INTRANET_ALT_TEXT_URL
+              value: http://ia-agent:8095/a2a/intranet-alt-text
             # Google Drive metadata (who modified a referenced file, its current name). Optional — without
             # the ec-google-drive secret the references work from their URL alone. The key file is
             # mounted below. IMPERSONATE: the user to act as with domain-wide delegation; unset, the

@@ -24,6 +24,8 @@ import java.util.Optional;
 public class Item extends AggregateRoot {
 
     private String id;
+    /** The site it belongs to (null: the intranet, as everything written before sites existed). */
+    private String siteId;
     private ItemType type;
     private String author;
     private String defaultLanguage;
@@ -52,6 +54,20 @@ public class Item extends AggregateRoot {
         item.versions = new ArrayList<>();
         item.updatedAt = now;
         return item;
+    }
+
+    /** As {@link #create}, in a site other than the intranet: a newsletter's page or article. */
+    public static Item create(String id, String siteId, ItemType type, String author, String defaultLanguage,
+                              ItemContent content, Instant now) {
+        var item = create(id, type, author, defaultLanguage, content, now);
+        var site = io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId);
+        item.siteId = io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET.equals(site) ? null : site;
+        return item;
+    }
+
+    /** The site it belongs to: the intranet unless it was written for another. */
+    public String siteId() {
+        return io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId);
     }
 
     public boolean hasVersions() {
@@ -151,6 +167,12 @@ public class Item extends AggregateRoot {
         }
         if ((type == ItemType.LINK || type == ItemType.DOCUMENT) && (content.url() == null || content.url().isBlank())) {
             throw new IllegalStateException("Un " + type.label().toLowerCase() + " necesita su URL");
+        }
+        if (type == ItemType.REMOTE_PAGE) {
+            if (!io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.isRemote(content.url())) {
+                throw new IllegalStateException("Una pantalla externa necesita su UI externa (y su ruta)");
+            }
+            io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.parse(content.url()); // refuses a malformed one
         }
         var ids = new HashSet<String>();
         for (var block : content.blocks()) {

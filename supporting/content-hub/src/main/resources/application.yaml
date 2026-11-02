@@ -93,6 +93,21 @@ content-hub:
   translation:
     agent-url: ${INTRANET_TRANSLATOR_URL:http://ia-agent:8095/a2a/intranet-translator}
     agent-timeout: ${INTRANET_TRANSLATOR_TIMEOUT:PT60S}
+  # «Sugerir texto alternativo con IA» («Salud del contenido»): the same, with the image inline; the agent's model must see.
+  alt-text:
+    agent-url: ${INTRANET_ALT_TEXT_URL:http://ia-agent:8095/a2a/intranet-alt-text}
+    agent-timeout: ${INTRANET_ALT_TEXT_TIMEOUT:PT60S}
+  # «Salud del contenido»: checked every night (and on demand); nothing is fixed or deleted by itself.
+  health:
+    expiry-days: ${HEALTH_EXPIRY_DAYS:14}
+    stale-months: ${HEALTH_STALE_MONTHS:12}
+    # the sections where freshness matters (ids, comma separated); empty: all
+    stale-sections: ${HEALTH_STALE_SECTIONS:}
+    unviewed-days: ${HEALTH_UNVIEWED_DAYS:90}
+    external-links: ${HEALTH_EXTERNAL_LINKS:true}
+    max-external-per-run: ${HEALTH_MAX_EXTERNAL_PER_RUN:300}
+    nightly:
+      cron: ${HEALTH_NIGHTLY_CRON:0 15 3 * * *}
   # Optional: without a service account key file the Drive references work from the URL alone, with no metadata.
   drive:
     credentials-file: ${GOOGLE_DRIVE_CREDENTIALS_FILE:}
@@ -102,6 +117,11 @@ content-hub:
     # The demo's employees are made up: every newsletter goes here, saying whom it was for.
     redirect-to: ${NEWSLETTER_REDIRECT_TO:}
   portal-url: ${PORTAL_URL:http://ec1.localhost:8800/intranet}
+  # The registry of external UIs (Configuración → UIs externas). A Mateu UI or a web component is a path the
+  # gateway routes; an iframe may point at another origin only if it is listed here (https://host[:port],
+  # comma-separated). Empty: no iframe source can be registered.
+  ui-sources:
+    iframe-origins: ${UI_SOURCES_IFRAME_ORIGINS:}
   surveys:
     # Keys who answered an anonymous survey (with each survey's salt): set it, and the database alone
     # cannot tell whether someone answered. Changing it lets everyone answer the open ones once more.

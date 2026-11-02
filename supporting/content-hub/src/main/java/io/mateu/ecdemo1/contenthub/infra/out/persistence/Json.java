@@ -30,15 +30,51 @@ public final class Json {
     interface AudienceMixin {
     }
 
-    public static final ObjectMapper MAPPER = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .addModule(new Jdk8Module())
-            .visibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
-            .visibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
-            .visibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .addMixIn(Audience.class, AudienceMixin.class)
+    static JsonMapper.Builder builder() {
+        return JsonMapper.builder()
+                .addModule(new JavaTimeModule())
+                .addModule(new Jdk8Module())
+                .visibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
+                .visibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+                .visibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .addMixIn(Audience.class, AudienceMixin.class);
+    }
+
+    /** Blocks as they are, for {@link KnownBlocks}. */
+    static final ObjectMapper BLOCKS = builder().build();
+
+    /**
+     * A block of a type this version does not know (written by a newer one: a branch, a rollback) is read as
+     * nothing — logged and left out — instead of failing the whole item, and with it every listing that reads it.
+     */
+    static final class KnownBlocks extends com.fasterxml.jackson.databind.JsonDeserializer<io.mateu.ecdemo1.contenthub.domain.item.Block> {
+        static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(KnownBlocks.class);
+
+        @Override
+        public io.mateu.ecdemo1.contenthub.domain.item.Block deserialize(com.fasterxml.jackson.core.JsonParser p,
+                                                                       com.fasterxml.jackson.databind.DeserializationContext c)
+                throws java.io.IOException {
+            com.fasterxml.jackson.databind.JsonNode node = p.readValueAsTree();
+            var type = node == null ? null : node.get("type");
+            if (type == null || java.util.Arrays.stream(io.mateu.ecdemo1.contenthub.domain.item.BlockType.values())
+                    .noneMatch(t -> t.name().equals(type.asText()))) {
+                LOG.warn("Block {} of unknown type {} left out", node == null ? null : node.get("id"), type);
+                return null;
+            }
+            try {
+                return BLOCKS.treeToValue(node, io.mateu.ecdemo1.contenthub.domain.item.Block.class);
+            } catch (RuntimeException | java.io.IOException e) { // a block its own type no longer accepts
+                LOG.warn("Block {} could not be read, left out: {}", node.get("id"), e.getMessage());
+                return null;
+            }
+        }
+    }
+
+    public static final ObjectMapper MAPPER = builder()
+            .addModule(new com.fasterxml.jackson.databind.module.SimpleModule("known-blocks")
+                    .addDeserializer(io.mateu.ecdemo1.contenthub.domain.item.Block.class, new KnownBlocks()))
             .build();
 
     private Json() {

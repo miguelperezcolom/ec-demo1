@@ -22,6 +22,27 @@ public class ContentHubMenu {
     VisualEditorListing visual;
 
     @Menu
+    @Label("Calendario editorial")
+    EditorialCalendarPage calendario;
+
+    @Menu
+    @Label("Historial de versiones")
+    HistoryListing historial;
+
+    @Menu
+    @Label("Nueva página desde plantilla")
+    NewPageFromTemplatePage nuevaPagina;
+
+    @Menu
+    @Label("Plantillas")
+    @Publishers
+    TemplatesCrud plantillas;
+
+    @Menu
+    @Label("Enlaces de vista previa")
+    PreviewLinksListing vistaPrevia;
+
+    @Menu
     @Label("Medios")
     MediaCrud medios;
 
@@ -31,8 +52,16 @@ public class ContentHubMenu {
     SlotContentCrud slots;
 
     @Menu
-    @Label("Newsletter")
-    NewsletterCrud newsletter;
+    @Label("Newsletters")
+    NewsletterCrud newsletters;
+
+    @Menu
+    @Label("Números de newsletter")
+    NewsletterIssuesCrud numeros;
+
+    @Menu
+    @Label("Editor visual de números")
+    IssueVisualEditorListing editorNumeros;
 
     @Menu
     @Label("Encuestas")
@@ -61,4 +90,8 @@ public class ContentHubMenu {
     @Menu
     @Label("Analítica")
     AnalyticsPage analitica;
+
+    @Menu
+    @Label("Salud del contenido")
+    HealthListing salud;
 }

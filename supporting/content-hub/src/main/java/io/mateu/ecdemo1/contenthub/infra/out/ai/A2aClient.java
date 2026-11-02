@@ -34,8 +34,17 @@ public class A2aClient {
 
     final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
 
+    /** An image sent beside the text (an A2A file part with its bytes inline), for an agent whose model sees. */
+    public record Image(String mimeType, byte[] bytes) {
+    }
+
     /** @return the agent's text answer, never blank */
     public String send(String url, String text, String authorization, Duration timeout) {
+        return send(url, text, List.of(), authorization, timeout);
+    }
+
+    /** @return the agent's text answer, never blank */
+    public String send(String url, String text, List<Image> images, String authorization, Duration timeout) {
         if (url == null || url.isBlank()) {
             throw new A2aException("no agent configured");
         }
@@ -49,7 +58,7 @@ public class A2aClient {
                     .header("Accept", "application/json")
                     .header("Authorization", authorization)
                     .header("X-A2A-No-Delegation", "true")
-                    .POST(HttpRequest.BodyPublishers.ofString(Json.write(request(text)))).build(),
+                    .POST(HttpRequest.BodyPublishers.ofString(Json.write(request(text, images)))).build(),
                     HttpResponse.BodyHandlers.ofString());
         } catch (java.net.http.HttpTimeoutException e) {
             throw new A2aException("no answer within " + timeout.toSeconds() + " s");
@@ -66,11 +75,21 @@ public class A2aClient {
     }
 
     static Map<String, Object> request(String text) {
+        return request(text, List.of());
+    }
+
+    static Map<String, Object> request(String text, List<Image> images) {
+        var parts = new java.util.ArrayList<Map<String, Object>>();
+        parts.add(Map.of("kind", "text", "text", text));
+        for (var image : images) {
+            parts.add(Map.of("kind", "file", "file", Map.of("mimeType", image.mimeType(),
+                    "bytes", java.util.Base64.getEncoder().encodeToString(image.bytes()))));
+        }
         var message = new LinkedHashMap<String, Object>();
         message.put("kind", "message");
         message.put("role", "user");
         message.put("messageId", UUID.randomUUID().toString());
-        message.put("parts", List.of(Map.of("kind", "text", "text", text)));
+        message.put("parts", parts);
         var request = new LinkedHashMap<String, Object>();
         request.put("jsonrpc", "2.0");
         request.put("id", UUID.randomUUID().toString());

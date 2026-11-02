@@ -12,8 +12,10 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.content.Media;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeTypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -86,9 +88,18 @@ public class A2aAgentExecutor implements A2aServer.Executor {
 
     @Override
     public String run(AgentConfig config, String text, String contextId, String authorization, A2aHop hop) {
+        return run(config, text, List.of(), contextId, authorization, hop);
+    }
+
+    /** The images go to the model with this turn's message only: the conversation keeps the text. */
+    @Override
+    public String run(AgentConfig config, String text, List<A2aServer.Image> images, String contextId,
+                      String authorization, A2aHop hop) {
+        var media = images.stream().map(i -> Media.builder()
+                .mimeType(MimeTypeUtils.parseMimeType(i.mimeType())).data(i.bytes()).build()).toList();
         var sessionId = "a2a:" + config.agentId() + ":" + contextId;
-        log.info("A2A message for {} (depth {}, chain {}): {} chars", config.agentId(), hop.depth(),
-                hop.chain(), text.length());
+        log.info("A2A message for {} (depth {}, chain {}): {} chars, {} images", config.agentId(), hop.depth(),
+                hop.chain(), text.length(), images.size());
         var observation = prompts.start(observationRegistry.getCurrentObservation(), sessionId, text,
                 hop.depth());
         try (var scope = observation.openScope()) {
@@ -115,8 +126,11 @@ public class A2aAgentExecutor implements A2aServer.Executor {
                 }
                 system.append("\n\n").append(A2A_NOTE);
 
-                var turn = agentTurn.call(config, system.toString(), conversationStore.getHistory(sessionId),
-                        message, tools.toArray(new ToolCallback[0]));
+                var history = conversationStore.getHistory(sessionId);
+                var toolArray = tools.toArray(new ToolCallback[0]);
+                var turn = media.isEmpty()
+                        ? agentTurn.call(config, system.toString(), history, message, toolArray)
+                        : agentTurn.call(config, system.toString(), history, message, media, toolArray);
                 var answer = turn.content() == null || turn.content().isBlank()
                         ? "(sin respuesta)" : NAVIGATE.matcher(turn.content()).replaceAll("").trim();
                 usageReporter.report(config.agentId(), config.llm().id(), config.llm().model(),

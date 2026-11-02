@@ -14,6 +14,10 @@ chat. Tus atributos los mantiene RRHH en el servicio de usuarios; si cambian (ot
 que ves cambia en unos segundos.
 :::
 
+El menú de la izquierda lo configura el equipo de la intranet (ver
+[Menús](/intranet/manual-backoffice/#menús)): puede que tengas entradas que otro no tiene, o submenús. Las
+direcciones de cada pantalla (`/intranet/noticias`, `/intranet/buscar`…) son siempre las mismas.
+
 ## Inicio
 
 *Intranet → Inicio* te saluda por tu nombre y reúne:
@@ -140,15 +144,27 @@ llegan a RRHH, si eres de RRHH. Abre una, escribe un comentario para el empleado
 
 Sin responsable en el directorio no se puede hacer una solicitud: RRHH tiene que asignártelo.
 
-## Mis preferencias
+## Newsletters
 
-*Mis preferencias* decide qué te llega por la **newsletter**:
+*Newsletters* lista las newsletters que son para ti (las de tu audiencia), si las recibes y su último
+número. Cada una es un pequeño sitio, con su logo y sus colores y **su propio menú**: *Inicio* (el último
+número y los anteriores), sus **secciones** (lo que han traído los números en esa sección y sus propios
+artículos), *Números anteriores* (el archivo) y **sus páginas** («Quiénes somos»…). Cada número tiene su
+página permanente: es el mismo número que te llegó por correo («Ver en el navegador» lleva ahí), con lo que
+puedes ver tú, y con sus vídeos y medios en la página.
 
-- **Recibir la newsletter**: desmárcalo y no te llegará ninguna edición.
-- **Solo de estas secciones**: elige las que te interesan; vacío, todas. Solo aparecen secciones con algo
-  que puedes ver.
+En la página de una newsletter:
+
+- **Darme de baja** / **Suscribirme**: solo para esa newsletter; las demás siguen igual. También el enlace
+  «Darte de baja de esta newsletter» del correo lleva aquí.
+- **Qué secciones recibo**: marca las que te interesan; ninguna marcada, todas.
 
 Nunca te llegará nada que no puedas ver en la intranet, elijas lo que elijas.
+
+## Mis preferencias
+
+*Mis preferencias* lista **las newsletters que recibes** (cada una lleva a su página, donde te das de
+baja o eliges secciones) y decide cómo se te avisa.
 
 ### Notificaciones
 
@@ -216,6 +232,20 @@ sabe lo que tú puedes leer.
 
 Confirmar una lectura **no** se hace desde el chat: abre el enlace y confírmala en el portal. Un contenido
 recién publicado tarda unos segundos en estar disponible para el chat.
+
+## Si te mandan un enlace de vista previa
+
+Un editor te puede pedir que revises algo antes de publicarlo mandándote un enlace
+`…/intranet/vista-previa/…`. Ábrelo con tu sesión de la intranet (sin sesión no se ve nada): verás el
+**borrador** tal como lo verán sus lectores, con la marca **«Borrador — vista previa»**, para quién es y hasta
+cuándo vale el enlace. Si el editor lo hizo «como» un perfil (p. ej. recepción de un hotel), verás lo que vería
+ese perfil, y te avisa si ese perfil no lo vería en absoluto; si no, verás todos los bloques, y los que solo ve
+una parte de la audiencia dicen para quién son.
+
+Es de **solo lectura**: no hay «Me gusta», comentarios, favoritos ni confirmación, y no cuenta como lectura.
+El editor sí ve que lo has abierto (quién y cuándo). El enlace deja de valer cuando caduca (7 días por
+defecto), cuando el editor lo revoca o cuando el contenido se publica: entonces te dice por qué y, si ya está
+publicado, te lleva a él.
 
 ## Si un editor te enseña "ver como"
 

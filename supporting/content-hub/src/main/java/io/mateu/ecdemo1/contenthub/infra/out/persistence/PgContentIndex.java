@@ -66,20 +66,20 @@ public class PgContentIndex implements ContentIndex {
         var content = version.content();
         var status = item.status() == ItemStatus.PUBLISHED ? "PUBLISHED" : item.status().name();
         jdbc.update("delete from ch_item_doc where item_id = ?", item.id());
-        var audience = Json.write(content.audience());
+        var audience = Json.write(content.visibilityAudience(item.type()));
         for (var e : content.translations().entrySet()) {
             var t = e.getValue();
             jdbc.update("insert into ch_item_doc (item_id, language, is_default, version, type, section_id, status, "
                             + "publish_at, expire_at, title, summary, body, url, author, published_at, read_tracking, "
-                            + "confirmation_required, confirmation_deadline, confirmation_version, audience, hashes, tsv) "
+                            + "confirmation_required, confirmation_deadline, confirmation_version, audience, hashes, tsv, site_id) "
                             + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::text[], "
-                            + "to_tsvector('simple', ?))",
+                            + "to_tsvector('simple', ?), ?)",
                     item.id(), e.getKey(), e.getKey().equals(item.defaultLanguage()), version.number(),
                     item.type().name(), content.sectionId(), status, Sql.ts(content.publishAt()),
                     Sql.ts(content.expireAt()), t.title(), t.summary(), t.body(), content.url(), item.author(),
                     Sql.ts(version.publishedAt()), content.readTracking(), content.confirmationRequired(),
                     Sql.ts(content.confirmationDeadline()), item.confirmationVersion(), audience, Sql.array(hashes),
-                    t.title() + " " + t.summary() + " " + HtmlSanitizer.text(t.body()));
+                    t.title() + " " + t.summary() + " " + HtmlSanitizer.text(t.body()), item.siteId());
         }
         jdbc.update("delete from ch_chunk where item_id = ?", item.id());
         for (var e : content.translations().entrySet()) {
@@ -95,7 +95,7 @@ public class PgContentIndex implements ContentIndex {
         for (var block : content.blocks()) {
             jdbc.update("insert into ch_block_doc (item_id, block_id, position, audience, hashes) "
                             + "values (?, ?, ?, ?::jsonb, ?::text[])", item.id(), block.id(), position++,
-                    Json.write(Audience.effective(content.audience(), block.audience())),
+                    Json.write(Audience.effective(content.visibilityAudience(item.type()), block.visibilityAudience())),
                     Sql.array(blockHashes.getOrDefault(block.id(), Set.of())));
         }
         jdbc.update("delete from ch_item_media where item_id = ?", item.id());
@@ -258,6 +258,10 @@ public class PgContentIndex implements ContentIndex {
             where.append(" and d.item_id in (")
                     .append(query.itemIds().stream().map(t -> "?").collect(Collectors.joining(","))).append(") ");
             params.addAll(query.itemIds());
+        } else {
+            // a listing, a section, a search: one site's content (the intranet's, unless the query says another)
+            where.append(" and d.site_id = ? ");
+            params.add(query.siteId());
         }
         var tsQuery = tsQuery(query.text());
         if (tsQuery != null) {
@@ -305,9 +309,10 @@ public class PgContentIndex implements ContentIndex {
     }
 
     @Override
-    public Set<String> sectionsWithVisibleContent(String hash, Instant now) {
+    public Set<String> sectionsWithVisibleContent(String hash, Instant now, String siteId) {
         return new LinkedHashSet<>(jdbc.queryForList("select distinct d.section_id from ch_item_doc d where"
-                + VISIBLE + " and d.section_id is not null", String.class, who(hash), Sql.ts(now), Sql.ts(now)));
+                + VISIBLE + " and d.section_id is not null and d.site_id = ?", String.class, who(hash), Sql.ts(now),
+                Sql.ts(now), siteId));
     }
 
     @Override
@@ -360,7 +365,7 @@ public class PgContentIndex implements ContentIndex {
         var q = vector(question);
         return jdbc.query("select c.item_id, c.language, c.chunk_no, d.title, c.text, c.embedding <=> ?::vector as dist "
                         + "from ch_chunk c join ch_item_doc d on d.item_id = c.item_id and d.language = c.language "
-                        + "where c.embedding is not null and" + VISIBLE + " and " + LANGUAGE
+                        + "where c.embedding is not null and d.site_id = 'intranet' and" + VISIBLE + " and " + LANGUAGE
                         + "order by c.embedding <=> ?::vector limit ?",
                 (rs, i) -> new Passage(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getString(4), rs.getString(5),
                         rs.getDouble(6)),
@@ -385,12 +390,12 @@ public class PgContentIndex implements ContentIndex {
     public List<ExternalReference> visibleGoogleUrls(String hash, String language, Instant now) {
         var who = who(hash);
         return jdbc.query("select item_id, title, url from ("
-                        + "select d.item_id, d.title, d.url, d.publish_at from ch_item_doc d where" + VISIBLE + " and "
+                        + "select d.item_id, d.title, d.url, d.publish_at from ch_item_doc d where d.site_id = 'intranet' and" + VISIBLE + " and "
                         + LANGUAGE + " and d.url ~* " + GOOGLE
                         + " union "
                         + "select d.item_id, d.title, m.external_url, d.publish_at from ch_item_doc d join ch_media m "
                         + "on (d.url = 'media:' || m.id or exists (select 1 from ch_item_media im where "
-                        + "im.item_id = d.item_id and im.media_id = m.id)) where" + VISIBLE + " and " + LANGUAGE
+                        + "im.item_id = d.item_id and im.media_id = m.id)) where d.site_id = 'intranet' and" + VISIBLE + " and " + LANGUAGE
                         + " and m.kind = 'EXTERNAL' and m.external_url ~* " + GOOGLE
                         + ") r order by publish_at desc, item_id",
                 (rs, i) -> new ExternalReference(rs.getString(1), rs.getString(2), rs.getString(3)),

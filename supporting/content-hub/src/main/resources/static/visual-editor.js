@@ -12,6 +12,9 @@
 //  - "+" between blocks, drag (or ↑/↓) to reorder, delete;
 //  - "Ver como…" draws the page as a profile of the directory would see it;
 //  - Save replaces the draft's blocks (ItemCommands.editBlocks). Review and publication stay in the form.
+//  - the language switch edits the blocks' text in es / en / de: a block with no text of its own in that
+//    language shows the default language's, marked «sin traducir» (left as it is, it stays untranslated);
+//    «Traducir con IA» fills what the language lacks, for the editor to review and save.
 (() => {
   if (!window.customElements || customElements.get('ec-visual-editor')) return;
 
@@ -20,6 +23,8 @@
   const LIMITED = new Set(['AUTOMATIC_LISTING', 'LATEST', 'NOTICES']);
   const MARK = /\[\[media:([A-Za-z0-9_-]+)]]/g;
   const PASTE_TAGS = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'A', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE']);
+
+  const LANGUAGE_NAMES = { es: 'Español', en: 'English', de: 'Deutsch' };
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -46,7 +51,7 @@
     button:disabled { opacity:.5; cursor:default; }
     button.primary { background:var(--ve-accent); border-color:var(--ve-accent); color:#fff; }
     button.danger { color:#c62828; }
-    select, input[type=text], input[type=url], input[type=number], input[type=search] {
+    select, textarea, input[type=text], input[type=url], input[type=number], input[type=search] {
       background:transparent; border:1px solid var(--ve-line); border-radius:6px; padding:.3rem .45rem; width:100%; }
     select option { background:var(--ve-bg); color:inherit; }
     .bar { display:flex; flex-wrap:wrap; gap:.5rem .75rem; align-items:center; padding:.5rem 0 .75rem;
@@ -122,6 +127,10 @@
     .grid img, .grid .ph { width:100%; height:90px; object-fit:cover; border-radius:6px; background:var(--ve-soft);
       display:flex; align-items:center; justify-content:center; font-size:1.6rem; }
     .grid span { font-size:.8rem; }
+    /* in the flow, above the block's content (never over its title or text) */
+    .untr { display:inline-block; margin:.15rem 0 .1rem; font-size:.7rem; line-height:1.4; padding:0 .45rem; border-radius:999px;
+      background:rgba(178,106,0,.9); color:#fff; pointer-events:none; }
+    .blk.untranslated .ttl, .blk.untranslated .body { opacity:.75; }
     .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
   `;
 
@@ -130,7 +139,8 @@
       super();
       this.root = this.attachShadow({ mode: 'open' });
       this.state = { page: null, blocks: [], rendered: {}, media: {}, catalog: null, profiles: [], warnings: [],
-        selected: null, dirty: false, viewAs: '', profileView: null, messages: [], busy: false, menuAt: null };
+        selected: null, dirty: false, viewAs: '', profileView: null, messages: [], busy: false, menuAt: null,
+        language: null };
       this.range = null;
       this.onBeforeUnload = (e) => { if (this.state.dirty) { e.preventDefault(); e.returnValue = ''; } };
       this.onLeaveClick = (e) => this.guardLeave(e);
@@ -139,6 +149,8 @@
 
     get api() { return this.getAttribute('api') || '/_intranet/api/editor'; }
     get pageId() { return this.getAttribute('page-id') || ''; }
+    /** What is edited: 'pages' (a page of a site) or 'issues' (a newsletter issue) — the same blocks either way. */
+    get resource() { return this.getAttribute('resource') === 'issues' ? 'issues' : 'pages'; }
 
     connectedCallback() {
       window.addEventListener('beforeunload', this.onBeforeUnload);
@@ -192,7 +204,8 @@
 
     async load() {
       try {
-        const data = await this.call('GET', '/pages/' + encodeURIComponent(this.pageId));
+        const data = await this.call('GET', '/' + this.resource + '/' + encodeURIComponent(this.pageId)
+          + (this.state.language ? '?language=' + encodeURIComponent(this.state.language) : ''));
         this.take(data);
         this.state.dirty = false;
         this.render();
@@ -204,6 +217,7 @@
     take(data) {
       const s = this.state;
       s.page = data.page;
+      s.language = data.page.language || s.language;
       s.catalog = data.catalog;
       s.profiles = data.profiles || [];
       s.blocks = (data.blocks || []).map((b) => this.normal(b));
@@ -217,7 +231,24 @@
     normal(b) {
       return { id: b.id || newId(), type: b.type || 'HTML', title: b.title || '', html: b.html || '', itemId: b.itemId || '',
         sectionId: b.sectionId || '', limit: b.limit == null ? null : b.limit, links: (b.links || []).map((l) => ({ label: l.label || '', url: l.url || '' })),
-        mediaId: b.mediaId || '', departments: b.departments || [], hotels: b.hotels || [], jobTitles: b.jobTitles || [] };
+        mediaId: b.mediaId || '', departments: b.departments || [], hotels: b.hotels || [], jobTitles: b.jobTitles || [],
+        // a «Componente remoto»: a registered UI and its route, or its attributes (edited as name=value lines)
+        remoteSourceId: b.remoteSourceId || '', remoteRoute: b.remoteRoute || '',
+        remoteAttributes: Object.entries(b.remoteAttributes || {}).map(([k, v]) => k + '=' + v).join('\n'),
+        // its text is the default language's: this language has none of its own (yet)
+        untranslated: !!b.untranslated };
+    }
+
+    get translating() { const p = this.state.page || {}; return !!p.language && p.language !== p.defaultLanguage; }
+
+    // name=value lines into the attributes the server checks (it refuses event handlers, javascript: and the like)
+    attrsOf(text) {
+      const out = {};
+      (text || '').split(/\r?\n/).forEach((line) => {
+        const i = line.indexOf('=');
+        if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      });
+      return out;
     }
 
     wire() {
@@ -229,6 +260,9 @@
         links: b.type === 'QUICK_LINKS' ? b.links.filter((l) => l.url && l.url.trim()) : [],
         mediaId: b.type === 'MEDIA' ? (b.mediaId || null) : null,
         departments: b.departments, hotels: b.hotels, jobTitles: b.jobTitles,
+        remoteSourceId: b.type === 'REMOTE' ? (b.remoteSourceId || null) : null,
+        remoteRoute: b.type === 'REMOTE' ? (b.remoteRoute || null) : null,
+        remoteAttributes: b.type === 'REMOTE' ? this.attrsOf(b.remoteAttributes) : {},
       }));
     }
 
@@ -242,8 +276,8 @@
       const s = this.state;
       const seq = (this.previewSeq = (this.previewSeq || 0) + 1);
       try {
-        const data = await this.call('POST', '/pages/' + encodeURIComponent(this.pageId) + '/preview',
-          { blocks: this.wire(), viewAs: s.viewAs || null });
+        const data = await this.call('POST', '/' + this.resource + '/' + encodeURIComponent(this.pageId) + '/preview',
+          { blocks: this.wire(), viewAs: s.viewAs || null, language: s.language });
         if (seq !== this.previewSeq) return;
         s.rendered = {};
         (data.blocks || []).forEach((r) => { s.rendered[r.id] = r; });
@@ -264,10 +298,12 @@
       if (s.busy) return;
       this.syncEditing();
       s.busy = true;
+      s.messages = []; // a new attempt: earlier errors and successes no longer hold
       this.renderBar();
+      this.renderMessages();
       try {
-        const data = await this.call('PUT', '/pages/' + encodeURIComponent(this.pageId) + '/blocks',
-          { blocks: this.wire(), updatedAt: s.page && s.page.updatedAt });
+        const data = await this.call('PUT', '/' + this.resource + '/' + encodeURIComponent(this.pageId) + '/blocks',
+          { blocks: this.wire(), updatedAt: s.page && s.page.updatedAt, language: s.language });
         this.take(data);
         s.dirty = false;
         s.busy = false;
@@ -278,6 +314,57 @@
         s.busy = false;
         this.renderBar();
         this.message('error', 'No se ha guardado: ' + e.message);
+      }
+    }
+
+    // Another language: its text of the blocks, from the server (what is not saved would be lost: asked first).
+    async switchLanguage(language) {
+      const s = this.state;
+      if (language === s.language) return;
+      this.syncEditing();
+      if (s.dirty && !confirm('Hay cambios sin guardar. Si cambias de idioma se pierden: ¿cambiar igualmente?')) {
+        this.renderBar();
+        return;
+      }
+      s.language = language;
+      s.dirty = false;
+      s.messages = [];
+      this.root.innerHTML = '<style>' + CSS + '</style><div class="msg info">Cargando los bloques en «' + esc(language) + '»…</div>';
+      await this.load();
+    }
+
+    // «Traducir con IA»: what this language lacks of the blocks, filled by the server's translator; not saved —
+    // the editor reviews it here and saves.
+    async translate() {
+      const s = this.state;
+      if (s.busy) return;
+      this.syncEditing();
+      s.busy = true;
+      s.messages = []; // a new attempt: what earlier ones said (an error, a success) no longer holds
+      this.renderBar();
+      this.message('info', 'Traduciendo con IA al «' + s.language + '»…');
+      try {
+        const data = await this.call('POST', '/' + this.resource + '/' + encodeURIComponent(this.pageId) + '/translate',
+          { blocks: this.wire(), language: s.language });
+        s.busy = false;
+        this.clearMessages('info');
+        if (!data.translated) {
+          this.renderBar();
+          this.message('info', 'No hay nada que traducir: todos los bloques tienen ya su texto en «' + s.language + '».');
+          return;
+        }
+        s.blocks = (data.blocks || []).map((b) => this.normal(b));
+        s.rendered = {};
+        (data.rendered || []).forEach((r) => { s.rendered[r.id] = r; });
+        s.media = Object.assign({}, s.media, data.media || {});
+        s.dirty = true;
+        this.render();
+        this.message('ok', 'Traducido con IA al «' + s.language + '» (' + data.translated + ' texto(s)). Revísalo y guarda.');
+      } catch (e) {
+        s.busy = false;
+        this.clearMessages('info');
+        this.renderBar();
+        this.message('error', 'No se ha traducido: ' + e.message);
       }
     }
 
@@ -320,7 +407,16 @@
       const s = this.state;
       const p = s.page || {};
       bar.innerHTML = '<h2>' + esc(p.title || p.id) + '</h2><span class="chip">' + esc(p.status || '') + '</span>'
-        + '<span class="chip" title="Los bloques están en el idioma por defecto de la página">idioma: ' + esc(p.language || 'es') + '</span>'
+        + '<label title="El texto de los bloques en cada idioma; lo que un idioma no tiene, sus lectores lo ven en el idioma por defecto">'
+        + 'Idioma <select class="lang"' + (s.busy ? ' disabled' : '') + '>'
+        + (p.languages || [p.language || 'es']).map((l) => '<option value="' + esc(l) + '"' + (l === p.language ? ' selected' : '') + '>'
+          + esc(LANGUAGE_NAMES[l] || l) + (l === p.defaultLanguage ? ' (por defecto)' : '') + '</option>').join('') + '</select></label>'
+        + (this.translating && s.blocks.some((b) => b.untranslated)
+          ? '<span class="chip" title="Sus lectores ven esos bloques en el idioma por defecto">'
+            + s.blocks.filter((b) => b.untranslated).length + ' sin traducir</span>' : '')
+        + (this.translating && p.canTranslate && p.canEdit
+          ? '<button class="translate"' + (s.busy ? ' disabled' : '') + ' title="Rellena lo que falta en este idioma desde el idioma por defecto; revísalo y guarda">'
+            + 'Traducir con IA</button>' : '')
         // always there, only hidden when clean: appearing would rewrap the bar and move what is under the cursor
         + '<span class="dirty" role="status"' + (s.dirty ? '' : ' style="visibility:hidden"') + '>● Cambios sin guardar</span>'
         + '<span class="spacer"></span>'
@@ -330,6 +426,8 @@
         + '<button class="primary save"' + (!s.dirty || s.busy || !p.canEdit ? ' disabled' : '') + '>'
         + (s.busy ? 'Guardando…' : 'Guardar') + '</button>';
       bar.querySelector('.viewas').addEventListener('change', (e) => this.viewAs(e.target.value));
+      bar.querySelector('.lang').addEventListener('change', (e) => this.switchLanguage(e.target.value));
+      bar.querySelector('.translate')?.addEventListener('click', () => this.translate());
       bar.querySelector('.save').addEventListener('click', () => this.save());
       if (!p.canEdit) this.message('info', 'Solo puedes verlo: guardar pide el permiso content:edit.');
     }
@@ -355,7 +453,9 @@
       let html = '';
       if (this.editing) {
         html += '<div class="pagehead">La página la ven: <b>' + esc(p.audience) + '</b> — ' + p.count + ' empleado(s).'
-          + ' Pasa el ratón por un bloque y haz clic para editarlo.</div>';
+          + ' Pasa el ratón por un bloque y haz clic para editarlo.'
+          + (this.translating ? ' Escribes el texto en <b>' + esc(LANGUAGE_NAMES[p.language] || p.language) + '</b>: tipo, enlaces, medios'
+            + ' y audiencia son los mismos en todos los idiomas.' : '') + '</div>';
       } else {
         const v = s.profileView;
         html += '<div class="msg info">👁 Así la ve el perfil <b>' + esc(v ? v.label : '…') + '</b> (sin guardar lo que no hayas guardado).'
@@ -437,8 +537,13 @@
       } else {
         inner = '<div class="content">' + this.serverInner(b) + '</div>';
       }
-      return '<div class="blk' + (sel ? ' sel' : '') + '" data-id="' + esc(b.id) + '" data-i="' + i + '" tabindex="0" aria-label="Bloque '
-        + (i + 1) + ': ' + esc(this.typeLabel(b.type)) + '">'
+      const untranslated = this.translating && b.untranslated;
+      return '<div class="blk' + (sel ? ' sel' : '') + (untranslated ? ' untranslated' : '') + '" data-id="' + esc(b.id)
+        + '" data-i="' + i + '" tabindex="0" aria-label="Bloque '
+        + (i + 1) + ': ' + esc(this.typeLabel(b.type)) + (untranslated ? ', sin traducir' : '') + '">'
+        + (untranslated ? '<span class="untr" title="Sin texto propio en este idioma: se ve en el idioma por defecto ('
+          + esc(s.page.defaultLanguage) + '). Escríbelo o usa «Traducir con IA».">sin traducir · '
+          + esc(s.page.defaultLanguage) + '</span>' : '')
         + '<span class="tag">' + esc(this.typeLabel(b.type)) + (narrowed ? ' · solo ' + esc(narrowed) : '') + '</span>'
         + '<span class="tools"><button class="handle" draggable="true" title="Arrastra para mover" aria-label="Mover">⠿</button>'
         + '<button class="up" title="Subir" aria-label="Subir"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
@@ -454,6 +559,7 @@
         case 'QUICK_LINKS': return 'añade enlaces en el panel';
         case 'PENDING': return 'se pinta solo a quien tiene algo pendiente de confirmar';
         case 'AUTOMATIC_LISTING': return 'no hay contenidos visibles en esa sección';
+        case 'REMOTE': return b.remoteSourceId ? '' : 'elige la UI externa en el panel';
         default: return '';
       }
     }
@@ -558,6 +664,7 @@
             const b = this.block(id);
             b.title = ttl.textContent.replace(/\s+/g, ' ').trim();
             this.dirty();
+            this.translated(id);
             const input = this.root.querySelector('.panel .f-title');
             if (input) input.value = b.title;
           });
@@ -571,6 +678,7 @@
           body.addEventListener('input', () => {
             this.block(id).html = this.fromEditable(body);
             this.dirty();
+            this.translated(id);
           });
           body.addEventListener('paste', (e) => this.paste(e));
         }
@@ -591,6 +699,7 @@
     syncEditing() {
       this.root.querySelectorAll('.blk').forEach((el) => {
         const b = this.block(el.dataset.id);
+        if (b && b.untranslated) return; // the default language's text, as shown: not this language's
         const body = el.querySelector('.body');
         const ttl = el.querySelector('.ttl');
         if (b && body) b.html = this.fromEditable(body);
@@ -629,6 +738,19 @@
         this.state.dirty = true;
         this.renderBar();
       }
+    }
+
+    // Its text written in this language: no longer «sin traducir» (the server keeps what was left as shown untranslated).
+    translated(id) {
+      const b = this.block(id);
+      if (!b || !b.untranslated) return;
+      b.untranslated = false;
+      const el = this.root.querySelector('.blk[data-id="' + id + '"]');
+      if (el) {
+        el.classList.remove('untranslated');
+        el.querySelector('.untr')?.remove();
+      }
+      this.renderBar();
     }
 
     changed(redraw) {
@@ -876,6 +998,19 @@
           + (m && m.thumb ? '<img src="' + esc(m.thumb) + '" alt="" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:.35rem">' : '')
           + '<button class="pick" style="margin-top:.35rem">Elegir en la biblioteca…</button></div>';
       }
+      if (f.has('remoteSourceId')) {
+        html += '<div class="field"><label for="f-remote">UI externa</label><select id="f-remote" class="f-remote">'
+          + opt(cat.uiSources || [], b.remoteSourceId, '— elige una UI registrada —') + '</select>'
+          + '<p class="note">Las registra la configuración de la intranet. En el portal se ve en vivo, con los permisos de cada lector.</p></div>';
+      }
+      if (f.has('remoteRoute')) {
+        html += '<div class="field"><label for="f-route">Ruta (UI de Mateu o iframe)</label><input id="f-route" type="text" class="f-route"'
+          + ' placeholder="/loyalty/members" value="' + esc(b.remoteRoute) + '"></div>';
+      }
+      if (f.has('remoteAttributes')) {
+        html += '<div class="field"><label for="f-attrs">Atributos (web component: nombre=valor, uno por línea)</label>'
+          + '<textarea id="f-attrs" class="f-attrs" rows="3">' + esc(b.remoteAttributes) + '</textarea></div>';
+      }
       if (f.has('links')) {
         html += '<div class="field"><label>Enlaces</label><table class="links"><tbody>' + b.links.map((l, i) =>
           '<tr><td><input type="text" aria-label="Texto del enlace ' + (i + 1) + '" placeholder="Texto" data-l="' + i + '" data-k="label" value="' + esc(l.label) + '"></td>'
@@ -907,18 +1042,24 @@
         const ttl = this.root.querySelector('.blk[data-id="' + b.id + '"] .ttl');
         if (ttl) ttl.textContent = b.title;
         this.dirty();
+        this.translated(b.id);
         if (!RICH.has(b.type)) this.refresh();
       });
       on('.f-item', 'change', (e) => { b.itemId = e.target.value; this.changed(); });
       on('.f-section', 'change', (e) => { b.sectionId = e.target.value; this.changed(); });
       on('.f-limit', 'change', (e) => { b.limit = e.target.value === '' ? null : Math.max(1, Math.min(50, Number(e.target.value))); this.changed(); });
       on('.f-media', 'change', (e) => { b.mediaId = e.target.value; this.changed(); });
+      on('.f-remote', 'change', (e) => { b.remoteSourceId = e.target.value; this.changed(); });
+      // typed: the model and the preview follow; the panel is not redrawn (see the links, below)
+      on('.f-route', 'input', (e) => { b.remoteRoute = e.target.value; this.dirty(); this.refresh(); });
+      on('.f-attrs', 'input', (e) => { b.remoteAttributes = e.target.value; this.dirty(); this.refresh(); });
       on('.pick', 'click', () => this.pickMedium((m) => { b.mediaId = m.value; this.changed(); }));
       // as the editor types: the model and the preview follow, the panel is NOT redrawn — redrawing it
       // swapped the inputs under the cursor, and what was typed next went to a detached one
       panel.querySelectorAll('.links input').forEach((input) => input.addEventListener('input', () => {
         b.links[Number(input.dataset.l)][input.dataset.k] = input.value;
         this.dirty();
+        if (input.dataset.k === 'label') this.translated(b.id);
         this.refresh();
       }));
       panel.querySelectorAll('.rmlink').forEach((btn) => btn.addEventListener('click', () => {

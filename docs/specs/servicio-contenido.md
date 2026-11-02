@@ -117,7 +117,9 @@ Detalle por área:
 
 - `Acuse` de tipo `LECTURA`: usuario, item, versión, fecha. Solo en items con seguimiento.
 - `Acuse` de tipo `CONFIRMACION`: usuario, item, versión, fecha. Un usuario tiene el item confirmado si tiene una confirmación con versión `>= versionConfirmacionVigente`.
-- `EdicionNewsletter`: título, items ordenados, audiencia de envío, fecha, estado.
+- `Sitio`: la intranet (por defecto) o una newsletter; identidad, audiencia, idiomas, su árbol de secciones, sus items e inicios.
+- `Newsletter` (de un sitio): maqueta, fuentes de cada sección, periodicidad y envío sin revisión; numera sus números.
+- `NumeroNewsletter`: número, fecha, asunto, bloques, items por sección, estado (borrador, programado, enviado, cancelado), envíos por grupo. (Antes `EdicionNewsletter`; las ediciones pasaron a números de «Boletín de la intranet».)
 
 ### Preparado para la fase 2
 
@@ -161,6 +163,7 @@ Reglas:
 Todos llaman a la función de visibilidad; ninguno tiene lógica de filtrado propia.
 
 - **Navegación.** Árbol de secciones; un nodo se muestra si él o un descendiente contiene algo visible. Las secciones vacías desaparecen. Caché por hash de atributos e idioma.
+- **Menús.** El menú de cada sitio (la intranet, cada newsletter) es configuración: un árbol ordenado de entradas con texto por idioma, destino (función del portal, página, sección, enlace u otra interfaz) y audiencia. Una entrada sale si el lector cumple su audiencia y puede abrir su destino; un submenú vacío desaparece. Las rutas no dependen del menú. Ver `doc/…/intranet/arquitectura.md#menús-configurables`.
 - **Listados.** "Últimas noticias", "avisos", listados automáticos de bloques: consultas con filtro de visibilidad, paginadas en el almacén.
 - **Búsqueda.** Cada documento indexado lleva la lista de hashes que lo ven (proyección materializada); la consulta va acotada por el hash del usuario dentro del motor. Paginación, contadores y autocompletado salen ya filtrados. Una traducción = un documento del índice.
 - **Slots.** El remoto de slots recibe la clave y la identidad, resuelve la variante de mayor prioridad visible para el usuario y devuelve el JSON de UI. Sin variante visible, respuesta vacía y la app pinta el fallback. Declara caché por hash de atributos.
@@ -217,6 +220,7 @@ App Mateu para editores y responsables de comunicación. Roles mínimos: editor 
     - una audiencia con nombre: el backoffice lista los perfiles (hashes) del directorio que la cumplen, con su número de empleados, y el editor elige uno.
 
     Usa la misma función de visibilidad, no una simulación.
+- **Menús.** Las entradas del menú de cada sitio (orden, submenús, textos es/en/de, destino, "quién lo verá", activa) y una vista previa "ver como". Administrador.
 - **Slots.** Lista de slots registrados por aplicación y pantalla, con su estado (vacío, con contenido, número de variantes). Edición de variantes por audiencia y prioridad. Slots que dejan de aparecer en los descriptores se marcan como huérfanos, no se borran.
 - **Newsletter.** Componer edición eligiendo items, previsualizar por perfil, programar envío.
 - **Confirmaciones.** Para items con confirmación obligatoria: porcentaje confirmado, desglose por hotel/departamento y lista de pendientes. Exportable.

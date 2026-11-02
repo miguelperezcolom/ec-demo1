@@ -41,6 +41,7 @@ espera a que exista); la imagen es
 | `NOTIFICATIONS_BATCH_SIZE` | — | `200` | Lectores por transacción del reparto, y destinatarios por correo |
 | `ANALYTICS_RETENTION` | — | `P90D` | Cuánto se guardan los eventos de uso en crudo (nunca menos de 30 días) |
 | `PORTAL_URL` | `https://ec1.mateu.io/intranet` | `http://ec1.localhost:8800/intranet` | Los enlaces de la newsletter y el mensaje de «ver como» |
+| `UI_SOURCES_IFRAME_ORIGINS` | — | vacío | Los únicos orígenes (`https://host[:puerto]`, separados por comas) a los que puede apuntar una UI externa de tipo iframe. Vacío: ninguna |
 | `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWKS_URI` | `https://auth.ec1.mateu.io/realms/ec-demo1`, `http://keycloak:8080/…/certs` | iguales | Verificar el token de las llamadas MCP |
 | `MEDIA_SECRET` | — | vacío | Firma las URL de los medios. Vacío: una clave aleatoria por arranque (las URL ya dibujadas dejan de valer al reiniciar) |
 | `MEDIA_MAX_BYTES` | — | `20971520` (20 MB) | Tamaño máximo de un fichero subido |
@@ -49,6 +50,11 @@ espera a que exista); la imagen es
 | `SEARCH_MAX_DISTANCE` | — | `0.3` | Distancia coseno máxima para que un pasaje cuente como coincidencia por significado |
 | `INTRANET_AGENT_URL`, `INTRANET_AGENT_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-agent`, — | igual, `PT30S` | El agente de la «Respuesta de la IA» |
 | `INTRANET_TRANSLATOR_URL`, `INTRANET_TRANSLATOR_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-translator`, — | igual, `PT60S` | El agente de «Traducir con IA» |
+| `INTRANET_ALT_TEXT_URL`, `INTRANET_ALT_TEXT_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-alt-text`, — | igual, `PT60S` | El agente de «Sugerir texto alternativo con IA» (su modelo tiene que ver imágenes) |
+| `HEALTH_EXPIRY_DAYS`, `HEALTH_STALE_MONTHS`, `HEALTH_UNVIEWED_DAYS` | — | `14`, `12`, `90` | «Salud del contenido»: cuándo avisar de que algo caduca, está desactualizado o nadie lo abre |
+| `HEALTH_STALE_SECTIONS` | — | vacío (todas) | Secciones (ids, separados por comas) donde importa que el contenido esté al día |
+| `HEALTH_EXTERNAL_LINKS`, `HEALTH_MAX_EXTERNAL_PER_RUN` | — | `true`, `300` | Comprobar los enlaces externos, y cuántas URL como mucho por pasada (el resto, en la siguiente) |
+| `HEALTH_NIGHTLY_CRON` | — | `0 15 3 * * *` | La pasada nocturna (hora de Madrid) |
 | `GOOGLE_DRIVE_CREDENTIALS_FILE` | `/etc/google-drive/credentials.json` | vacío | El fichero de clave de la cuenta de servicio de Drive. Sin él, o si no se puede leer, Drive queda apagado |
 | `GOOGLE_DRIVE_IMPERSONATE` | (Secret `ec-google-drive`, opcional) | vacío | Usuario de Workspace por el que actuar con delegación de dominio. Vacío: la cuenta ve lo compartido con su propia dirección |
 
@@ -62,6 +68,32 @@ content-hub **no tiene clave de ningún modelo**. La «Respuesta de la IA» y «
 servicio. Hacen falta dos agentes sin herramientas en el catálogo del plano de control, `intranet-agent` e
 `intranet-translator`. Mientras no existan, o si fallan, el usuario ve un aviso breve; los resultados de la
 búsqueda siguen funcionando y el formulario del editor no cambia. El motivo queda en el log, en `INFO`.
+
+«Sugerir texto alternativo con IA» («Salud del contenido») usa un tercer agente, **`intranet-alt-text`**, con un
+**modelo que vea imágenes** (el Claude por defecto lo hace): la imagen va en el mismo mensaje A2A como parte
+`file` con sus bytes, y `ia-agent` se la pasa al modelo. Prompt de sistema sugerido: «Describes imágenes para
+el atributo alt de una intranet de hoteles: una sola frase en español, de 125 caracteres como mucho, sin
+comillas ni comentarios. Si no recibes ninguna imagen, responde exactamente SIN_IMAGEN.» Sin herramientas ni
+RAG. Sin él, el botón da un aviso y nada cambia.
+
+### Salud del contenido
+
+Una pasada cada noche (`HEALTH_NIGHTLY_CRON`) y las que pidan los editores. La noche se **reclama en la base de
+datos** (`ch_health_run.nightly_day`, único): un segundo disparo, un reinicio o otra réplica esa noche no hace
+nada. Lo que guarda: `ch_health_run` (cada pasada y sus cuentas, o su error), `ch_health_finding` (los avisos
+de la última, con cuándo se vio cada uno por primera vez), `ch_health_snooze` (los «revisado»),
+`ch_health_link` (lo que respondió cada URL externa: lo bueno vale 7 días, lo malo 1) y `ch_media_alt` (los
+textos alternativos). Nada se arregla ni se borra solo.
+
+Los enlaces externos se piden con **HEAD** (GET si el servidor no entiende HEAD, cerrando el cuerpo sin leerlo),
+5 s de espera, **un segundo entre dos peticiones al mismo host**, sin seguir redirecciones solas (se siguen a
+mano, hasta 5) y con el User-Agent `ec-demo1-content-health/1.0 (…)`. **Nunca se pide una dirección interna**
+(loopback, privadas, link-local, CGNAT, `fc00::/7`), ni directamente ni por una redirección: se marca «no se
+comprueba». 401 y 403 cuentan como que existe; 429 se deja para otra pasada. Si el pod no tiene salida a
+internet, las URL externas salen como rotas («no se puede conectar»): apágalo con `HEALTH_EXTERNAL_LINKS=false`.
+
+Qué hosts son «el portal» (sus enlaces se comprueban como rutas internas): el de `PORTAL_URL` y los de
+`content-hub.health.internal-hosts` (separados por comas).
 
 ### Google Drive
 
@@ -136,7 +168,10 @@ Dos semillas, idempotentes:
   distintas —uno para todos con el vídeo, el cuadrante de turnos de Canarias, la carta de otoño para
   cocinas, la política de datos con confirmación obligatoria, uno solo para directores, uno programado y
   uno caducado—, una página con bloques (uno solo para recepción), el slot
-  `front-office.bienvenida.destacado` y una edición de newsletter.
+  `front-office.bienvenida.destacado` y la newsletter «Boletín de la intranet» (un sitio con su página
+  «Quiénes somos» y un primer número en borrador). En cada arranque, si faltan: las UIs
+  externas **Riu Class** (`/_loyalty`) y **Notificaciones en este navegador** (`<ec-push-toggle>`), la
+  pantalla externa «Riu Class · socios» y la página «Herramientas» con dos componentes remotos.
 
 Para enseñar las diferencias: *Ver como* con `ana.perez` (recepción, Tenerife), `kevin.lee` (cocina,
 Mauricio) y `raj.patel` (director, Mauricio).
@@ -161,6 +196,10 @@ llamada se rechaza.
 
 ## Problemas conocidos y límites
 
+- **Salud del contenido**: entre resolver el nombre de un host y pedirle la URL se resuelve otra vez (lo hace el
+  cliente HTTP): un DNS que cambie de respuesta entre las dos podría llevar una petición a una dirección
+  interna. Los avisos se recalculan enteros en cada pasada, en memoria: a la escala de la demo es poco; con
+  decenas de miles de contenidos habría que trocearla.
 - **El saneador de Mateu quita los `<iframe>`.** Los vídeos externos (YouTube, Vimeo, Drive) y los PDF se
   dibujan como marcadores con un enlace, y `embed.js` los convierte en reproductor. Si `embed.js` no carga
   (un shell sin el `@Script`, o la ruta pública quitada del gateway), se ven como enlace o miniatura. Solo
@@ -184,6 +223,15 @@ llamada se rechaza.
   servidor y `@ContentSlot` de Mateu, que aún no se han publicado; los descriptores de las aplicaciones
   tampoco se cargan todavía (el slot de demo lo registra la semilla). Cuando Mateu lo publique, se sube
   `mateu.version` y el remoto pasa a ser un componente.
+- **UIs externas y hosts.** Una UI de Mateu registrada se pide por su prefijo en el gateway desde el host donde
+  se lee la intranet: en la consola de datos lo están los de sus menús; en `intranet.*`, solo `/_portal` y
+  `/_inbox`, así que allí una pantalla de Riu Class no carga hasta que el gateway enrute `/_loyalty` en ese
+  host. Dentro de una pantalla externa, un enlace de la UI remota navega a su ruta propia, que resuelve la
+  consola de datos (su `RemoteMenu`) y no el host de la intranet.
+- **UIs externas: permisos al dibujar.** Los permisos que exige una fuente se miran al pintar, no en la
+  proyección: quien no los tiene ve la pantalla externa en los listados y, al abrirla, «No puedes usar esta
+  aplicación». Un web component `.mjs` cargado con token no resuelve imports relativos; un iframe no lleva el
+  token.
 - **"Ver como" vive en memoria** (una hora por editor), igual que la clave aleatoria de las URL de medios
   si no se fija `MEDIA_SECRET`: un reinicio los pierde.
 - **Una sola réplica.** Por lo anterior y por la caché local por hash, el manifiesto usa una réplica y

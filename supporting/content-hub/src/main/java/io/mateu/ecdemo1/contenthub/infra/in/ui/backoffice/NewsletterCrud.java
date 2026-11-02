@@ -1,7 +1,12 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
-import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
+import io.mateu.ecdemo1.contenthub.application.out.NewsletterIssueRepository;
 import io.mateu.ecdemo1.contenthub.application.out.NewsletterRepository;
+import io.mateu.ecdemo1.contenthub.application.out.SiteRepository;
+import io.mateu.ecdemo1.contenthub.application.visibility.NamedAudiences;
+import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue;
+import io.mateu.ecdemo1.contenthub.domain.site.Site;
+import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Title;
@@ -16,33 +21,28 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * The newsletters: each a site of its own (identity, audience, sections, pages) and its issues. A row opens
+ * the newsletter; its issues are under it, and in «Números».
+ */
 @Service
 @Scope("prototype")
 @RequiredArgsConstructor
-@Title("Newsletter")
+@Title("Newsletters")
 @Editors
 public class NewsletterCrud extends SimpleCrud<NewsletterForm, NewsletterForm, NewsletterForm, NoFilters,
         NewsletterCrud.Row, String> {
 
-    public record Row(@Label("Id") String id, @Label("Título") String title, @Label("Estado") String status,
-                      @Label("Envío") String scheduledAt, @Label("Items") int items, @Label("Grupos enviados") long groups) {
+    public record Row(@Label("Id") String id, @Label("Nombre") String name, @Label("Audiencia") String audience,
+                      @Label("Periodicidad") String cadence, @Label("Activa") String active, @Label("Números") int issues,
+                      @Label("Último enviado") String lastSent) {
     }
 
     final ObjectProvider<NewsletterForm> forms;
-    final NewsletterRepository editions;
-    final io.mateu.ecdemo1.contenthub.application.usecases.WeeklyNewsletter weekly;
-    final io.mateu.ecdemo1.contenthub.infra.in.security.Readers readers;
-    final java.time.Clock clock;
-
-    /** This week's edition now, instead of waiting for Monday: a draft to review. */
-    @io.mateu.uidl.annotations.Toolbar
-    @io.mateu.uidl.annotations.Action
-    public Object prepararBoletinDeLaSemana(HttpRequest httpRequest) {
-        readers.of(httpRequest).require(io.mateu.ecdemo1.contenthub.application.security.EditorialPermission.EDIT);
-        return weekly.compose(clock.instant(), false)
-                .<Object>map(id -> io.mateu.uidl.data.Message.success("Preparado el borrador " + id + ": revísalo y prográmalo"))
-                .orElseGet(() -> io.mateu.uidl.data.Message.warning("Ya existe el boletín de esta semana, o no hay nada nuevo que contar"));
-    }
+    final SiteRepository sites;
+    final NewsletterRepository newsletters;
+    final NewsletterIssueRepository issues;
+    final NamedAudiences namedAudiences;
 
     @Override
     protected Class<NewsletterForm> formClass() {
@@ -51,17 +51,20 @@ public class NewsletterCrud extends SimpleCrud<NewsletterForm, NewsletterForm, N
 
     @Override
     public ListingData<Row> search(SearchRequest request, HttpRequest httpRequest) {
-        return all(editions.findAll().stream().map(e -> new Row(e.id(), e.title(), switch (e.status()) {
-            case DRAFT -> "Borrador";
-            case SCHEDULED -> "Programada";
-            case SENT -> "Enviada";
-        }, Ui.when(e.scheduledAt()), e.itemIds().size(), e.sends().stream().filter(s -> s.sentAt() != null).count()))
-                .toList(), "Sin ediciones");
+        var labels = namedAudiences.labels();
+        return all(sites.findAll().stream().filter(s -> s.kind() == Site.Kind.NEWSLETTER).map(s -> {
+            var n = newsletters.find(s.id()).orElse(null);
+            var all = issues.ofNewsletter(s.id());
+            var sent = all.stream().filter(i -> i.status() == NewsletterIssue.Status.SENT).findFirst();
+            return new Row(s.id(), s.name(), s.audience().describe(labels),
+                    n == null ? "" : n.settings().cadence().describe(), s.active() ? "Sí" : "No", all.size(),
+                    sent.map(i -> "nº " + i.number() + " · " + Ui.when(i.sentAt())).orElse(""));
+        }).toList(), "Sin newsletters: crea una");
     }
 
     @Override
     public NewsletterForm view(String id, HttpRequest httpRequest) {
-        return forms.getObject().load(editions.find(id).orElseThrow());
+        return forms.getObject().load(id);
     }
 
     @Override
@@ -76,6 +79,6 @@ public class NewsletterCrud extends SimpleCrud<NewsletterForm, NewsletterForm, N
 
     @Override
     public void deleteAllById(List<String> ids, HttpRequest httpRequest) {
-        throw new IllegalStateException("Las ediciones no se borran");
+        throw new IllegalStateException("Las newsletters no se borran: desactívala y deja de enviarse");
     }
 }
