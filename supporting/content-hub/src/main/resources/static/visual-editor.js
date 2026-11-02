@@ -97,6 +97,8 @@
     .ec-media::after { content:'medio · ' attr(data-ec-media); position:absolute; top:.2rem; right:.3rem; font-size:.7rem;
       background:rgba(0,0,0,.55); color:#fff; padding:0 .3rem; border-radius:4px; }
     span.ec-media { display:inline-block; }
+    /* while editing, a player is a picture: a click on it selects its block (an iframe would swallow it) */
+    .canvas.editing .blk iframe, .canvas.editing .blk video, .canvas.editing .blk audio { pointer-events:none; }
     .panel { position:sticky; top:3.5rem; border:1px solid var(--ve-line); border-radius:10px; padding:.75rem .9rem; background:var(--ve-bg);
       max-height:calc(100vh - 8rem); overflow:auto; }
     .panel h3 { margin:.1rem 0 .5rem; font-size:1rem; }

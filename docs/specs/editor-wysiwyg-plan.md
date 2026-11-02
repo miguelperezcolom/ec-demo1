@@ -128,8 +128,8 @@ Decidido con el usuario el 2026-11-02 (rama `feat/editor-visual`):
 | 3.2 | API `VisualEditorController` (`/_intranet/api/editor`: página, preview/ver como, guardar, medio, código), autorizada como el backoffice (`Readers`) + `PageRenderer.draftHtml` (+ tests de autorización) | hecho |
 | 3.3 | Componente `visual-editor.js` (seleccionar, texto en el sitio con barra, medios, pegado limpio, panel, audiencia y recuento, +, arrastrar/↑↓, eliminar, ver como, guardar, aviso de cambios sin guardar); `embed.js` lo carga con el token del usuario | hecho |
 | 3.4 | Backoffice: Editorial → Editor visual (`/editorial/visual/{id}`) y «Editar sobre la página» en el formulario de una página | hecho |
-| 3.5 | Desplegar en local y probar sin navegador (API con token de `demo`, en una página de prueba) | ver el PR |
-| 3.6 | Probar en el navegador, Vaadin (`ws.localhost:8800`) y Redwood (`rw.localhost:8800`) | pendiente |
+| 3.5 | Desplegar en local y probar sin navegador (API con token de `demo`, en una página de prueba) | hecho (2026-11-02): página de prueba «Prueba editor visual»; leer, preview, ver como, guardar, 400 con un valor que el directorio no tiene, 409 con una versión vieja |
+| 3.6 | Probar en el navegador, Vaadin (`ws.localhost:8800`) y Redwood (`rw.localhost:8800`) | hecho con Chromium sin cabeza (Playwright) en los dos: el componente carga, seleccionar, escribir, panel y recuento, ver como, guardar; falta una prueba a mano (arrastrar, pegar, insertar medio, tema oscuro) |
 | 3.7 | Manual del backoffice y arquitectura | hecho |
 
 Limitaciones conocidas:
