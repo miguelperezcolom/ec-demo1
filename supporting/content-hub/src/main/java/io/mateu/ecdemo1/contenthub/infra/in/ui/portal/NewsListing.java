@@ -6,16 +6,19 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.annotations.RowRoute;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 @Service
+@RowRoute("/intranet/noticias/${row.id}")
 @Scope("prototype")
 @Title("Noticias")
 public class NewsListing extends VisibleListing implements Searchable {
 
-    public NewsListing(PortalSupport portal) {
-        super(portal);
+    public NewsListing(PortalSupport portal, ObjectProvider<ItemPage> pages) {
+        super(portal, pages);
     }
 
     @Override

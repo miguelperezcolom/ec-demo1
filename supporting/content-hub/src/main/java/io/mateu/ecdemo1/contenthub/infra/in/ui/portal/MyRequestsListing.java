@@ -9,6 +9,8 @@ import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
 import io.mateu.uidl.annotations.RowRoute;
+import io.mateu.uidl.interfaces.Navigable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -17,12 +19,14 @@ import org.springframework.stereotype.Service;
 @Service
 @Scope("prototype")
 @Title("Mis solicitudes")
-public class MyRequestsListing implements Listing<RequestRow> {
+public class MyRequestsListing implements Listing<RequestRow>, Navigable<RequestPage, String> {
 
     final PortalSupport portal;
+    final ObjectProvider<RequestPage> pages;
     final RequestService requests;
 
-    public MyRequestsListing(PortalSupport portal, RequestService requests) {
+    public MyRequestsListing(PortalSupport portal, RequestService requests, ObjectProvider<RequestPage> pages) {
+        this.pages = pages;
         this.portal = portal;
         this.requests = requests;
     }
@@ -36,4 +40,10 @@ public class MyRequestsListing implements Listing<RequestRow> {
                 "No has hecho ninguna solicitud. Hazla en «Nueva solicitud».");
     }
 
+
+    /** Not reached from a row (@RowRoute opens the page's own route), but what makes it a crud. */
+    @Override
+    public RequestPage view(String id, HttpRequest httpRequest) {
+        return pages.getObject().load(id, httpRequest);
+    }
 }

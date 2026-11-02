@@ -10,6 +10,8 @@ import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
 import io.mateu.uidl.annotations.RowRoute;
+import io.mateu.uidl.interfaces.Navigable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -25,15 +27,17 @@ import java.util.stream.Collectors;
 @Service
 @Scope("prototype")
 @Title("Secciones")
-public class SectionsListing implements Listing<SectionRow> {
+public class SectionsListing implements Listing<SectionRow>, Navigable<SectionPage, String> {
 
     final PortalSupport portal;
+    final ObjectProvider<SectionPage> pages;
     final Visibility visibility;
     final NavigationRepository navigation;
     final ProjectionCache cache;
 
     public SectionsListing(PortalSupport portal, Visibility visibility, NavigationRepository navigation,
-                           ProjectionCache cache) {
+                           ProjectionCache cache, ObjectProvider<SectionPage> pages) {
+        this.pages = pages;
         this.portal = portal;
         this.visibility = visibility;
         this.navigation = navigation;
@@ -61,4 +65,10 @@ public class SectionsListing implements Listing<SectionRow> {
                 "No hay secciones con contenido para ti");
     }
 
+
+    /** Not reached from a row (@RowRoute opens the page's own route), but what makes it a crud. */
+    @Override
+    public SectionPage view(String id, HttpRequest httpRequest) {
+        return pages.getObject().load(id, httpRequest);
+    }
 }

@@ -5,19 +5,22 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.annotations.RowRoute;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 /** "Mis favoritos": the reader's favourites crossed with the visibility function. */
 @Service
+@RowRoute("/intranet/noticias/${row.id}")
 @Scope("prototype")
 @Title("Mis favoritos")
 public class FavoritesListing extends VisibleListing {
 
     final ReaderActions actions;
 
-    public FavoritesListing(PortalSupport portal, ReaderActions actions) {
-        super(portal);
+    public FavoritesListing(PortalSupport portal, ObjectProvider<ItemPage> pages, ReaderActions actions) {
+        super(portal, pages);
         this.actions = actions;
     }
 
