@@ -116,7 +116,7 @@ Decidido con el usuario el 2026-11-02 (rama `feat/editor-visual`):
 - un web component propio (`<ec-visual-editor>`, JS sin framework) alojado como `Element` de Mateu en
   una ruta del backoffice, que funciona en los dos shells;
 - pinta los bloques del **borrador** con los datos del portal (`PageRenderer`), en el idioma por defecto
-  (los bloques son monolingües);
+  (los bloques eran monolingües; desde el paso 3.8, en el idioma que se elija);
 - texto de HTML/Banner editable en el sitio; panel lateral con el tipo, los campos del tipo y la
   audiencia del bloque como estrechamiento de la de la página, con el recuento;
 - guardar por el mismo servicio y validaciones que el formulario; la revisión y la publicación, en el
@@ -131,11 +131,13 @@ Decidido con el usuario el 2026-11-02 (rama `feat/editor-visual`):
 | 3.5 | Desplegar en local y probar sin navegador (API con token de `demo`, en una página de prueba) | hecho (2026-11-02): página de prueba «Prueba editor visual»; leer, preview, ver como, guardar, 400 con un valor que el directorio no tiene, 409 con una versión vieja |
 | 3.6 | Probar en el navegador, Vaadin (`ws.localhost:8800`) y Redwood (`rw.localhost:8800`) | hecho con Chromium sin cabeza (Playwright) en los dos: el componente carga, seleccionar, escribir, panel y recuento, ver como, guardar; falta una prueba a mano (arrastrar, pegar, insertar medio, tema oscuro) |
 | 3.7 | Manual del backoffice y arquitectura | hecho |
+| 3.8 | Bloques multilingües: `Block.translations` (título, HTML y textos de los enlaces por URL; los campos propios son el idioma por defecto, así que lo guardado antes se lee igual, sin migración); el lector los ve en su idioma con el respaldo de los items, parte a parte (portal, página de una newsletter, número web y correo por grupo); `BlockForm` con Español/English/Deutsch; selector de idioma en el editor visual (`?language=`, lo que no tiene texto propio sale en el idioma por defecto marcado «sin traducir» y, si no se toca, sigue sin traducir); «Traducir con IA» también para los bloques (formulario y editor visual), una llamada por idioma con las mismas comprobaciones que el cuerpo | hecho en la rama (tests con un traductor de mentira); falta desplegar y probarlo en el navegador. El diff de versiones (#284) no estaba en master: cuando entre, que compare los bloques por idioma |
 
 Limitaciones conocidas:
 - el aviso de «cambios sin guardar» al salir cubre cerrar/recargar la pestaña y los clics en menús,
   botones y enlaces fuera del editor; no la tecla «atrás» del navegador;
-- el texto de los bloques solo en el idioma por defecto (los bloques no tienen traducciones);
+- ~~el texto de los bloques solo en el idioma por defecto (los bloques no tienen traducciones)~~ —
+  **resuelto** (rama `feat/multilingual-blocks`, paso 3.8);
 - en Safari, la selección dentro de un shadow root es limitada: probado en Chrome.
 
 ---
@@ -379,7 +381,7 @@ Los contenidos tienen español, inglés y alemán (`ItemForm` y sus secciones po
 |---|---|---|
 | F3.1 | Elegir de dónde sale el modelo (catálogo de IA o config propia) y la clave en local | hecho: la clave del secreto del clúster `ec-anthropic` (la misma que usa ia-control-plane), opcional; modelo `content-hub.translation.model` (por defecto `claude-opus-5-5`) |
 | F3.2 | Servicio `Translator` (aplicación) + adaptador Spring AI, con tests del contrato (HTML y marcas intactos) | hecho (ba8944e9): `Translator` + `ClaudeTranslator` con el SDK oficial `anthropic-java` 3.2.0 (no Spring AI): esfuerzo bajo, esquema JSON escrito a mano (la derivación del SDK choca con el jsonschema-generator de Spring AI), fallback de servidor ante rechazos, cuerpo saneado y marcas `[[media:…]]` verificadas; tests |
-| F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | hecho (ba8944e9): acción en `ItemForm` (solo si hay clave); bloques y variantes de slot, pendiente |
+| F3.3 | Acción "Traducir con IA" en `ItemForm` (y bloques), aviso de revisión | hecho (ba8944e9): acción en `ItemForm` (solo si hay clave); bloques: hecho (paso 3.8, `BlockTranslation`, en el formulario y en el editor visual); variantes de slot, pendiente |
 | F3.4 | Probar en local en Vaadin y Redwood; documentar en el manual del backoffice | hecho en local (2026-11-01, sin navegador: la acción del formulario): «bienvenida» traducida a en y de con el formato (`<b>`) y la marca `[[media:m1]]` intactos. Hizo falta devolver `List.of(this, Message…)`: un `Message` solo no devuelve el estado del formulario. Documentado en el manual del backoffice |
 
 ## N — Newsletter: recurrente, intro rica, aperturas y clics, suscripción

@@ -44,7 +44,9 @@ modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 
 **Traducir con IA** (en la barra del formulario) rellena los idiomas que aún no tienen título a partir
 del idioma por defecto: título, resumen y cuerpo, con el formato intacto y las marcas `[[media:…]]` en su
-sitio. Solo cambia el formulario: **revísalo y guarda**. Nada se publica sin pasar por el flujo de siempre.
+sitio. En una **página**, también lo que a cada idioma le falta de sus **bloques** (título, contenido,
+textos de los enlaces; ver [Bloques en varios idiomas](#bloques-en-varios-idiomas)). Solo cambia el
+formulario: **revísalo y guarda**. Nada se publica sin pasar por el flujo de siempre.
 Para retraducir un idioma, vacía su título. Si una traducción pierde una marca de medio, el formato o un
 enlace del cuerpo, no se aplica. La traduce el agente `intranet-translator` del plano de control de IA, en tu
 nombre y con tu presupuesto; si no está disponible, o su respuesta no sirve, sale un mensaje breve y **el
@@ -90,6 +92,21 @@ un listado, su sección y cuántos), además de la audiencia.
 
 Cada bloque puede restringirse a unos **departamentos, hoteles o puestos**. Esa audiencia **solo
 estrecha** la de la página: lo ven quienes cumplen las dos. Si nadie cumple ambas, *Avisos* lo dice.
+
+#### Bloques en varios idiomas
+
+El texto de un bloque —**título**, **contenido** (HTML, Banner) y **textos de los enlaces**— se escribe
+por idioma, como el del contenido: el formulario del bloque tiene *Título (Español)*, *Title (English)*,
+*Titel (Deutsch)* y lo mismo para el contenido; cada enlace, su texto en cada idioma (la **URL** es la misma
+en todos). Lo demás —tipo, item, sección, medio, UI externa, audiencia— es común.
+
+El lector ve cada parte **en su idioma** si el bloque la tiene, y si no **en el idioma por defecto** de la
+página, como un contenido sin traducción: en el portal, en la página de una newsletter (en el idioma de la
+newsletter para él) y en un número, web y correo (en el idioma de cada grupo). Las páginas y maquetas
+escritas antes tienen su texto en el idioma por defecto y se ven igual que antes.
+
+Para rellenar lo que falta: **Traducir con IA** (en el formulario de la página o en el editor visual,
+abajo), que traduce solo lo que a cada idioma le falta y deja el resultado en el formulario para revisarlo.
 
 ### Pantallas externas y componentes remotos
 
@@ -141,6 +158,15 @@ Lo que se ve es el **borrador** de la página, con sus bloques dibujados como en
 - **Ver como…**: el desplegable de arriba dibuja la página como la vería un perfil del directorio (lo
   no guardado incluido): los bloques que ese perfil no ve aparecen tachados como «No lo ve este perfil».
   «Volver a editar» regresa.
+- **Idioma**: el desplegable de arriba cambia el idioma en que se escribe el texto de los bloques
+  (Español, English, Deutsch; el de la página va marcado «por defecto»). En otro idioma, un bloque sin
+  texto propio en él muestra el del idioma por defecto con la marca **«sin traducir · es»** (y arriba,
+  cuántos hay); si no se toca, sigue sin traducir al guardar —sus lectores lo verán en el idioma por
+  defecto—; al escribir en él, pasa a ser de ese idioma. Tipo, enlaces (sus URL), medios y audiencia son los
+  mismos en todos los idiomas. Cambiar de idioma con cambios sin guardar pide confirmación (se pierden).
+- **Traducir con IA** (en un idioma que no es el por defecto): rellena lo que a ese idioma le falta de los
+  bloques a partir del idioma por defecto, con el formato y las marcas de medios intactos. No guarda:
+  **revísalo y guarda**. Si la traducción pierde algo, no se aplica y sale un mensaje.
 - **Guardar** guarda los bloques en el **borrador** (los textos, la audiencia y las fechas de la página
   no se tocan). Mientras hay cambios sin guardar se ve «● Cambios sin guardar»; salir por el menú, por
   otro botón o cerrando la pestaña pide confirmación. Si otra persona guardó la página mientras tanto,
@@ -496,8 +522,9 @@ página*—; publicada, sale en su menú) y **Ver en el portal**.
 aperturas, clics); **Nuevo** pide la newsletter y abre su número siguiente. Un número tiene:
 
 - **Asunto**, **fecha** y **Enviar el** (vacío: al programar).
-- **Bloques**: como una página. Se editan aquí o **sobre el número** (*Editar sobre el número*: el mismo
-  editor visual de las páginas, con vista previa como cualquier perfil).
+- **Bloques**: como una página, también en varios idiomas (su idioma por defecto es el primero de la
+  newsletter). Se editan aquí o **sobre el número** (*Editar sobre el número*: el mismo editor visual de las
+  páginas, con su selector de idioma, «Traducir con IA» y vista previa como cualquier perfil).
 - **Items de cada sección**, en orden. **Añadir lo nuevo** suma lo publicado desde que se abrió.
 - **Destinatarios**: los grupos (perfil, idioma, secciones que quieren) con cuántos son y cuántos items ve
   cada uno. **Cada grupo recibe solo lo que puede ver**, con los bloques cuya audiencia cumple; un grupo

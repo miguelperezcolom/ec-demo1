@@ -78,9 +78,10 @@ Editar una página sobre la propia página (Editorial → Editor visual, `/edito
 
 | Método y ruta | Qué hace | Permiso |
 | :--- | :--- | :--- |
-| `GET /_intranet/api/editor/pages/{id}` | Bloques del borrador, el HTML de cada uno, audiencia de la página y cuántos la ven, catálogos (tipos y sus campos, items, secciones, medios, departamentos/hoteles/puestos), perfiles para «ver como» | editorial |
-| `POST /_intranet/api/editor/pages/{id}/preview` | Dibuja bloques sin guardar, como el editor o como un perfil (`viewAs`): HTML, visible o no, y cuántos empleados lo ven | editorial |
-| `PUT /_intranet/api/editor/pages/{id}/blocks` | Guarda los bloques en el borrador (`ItemCommands.editBlocks`); `updatedAt` evita pisar cambios ajenos (409) | `content:edit` |
+| `GET /_intranet/api/editor/pages/{id}?language=` | Bloques del borrador en ese idioma (sin él, el por defecto; cada uno con `untranslated` si muestra el texto del idioma por defecto), el HTML de cada uno, idiomas, audiencia de la página y cuántos la ven, catálogos (tipos y sus campos, items, secciones, medios, departamentos/hoteles/puestos), perfiles para «ver como» | editorial |
+| `POST /_intranet/api/editor/pages/{id}/preview` | Dibuja bloques sin guardar, en su `language`, como el editor o como un perfil (`viewAs`): HTML, visible o no, y cuántos empleados lo ven | editorial |
+| `POST /_intranet/api/editor/pages/{id}/translate` | «Traducir con IA»: lo que a `language` le falta de los bloques enviados, traducido (`BlockTranslation`); no guarda | `content:edit` |
+| `PUT /_intranet/api/editor/pages/{id}/blocks` | Guarda los bloques —su texto, el de `language`— en el borrador (`ItemCommands.editBlocks`); `updatedAt` evita pisar cambios ajenos (409) | `content:edit` |
 | `GET /_intranet/api/editor/media/{id}` | Un medio dibujado, para insertarlo en un texto | editorial |
 | `GET /_intranet/api/editor/visual-editor.js` | El código del componente | editorial |
 
@@ -92,6 +93,33 @@ Editar una página sobre la propia página (Editorial → Editor visual, `/edito
   valores del directorio, y `Block.isNarrowing` rechaza cualquier otra cosa (un OR, una audiencia con
   nombre): un bloque **estrecha** la audiencia de su página, nunca la ensancha (además, la efectiva es
   siempre página **y** bloque).
+- **Idiomas**: el editor manda el texto de un idioma; `Block.edited` lo pone sobre el bloque guardado (mismo
+  id): la estructura (tipo, enlaces, audiencia…) es la enviada y el texto de los demás idiomas, el guardado. Lo
+  que se mostró como respaldo y vuelve igual —el HTML comparado tras sanearlo y normalizarlo
+  (`HtmlSanitizer.same`), porque el navegador lo reescribe a su manera— sigue sin traducir. Un bloque nuevo
+  escrito en otro idioma lleva ese texto también como el del idioma por defecto, para no quedar vacío.
+
+### Bloques en varios idiomas
+
+Un `Block` guarda su texto (`title`, `html`, el `label` de cada enlace) en el **idioma por defecto** de lo que
+lo contiene —el de la página, o el primero de la newsletter (`Site.defaultLanguage`) para la maqueta y los
+números— y en `translations` (`Map<idioma, BlockText>`) el de los demás: `BlockText(title, html, labels)`,
+con los textos de los enlaces **por URL** (las URL son del bloque, comunes a todos los idiomas; así reordenar o
+añadir enlaces no descoloca las traducciones). Cada parte puede faltar.
+
+- **Compatibilidad**: un bloque guardado antes no tiene `translations` y se lee igual —su texto es el del
+  idioma por defecto—, así que no hay migración (ni al arrancar ni perezosa); escribirlo y leerlo de nuevo da
+  lo mismo.
+- **Lectura**: `Block.in(idioma, porDefecto)` da el bloque como lo ve un lector de ese idioma, **parte a
+  parte**: lo que el idioma tiene, y lo que no, del idioma por defecto —la regla de los items (su idioma, si no
+  el por defecto), por partes—. Lo aplican `PageRenderer.visibleBlocks` (portal; en la página de una
+  newsletter, con `Site.languageFor`), `NewsletterRenderer.blocks` (número web y correo, en el idioma de cada
+  grupo) y el editor visual.
+- **Formulario**: `BlockForm` tiene título y contenido en Español/English/Deutsch y `LinkForm` el texto de cada
+  enlace en los tres; `BlockForm.of(bloque, porDefecto)` y `toBlock(porDefecto)` (si cambia el idioma por defecto
+  de la página, el del bloque cambia con él).
+- **Saneado y medios**: `Block.mapHtml` sanea el HTML de todos los idiomas; `MediaReferences` cuenta sus marcas.
+- **Traducir con IA** (`BlockTranslation`): ver abajo.
 
 ## La visibilidad
 
@@ -464,6 +492,13 @@ saltos de línea dentro de las cadenas) y se comprueba con dureza. Es un fallo, 
 - que cambien las etiquetas, su orden o los `href` y `src` del cuerpo, comparados tras sanearlos.
 
 El cuerpo se sanea como cualquier contenido, y el editor revisa y guarda: nada se publica desde aquí.
+
+**Bloques** (`BlockTranslation`): lo que a un idioma le falta de los bloques (títulos, HTML, textos de enlace;
+un enlace cuyo texto es su URL no cuenta) viaja en **una llamada por idioma**, el mismo mensaje y las mismas
+comprobaciones que un cuerpo: cada parte es un elemento del `body` —`<h3>` un título, `<section>` un HTML,
+`<p>` un texto de enlace— y vuelve por su posición. Si la respuesta no trae todas las partes, en orden y con la
+misma etiqueta, no cambia nada. Lo usan «Traducir con IA» del formulario de una página (`ItemForm`) y el del
+editor visual (`/translate`, páginas y números).
 
 ## Google Drive
 
@@ -867,6 +902,12 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 - `RemoteBlockRenderingTest`, `VisualEditorRemoteBlocksTest`: el dibujo en el portal (`MicroFrontend`,
   `<ec-ui-source>`), la pantalla externa, la tarjeta del editor visual, el enlace del correo, y el bloque en el
   formulario y en el editor visual (ida y vuelta, rechazos).
+- `BlockLanguagesTest`, `BlockLanguagesRenderingTest`, `BlockTranslationTest`, `AgentTranslatorBlocksTest`,
+  `VisualEditorLanguagesTest`: bloques en varios idiomas —un bloque guardado antes se lee igual, respaldo parte a
+  parte, lo dejado como respaldo sigue sin traducir, el formulario por idioma—; el portal y el número (web y
+  correo) en el idioma del lector o del grupo; «Traducir con IA» de bloques con un traductor de mentira (nunca la
+  IA real: marcas, formato, respuestas incompletas) y que el mensaje pasa las comprobaciones del agente; la API del
+  editor visual por idioma (leer, ver, traducir sin guardar, guardar solo ese idioma).
 - `NotificationsTest` (Testcontainers): a quién llega (visibilidad, activos, idioma), por tipo y por decisión del
   editor, una vez por versión, programados y caídas, espera a la proyección, preferencias por canal, lotes que
   fallan y se reanudan, relay caído, recordatorio y qué cierra cada cosa.
