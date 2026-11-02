@@ -3,17 +3,9 @@ import { test, expect } from './support'
 /**
  * The control plane's intranet configuration (console.localhost / rw-console.localhost → Intranet), as
  * `demo` (ai-admin + content:admin). Read-only: the configured menu is never changed.
- *
- * «Menús» and «Menús: vista previa» come with the branch feat/configurable-menus. Until it is merged
- * into master these tests are skipped; set E2E_CONFIGURABLE_MENUS=1 to run them against a cluster
- * that already has it deployed.
  */
-const MENUS = process.env.E2E_CONFIGURABLE_MENUS === '1'
 
 test.describe('Control plane · Intranet', () => {
-
-    test.skip(!MENUS, 'feat/configurable-menus is not merged into master (checked 2026-11-02): no «Menús» screens ' +
-        'in master yet. E2E_CONFIGURABLE_MENUS=1 runs them anyway.')
 
     test('Menús lists the menu entries', async ({ as, hosts }) => {
         const demo = await as('demo')

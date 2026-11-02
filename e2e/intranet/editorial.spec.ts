@@ -98,10 +98,7 @@ test.describe('Editorial', () => {
         expect(await embeds(demo), 'the medium was saved into the seeded notice').toBe(before)
     })
 
-    test('the blocks table shows type and title; «Edit» opens only the type\'s fields', async ({ as, hosts, shell }) => {
-        test.fail(shell === 'redwood', 'PRODUCT BUG (Mateu Redwood renderer): the row editor of a block («Edit block» dialog) ' +
-            'draws only Tipo and Título — the Quick links\' «Enlaces» table (List<LinkForm>) and the block\'s audience ' +
-            'multi-selects are missing, so a block\'s links cannot be edited from the form in Redwood. Vaadin draws them.')
+    test('the blocks table shows type and title; «Edit» opens only the type\'s fields', async ({ as, hosts }) => {
         const demo = await as('demo')
         await openEditForm(demo, hosts.data, PAGE)
         await demo.page.getByText('Bloques (solo páginas)').filter({ visible: true }).last().scrollIntoViewIfNeeded()

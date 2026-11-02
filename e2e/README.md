@@ -36,7 +36,7 @@ every user in once, untraced, and keeps their Keycloak session cookies in `e2e/.
 | `editorial.spec.ts` | demo | Contenidos; an item's edit form (rich-text body, «Insertar medio» / «Previsualizar» / «Traducir con IA» under it); «Insertar medio» shows the medium in the preview **without saving** (Cancel); the blocks table and its row editor (Quick links → only the links table) |
 | `visual-editor.spec.ts` | demo | on a page it creates: a Banner's text typed in place, a Quick links block with a link, restricted to COCINA, save, reload, persisted; «Ver como» a DIRECCION profile hides that block |
 | `requests.spec.ts` | ana.perez, carlos.diaz, isabel.torres | a vacation request typed `d/m/yyyy` → «Mis solicitudes» pending → Carlos approves with a comment → Isabel (HR) approves → Ana sees «Aprobada» with its history. Sends Ana the decision emails (redirected locally) |
-| `control-plane.spec.ts` | demo | Intranet → «Menús» and «Menús: vista previa» — skipped until `feat/configurable-menus` is in master (`E2E_CONFIGURABLE_MENUS=1` runs them) |
+| `control-plane.spec.ts` | demo | Intranet → «Menús» and «Menús: vista previa» |
 
 **Safe to re-run on the shared demo.** It never deletes, never resets and never saves over seeded content
 (editorial forms are left with Cancel). What it writes is its own, named «E2E …» with a run tag: one
