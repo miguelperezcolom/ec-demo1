@@ -85,12 +85,19 @@ class RemoteBlockRenderingTest {
         assertThat(mf.baseUrl()).isEqualTo("/_loyalty");
         assertThat(mf.route()).isEqualTo("/loyalty/members");
         assertThat(mf.resolvedByServer()).as("the renderer asks for it, with the reader's token").isFalse();
+        // a block: embed.js takes its breadcrumb and window title off, and its page title (the block has one)
+        assertThat(mf.cssClasses()).isEqualTo("ec-remote-ui ec-remote-block ec-remote-notitle");
+        var untitled = new Block("b2", BlockType.REMOTE, null, null, null, null, null, null, null, null,
+                RemoteUi.of("riu-class", "/loyalty/members"));
+        assertThat(((MicroFrontend) renderer.content(reader("CANARIAS"), untitled)).cssClasses())
+                .as("no title of its own: the remote's stays").isEqualTo("ec-remote-ui ec-remote-block");
     }
 
     @Test
     void a_web_component_and_an_iframe_go_through_ec_ui_source() {
         var c = (Element) renderer.content(reader("ANY", "inbox:read"), block("push", "/x", Map.of("mode", "a\"<b>")));
         assertThat(c.name()).isEqualTo("ec-ui-source");
+        assertThat(c.cssClasses()).isEqualTo("ec-remote-ui ec-remote-block ec-remote-notitle");
         assertThat(c.attributes()).containsEntry("kind", "web-component").containsEntry("src", "/_inbox/push/push.js")
                 .containsEntry("tag", "ec-push-toggle").containsEntry("import", "/_intranet/embed.js")
                 .containsEntry("attrs", "{\"mode\":\"a\\\"\\u003cb\\u003e\",\"route\":\"/x\"}");
@@ -133,8 +140,11 @@ class RemoteBlockRenderingTest {
                 "Riu Class", "Socios", "", "ui:riu-class/loyalty/members", "eva", null, null, false, false, null, 0);
         var shown = (io.mateu.uidl.fluent.Form) page.remotePage(reader("CANARIAS"), item, new java.util.ArrayList<>());
         assertThat(shown.title()).isEqualTo("Riu Class");
-        assertThat(shown.content()).singleElement().isInstanceOfSatisfying(MicroFrontend.class,
-                mf -> assertThat(mf.route()).isEqualTo("/loyalty/members"));
+        assertThat(shown.content()).singleElement().isInstanceOfSatisfying(MicroFrontend.class, mf -> {
+            assertThat(mf.route()).isEqualTo("/loyalty/members");
+            assertThat(mf.cssClasses()).as("a page: its title may name the window; the breadcrumb is the intranet's")
+                    .isEqualTo("ec-remote-ui ec-remote-page");
+        });
         var refused = (io.mateu.uidl.fluent.Form) page.remotePage(reader("BALEARES"), item, new java.util.ArrayList<>());
         assertThat(refused.content()).singleElement().isInstanceOf(io.mateu.uidl.data.EmptyState.class);
     }

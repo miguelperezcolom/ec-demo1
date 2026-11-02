@@ -63,7 +63,7 @@ public class MenuEntryPage implements ComponentTreeSupplier, Identifiable {
                         r.route() == null || r.route().isBlank() ? null : r.route());
                 var reader = portal.reader(httpRequest);
                 yield Form.builder().title(entry.label()).content(List.of(remoteUis.usable(reader, use)
-                        .map(s -> remote.component(s, use))
+                        .map(s -> remote.component(s, use, io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer.Mode.PAGE))
                         .orElseGet(() -> EmptyState.builder().title("No puedes usar esta aplicación").build()))).build();
             }
             default -> Form.builder().title(entry.label()).content(List.of(

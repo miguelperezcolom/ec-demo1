@@ -167,7 +167,9 @@ public class PageRenderer {
                 yield list.isEmpty() ? null : items(list, "");
             }
             // a registered UI, live, if the reader may use its source (the remote then applies its own permissions)
-            case REMOTE -> remoteUis.usable(reader, b.remote()).map(s -> remote.component(s, b.remote())).orElse(null);
+            // as a block: no breadcrumb or window title of its own; its page title hidden when the block has its own
+            case REMOTE -> remoteUis.usable(reader, b.remote()).map(s -> remote.component(s, b.remote(),
+                    io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer.Mode.BLOCK, !blank(b.title()))).orElse(null);
         };
     }
 

@@ -178,20 +178,93 @@
   }
   if (window.customElements && !customElements.get('ec-ui-source')) customElements.define('ec-ui-source', EcUiSource);
 
+  // Mateu UIs embedded by content-hub (a MicroFrontend: a «Componente remoto» block, a remote page),
+  // marked with CSS classes by RemoteUiRenderer. Mateu draws the island's page as a top-level one — an
+  // automatic breadcrumb worked out from the HOST's menu and URL, and the remote's SetWindowTitle on the
+  // browser tab — and has no "embedded" option yet. Until it has, this takes that chrome off:
+  //  - every island (ec-remote-ui): no breadcrumb of its own — the intranet's is the page's;
+  //  - a titled block (ec-remote-notitle): no page title either (the block has its own): a compact header;
+  //  - a block (ec-remote-block): the tab keeps the host page's title (see the title guard below).
+  // A remote page (ec-remote-page) may name the window.
+  const ISLAND_CSS = '.breadcrumbs-bar{display:none!important}';
+  const NOTITLE_CSS = '.form-header h2{display:none!important}';
+  const dressed = new WeakMap();
+  const watched = new WeakSet();
+  const shadowRootsIn = (el, fn) => {
+    const visit = (node) => {
+      if (!node.shadowRoot) return;
+      fn(node.shadowRoot);
+      node.shadowRoot.querySelectorAll('*').forEach(visit);
+    };
+    visit(el);
+    el.querySelectorAll('*').forEach(visit);
+  };
+  const dressIsland = (island) => {
+    const css = ISLAND_CSS + (island.classList.contains('ec-remote-notitle') ? NOTITLE_CSS : '');
+    shadowRootsIn(island, (root) => {
+      if (dressed.get(root) !== css) {
+        let style = [...root.children].find((c) => c.tagName === 'STYLE' && c.hasAttribute('data-ec-remote'));
+        if (!style) {
+          style = document.createElement('style');
+          style.setAttribute('data-ec-remote', '');
+          root.appendChild(style);
+        }
+        style.textContent = css;
+        dressed.set(root, css);
+      }
+      // the island re-renders inside its own shadow roots, which the page's observer does not see
+      if (!watched.has(root)) {
+        watched.add(root);
+        new MutationObserver(() => schedule()).observe(root, { childList: true, subtree: true });
+      }
+    });
+  };
+
+  // The title guard: a block's remote names the window when it loads (SetWindowTitle). When the tab's
+  // title changes to a heading drawn inside a block island, it goes back to what it was — the host page's.
+  // Checked a moment later, once the island has drawn the heading it named the window after.
+  const blockHeadings = () => {
+    const texts = new Set();
+    eachDeep(document, '.ec-remote-ui.ec-remote-block', (island) => {
+      const take = (root) => root.querySelectorAll('h1,h2,h3,[role=heading]')
+        .forEach((h) => texts.add((h.textContent || '').trim()));
+      take(island);
+      shadowRootsIn(island, take);
+    });
+    return texts;
+  };
+  let shownTitle = document.title;
+  const onTitle = () => {
+    const t = document.title;
+    const before = shownTitle;
+    shownTitle = t;
+    if (t === before || !t.trim()) return;
+    const check = () => {
+      if (document.title === t && blockHeadings().has(t.trim())) document.title = before;
+    };
+    setTimeout(check, 250);
+    setTimeout(check, 1200);
+  };
+  if (document.head) {
+    new MutationObserver(onTitle).observe(document.head, { childList: true, subtree: true, characterData: true });
+  }
+
   let pending = false;
+  const schedule = () => {
+    if (!pending) {
+      pending = true;
+      requestAnimationFrame(scan);
+    }
+  };
   const scan = () => {
     pending = false;
+    eachDeep(document, '.ec-remote-ui', dressIsland);
     eachDeep(document, '[data-ec-embed]', upgrade);
     if (window.customElements && !customElements.get(EDITOR) && !editorLoading) {
       eachDeep(document, EDITOR, loadEditor);
     }
   };
-  new MutationObserver(() => {
-    if (!pending) {
-      pending = true;
-      requestAnimationFrame(scan);
-    }
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
   setInterval(scan, 1500); // shadow roots the observer does not see into
   scan();
 })();

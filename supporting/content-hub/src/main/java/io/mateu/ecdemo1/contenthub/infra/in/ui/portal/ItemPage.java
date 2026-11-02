@@ -166,7 +166,8 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
         var source = use == null ? java.util.Optional.<io.mateu.ecdemo1.contenthub.domain.uisource.UiSource>empty()
                 : remoteUis.usable(reader, use);
         if (source.isPresent()) {
-            content.add(remote.component(source.get(), use));
+            // the whole page: the remote may name the window; the breadcrumb stays the intranet's
+            content.add(remote.component(source.get(), use, io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer.Mode.PAGE));
         } else {
             content.add(EmptyState.builder().title("No puedes usar esta aplicación")
                     .description("No está disponible o no tienes los permisos que pide.").build());
