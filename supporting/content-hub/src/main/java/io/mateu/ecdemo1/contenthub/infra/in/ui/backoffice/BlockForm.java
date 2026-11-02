@@ -134,6 +134,12 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
             BlockType.NOTICES, java.util.Set.of("limit"),
             BlockType.LATEST, java.util.Set.of("sectionId", "limit"));
 
+    /** The type's own fields, in the form's order — what the visual editor's side panel shows for it. */
+    public static List<String> fieldsOf(BlockType type) {
+        var own = FIELDS_OF.getOrDefault(type, java.util.Set.of());
+        return java.util.stream.Stream.of("html", "itemId", "sectionId", "limit", "links", "mediaId").filter(own::contains).toList();
+    }
+
     static final java.util.Set<String> BY_TYPE = java.util.Set.of("html", "itemId", "sectionId", "limit", "links", "mediaId");
 
     @Override

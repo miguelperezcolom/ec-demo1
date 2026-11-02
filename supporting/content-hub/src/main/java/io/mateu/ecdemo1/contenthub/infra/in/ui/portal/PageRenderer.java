@@ -166,6 +166,62 @@ public class PageRenderer {
         };
     }
 
+    /**
+     * A block of a page's DRAFT as markup, for the visual editor (VisualEditorController): what
+     * {@link #content} shows the reader, from the same sources (the visibility function for listings and
+     * the featured item), drawn as a card like the portal's — the editor is a web component, not a Mateu
+     * screen, so it gets HTML. Media are signed for the editor ({@code MediaUrls.EDITOR}): a draft may embed
+     * media no reader can fetch yet. Empty when the block shows nothing to this reader; whether it is shown
+     * at all (its audience) is the caller's call.
+     */
+    public String draftHtml(Reader reader, Block b) {
+        var hash = io.mateu.ecdemo1.contenthub.infra.in.render.MediaUrls.EDITOR;
+        String inner = switch (b.type()) {
+            case HTML, BANNER -> blank(b.html()) ? null : renderer.body(b.html(), PORTAL_BASE, hash);
+            case MEDIA -> b.mediaId() == null ? null : renderer.medium(b.mediaId(), PORTAL_BASE, hash);
+            case QUICK_LINKS -> b.links().isEmpty() ? null : "<ul>" + b.links().stream()
+                    .map(l -> "<li><a href=\"" + esc(l.url()) + "\"" + (l.url() != null && l.url().startsWith("/") ? ""
+                            : " target=\"_blank\" rel=\"noopener\"") + ">" + esc(l.label()) + "</a></li>")
+                    .collect(Collectors.joining()) + "</ul>";
+            case FEATURED -> b.itemId() == null ? null : visibility.item(reader.attributes(), b.itemId())
+                    .map(i -> "<p><a href=\"" + Ui.itemLink(i.itemId()) + "\"><b>" + esc(i.title()) + "</b></a></p>"
+                            + (blank(i.summary()) ? "" : "<p>" + esc(i.summary()) + "</p>"))
+                    .orElse(null);
+            case GREETING -> "<h2 style=\"margin:.25rem 0\">Hola, " + esc(reader.name()) + "</h2>";
+            case PENDING -> {
+                if (reader.viewingAs() != null) {
+                    yield null;
+                }
+                var pending = actions.pendingConfirmations(reader);
+                yield pending.isEmpty() ? null : list(pending);
+            }
+            case NOTICES -> latestHtml(reader, b, Set.of(ItemType.NOTICE), "Sin avisos.");
+            case LATEST -> latestHtml(reader, b, Set.of(ItemType.ARTICLE, ItemType.PAGE), "Sin noticias.");
+            case AUTOMATIC_LISTING -> {
+                var list = visibility.visibles(reader.attributes(), new ContentQuery(Set.of(), b.sectionId(),
+                        null, null, 0, b.limit() == null ? 5 : b.limit())).content();
+                yield list.isEmpty() ? null : list(list);
+            }
+        };
+        if (inner == null) {
+            return "";
+        }
+        var title = title(b);
+        var heading = blank(title) || b.type() == BlockType.GREETING ? "" : "<h3 style=\"margin:0 0 .5rem\">" + esc(title) + "</h3>";
+        if (b.type() == BlockType.BANNER) {
+            return "<section style=\"margin:1rem 0;padding:1.25rem;border-radius:12px;background:linear-gradient(90deg,#1d5c7a,#2f8f8f);"
+                    + "color:#fff\">" + heading + inner + "</section>";
+        }
+        return "<section style=\"margin:1rem 0;padding:1rem 1.25rem;border:1px solid rgba(128,128,128,.25);border-radius:12px\">"
+                + heading + inner + "</section>";
+    }
+
+    String latestHtml(Reader reader, Block b, Set<ItemType> types, String empty) {
+        var list = visibility.visibles(reader.attributes(), new ContentQuery(types, b.sectionId(), null, null, 0,
+                b.limit() == null ? 5 : b.limit())).content();
+        return list.isEmpty() ? "<p style=\"opacity:.7\">" + esc(empty) + "</p>" : list(list);
+    }
+
     /** A block's heading: its own title, else the one its type stands for. */
     static String title(Block b) {
         if (!blank(b.title())) {
