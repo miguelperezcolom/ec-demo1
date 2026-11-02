@@ -19,7 +19,7 @@ consultado el clúster ni ha ejecutado llamadas a Opera, Salesforce o los LLM.
 | Reglas | `2.37.0` | `rules.imageTag` en el mismo fichero |
 | Aplicaciones con Mateu | `0.84.0` | Imágenes en `deploy/manifests/` |
 | Gateway, `ia-agent`, `api-mcp` | `0.84.0` | `35-gateway.yaml`, `63-ia-agent.yaml`, `74-api-mcp.yaml` |
-| Sitio de documentación | `0.4.18` | `81-docs.yaml` |
+| Sitio de documentación | `0.4.20` | `81-docs.yaml` |
 
 La versión de la librería usada al compilar y la de una imagen desplegable son decisiones separadas.
 El `appVersion: 2.1.1` del chart vendorizado identifica su origen; **los `imageTag` de los values son
