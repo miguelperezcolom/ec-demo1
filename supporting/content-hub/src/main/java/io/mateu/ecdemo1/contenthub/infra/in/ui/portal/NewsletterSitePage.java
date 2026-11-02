@@ -103,6 +103,10 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
 
     @Override
     public Component component(HttpRequest httpRequest) {
+        return PortalComponents.namingTheTab(httpRequest, draw(httpRequest));
+    }
+
+    Component draw(HttpRequest httpRequest) {
         var reader = portal.reader(httpRequest);
         var w = where(httpRequest);
         var site = w.site() == null ? null : newsletters.readable(reader, w.site()).orElse(null);

@@ -78,6 +78,10 @@ public class SearchPage implements ComponentTreeSupplier {
 
     @Override
     public Component component(HttpRequest httpRequest) {
+        return PortalComponents.namingTheTab(httpRequest, draw(httpRequest));
+    }
+
+    Component draw(HttpRequest httpRequest) {
         var content = new ArrayList<Component>();
         var reader = portal.reader(httpRequest);
         content.addAll(PortalComponents.viewingAs(reader.viewingAs()));

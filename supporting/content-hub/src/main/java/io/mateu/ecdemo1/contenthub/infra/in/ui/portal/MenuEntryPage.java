@@ -44,6 +44,10 @@ public class MenuEntryPage implements ComponentTreeSupplier, Identifiable {
 
     @Override
     public Component component(HttpRequest httpRequest) {
+        return PortalComponents.namingTheTab(httpRequest, draw(httpRequest));
+    }
+
+    Component draw(HttpRequest httpRequest) {
         id = httpRequest.lastPathItem();
         var siteId = httpRequest.penultimatePathItem();
         var context = PortalMenu.get().context(siteId, httpRequest);
