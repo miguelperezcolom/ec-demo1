@@ -54,6 +54,7 @@
     .bar h2 { font-size:1.05rem; margin:0; font-weight:600; }
     .chip { font-size:.75rem; border-radius:999px; padding:.1rem .55rem; background:var(--ve-soft); border:1px solid var(--ve-line); }
     .dirty { color:#b26a00; font-weight:600; font-size:.85rem; }
+    .bar select { max-width:12rem; }
     .spacer { flex:1; }
     .bar label { display:flex; gap:.35rem; align-items:center; font-size:.85rem; }
     .bar select { width:auto; max-width:22rem; }
@@ -87,7 +88,9 @@
     .ins.alone { height:auto; } .ins.alone button { opacity:1; width:auto; height:auto; padding:.4rem .9rem; border-radius:8px; top:0; }
     .menu { position:absolute; top:1.5rem; z-index:10; background:var(--ve-bg); border:1px solid var(--ve-line); border-radius:8px;
       box-shadow:0 8px 24px rgba(0,0,0,.2); padding:.35rem; display:grid; grid-template-columns:1fr 1fr; gap:.25rem; min-width:20rem; }
-    .menu button { text-align:left; }
+    /* the menu sits inside .ins: its items must not take the round «+» button's look */
+    .ins .menu button { text-align:left; width:auto; height:auto; border-radius:6px; padding:.4rem .6rem; opacity:1; top:0;
+      line-height:1.2; white-space:nowrap; }
     [contenteditable=true] { outline:none; cursor:text; }
     [contenteditable=true]:focus { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ve-accent) 35%, transparent); border-radius:4px; }
     h3[data-ph]:empty::before, div[data-ph]:empty::before { content:attr(data-ph); opacity:.5; }
@@ -318,7 +321,8 @@
       const p = s.page || {};
       bar.innerHTML = '<h2>' + esc(p.title || p.id) + '</h2><span class="chip">' + esc(p.status || '') + '</span>'
         + '<span class="chip" title="Los bloques están en el idioma por defecto de la página">idioma: ' + esc(p.language || 'es') + '</span>'
-        + (s.dirty ? '<span class="dirty" role="status">● Cambios sin guardar</span>' : '')
+        // always there, only hidden when clean: appearing would rewrap the bar and move what is under the cursor
+        + '<span class="dirty" role="status"' + (s.dirty ? '' : ' style="visibility:hidden"') + '>● Cambios sin guardar</span>'
         + '<span class="spacer"></span>'
         + '<label>Ver como <select class="viewas"><option value="">yo, editando</option>'
         + s.profiles.map((o) => '<option value="' + esc(o.value) + '"' + (o.value === s.viewAs ? ' selected' : '') + '>'
@@ -910,9 +914,12 @@
       on('.f-limit', 'change', (e) => { b.limit = e.target.value === '' ? null : Math.max(1, Math.min(50, Number(e.target.value))); this.changed(); });
       on('.f-media', 'change', (e) => { b.mediaId = e.target.value; this.changed(); });
       on('.pick', 'click', () => this.pickMedium((m) => { b.mediaId = m.value; this.changed(); }));
-      panel.querySelectorAll('.links input').forEach((input) => input.addEventListener('change', () => {
+      // as the editor types: the model and the preview follow, the panel is NOT redrawn — redrawing it
+      // swapped the inputs under the cursor, and what was typed next went to a detached one
+      panel.querySelectorAll('.links input').forEach((input) => input.addEventListener('input', () => {
         b.links[Number(input.dataset.l)][input.dataset.k] = input.value;
-        this.changed();
+        this.dirty();
+        this.refresh();
       }));
       panel.querySelectorAll('.rmlink').forEach((btn) => btn.addEventListener('click', () => {
         b.links.splice(Number(btn.dataset.l), 1);
