@@ -341,6 +341,40 @@ class ConsumersTest {
         homes.save("boletin", List.of());
     }
 
+    /**
+     * Regression check (2026-11-02, after sites): the intranet's published items with an audience other than
+     * everyone are still seen by whoever meets it — in the news, the notices, the latest, a section and the
+     * search — also for rows indexed before sites existed (their site_id is the column's default). And a
+     * scheduled item is seen from its date, as always (the demo's «gala-navidad»: 30 November).
+     */
+    @Test
+    void restricted_intranet_items_stay_visible_to_who_meets_them_after_sites() {
+        var article = publish(ItemType.ARTICLE, "noticias", RECEPCION_CANARIAS, "Turnos nuevos", "<p>recepción</p>");
+        var notice = publish(ItemType.NOTICE, "nominas", Audience.in(Attribute.DEPARTMENT, "RECEPCION"), "Aviso de nómina", "");
+        var later = publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, Map.of("es", new Translation("Gala", "", "")),
+                List.of(), clock.instant().plus(Duration.ofDays(29)), null, false);
+        for (var round : List.of("indexed with sites", "rows of before sites")) {
+            if (round.startsWith("rows")) {
+                jdbc.update("update ch_item_doc set site_id = default");
+            }
+            assertThat(visibility.visibles(ANA, ContentQuery.of(ItemType.ARTICLE, 0, 20)).content())
+                    .as(round).extracting(VisibleItem::itemId).contains(article).doesNotContain(later);
+            assertThat(visibility.visibles(ANA, ContentQuery.of(ItemType.NOTICE, 0, 20)).content())
+                    .as(round).extracting(VisibleItem::itemId).contains(notice);
+            assertThat(visibility.visibles(ANA, ContentQuery.latest(50)).content()).as(round)
+                    .extracting(VisibleItem::itemId).contains(article, notice);
+            assertThat(visibility.visibles(ANA, ContentQuery.section("nominas", 0, 20)).content()).as(round)
+                    .extracting(VisibleItem::itemId).containsExactly(notice);
+            assertThat(visibility.visibles(ANA, ContentQuery.search("turnos", 0, 20)).content()).as(round)
+                    .extracting(VisibleItem::itemId).containsExactly(article);
+            assertThat(visibility.sectionsWithVisibleContent(ANA)).as(round).contains("noticias", "nominas");
+            assertThat(visibility.item(ANA, article)).as(round).isPresent();
+            assertThat(visibility.item(KLAUS, article)).as(round).isEmpty();
+        }
+        clock.advance(Duration.ofDays(30));
+        assertThat(visibility.item(ANA, later)).isPresent();
+    }
+
     @Test
     void sections_with_nothing_visible_disappear() {
         publish(ItemType.ARTICLE, "nominas", RECEPCION_CANARIAS, "Nómina", "");
