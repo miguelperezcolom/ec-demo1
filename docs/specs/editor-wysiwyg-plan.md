@@ -498,6 +498,22 @@ Limitaciones conocidas:
 - un web component `.mjs` cargado con token (blob) no resuelve imports relativos: que el script sea un bundle;
 - un iframe no lleva el token del usuario: el otro sitio inicia sesión por su cuenta.
 
+## V — Historial y calendario
+
+Pedido el 2026-11-02: (A) el historial de versiones de un contenido, con comparación y restaurar; (B) un calendario
+editorial. Rama `feat/history-calendar`.
+
+| # | Paso | Estado |
+|---|---|---|
+| V1 | **Historial**: cada paso del workflow (creado, editado, enviado a revisión, publicado, rechazado, retirado, restaurado) con quién y cuándo, en `ch_item_history`, aparte del item. Las versiones solo guardaban lo publicado: ahora cada guardado que cambia algo guarda también la copia del borrador (barato: un `ItemContent` en JSON). Las publicaciones previas al historial se leen de las versiones | hecho: `ItemHistory`, `HistoryEntry`/`HistoryAction`, `PgItemHistoryRepository`, anotado desde `ItemCommands` |
+| V2 | **Comparar** dos estados (versión, copia guardada o borrador actual): por campo y por idioma (título, resumen, cuerpo como texto —sin etiquetas— con lo añadido y quitado resaltado), bloques (añadidos, quitados, movidos, cambiados), audiencia y ventana de publicación | hecho: `TextDiff`, `ContentDiff`, `DiffView` |
+| V3 | **Restaurar esta versión** (`content:edit`): al borrador, nunca publica; queda en el historial | hecho: `ItemHistory.restore`; una fecha de publicación pasada se quita, caducidad o límite pasados se avisan |
+| V4 | Pantalla `HistoryPage` (`/editorial/historial/{id}`), botón *Historial* en el formulario, *Editorial → Historial de versiones* | hecho |
+| V5 | **Calendario editorial** (`/editorial/calendario`) con el arquetipo `CalendarPage` de Mateu: mes, semana y lista; publica, caduca, confirmar antes de, en revisión; filtros por tipo, sección y estado; pulsar abre el contenido | hecho: `EditorialCalendar`, `ItemsCalendarSource`, `EditorialCalendarPage` |
+| V6 | **Punto de extensión** `CalendarSource` para que las ediciones programadas de las newsletters (y otros) añadan entradas | hecho: `NewsletterIssuesCalendarSource` (números programados y enviados, abren `/editorial/numeros/{id}`) |
+| V7 | Tests (diff por palabras y de HTML, diferencias, restaurar, agregación del calendario, store) y documentación (manual del backoffice, arquitectura) | hecho |
+| V8 | Probar en local en Vaadin | primera prueba del coordinador: el calendario fallaba (lector sin permisos: Mateu evaluaba el campo sin petición) y los selects del historial eran de solo lectura (ficha de un listado). Corregido: lector desde la petición en curso; selects como `FormField` en `detailContent`. Falta volver a probarlo, y Redwood |
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.

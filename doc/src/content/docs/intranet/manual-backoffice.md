@@ -181,6 +181,52 @@ Quien lo ha desactivado en *Mis preferencias* no recibe ese canal. Si el conteni
 fecha límite, quien no haya confirmado recibe **un** recordatorio unos dos días antes, aunque el contenido no
 notificara al publicarse. *Lectores notificados*, en *Cifras*, dice a cuántos se ha avisado.
 
+### Historial de versiones
+
+**Historial**, en la barra del formulario de un contenido (o *Editorial → Historial de versiones* y elegir el
+contenido), abre `/editorial/historial/{id}`:
+
+- **El historial**: cada paso, el más reciente arriba —número, cuándo, quién y qué: *Creado*, *Editado*,
+  *Enviado a revisión*, *Publicado* (con su número de versión), *Rechazado*, *Retirado* o *Restaurado* (y de
+  dónde)—. Cada guardado que cambia algo deja una copia del borrador (un guardado sin cambios no cuenta). Las
+  publicaciones anteriores a que existiera el historial salen igualmente, leídas de las versiones del contenido.
+- **Comparar**: elige *Desde* y *Hasta* entre el *Borrador actual*, cada *Versión N* publicada y cada copia
+  guardada (*#N · Editado…*), y pulsa **Comparar**. Al abrir, compara la última versión publicada con el borrador
+  (lo que verían los lectores al publicar). Las diferencias salen por grupos: *General* (sección, URL), *Texto*
+  por idioma (título, resumen y cuerpo, palabra a palabra: lo quitado tachado en rojo y lo añadido en verde; el
+  cuerpo se compara por su texto, no por sus etiquetas, y si solo cambia el formato lo dice), *Bloques* (añadidos,
+  quitados, movidos de posición o cambiados, y en qué), *Audiencia* y *Publicación* (fechas de publicación,
+  caducidad y confirmación, seguimiento, notificación).
+- **Restaurar esta versión** (`content:edit`): copia la versión elegida en *Restaurar* en el **borrador**. No
+  publica nada: lo que ven los lectores sigue igual, y el borrador restaurado sigue el flujo de siempre (revisión,
+  publicación). Queda en el historial como *Restaurado*. Si la versión tenía una fecha de *Publicar a partir de*
+  ya pasada se quita (se publicará al publicarla); si su caducidad o su fecha límite de confirmación ya pasaron,
+  avisa para que las cambies antes de publicar.
+
+Ver el historial y comparar es para cualquier permiso editorial. Vale para los contenidos de cualquier sitio
+(la intranet o una newsletter).
+
+### Calendario editorial
+
+*Editorial → Calendario editorial* (`/editorial/calendario`) muestra, por mes, semana o lista, qué pasa cada día:
+
+| Entrada | Color | Cuándo |
+| :------ | :---- | :----- |
+| **Publica · título** | verde | Su *Publicar a partir de* |
+| **Caduca · título** | rojo | Su *Caduca el* |
+| **Confirmar · título** | ámbar | Su *Confirmar antes del*, si exige confirmación |
+| **Revisión · título** | azul | El día en que se envió a revisión, mientras espera a un publicador |
+| **Envío · newsletter nº N** | morado | Cuándo sale un número programado (abre el número) |
+| **Enviado · newsletter nº N** | gris | Cuándo salió un número enviado |
+
+De un contenido publicado salen las fechas de lo que se ve (su última versión). De un borrador nunca publicado,
+las que planea, marcadas *(previsto)*; de uno publicado con cambios sin publicar, solo las fechas que cambia,
+marcadas *(cambios sin publicar)*. Un borrador sin *Publicar a partir de* no tiene fecha: se publica al publicarlo.
+
+Encima del calendario, tres filas de botones filtran por **tipo**, **sección** (con sus subsecciones) y
+**estado**; sin estado elegido no salen los retirados. Las flechas y *Hoy* mueven el periodo; **Mes**, **Semana**
+y **Lista** cambian la vista (en semana y lista, con la hora). **Pulsar una entrada abre el contenido.**
+
 ## Biblioteca de medios
 
 *Intranet → Medios*. Cada medio tiene un id (`m…`) y la marca para incrustarlo (`[[media:id]]`).

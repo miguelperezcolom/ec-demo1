@@ -9,6 +9,7 @@ import io.mateu.ecdemo1.contenthub.application.visibility.NamedAudiences;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.employee.Employee;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
+import io.mateu.ecdemo1.contenthub.domain.item.HistoryAction;
 import io.mateu.ecdemo1.contenthub.domain.item.Item;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemContent;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
@@ -53,6 +54,20 @@ public class ItemCommands {
         this(items, events, directory, namedAudiences, clock, null);
     }
 
+    /** The items' history (ItemHistory). Optional, so the workflow's tests can leave it out. */
+    io.mateu.ecdemo1.contenthub.application.history.ItemHistory history;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setHistory(io.mateu.ecdemo1.contenthub.application.history.ItemHistory history) {
+        this.history = history;
+    }
+
+    private void record(Item item, HistoryAction action, String by, Integer version, ItemContent snapshot) {
+        if (history != null) {
+            history.record(item, action, by, version, null, snapshot);
+        }
+    }
+
     @Transactional
     public String create(Reader reader, ItemType type, String defaultLanguage, ItemContent content) {
         reader.require(EditorialPermission.EDIT);
@@ -60,6 +75,7 @@ public class ItemCommands {
         checkRemotes(type, content);
         var item = Item.create(id, type, reader.userId(), defaultLanguage, sanitized(content), clock.instant());
         items.save(item);
+        record(item, HistoryAction.CREATED, reader.userId(), null, item.draft());
         return id;
     }
 
@@ -68,7 +84,9 @@ public class ItemCommands {
     public String createInSite(Reader reader, String siteId, ItemType type, String defaultLanguage, ItemContent content) {
         reader.require(EditorialPermission.EDIT);
         var id = UUID.randomUUID().toString().substring(0, 8);
-        items.save(Item.create(id, siteId, type, reader.userId(), defaultLanguage, sanitized(content), clock.instant()));
+        var item = Item.create(id, siteId, type, reader.userId(), defaultLanguage, sanitized(content), clock.instant());
+        items.save(item);
+        record(item, HistoryAction.CREATED, reader.userId(), null, item.draft());
         return id;
     }
 
@@ -76,7 +94,9 @@ public class ItemCommands {
     @Transactional
     public void createWithIdInSite(String id, String siteId, String author, ItemType type, String defaultLanguage,
                                    ItemContent content) {
-        items.save(Item.create(id, siteId, type, author, defaultLanguage, sanitized(content), clock.instant()));
+        var item = Item.create(id, siteId, type, author, defaultLanguage, sanitized(content), clock.instant());
+        items.save(item);
+        record(item, HistoryAction.CREATED, author, null, item.draft());
     }
 
     /** As {@link #create}, with the id given — the seed's items keep theirs across resets. */
@@ -85,6 +105,7 @@ public class ItemCommands {
         checkRemotes(type, content);
         var item = Item.create(id, type, author, defaultLanguage, sanitized(content), clock.instant());
         items.save(item);
+        record(item, HistoryAction.CREATED, author, null, item.draft());
     }
 
     @Transactional
@@ -92,8 +113,17 @@ public class ItemCommands {
         reader.require(EditorialPermission.EDIT);
         var item = items.find(id).orElseThrow();
         checkRemotes(item.type(), content);
+        var before = item.draft();
         item.editDraft(sanitized(content), clock.instant());
         items.save(item);
+        recordEdit(reader, item, before);
+    }
+
+    /** A save that changed the draft is a step of the history, with the draft it left; one that did not, is not. */
+    private void recordEdit(Reader reader, Item item, ItemContent before) {
+        if (!item.draft().equals(before)) {
+            record(item, HistoryAction.EDITED, reader.userId(), null, item.draft());
+        }
     }
 
     /**
@@ -116,10 +146,12 @@ public class ItemCommands {
         }
         var d = item.draft();
         var content = new ItemContent(d.sectionId(), d.audience(), d.translations(), blocks, d.publishAt(), d.expireAt(),
-                d.readTracking(), d.confirmationRequired(), d.confirmationDeadline(), d.url());
+                d.readTracking(), d.confirmationRequired(), d.confirmationDeadline(), d.url())
+                .withNotification(d.notifyReaders(), d.important());
         checkRemotes(item.type(), content);
         item.editDraft(sanitized(content), clock.instant());
         items.save(item);
+        recordEdit(reader, item, d);
     }
 
     @Transactional
@@ -128,6 +160,7 @@ public class ItemCommands {
         var item = items.find(id).orElseThrow();
         item.submitForReview(clock.instant());
         items.save(item);
+        record(item, HistoryAction.SENT_TO_REVIEW, reader.userId(), null, null);
     }
 
     @Transactional
@@ -136,14 +169,16 @@ public class ItemCommands {
         var item = items.find(id).orElseThrow();
         item.reject(clock.instant());
         items.save(item);
+        record(item, HistoryAction.REJECTED, reader.userId(), null, null);
     }
 
     @Transactional
     public void publish(Reader reader, String id, boolean requireReconfirmation) {
         reader.require(EditorialPermission.PUBLISH);
         var item = items.find(id).orElseThrow();
-        item.publish(reader.userId(), true, requireReconfirmation, clock.instant());
+        var version = item.publish(reader.userId(), true, requireReconfirmation, clock.instant());
         items.save(item);
+        record(item, HistoryAction.PUBLISHED, reader.userId(), version.number(), null);
         events.drain(item);
     }
 
@@ -153,6 +188,7 @@ public class ItemCommands {
         var item = items.find(id).orElseThrow();
         item.retire(clock.instant());
         items.save(item);
+        record(item, HistoryAction.RETIRED, reader.userId(), null, null);
         events.drain(item);
     }
 

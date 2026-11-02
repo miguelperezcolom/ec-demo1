@@ -206,6 +206,52 @@ stateDiagram-v2
   confirmaciones anteriores siguen valiendo.
 - Los items **no se borran**: se retiran.
 
+### Historial, diferencias y restaurar
+
+- **Qué se guarda.** Cada paso del workflow (`ItemCommands`) se anota en `ch_item_history` (`ItemHistory`,
+  puerto `ItemHistoryRepository`): acción (`HistoryAction`: creado, editado, enviado a revisión, publicado,
+  rechazado, retirado, restaurado), quién, cuándo y, para crear, guardar y restaurar, **la copia del borrador**
+  que dejó (`snapshot`, el `ItemContent` en JSON; un guardado sin cambios no se anota). Una publicación no copia
+  nada: su contenido es su `ItemVersion`, que el item ya guarda. El historial va **aparte del agregado**: solo
+  crece, y no debe pesar en cada carga del item. Las publicaciones de antes de existir el historial se leen de
+  las versiones (`seq` 0). El número de cada paso lo da el `insert … select max(seq)+1` en la misma sentencia.
+- **Estados comparables**, por clave: `draft` (el borrador actual), `v<N>` (la versión N) y `h<seq>` (la copia
+  que dejó el paso). `ContentDiff` compara dos `ItemContent` campo a campo: textos por idioma con `TextDiff`
+  (diff por palabras con LCS, recortando antes prefijo y sufijo comunes; un cuerpo HTML se lee como su texto
+  —un párrafo, encabezado o elemento de lista por línea, imágenes como «[imagen: alt]», entidades decodificadas—,
+  así que nunca se ven etiquetas; si el texto es igual y el HTML no, dice «cambia el formato»), bloques por id
+  (añadidos, quitados, cambiados —tipo, título, contenido, audiencia, destacado, sección, cuántos, enlaces, medio—
+  y **movidos**: los que quedan fuera de la subsecuencia común más larga del orden), audiencia (`describe`) y
+  ventana de publicación. `DiffView` lo pinta (tachado en rojo, añadido en verde).
+- **Restaurar** (`content:edit`) copia el estado en el borrador con `editDraft` —nunca publica; anula una revisión
+  pendiente, porque el borrador es otro— y anota *Restaurado* con su copia. Una fecha de publicación ya pasada se
+  quita (se publica al publicar); caducidad o fecha límite pasadas se avisan.
+- Pantalla: `HistoryPage` (`/editorial/historial/{id}`, desde el botón *Historial* del formulario o desde
+  `HistoryListing`). La abre un listado, así que Mateu la pinta como ficha de solo lectura: los selects son
+  `FormField` fluidos en su `detailContent` (como `ApprovalPage`), ligados a campos ocultos que leen las acciones
+  *Comparar* y *Restaurar esta versión*. Un solo `Element` por pantalla (`Html`): diferencias e historial juntos.
+  El historial va por id de item, así que vale para los items de cualquier sitio.
+
+### Calendario editorial
+
+`EditorialCalendar` junta las entradas de todos los beans **`CalendarSource`** (`entries(from, to)`, días de
+Madrid), quita duplicados por id, filtra por tipo, sección (con sus subsecciones, por `Navigation.ancestors`) y
+estado (sin estado, fuera los retirados) y ordena por día y hora. Cada `CalendarEntry` lleva su clase (`kind`),
+título, color, la ruta del backoffice que lo abre y las tres facetas que miran los filtros.
+
+- `ItemsCalendarSource`: de lo publicado, las fechas de su última versión (publica, caduca, confirmar antes de);
+  de un borrador nunca publicado, las previstas; de uno publicado con cambios, solo las fechas que cambia; y
+  *En revisión* el día en que se envió (mientras espera, `updatedAt` es ese momento).
+- `NewsletterIssuesCalendarSource`: los números de las newsletters — uno programado en su `scheduledAt`, uno
+  enviado en su `sentAt` (borradores y cancelados no tienen fecha), con `type` = `NEWSLETTER`, el estado del
+  número y sin sección; abre `/editorial/numeros/{id}`.
+- **Punto de extensión**: otra fuente es un `@Component` que implementa `CalendarSource`; nada más cambia.
+- Pantalla: `EditorialCalendarPage` extiende el arquetipo **`CalendarPage`** de Mateu (vistas mes, semana y
+  lista; pulsar una entrada navega a su `target`). Los filtros son filas de botones encima del calendario (el
+  arquetipo pinta sus campos primero: como campos de formulario quedarían debajo), con el estado en campos
+  ocultos. Mateu puede evaluar el campo del calendario antes de darle la petición a la página: entonces el lector
+  sale de la petición que se está sirviendo (`RequestContextHolder`), para no perder sus permisos.
+
 ### Permisos editoriales
 
 | Scope | Rol de ejemplo | Qué permite |
@@ -247,6 +293,7 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | Tablas | Qué guardan |
 | :----- | :---------- |
 | `ch_item`, `ch_navigation`, `ch_slot`, `ch_named_audience`, `ch_newsletter`, `ch_favorites` | Los agregados, como documento JSON (más las columnas por las que se lista) |
+| `ch_item_history` | El historial de cada item: un paso por fila (`item_id`, `seq`), con la copia del borrador en `snapshot` (JSON) cuando la hay |
 | `ch_menu` | El menú de cada sitio, un documento JSON por `site_id` |
 | `ch_ack` | Acuses de lectura y confirmación |
 | `ch_media` | La biblioteca de medios; los ficheros subidos, en `bytea` |
@@ -771,6 +818,12 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 ## Pruebas
 
 - `ItemTest`: el workflow y las invariantes del item.
+- `TextDiffTest`, `ContentDiffTest`, `ItemHistoryTest`, `ItemHistoryStoreTest` (Testcontainers): el diff por
+  palabras y el texto de un HTML, las diferencias por campo, idioma, bloque (añadido, quitado, movido, cambiado),
+  audiencia y fechas; los pasos que anota el workflow, las versiones anteriores al historial, comparar, y que
+  restaurar solo toca el borrador (fechas pasadas, revisión anulada, `content:edit`).
+- `EditorialCalendarTest`: las fechas de lo publicado, lo previsto, los cambios sin publicar y la revisión; los
+  filtros (sección con subsecciones, retirados fuera por defecto) y otra `CalendarSource` sumándose.
 - `SiteMenuTest`, `SiteMenusTest`, `PortalMenuTest`, `MenuStoreTest` (Testcontainers): las operaciones del árbol del
   menú, lo que ve cada lector (audiencia, destinos que no puede abrir, submenús vacíos fuera, inactivas, idioma de
   reserva), la siembra idempotente, un menú por sitio, el permiso `content:admin`, y lo que el `MenuSupplier`
