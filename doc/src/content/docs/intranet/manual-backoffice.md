@@ -353,35 +353,70 @@ Los huecos de contenido editorial en pantallas de otras aplicaciones. Están par
 El de la demo es `front-office.bienvenida.destacado`: una variante general para todos y una de prioridad
 10 para «Recepción Canarias».
 
-## Newsletter
+## Newsletters
 
-*Editorial → Newsletter*. Una edición la compone un editor; **programarla** (enviarla) es publicar y
-pide `content:publish`. Una edición tiene título, introducción (escrita en el editor, con formato),
-**items en orden**, audiencia y fecha de envío.
+Una newsletter es **un sitio más**, como la intranet pero suyo: tiene su identidad (nombre, logo,
+colores, cabecera y pie), su audiencia («quién lo verá», con el recuento de empleados), los idiomas en que
+se escribe, **sus secciones** («Editorial», «Noticias de la cadena», «Personas»…), **sus páginas**
+(«Quiénes somos», «Contacto»), y sus **números**. En el portal se lee en `/intranet/n/{id}`; por correo
+llega cada número.
 
-**El boletín de la semana se prepara solo**: cada lunes a las 9 (hora de Madrid) aparece un borrador
-`w-AAAA-Wnn` con lo publicado desde el boletín anterior (noticias, avisos y páginas, lo más reciente
-primero, sin las páginas de inicio), para todos. Revísalo, quita o reordena items y prográmalo. Sin
-programar no sale. **Preparar boletín de la semana** (en el listado) lo crea en el momento, sin esperar
-al lunes. Se configura con `content-hub.newsletter.weekly.*`: `cron`, `enabled` y `send` (enviar sin
-revisión).
+*Editorial → Newsletters* lista las newsletters (audiencia, periodicidad, números, último enviado). Al
+abrir una:
 
-- **Grupos de destinatarios**: los empleados que la recibirían, agrupados por perfil e idioma, con los
-  items que ve cada grupo. **Cada grupo recibe solo lo que puede ver**, en su idioma; un grupo que no ve
-  ninguno de los items no recibe nada.
-- **Vista previa (primer grupo)**: el correo tal como saldría.
-- **Aperturas y clics** (una edición enviada): cuántas veces se abrió y cuántos clics tuvo cada item, por
-  grupo y sumado por **hotel** y por **departamento**. Se cuentan **por grupo**, nunca por persona: el
-  correo de un grupo es un solo mensaje para todos. La apertura depende de que el cliente de correo cargue
-  imágenes, así que es una cifra mínima.
-- Los grupos respetan las **preferencias** de cada empleado (*Mis preferencias* en el portal): quien se ha
-  dado de baja no está en ninguno, y quien eligió secciones forma grupo aparte y solo recibe los items de
-  esas secciones.
-- **Programar**: se envía en la fecha indicada (vacía: ya), un correo por grupo, en menos de un minuto.
-  Si un grupo falla se reintenta solo ese. Una edición enviada ya no se modifica.
+- **Newsletter** e **Identidad**: nombre, descripción, idiomas (un lector de otro idioma la recibe en el
+  primero), activa, logo (una imagen de la biblioteca de medios), color principal y de los enlaces
+  (`#RRGGBB`), cabecera y pie (texto con formato).
+- **Audiencia**: la de siempre (audiencia con nombre o atributos). Solo la ven y la reciben quienes la
+  cumplen.
+- **Secciones**: las del sitio de la newsletter. Cada una puede **tomar lo publicado en secciones de la
+  intranet** (p. ej. «Noticias de la cadena» ← Noticias y RRHH); además, lo que se escriba en la propia
+  sección (un artículo del sitio de la newsletter) va a ella.
+- **Maqueta de cada número**: los bloques con los que empieza un número nuevo. Son los **bloques de
+  siempre** (HTML, banner, destacado, enlaces, medio, listados…, cada uno con su audiencia que solo
+  estrecha), más **«Sección de la newsletter»**, que pone los items del número en esa sección. Vacía: una
+  introducción y un bloque por sección.
+- **Periodicidad**: sin periodicidad (los números se crean a mano), semanal (día y hora) o mensual (día del
+  mes y hora; un mes más corto usa su último día), hora de Madrid. Cuando llega el momento aparece **solo
+  el borrador del número siguiente**, ya relleno; **«Enviar cada número sin revisión»** (pide
+  `content:publish`) lo programa además en el acto. Un mismo momento nunca crea dos números, y si el
+  servicio estuvo parado varias semanas se crea uno, no varios. **Próximo número** dice cuándo.
+- **Números y páginas**: sus números (número, fecha, asunto, estado, aperturas, clics), cada uno con su
+  enlace, y sus páginas.
 
-En la demo, todo correo va a un buzón único (`NEWSLETTER_REDIRECT_TO`) con el grupo y el idioma en el
-asunto.
+Acciones: **Nuevo número** (lo abre ya relleno: la maqueta y lo publicado desde el número anterior en cada
+sección que vea alguien de su audiencia, lo más reciente primero), **Nueva página** (una página del sitio
+de la newsletter, que se escribe, revisa y publica como cualquier contenido —también *Editar sobre la
+página*—; publicada, sale en su menú) y **Ver en el portal**.
+
+### Números
+
+*Editorial → Números de newsletter* lista todos los números (newsletter, nº, fecha, asunto, estado,
+aperturas, clics); **Nuevo** pide la newsletter y abre su número siguiente. Un número tiene:
+
+- **Asunto**, **fecha** y **Enviar el** (vacío: al programar).
+- **Bloques**: como una página. Se editan aquí o **sobre el número** (*Editar sobre el número*: el mismo
+  editor visual de las páginas, con vista previa como cualquier perfil).
+- **Items de cada sección**, en orden. **Añadir lo nuevo** suma lo publicado desde que se abrió.
+- **Destinatarios**: los grupos (perfil, idioma, secciones que quieren) con cuántos son y cuántos items ve
+  cada uno. **Cada grupo recibe solo lo que puede ver**, con los bloques cuya audiencia cumple; un grupo
+  que no ve nada no recibe nada. Quien se dio de baja de esta newsletter no está en ninguno.
+- **Aperturas, clics y vista previa**: totales por hotel y departamento (por grupo, nunca por persona: el
+  correo de un grupo es un solo mensaje) y el correo tal como sale para el primer grupo.
+
+Estados: **Borrador → Programado → Enviado**, o **Cancelado**. **Enviar prueba** te lo manda a ti (tu
+perfil, todas las secciones; en la demo, al buzón de redirección) sin registrar nada. **Programar**,
+**Volver a borrador** y **Cancelar** piden `content:publish`. Si un grupo falla se reintenta solo ese; un
+número enviado o cancelado ya no cambia.
+
+El correo es la misma maqueta en HTML apto para correo: cabecera con la identidad, los bloques (un medio
+es un enlace a la versión web), y al pie **«Ver en el navegador»** (el enlace permanente del número) y
+**«Darte de baja de esta newsletter»** (su página en el portal). En la demo, todo correo va a un buzón
+único (`NEWSLETTER_REDIRECT_TO`) como un solo mensaje con una parte por grupo.
+
+**«Boletín de la intranet»** es la newsletter de la demo: semanal (lunes a las 9), «Lo más destacado» toma
+lo publicado en todas las secciones de la intranet. Las ediciones de antes de que hubiera newsletters son
+sus primeros números (ver *Arquitectura*).
 
 ## Confirmaciones
 

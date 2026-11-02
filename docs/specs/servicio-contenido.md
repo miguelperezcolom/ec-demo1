@@ -117,7 +117,9 @@ Detalle por área:
 
 - `Acuse` de tipo `LECTURA`: usuario, item, versión, fecha. Solo en items con seguimiento.
 - `Acuse` de tipo `CONFIRMACION`: usuario, item, versión, fecha. Un usuario tiene el item confirmado si tiene una confirmación con versión `>= versionConfirmacionVigente`.
-- `EdicionNewsletter`: título, items ordenados, audiencia de envío, fecha, estado.
+- `Sitio`: la intranet (por defecto) o una newsletter; identidad, audiencia, idiomas, su árbol de secciones, sus items e inicios.
+- `Newsletter` (de un sitio): maqueta, fuentes de cada sección, periodicidad y envío sin revisión; numera sus números.
+- `NumeroNewsletter`: número, fecha, asunto, bloques, items por sección, estado (borrador, programado, enviado, cancelado), envíos por grupo. (Antes `EdicionNewsletter`; las ediciones pasaron a números de «Boletín de la intranet».)
 
 ### Preparado para la fase 2
 

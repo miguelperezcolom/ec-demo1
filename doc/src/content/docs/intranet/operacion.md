@@ -137,7 +137,8 @@ Dos semillas, idempotentes:
   distintas —uno para todos con el vídeo, el cuadrante de turnos de Canarias, la carta de otoño para
   cocinas, la política de datos con confirmación obligatoria, uno solo para directores, uno programado y
   uno caducado—, una página con bloques (uno solo para recepción), el slot
-  `front-office.bienvenida.destacado` y una edición de newsletter. En cada arranque, si faltan: las UIs
+  `front-office.bienvenida.destacado` y la newsletter «Boletín de la intranet» (un sitio con su página
+  «Quiénes somos» y un primer número en borrador). En cada arranque, si faltan: las UIs
   externas **Riu Class** (`/_loyalty`) y **Notificaciones en este navegador** (`<ec-push-toggle>`), la
   pantalla externa «Riu Class · socios» y la página «Herramientas» con dos componentes remotos.
 

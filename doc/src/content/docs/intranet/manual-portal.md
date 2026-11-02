@@ -144,15 +144,27 @@ llegan a RRHH, si eres de RRHH. Abre una, escribe un comentario para el empleado
 
 Sin responsable en el directorio no se puede hacer una solicitud: RRHH tiene que asignártelo.
 
-## Mis preferencias
+## Newsletters
 
-*Mis preferencias* decide qué te llega por la **newsletter**:
+*Newsletters* lista las newsletters que son para ti (las de tu audiencia), si las recibes y su último
+número. Cada una es un pequeño sitio, con su logo y sus colores y **su propio menú**: *Inicio* (el último
+número y los anteriores), sus **secciones** (lo que han traído los números en esa sección y sus propios
+artículos), *Números anteriores* (el archivo) y **sus páginas** («Quiénes somos»…). Cada número tiene su
+página permanente: es el mismo número que te llegó por correo («Ver en el navegador» lleva ahí), con lo que
+puedes ver tú, y con sus vídeos y medios en la página.
 
-- **Recibir la newsletter**: desmárcalo y no te llegará ninguna edición.
-- **Solo de estas secciones**: elige las que te interesan; vacío, todas. Solo aparecen secciones con algo
-  que puedes ver.
+En la página de una newsletter:
+
+- **Darme de baja** / **Suscribirme**: solo para esa newsletter; las demás siguen igual. También el enlace
+  «Darte de baja de esta newsletter» del correo lleva aquí.
+- **Qué secciones recibo**: marca las que te interesan; ninguna marcada, todas.
 
 Nunca te llegará nada que no puedas ver en la intranet, elijas lo que elijas.
+
+## Mis preferencias
+
+*Mis preferencias* lista **las newsletters que recibes** (cada una lleva a su página, donde te das de
+baja o eliges secciones) y decide cómo se te avisa.
 
 ### Notificaciones
 
