@@ -165,7 +165,7 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
         sections = new ArrayList<>(navigation.get(siteId).sections().stream().filter(s -> s.parentId() == null)
                 .map(s -> NewsletterSectionForm.of(s.id(), s.name(language),
                         newsletter.settings().sources().getOrDefault(s.id(), List.of()))).toList());
-        layout = new ArrayList<>(newsletter.settings().layout().stream().map(BlockForm::of).toList());
+        layout = new ArrayList<>(newsletter.settings().layout().stream().map(b -> BlockForm.of(b, language)).toList());
         var cadence = newsletter.settings().cadence();
         frequency = cadence.frequency().name();
         dayOfWeek = cadence.dayOfWeek() == null ? "MONDAY" : cadence.dayOfWeek().name();
@@ -193,7 +193,8 @@ public class NewsletterForm extends AudienceForm implements SimpleCrud.CrudForm 
         var f = Cadence.Frequency.valueOf(frequency == null ? "NONE" : frequency);
         var cadence = new Cadence(f, f == Cadence.Frequency.WEEKLY ? DayOfWeek.valueOf(dayOfWeek) : null,
                 f == Cadence.Frequency.MONTHLY ? dayOfMonth : null, at);
-        return new Newsletter.Settings(layout == null ? List.of() : layout.stream().map(BlockForm::toBlock).toList(),
+        var language = languages == null || languages.isEmpty() ? "es" : languages.getFirst(); // the blocks' default language
+        return new Newsletter.Settings(layout == null ? List.of() : layout.stream().map(b -> b.toBlock(language)).toList(),
                 null, cadence, autoSend);
     }
 

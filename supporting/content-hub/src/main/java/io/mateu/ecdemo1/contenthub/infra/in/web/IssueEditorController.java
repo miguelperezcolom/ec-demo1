@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -53,10 +54,13 @@ public class IssueEditorController {
     final AudienceCommands audiences;
     final NamedAudiences namedAudiences;
 
+    /** The issue, its blocks' text in {@code language} (none: the newsletter's first language). */
     @GetMapping("/{id}")
-    public Map<String, Object> issue(@PathVariable String id, HttpServletRequest request) {
+    public Map<String, Object> issue(@PathVariable String id, @RequestParam(required = false) String language,
+                                     HttpServletRequest request) {
         var reader = pages.editor(request);
-        return payload(reader, issue(id));
+        var issue = issue(id);
+        return payload(reader, issue, VisualEditorController.language(language, site(issue).defaultLanguage()));
     }
 
     @PostMapping("/{id}/preview")
@@ -65,7 +69,9 @@ public class IssueEditorController {
         var reader = pages.editor(request);
         var issue = issue(id);
         var site = site(issue);
-        var blocks = pages.blocks(body);
+        var language = VisualEditorController.language(body.language(), site.defaultLanguage());
+        var blocks = VisualEditorController.in(VisualEditorController.merged(issue.blocks(), pages.blocks(body), language,
+                site.defaultLanguage()), language, site.defaultLanguage());
         var out = new LinkedHashMap<String, Object>();
         Reader as = reader;
         if (body.viewAs() != null && !body.viewAs().isBlank()) {
@@ -77,9 +83,30 @@ public class IssueEditorController {
             out.put("profile", VisualEditorController.profileLabel(profile));
             out.put("pageVisible", namedAudiences.policy().admits(site.audience(), profile.attributes()));
         }
-        out.put("blocks", render(as, issue, site, blocks, as != reader));
+        out.put("blocks", render(as, issue, site, blocks, as != reader, language));
         out.put("media", pages.mediaOf(blocks));
         out.put("warnings", List.of());
+        return out;
+    }
+
+    /** «Traducir con IA» on the issue's blocks, as on a page's: nothing saved, the blocks back to review. */
+    @PostMapping("/{id}/translate")
+    public Map<String, Object> translate(@PathVariable String id, @RequestBody VisualEditorController.BlocksRequest body,
+                                         HttpServletRequest request) {
+        var reader = pages.editor(request);
+        reader.require(EditorialPermission.EDIT);
+        var issue = issue(id);
+        var site = site(issue);
+        var from = site.defaultLanguage();
+        var language = VisualEditorController.language(body.language(), from);
+        var all = VisualEditorController.merged(issue.blocks(), pages.blocks(body), language, from);
+        var result = pages.translated(all, from, language, issue.subject(), request);
+        var shown = VisualEditorController.in(result.blocks(), language, from);
+        var out = new LinkedHashMap<String, Object>();
+        out.put("blocks", VisualEditorController.dtos(result.blocks(), language, from));
+        out.put("rendered", render(reader, issue, site, shown, false, language));
+        out.put("media", pages.mediaOf(shown));
+        out.put("translated", result.parts());
         return out;
     }
 
@@ -87,26 +114,31 @@ public class IssueEditorController {
     public Map<String, Object> save(@PathVariable String id, @RequestBody VisualEditorController.BlocksRequest body,
                                     HttpServletRequest request) {
         var reader = pages.editor(request);
+        var before = issue(id);
+        var from = site(before).defaultLanguage();
+        var language = VisualEditorController.language(body.language(), from);
         try {
-            editorial.editIssueBlocks(reader, id, pages.blocks(body), body.updatedAt());
+            editorial.editIssueBlocks(reader, id, VisualEditorController.merged(before.blocks(), pages.blocks(body), language,
+                    from), body.updatedAt());
         } catch (IllegalStateException e) {
             if (e.getMessage() != null && e.getMessage().startsWith("Alguien")) {
                 throw new VisualEditorController.Conflict(e.getMessage());
             }
             throw e;
         }
-        var payload = payload(reader, issue(id));
+        var payload = payload(reader, issue(id), language);
         payload.put("saved", true);
         return payload;
     }
 
-    Map<String, Object> payload(Reader reader, NewsletterIssue issue) {
+    Map<String, Object> payload(Reader reader, NewsletterIssue issue, String language) {
         var site = site(issue);
+        var shown = VisualEditorController.in(issue.blocks(), language, site.defaultLanguage());
         var out = new LinkedHashMap<String, Object>();
         var page = new LinkedHashMap<String, Object>();
         page.put("id", issue.id());
         page.put("title", site.name() + " · nº " + issue.number() + " — " + issue.subject());
-        page.put("language", site.definition().languages().isEmpty() ? "es" : site.definition().languages().getFirst());
+        pages.languages(page, language, site.defaultLanguage());
         page.put("status", issue.status().label());
         page.put("published", issue.status() == NewsletterIssue.Status.SENT);
         page.put("updatedAt", issue.updatedAt() == null ? null : issue.updatedAt().toString());
@@ -114,16 +146,16 @@ public class IssueEditorController {
         page.put("count", audiences.count(site.audience()));
         page.put("canEdit", reader.may(EditorialPermission.EDIT) && issue.editable());
         out.put("page", page);
-        out.put("blocks", issue.blocks().stream().map(VisualEditorController::dto).toList());
-        out.put("rendered", render(reader, issue, site, issue.blocks(), false));
-        out.put("media", pages.mediaOf(issue.blocks()));
+        out.put("blocks", VisualEditorController.dtos(issue.blocks(), language, site.defaultLanguage()));
+        out.put("rendered", render(reader, issue, site, shown, false, language));
+        out.put("media", pages.mediaOf(shown));
         out.put("warnings", issue.editable() ? List.of() : List.of("Este número está " + issue.status().label().toLowerCase()
                 + ": ya no se cambia"));
         var catalog = pages.catalog();
         var sections = new ArrayList<Map<String, String>>(VisualEditorController.options(
                 io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice.Catalog.get().sections()));
         navigation.get(site.id()).sections().forEach(s -> sections.add(Map.of("value", Newsletter.SECTION_PREFIX + s.id(),
-                "label", site.name() + " · " + s.name("es"))));
+                "label", site.name() + " · " + s.name(language))));
         catalog.put("sections", sections);
         out.put("catalog", catalog);
         out.put("profiles", audiences.allProfiles().values().stream()
@@ -133,10 +165,10 @@ public class IssueEditorController {
 
     /** As on a page; a newsletter section block, the titles of the items the issue carries in it. */
     List<VisualEditorController.RenderedBlock> render(Reader reader, NewsletterIssue issue, Site site, List<Block> blocks,
-                                                      boolean asProfile) {
+                                                      boolean asProfile, String language) {
         var rendered = pages.render(reader, site.audience(), blocks, asProfile);
         var names = new LinkedHashMap<String, String>();
-        navigation.get(site.id()).sections().forEach(s -> names.put(s.id(), s.name("es")));
+        navigation.get(site.id()).sections().forEach(s -> names.put(s.id(), s.name(language)));
         var out = new ArrayList<VisualEditorController.RenderedBlock>();
         for (int i = 0; i < blocks.size(); i++) {
             var b = blocks.get(i);
@@ -145,7 +177,7 @@ public class IssueEditorController {
                 var key = Newsletter.sectionOf(b);
                 var title = b.title() == null || b.title().isBlank() ? names.getOrDefault(key, key) : b.title();
                 var list = issue.section(key).stream().map(itemId -> items.find(itemId).map(it ->
-                        "<li><a href=\"" + Ui.itemLink(itemId) + "\">" + Ui.esc(it.draft().in(it.defaultLanguage(),
+                        "<li><a href=\"" + Ui.itemLink(itemId) + "\">" + Ui.esc(it.draft().in(language,
                                 it.defaultLanguage()).title()) + "</a></li>").orElse("")).reduce("", String::concat);
                 var html = "<section style=\"margin:1rem 0;padding:1rem 1.25rem;border:1px dashed rgba(128,128,128,.45);"
                         + "border-radius:12px\"><h3 style=\"margin:0 0 .5rem\">" + Ui.esc(title) + "</h3>"

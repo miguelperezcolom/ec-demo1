@@ -134,7 +134,7 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
             case SENT -> " el " + Ui.when(i.sentAt());
             default -> "";
         };
-        blocks = new ArrayList<>(i.blocks().stream().map(BlockForm::of).toList());
+        blocks = new ArrayList<>(i.blocks().stream().map(b -> BlockForm.of(b, language(i.newsletterId()))).toList());
         var names = newsletter.sectionNames(i.newsletterId(), "es");
         var out = new ArrayList<IssueSectionForm>();
         names.forEach((key, name) -> out.add(IssueSectionForm.of(key, i.section(key))));
@@ -247,6 +247,12 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
                         String.valueOf(r.getValue()[2]))).toList());
     }
 
+    /** The newsletter's first language: its blocks' default language. */
+    String language(String newsletterId) {
+        return newsletterId == null ? "es" : sites.find(newsletterId).map(io.mateu.ecdemo1.contenthub.domain.site.Site::defaultLanguage)
+                .orElse("es");
+    }
+
     Map<String, List<String>> sectionItems() {
         var out = new LinkedHashMap<String, List<String>>();
         for (var s : sections == null ? List.<IssueSectionForm>of() : sections) {
@@ -269,7 +275,7 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
     @Override
     public void save(HttpRequest httpRequest) {
         editorial.editIssue(readers.of(httpRequest), id, subject, date,
-                blocks == null ? List.of() : blocks.stream().map(BlockForm::toBlock).toList(), sectionItems());
+                blocks == null ? List.of() : blocks.stream().map(b -> b.toBlock(language(newsletterId))).toList(), sectionItems());
     }
 
     /** What was published since the issue was opened, added to its sections. */

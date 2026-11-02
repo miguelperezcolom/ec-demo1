@@ -29,12 +29,28 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
 
     @Label("Tipo")
     public BlockType type = BlockType.HTML;
-    @Label("Título")
-    public String title;
+    // its text in each language, as an item's (Español / English / Deutsch); the default language's is what a
+    // reader of a language without its own gets
+    @Label("Título (Español)")
+    public String titleEs;
     @HiddenInList
-    @Label("Contenido (incrusta medios con [[media:id]])")
+    @Label("Contenido (Español; incrusta medios con [[media:id]])")
     @Stereotype(FieldStereotype.richText)
-    public String html;
+    public String htmlEs;
+    @HiddenInList
+    @Label("Title (English)")
+    public String titleEn;
+    @HiddenInList
+    @Label("Content (English)")
+    @Stereotype(FieldStereotype.richText)
+    public String htmlEn;
+    @HiddenInList
+    @Label("Titel (Deutsch)")
+    public String titleDe;
+    @HiddenInList
+    @Label("Inhalt (Deutsch)")
+    @Stereotype(FieldStereotype.richText)
+    public String htmlDe;
     @HiddenInList
     @Label("Item destacado")
     @Stereotype(FieldStereotype.select)
@@ -80,17 +96,34 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
     @Label("Id")
     public String id;
 
-    public static BlockForm of(Block b) {
+    /** The languages a block's text is written in, as an item's. */
+    public static final List<String> LANGUAGES = List.of("es", "en", "de");
+
+    /**
+     * @param defaultLanguage the language of the block's own text (its page's, its newsletter's): its fields are
+     *                        that language's; each translation fills its own
+     */
+    public static BlockForm of(Block b, String defaultLanguage) {
         var f = new BlockForm();
         f.id = b.id();
         f.type = b.type();
-        f.title = b.title();
-        f.html = b.html();
         f.itemId = b.itemId();
         f.sectionId = b.sectionId();
         f.limit = b.limit();
         f.mediaId = b.mediaId();
-        f.links = new java.util.ArrayList<>(b.links().stream().map(l -> LinkForm.of(l.label(), l.url())).toList());
+        f.links = new java.util.ArrayList<>(b.links().stream().map(l -> {
+            var link = new LinkForm();
+            link.url = l.url();
+            return link;
+        }).toList());
+        for (var language : LANGUAGES) {
+            var text = b.textIn(language, defaultLanguage);
+            f.title(language, text.title());
+            f.html(language, text.html());
+            for (var link : f.links) {
+                link.label(language, text.labels().get(link.url));
+            }
+        }
         if (b.remote() != null) {
             f.remoteSourceId = b.remote().sourceId();
             f.remoteRoute = b.remote().route();
@@ -103,16 +136,28 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
         return f;
     }
 
-    public Block toBlock() {
+    /** The block, its own text {@code defaultLanguage}'s and the other languages' as its translations. */
+    public Block toBlock(String defaultLanguage) {
         var values = new EnumMap<Attribute, List<String>>(Attribute.class);
         values.put(Attribute.DEPARTMENT, blockDepartments);
         values.put(Attribute.HOTEL, blockHotels);
         values.put(Attribute.JOB_TITLE, blockJobTitles);
         Audience audience = AudienceFields.build(null, values, null);
-        var parsedLinks = links == null ? List.<Block.Link>of() : links.stream()
-                .filter(l -> l != null && l.url != null && !l.url.isBlank())
-                .map(l -> new Block.Link(l.label == null || l.label.isBlank() ? l.url.trim() : l.label.trim(), l.url.trim()))
+        var withUrl = links == null ? List.<LinkForm>of() : links.stream()
+                .filter(l -> l != null && l.url != null && !l.url.isBlank()).toList();
+        var parsedLinks = withUrl.stream()
+                .map(l -> new Block.Link(blank(l.label(defaultLanguage)) == null ? l.url.trim() : l.label(defaultLanguage).trim(),
+                        l.url.trim()))
                 .toList();
+        var translations = new java.util.LinkedHashMap<String, Block.BlockText>();
+        for (var language : LANGUAGES) {
+            if (language.equals(defaultLanguage)) {
+                continue;
+            }
+            var labels = new java.util.LinkedHashMap<String, String>();
+            withUrl.forEach(l -> labels.putIfAbsent(l.url.trim(), l.label(language)));
+            translations.put(language, new Block.BlockText(title(language), html(language), labels));
+        }
         var t = type == null ? BlockType.HTML : type;
         RemoteUi remote = null;
         if (t == BlockType.REMOTE) {
@@ -122,7 +167,40 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
             remote = new RemoteUi(blank(remoteSourceId), remoteRoute, RemoteUi.attributesOf(remoteAttributes));
         }
         return new Block(id == null || id.isBlank() ? "b" + UUID.randomUUID().toString().substring(0, 6) : id,
-                t, audience, title, html, blank(itemId), blank(sectionId), limit, parsedLinks, blank(mediaId), remote);
+                t, audience, title(defaultLanguage), html(defaultLanguage), blank(itemId), blank(sectionId), limit,
+                parsedLinks, blank(mediaId), remote, translations);
+    }
+
+    public String title(String language) {
+        return switch (language == null ? "es" : language) {
+            case "en" -> titleEn;
+            case "de" -> titleDe;
+            default -> titleEs;
+        };
+    }
+
+    public void title(String language, String title) {
+        switch (language == null ? "es" : language) {
+            case "en" -> titleEn = title;
+            case "de" -> titleDe = title;
+            default -> titleEs = title;
+        }
+    }
+
+    public String html(String language) {
+        return switch (language == null ? "es" : language) {
+            case "en" -> htmlEn;
+            case "de" -> htmlDe;
+            default -> htmlEs;
+        };
+    }
+
+    public void html(String language, String html) {
+        switch (language == null ? "es" : language) {
+            case "en" -> htmlEn = html;
+            case "de" -> htmlDe = html;
+            default -> htmlEs = html;
+        }
     }
 
     static String blank(String s) {
@@ -177,14 +255,17 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
         if ("id".equals(fieldName)) {
             return true;
         }
-        if (!BY_TYPE.contains(fieldName)) {
+        // the HTML in each language is the type's «html»
+        var field = fieldName.startsWith("html") ? "html" : fieldName;
+        if (!BY_TYPE.contains(field)) {
             return false;
         }
-        return !FIELDS_OF.getOrDefault(type == null ? BlockType.HTML : type, java.util.Set.of()).contains(fieldName);
+        return !FIELDS_OF.getOrDefault(type == null ? BlockType.HTML : type, java.util.Set.of()).contains(field);
     }
 
     @Override
     public String toString() {
+        var title = titleEs != null ? titleEs : titleEn != null ? titleEn : titleDe;
         return (type == null ? "" : type.label()) + (title == null ? "" : " · " + title);
     }
 }
