@@ -188,6 +188,12 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
 
     static final java.util.Set<String> REMOTE_PAGE_FIELDS = java.util.Set.of("uiSourceId", "uiRoute", "uiAttributes");
 
+    @Section("Enlaces de vista previa")
+    @HiddenInCreate
+    @Label("")
+    @Colspan(2)
+    java.util.concurrent.Callable<io.mateu.uidl.fluent.Component> enlacesDeVistaPrevia = this::previewLinks;
+
     static final String NOTIFY_BY_TYPE = "POR_TIPO";
     static final String NOTIFY_YES = "SI";
     static final String NOTIFY_NO = "NO";
@@ -202,13 +208,19 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     final io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer;
     final io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration;
     final io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics;
+    final io.mateu.ecdemo1.contenthub.application.usecases.Templates templates;
+    final io.mateu.ecdemo1.contenthub.application.usecases.PreviewLinks previewLinks;
 
     public ItemForm(ItemCommands commands, ItemRepository items, ContentIndex index, AudienceCommands audienceCommands,
                     NamedAudiences namedAudiences, Readers readers,
                     io.mateu.ecdemo1.contenthub.application.out.Translator translator,
                     io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer,
                     io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration,
-                    io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics) {
+                    io.mateu.ecdemo1.contenthub.application.usecases.UsageAnalytics analytics,
+                    io.mateu.ecdemo1.contenthub.application.usecases.Templates templates,
+                    io.mateu.ecdemo1.contenthub.application.usecases.PreviewLinks previewLinks) {
+        this.templates = templates;
+        this.previewLinks = previewLinks;
         this.commands = commands;
         this.items = items;
         this.index = index;
@@ -433,6 +445,31 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         return io.mateu.uidl.data.UICommand.navigateTo(HistoryPage.route(id));
     }
 
+    /** The draft, to a reviewer: this item's preview links (PreviewLinksPage), to make, follow and revoke. */
+    @Toolbar
+    @Action
+    @Label("Enlace de vista previa")
+    public Object enlaceDeVistaPrevia(HttpRequest httpRequest) {
+        return io.mateu.uidl.data.UICommand.navigateTo(PreviewLinksPage.route(id));
+    }
+
+    /** The page draft's blocks and audience as a new template (a publisher's); opens it to name and describe it. */
+    @Toolbar
+    @Publishers
+    @Action
+    @Label("Guardar como plantilla")
+    public Object guardarComoPlantilla(HttpRequest httpRequest) {
+        var title = titleEs != null && !titleEs.isBlank() ? titleEs : toString();
+        var created = templates.saveFromPage(readers.of(httpRequest), id, "Plantilla: " + title,
+                "Creada a partir de la página «" + title + "»");
+        return io.mateu.uidl.data.UICommand.navigateTo(TemplatesCrud.route(created));
+    }
+
+    io.mateu.uidl.fluent.Component previewLinks() {
+        return io.mateu.ecdemo1.uicommons.html.Html.block(PreviewLinksPage.list(previewLinks, id)
+                + "<p style=\"font-size:.85rem;opacity:.75\">Créalos y revócalos con «Enlace de vista previa».</p>");
+    }
+
     @Toolbar
     @Action
     public Object enviarARevision(HttpRequest httpRequest) {
@@ -478,9 +515,10 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             return true;
         }
         if (id == null) {
-            return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina", "historial").contains(fieldName);
+            return List.of("enviarARevision", "publicar", "rechazar", "retirar", "editarSobreLaPagina", "historial",
+                    "guardarComoPlantilla", "enlaceDeVistaPrevia").contains(fieldName);
         }
-        if ("editarSobreLaPagina".equals(fieldName)) {
+        if ("editarSobreLaPagina".equals(fieldName) || "guardarComoPlantilla".equals(fieldName)) {
             return type != ItemType.PAGE;
         }
         var item = items.find(id).orElse(null);
