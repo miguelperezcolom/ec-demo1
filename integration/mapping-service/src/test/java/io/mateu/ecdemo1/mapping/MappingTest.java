@@ -49,6 +49,7 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -363,6 +364,71 @@ class MappingTest {
         assertThat(tools.approveMapping(mp.id(), "Miguel")).startsWith("Approved BOARD MP → HALFB");
         assertThat(dictionary.resolve("PMI01", CodeType.BOARD, "MP")).isPresent();
         assertThat(consume("notifications", r -> r.value().contains("PROPOSAL_READY"), 1, 10)).isNotEmpty();
+    }
+
+    @Test
+    void reservationsOperaRefusesTheSameWayWaitOnOneCauseAndASupersededOneLeavesOnlyItself() throws Exception {
+        // Opera has no rooms of the type: three reservations refused alike are one incident with three behind it
+        var refusal = io.mateu.ecdemo1.integration.model.mapping.Cause.pmsRejectedReservation("MRU02", "R1", "upsert-reservation",
+                "There are not enough rooms available on Room Type level — RSV00138");
+        assertThat(refusal.key()).isEqualTo("PMS_REJECTED:MRU02:upsert-reservation:RSV00138");
+        for (var locator : List.of("R1", "R2", "R3")) {
+            causesService.await("proyectar-reserva:MRU02/" + locator, "proyectar-reserva", "MRU02", locator,
+                    List.of(new Variable("definitionId", "proyectar-reserva")),
+                    List.of(io.mateu.ecdemo1.integration.model.mapping.Cause.pmsRejectedReservation("MRU02", locator,
+                            "upsert-reservation", "There are not enough rooms available on Room Type level — RSV00138")));
+        }
+        assertThat(waiters.countWaitingOn(refusal.key())).isEqualTo(3);
+        assertThat(causes.findById(refusal.key()).orElseThrow().openings).isEqualTo(1);
+        // the cause of a reservation is found by its locator, although the key does not name it
+        mvc.perform(get("/causes").param("openOnly", "false").param("subject", "R2"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[*].key").value(org.hamcrest.Matchers.hasItem(refusal.key())));
+
+        // a newer version of R1 got into Opera: R1 resumes, R2 and R3 keep waiting on the open cause
+        mvc.perform(post("/causes/release-refusal").param("hotelCode", "MRU02").param("locator", "R1")
+                .param("step", "upsert-reservation").param("by", "pms-integration: v2 is in Opera")).andExpect(status().isOk());
+        assertThat(waiters.findById("proyectar-reserva:MRU02/R1").orElseThrow().getStatus()).isEqualTo(WaiterStatus.RELEASED);
+        assertThat(waiters.countWaitingOn(refusal.key())).isEqualTo(2);
+        assertThat(causes.findById(refusal.key()).orElseThrow().status).isEqualTo(CauseStatus.OPEN);
+
+        // once nobody waits on it, it is resolved
+        for (var locator : List.of("R2", "R3")) {
+            causesService.releaseRefusal("MRU02", locator, "upsert-reservation", "pms-integration");
+        }
+        assertThat(causes.findById(refusal.key()).orElseThrow().status).isEqualTo(CauseStatus.RESOLVED);
+    }
+
+    @Test
+    void aRefusalForWantOfRoomCanBeLetInOnRequestAndItStaysSoThroughAReopening() throws Exception {
+        var refusal = io.mateu.ecdemo1.integration.model.mapping.Cause.pmsRejectedReservation("MRU03", "Q1", "upsert-reservation",
+                "There are not enough rooms available on Room Type level — RSV00138");
+        causesService.await("proyectar-reserva:MRU03/Q1", "proyectar-reserva", "MRU03", "Q1",
+                List.of(new Variable("definitionId", "proyectar-reserva")), List.of(refusal));
+
+        mvc.perform(post("/causes/on-request").param("key", refusal.key()).param("by", "ana")).andExpect(status().isOk());
+        mvc.perform(get("/causes")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.key == '" + refusal.key() + "')].onRequestBy").value(org.hamcrest.Matchers.hasItem("ana")));
+        mvc.perform(get("/causes/waiting").param("key", refusal.key())).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].subject").value("Q1")).andExpect(jsonPath("$[0].hotelCode").value("MRU03"));
+
+        // let in, and refused again: the cause comes back still on request — it is the person's answer
+        causesService.releaseRefusal("MRU03", "Q1", "upsert-reservation", "on request: Opera has room now");
+        causesService.await("proyectar-reserva:MRU03/Q1>r", "proyectar-reserva", "MRU03", "Q1",
+                List.of(new Variable("definitionId", "proyectar-reserva")), List.of(refusal));
+        var again = causes.findById(refusal.key()).orElseThrow();
+        assertThat(again.status).isEqualTo(CauseStatus.OPEN);
+        assertThat(again.onRequestBy).isEqualTo("ana");
+
+        mvc.perform(post("/causes/on-request").param("key", refusal.key()).param("on", "false").param("by", "ana"))
+                .andExpect(status().isOk());
+        assertThat(causes.findById(refusal.key()).orElseThrow().onRequestSince).isNull();
+
+        // a missing equivalence is not let in on request: nothing in Opera to wait for
+        var missing = io.mateu.ecdemo1.integration.model.mapping.Cause.missingMapping("MRU03", CodeType.BOARD, "XX");
+        causesService.await("proyectar-reserva:MRU03/Q2", "proyectar-reserva", "MRU03", "Q2",
+                List.of(new Variable("definitionId", "proyectar-reserva")), List.of(missing));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> causesService.letInOnRequest(missing.key(), "ana"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

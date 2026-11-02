@@ -15,4 +15,11 @@ public interface WaiterCauseRepository extends JpaRepository<WaiterCause, Waiter
             where l.processKey = :process and c.causeKey = l.causeKey and c.status = 'OPEN'
             """)
     long openCausesOf(@Param("process") String processKey);
+
+    /** The causes the processes of this subject (a reservation's locator) wait or waited on. */
+    @Query("""
+            select distinct l.causeKey from WaiterCause l, Waiter w
+            where w.processKey = l.processKey and w.subject = :subject
+            """)
+    List<String> causesOfSubject(@Param("subject") String subject);
 }

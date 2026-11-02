@@ -242,11 +242,11 @@ class ReceptionHandlersTest {
         // Whoever consumes the PMS reads it again: the stay comes back «en casa».
         verify(events).written("XMAR", "39486034", "MRU01", "GSX4AK", "registrar-checkin");
         // An earlier attempt Opera refused (another room) has nothing left to wait for.
-        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:assign-room"), anyString());
-        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:check-in-reservation"), anyString());
+        verify(integration).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("assign-room"), anyString());
+        verify(integration).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("check-in-reservation"), anyString());
         // The desk's charges that waited for the guests to be in the house go on the folio now.
-        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:post-charge"), anyString());
-        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:reverse-charge"), anyString());
+        verify(integration).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("post-charge"), anyString());
+        verify(integration).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("reverse-charge"), anyString());
     }
 
     @Test
@@ -300,7 +300,7 @@ class ReceptionHandlersTest {
                 "COMPLETED [checkInOutcome=STALE, pmsReservationId=39486034]");
         assertThat(writes()).isEmpty();
         verify(integration, never()).await(any(), any(), any(), any(), any(), any());
-        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:check-in-reservation"), anyString());
+        verify(integration).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("check-in-reservation"), anyString());
     }
 
     // ── the check-out and its invoice ─────────────────────────────────────────────────────────────

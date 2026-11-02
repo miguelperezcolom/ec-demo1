@@ -16,7 +16,8 @@ import java.util.List;
 /**
  * The data plane's home ({@link ShellHome#homeRoute()}): the welcome archetype — a hero, and under it
  * the external APIs' tiles: Salesforce's calls left of the org's daily allowance, our pace, and
- * Opera's calls today — what to look at before a meeting or a demo. Each opens the usage page.
+ * Opera's calls today — what to look at before a meeting or a demo, each opening the usage page — and
+ * the room types Opera runs out of in the next two weeks, opening the free rooms by night.
  *
  * <p>A welcome page, and not a landing template with a micro frontend under it, because a welcome's
  * {@code @Panel} tiles are what both renderers draw as KPIs; Redwood draws no micro frontend in a
@@ -48,6 +49,10 @@ public class Inicio extends Welcome {
     @Panel(title = "")
     MetricCard opera = usage.get(2);
 
+    /** Opera's room types that run out in the next two weeks: what a booking there cannot get. */
+    @Panel(title = "")
+    MetricCard operaRooms = OperaRooms.kpi(OperaRooms.read(), "verCupoOpera");
+
     @Override
     public Component component(HttpRequest httpRequest) {
         novedades = ContentSlots.block(httpRequest, SLOT).orElse(null);
@@ -64,9 +69,29 @@ public class Inicio extends Welcome {
         return "Reservas y workflows, en una sola plataforma.";
     }
 
+    /**
+     * The band's texture. Vaadin draws it on the right of the band. Redwood's welcome banner is
+     * Spectra's, which draws a texture in the band's right half from its top centre, clipped to the
+     * band: there it is one shaped as redwood.oracle.com's (864x250, the shapes on the right).
+     */
     @Override
     protected String heroImage() {
-        return "/images/redwood-header-texture.png";
+        return REDWOOD ? "/images/redwood-banner-texture.png" : "/images/redwood-header-texture.png";
+    }
+
+    /** Whether this build renders with Redwood (mateu-redwood on the classpath), not Vaadin. */
+    static final boolean REDWOOD = Inicio.class.getResource("/static/_redwood/bundles/vb-app-bundle.js") != null;
+
+    /** Each console's own colour (its logo's pill), so the home says where one is. */
+    @Override
+    protected io.mateu.uidl.data.HeroTone heroTone() {
+        return io.mateu.uidl.data.HeroTone.rose;
+    }
+
+    /** The free rooms, room type by night. */
+    @Action
+    Object verCupoOpera() {
+        return URI.create("/opera/cupo");
     }
 
     /** A tile opens the usage page: the breakdown by purpose, ours against others, the pause. */
@@ -74,4 +99,5 @@ public class Inicio extends Welcome {
     Object verApisExternas() {
         return URI.create("/usage/apis");
     }
+
 }

@@ -5,6 +5,7 @@ import io.mateu.ecdemo1.mapping.store.CauseRecord;
 import io.mateu.ecdemo1.mapping.store.CauseStatus;
 import io.mateu.ecdemo1.mapping.queries.CauseQueries;
 import io.mateu.uidl.annotations.Action;
+import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.ReadOnly;
 import io.mateu.uidl.annotations.Section;
 import io.mateu.uidl.annotations.Stereotype;
@@ -52,6 +53,13 @@ public class CauseViewModel implements Identifiable, VisibilitySupplier {
     String openedAt;
     @ReadOnly
     String resolved;
+    /** Since when, and by whom, what waits on it goes in on request — by itself, once Opera has room. */
+    @ReadOnly
+    String onRequest;
+
+    /** Whether it is a refusal for want of room in Opera — the only kind that can wait on request. */
+    @Hidden
+    boolean onRequestable;
 
     @Section("Waiting")
     @ReadOnly
@@ -81,6 +89,12 @@ public class CauseViewModel implements Identifiable, VisibilitySupplier {
         }
         if ("resolve".equals(memberName)) {
             return "Resolved".equals(status == null ? null : status.message());
+        }
+        if ("letInOnRequest".equals(memberName)) {
+            return !onRequestable || (onRequest != null && !onRequest.isBlank());
+        }
+        if ("withdrawOnRequest".equals(memberName) || "onRequest".equals(memberName)) {
+            return onRequest == null || onRequest.isBlank();
         }
         return false;
     }
@@ -112,14 +126,44 @@ public class CauseViewModel implements Identifiable, VisibilitySupplier {
         return List.of(new Message("Resolved: the processes behind it resume"), new State(this));
     }
 
+    /**
+     * Opera had no room for these reservations: instead of waiting for a person, they go in by
+     * themselves «on request» — each as soon as Opera has room for its stay.
+     */
+    @Toolbar
+    @Action(confirmationRequired = true, confirmationTitle = "Let them in on request?",
+            confirmationMessage = "The reservations behind it keep waiting, and each goes into Opera by itself as soon as "
+                    + "Opera has room for its stay. Until then they are on request.")
+    @io.mateu.uidl.annotations.Label("Dejar entrar on-request")
+    public Object letInOnRequest(HttpRequest httpRequest) {
+        causes.letInOnRequest(key, EntryViewModel.user(httpRequest));
+        onRequest = "since now, by " + EntryViewModel.user(httpRequest);
+        status = new Status(StatusType.INFO, "On request");
+        return List.of(new Message("On request: each reservation goes into Opera as soon as there is room for it"), new State(this));
+    }
+
+    /** Back to waiting for a person. */
+    @Toolbar
+    @Action
+    @io.mateu.uidl.annotations.Label("Quitar on-request")
+    public Object withdrawOnRequest(HttpRequest httpRequest) {
+        causes.withdrawOnRequest(key, EntryViewModel.user(httpRequest));
+        onRequest = "";
+        status = new Status(StatusType.WARNING, "Open");
+        return List.of(new Message("No longer on request: the reservations wait for a person again"), new State(this));
+    }
+
     public CauseViewModel load(CauseRecord cause) {
         return load(cause, true);
     }
 
     /** @param rowActions whether each waiting process's row carries its «Descartar» (see {@link CausesPage#redwood}) */
     public CauseViewModel load(CauseRecord cause, boolean rowActions) {
-        status = cause.status == CauseStatus.OPEN ? new Status(StatusType.WARNING, "Open")
-                : new Status(StatusType.SUCCESS, "Resolved");
+        status = cause.status != CauseStatus.OPEN ? new Status(StatusType.SUCCESS, "Resolved")
+                : cause.onRequestSince != null ? new Status(StatusType.INFO, "On request")
+                : new Status(StatusType.WARNING, "Open");
+        onRequestable = cause.onRequestable();
+        onRequest = cause.onRequestSince == null ? "" : CausesPage.moment(cause.onRequestSince) + " by " + cause.onRequestBy;
         key = cause.causeKey;
         type = cause.type.name();
         description = cause.description;

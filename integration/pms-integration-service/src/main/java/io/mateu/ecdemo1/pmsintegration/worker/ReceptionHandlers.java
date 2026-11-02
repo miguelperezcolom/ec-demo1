@@ -415,8 +415,7 @@ public class ReceptionHandlers {
     void supersede(ReceptionTask input, String why, String... steps) {
         for (var step : steps) {
             try {
-                integration.resolveCauseIfOpen(Cause.pmsRejectedReservation(input.hotelCode(), input.locator(), step, "").key(),
-                        "pms-integration: " + why);
+                integration.releaseRefusal(input.hotelCode(), input.locator(), step, "pms-integration: " + why);
             } catch (RuntimeException e) {
                 log.warn("{}: a refusal of its {} could not be resolved as superseded: {}", input.locator(), step, e.getMessage());
             }

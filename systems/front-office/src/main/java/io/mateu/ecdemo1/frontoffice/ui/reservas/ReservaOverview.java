@@ -192,7 +192,7 @@ public class ReservaOverview
           };
 
   // ── cuerpo: huéspedes + operativa en dos columnas; en el check-in, envuelto en un
-  // foldout con la info accesoria del cliente (perfil) como panel lateral plegado ──────
+  // foldout con la info accesoria del cliente (perfil) como panel lateral, abierto al entrar ──────
   @Section(value = " ", frameless = true)
   @Label("")
   Callable<Component> cuerpo = this::cuerpo;
@@ -274,7 +274,7 @@ public class ReservaOverview
     }
     // check-in / en casa (foldout, anatomía RDS): overview = rail de huéspedes;
     // panel ancho = la operativa (checklist de llegada o cockpit de estancia); y la
-    // info accesoria del cliente (perfil) como TERCER panel, plegado
+    // info accesoria del cliente (perfil) como TERCER panel, abierto al entrar
     return FoldoutLayout.builder()
         // el overview lleva su propio título de panel (no el de la página)
         .headerTitle("Huéspedes")
@@ -298,7 +298,8 @@ public class ReservaOverview
                 .id("perfil")
                 // título corto: "Perfil del cliente" no cabe en la cabecera Redwood a 17rem
                 .title("Perfil")
-                .open(false)
+                // abierto al entrar: el perfil se ve sin buscarlo (se puede plegar)
+                .open(true)
                 // info accesoria: estrecha
                 .width("14rem")
                 .content(huespedes().perfilCliente())

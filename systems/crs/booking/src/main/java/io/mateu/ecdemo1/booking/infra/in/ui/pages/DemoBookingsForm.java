@@ -37,6 +37,8 @@ public class DemoBookingsForm {
     final RoomPricing pricing;
     final PartnerDirectory partnerDirectory;
     final Clock clock;
+    /** What Opera would sell: the demo's bookings are drawn until each would get in. */
+    final io.mateu.ecdemo1.booking.infra.out.pms.OperaFit operaFit;
 
     /** A different batch each time; a seed gives the same bookings on the same day (tests). */
     Outcome create() {
@@ -59,10 +61,14 @@ public class DemoBookingsForm {
         }
         var batch = Long.toString(clock.instant().getEpochSecond(), 36).toUpperCase(Locale.ROOT);
         var generator = new DemoBookingGenerator(catalog, pricing, partners,
-                seed != null ? new Random(seed) : new Random(), LocalDate.now(clock), batch).tagged(tag);
+                seed != null ? new Random(seed) : new Random(), LocalDate.now(clock), batch).tagged(tag)
+                .guarded(operaFit::fits);
         var created = new ArrayList<String>();
         var failed = new ArrayList<String>();
         var bookings = generator.generate(COUNT);
+        if (generator.unfitted > 0) {
+            notes.add("%d booking(s) found no room in Opera for any stay drawn: they will wait for it".formatted(generator.unfitted));
+        }
         for (int i = 0; i < bookings.size(); i++) {
             var booking = bookings.get(i);
             try {

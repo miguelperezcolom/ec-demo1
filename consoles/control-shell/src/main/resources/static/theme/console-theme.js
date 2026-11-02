@@ -8,12 +8,12 @@
   style.dataset.ecTheme = 'control-plane';
   style.textContent = `
     #shell_SUISGlobalHeader,
-    #shell_SUISGlobalHeader oj-sp-global-header > div { background-color: #464c68 !important; }
+    #shell_SUISGlobalHeader oj-sp-global-header > div { background-color: #4b2e83 !important; }
     /* the home's welcome banner (oj-sp-header-welcome-banner): Redwood paints it in one of its own
        colours, set inline; ours instead, like the top bar */
     .oj-sp-header-welcome-banner-container {
-      --oj-sp-header-welcome-banner-background-color: #464c68 !important;
-      background-color: #464c68 !important;
+      --oj-sp-header-welcome-banner-background-color: #4b2e83 !important;
+      background-color: #4b2e83 !important;
     }`;
   document.head.appendChild(style);
 })();

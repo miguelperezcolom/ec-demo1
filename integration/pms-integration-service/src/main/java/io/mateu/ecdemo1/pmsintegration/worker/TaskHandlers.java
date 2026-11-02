@@ -269,7 +269,7 @@ public class TaskHandlers {
     void supersedeRefusals(Reservation r, long version) {
         for (var step : SUPERSEDED_STEPS) {
             try {
-                integration.resolveCauseIfOpen(Cause.pmsRejectedReservation(r.hotelCode(), r.locator(), step, "").key(),
+                integration.releaseRefusal(r.hotelCode(), r.locator(), step,
                         "pms-integration: v%d is in Opera".formatted(version));
             } catch (RuntimeException e) {
                 log.warn("{}: a refusal of its {} could not be resolved as superseded: {}", r.locator(), step, e.getMessage());

@@ -205,7 +205,7 @@ class ChargeHandlersTest {
         });
         verify(outcomes).charge("XMAR", "39486034", "GSX4AK", "L-1", false, false, "En el folio de Opera", "88731245");
         // A void of it that waited for it to be there has it now.
-        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:reverse-charge"), anyString());
+        verify(integration).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("reverse-charge"), anyString());
     }
 
     @Test
@@ -298,7 +298,7 @@ class ChargeHandlersTest {
                 any(), any());
         verify(outcomes).charge(eq("XMAR"), eq("39486034"), eq("GSX4AK"), eq("L-1"), eq(false), eq(true),
                 org.mockito.ArgumentMatchers.contains("not valid for posting"), eq(null));
-        verify(integration, never()).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:reverse-charge"), anyString());
+        verify(integration, never()).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("reverse-charge"), anyString());
     }
 
     @Test

@@ -15,6 +15,8 @@ public interface CauseRecordRepository extends JpaRepository<CauseRecord, String
 
     List<CauseRecord> findByTypeAndStatus(CauseType type, CauseStatus status);
 
+    List<CauseRecord> findByCauseKeyStartingWithAndStatus(String prefix, CauseStatus status);
+
     /**
      * Locks the cause's row until the transaction ends — empty when there is none yet. Waiting on a
      * cause and resolving it take this lock first, so the two never interleave: a resolution sees every

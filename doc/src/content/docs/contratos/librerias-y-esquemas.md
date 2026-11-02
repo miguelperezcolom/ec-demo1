@@ -62,3 +62,11 @@ valor de enum, cambiar un tipo, hacer obligatoria una propiedad— es **incompat
 se publica como versión nueva (`TopicSpec.version(2)` → `v2.schema.json`), mientras `v1` sigue mientras
 algo la lea. Una propiedad, variante o definición nueva y opcional es aditiva y se queda en la misma
 versión: todos los consumidores de aquí leen de forma tolerante (ignoran lo que no conocen).
+
+Ejemplo: `human-tasks`. El `HumanTaskChanged` del motor de formularios ganó en EventConductor 2.31 el
+evento del ciclo de vida y la asignación (`event`, `candidateUsers`, `candidateGroups`, `priority`,
+`dueDate`, `escalationLevel`, `businessKey`). `v1` es cerrado y no podía recogerlos —el build lo marcó
+como un cambio que sus consumidores quizá no lean—, así que se publicó `v2.schema.json`, con un ejemplo
+de tarea creada y otro de completada, y `v1` se queda. `communication-service`, el único consumidor,
+lee las dos (toma los campos que conoce): una tarea pendiente abre su fila en la bandeja y una
+completada la cierra.

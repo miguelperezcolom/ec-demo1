@@ -40,4 +40,18 @@ public class CauseRecord {
     public String resolvedBy;
     /** How many times it was opened: a cause that keeps coming back says something too. */
     public int openings;
+    /**
+     * Since when a person lets what waits on it in «on request»: Opera had no room for them, and each
+     * goes in by itself as soon as Opera has room for its stay (pms-integration watches). It stays
+     * across a resolution and a reopening — it is the person's answer to this refusal at this hotel —
+     * until a person withdraws it. Null: nobody chose it.
+     */
+    public Instant onRequestSince;
+    public String onRequestBy;
+
+    /** Whether the refusal it stands for is one a reservation can be let in on request for: no room in Opera. */
+    public boolean onRequestable() {
+        return type == CauseType.PMS_REJECTED && causeKey != null
+                && (causeKey.contains(":upsert-reservation:") || causeKey.endsWith(":upsert-reservation"));
+    }
 }

@@ -24,6 +24,13 @@ cd "$(dirname "$0")"
 . ./common.sh
 salesforce_env
 
+# On deploy/local (up.sh) the new context is ECLOCAL-…, not ec1's ECDEMO1-…; the cancelling is the same.
+if [ "$(kubectl config current-context 2>/dev/null)" = kind-ec-demo1-local ]; then
+  RUN_PREFIX=ECLOCAL
+else
+  RUN_PREFIX=ECDEMO1
+fi
+
 echo "Stopping the services and the engine"
 for d in $SERVICES; do kubectl -n $NS scale deploy/$d --replicas=0 >/dev/null; done
 for d in $SERVICES; do kubectl -n $NS wait --for=delete pod -l app=$d --timeout=180s >/dev/null 2>&1 || true; done
@@ -33,7 +40,7 @@ echo "Cancelling in Opera the reservations of the demo's runs"
 python3 ./opera-cancel-ours.py XMAR --yes || echo "  (some were not cancelled: see above)"
 
 echo "A new Opera context for this run"
-set_opera_context "ECDEMO1-$(date -u +%m%d%H%M)"
+set_opera_context "$RUN_PREFIX-$(date -u +%m%d%H%M)"
 
 # Only the tables that exist: a service deployed before the version that added a table (or a database not
 # created yet) would otherwise stop the script half-way, with every service down.
