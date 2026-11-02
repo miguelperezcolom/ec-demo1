@@ -7,8 +7,11 @@ import io.mateu.ecdemo1.iaagent.config.AgentConfigClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -20,13 +23,14 @@ import java.util.UUID;
  * agent.
  *
  * <p><strong>The subset, deliberately.</strong> Implemented: the card at
- * {@code /a2a/{agentId}/.well-known/agent-card.json}, and {@code message/send} with text parts,
- * answered with a {@code Message} — which the specification allows for a call that completes at
+ * {@code /a2a/{agentId}/.well-known/agent-card.json}, and {@code message/send} with text parts —
+ * and, beside the text, images sent inline ({@code file} parts with {@code bytes} and an
+ * {@code image/*} {@code mimeType}, for a model that sees) — answered with a {@code Message} — which the specification allows for a call that completes at
  * once, and which is what an agent that answers in one turn does. Not implemented, and said so in
  * the card and in the errors: streaming ({@code message/stream}, {@code tasks/resubscribe} →
  * UnsupportedOperation), push notifications ({@code tasks/pushNotificationConfig/*} →
  * PushNotificationNotSupported), tasks ({@code tasks/get}, {@code tasks/cancel} → TaskNotFound,
- * since none is ever kept), and file or data parts (ContentTypeNotSupported). Field names follow the
+ * since none is ever kept), and any other file or data part (ContentTypeNotSupported). Field names follow the
  * A2A specification 0.3.0: {@code kind} discriminators, {@code messageId}, {@code contextId},
  * {@code parts}.
  *
@@ -78,9 +82,26 @@ public class A2aServer {
         }
     }
 
+    /** An image sent inline beside the text: its media type and its bytes, already decoded. */
+    public record Image(String mimeType, byte[] bytes) {
+    }
+
+    /** At most this many images per message, of at most this many bytes each (decoded). */
+    public static final int MAX_IMAGES = 4;
+    public static final int MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
     /** Runs one turn of an agent and returns its text answer. */
     public interface Executor {
         String run(AgentConfig config, String text, String contextId, String authorization, A2aHop hop);
+
+        /** The same turn with images beside the text. An executor that cannot show them refuses. */
+        default String run(AgentConfig config, String text, List<Image> images, String contextId,
+                           String authorization, A2aHop hop) {
+            if (!images.isEmpty()) {
+                throw new UnsupportedOperationException("this agent does not take images");
+            }
+            return run(config, text, contextId, authorization, hop);
+        }
     }
 
     private final Configs configs;
@@ -173,6 +194,7 @@ public class A2aServer {
             return error(id, INVALID_PARAMS, "Invalid params: params.message.parts is required");
         }
         var text = new StringBuilder();
+        var images = new ArrayList<Image>();
         boolean otherParts = false;
         for (var part : message.path("parts")) {
             if ("text".equals(part.path("kind").asText("text")) && part.hasNonNull("text")) {
@@ -180,13 +202,26 @@ public class A2aServer {
                     text.append('\n');
                 }
                 text.append(part.get("text").asText());
+            } else if (inlineImage(part)) {
+                byte[] bytes;
+                try {
+                    bytes = Base64.getDecoder().decode(part.path("file").path("bytes").asText());
+                } catch (IllegalArgumentException e) {
+                    return error(id, INVALID_PARAMS, "Invalid params: an image's bytes are not base64");
+                }
+                if (bytes.length > MAX_IMAGE_BYTES || images.size() >= MAX_IMAGES) {
+                    return error(id, INVALID_PARAMS, "Invalid params: at most " + MAX_IMAGES + " images of "
+                            + (MAX_IMAGE_BYTES / 1024 / 1024) + " MB each");
+                }
+                images.add(new Image(part.path("file").path("mimeType").asText(), bytes));
             } else {
                 otherParts = true;
             }
         }
         if (text.isEmpty()) {
-            return otherParts
-                    ? error(id, CONTENT_TYPE_NOT_SUPPORTED, "Incompatible content types: only text parts are accepted")
+            return otherParts || !images.isEmpty()
+                    ? error(id, CONTENT_TYPE_NOT_SUPPORTED,
+                    "Incompatible content types: only text parts, and inline images beside a text, are accepted")
                     : error(id, INVALID_PARAMS, "Invalid params: the message has no text");
         }
         if (hop.depth() > maxDepth) {
@@ -212,9 +247,12 @@ public class A2aServer {
         }
         String answer;
         try {
-            answer = executor.run(config, text.toString(), contextId, authorization, hop);
+            answer = images.isEmpty() ? executor.run(config, text.toString(), contextId, authorization, hop)
+                    : executor.run(config, text.toString(), List.copyOf(images), contextId, authorization, hop);
         } catch (Blocked e) {
             return error(id, GUARDRAIL_BLOCKED, e.getMessage());
+        } catch (UnsupportedOperationException e) {
+            return error(id, CONTENT_TYPE_NOT_SUPPORTED, "Incompatible content types: " + e.getMessage());
         } catch (Exception e) {
             log.error("A2A call to {} failed: {}", agentId, e.toString(), e);
             return error(id, INTERNAL_ERROR, "Internal error: " + e.getClass().getSimpleName()
@@ -227,6 +265,14 @@ public class A2aServer {
         reply.put("parts", List.of(Map.of("kind", "text", "text", answer)));
         reply.put("contextId", contextId);
         return result(id, reply);
+    }
+
+    /** A file part with an image inline: {@code {"kind":"file","file":{"mimeType":"image/…","bytes":"…"}}}. No SVG. */
+    static boolean inlineImage(JsonNode part) {
+        var file = part.path("file");
+        var mimeType = file.path("mimeType").asText("").toLowerCase(Locale.ROOT);
+        return "file".equals(part.path("kind").asText()) && file.path("bytes").isTextual()
+                && mimeType.startsWith("image/") && !mimeType.contains("svg");
     }
 
     static Map<String, Object> result(Object id, Object result) {

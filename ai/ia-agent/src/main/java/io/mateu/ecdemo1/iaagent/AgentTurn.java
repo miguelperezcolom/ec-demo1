@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.iaagent.config.AgentConfig;
 import io.mateu.ecdemo1.iaagent.config.ChatClientRegistry;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.content.Media;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -30,11 +31,17 @@ public class AgentTurn {
 
     public Result call(AgentConfig config, String systemPrompt, List<Message> history,
                        String userMessage, ToolCallback[] tools) {
+        return call(config, systemPrompt, history, userMessage, List.of(), tools);
+    }
+
+    /** The same turn with images beside the message, for a model that sees them. */
+    public Result call(AgentConfig config, String systemPrompt, List<Message> history,
+                       String userMessage, List<Media> media, ToolCallback[] tools) {
         var chatResponse = chatClients.forLlm(config.llm()).prompt()
                 .options(chatClients.optionsFor(config.llm()))
                 .system(systemPrompt)
                 .messages(history)
-                .user(userMessage)
+                .user(u -> u.text(userMessage).media(media.toArray(new Media[0])))
                 .toolCallbacks(tools)
                 .call()
                 .chatResponse();
