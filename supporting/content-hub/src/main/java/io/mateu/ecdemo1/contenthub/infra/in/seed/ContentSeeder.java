@@ -65,6 +65,8 @@ public class ContentSeeder {
     final io.mateu.ecdemo1.contenthub.application.out.SurveyRepository surveyRepository;
     final io.mateu.ecdemo1.contenthub.application.out.DiscussionRepository discussions;
     final io.mateu.ecdemo1.contenthub.application.out.LikesRepository likes;
+    final io.mateu.ecdemo1.contenthub.application.out.UiSources uiSources;
+    final io.mateu.ecdemo1.contenthub.application.usecases.UiSourceCommands uiSourceCommands;
     final Clock clock;
 
     @Value("${content-hub.seed.enabled:true}")
@@ -88,6 +90,8 @@ public class ContentSeeder {
             // and the collaboration examples: a survey, and comments and likes on the welcome article
             seedSurvey();
             seedComments();
+            // and the external UIs: two registered sources, a remote page and a page with remote blocks
+            seedUiSources();
         } catch (RuntimeException e) {
             log.error("Could not seed the demo content", e);
         }
@@ -123,6 +127,51 @@ public class ContentSeeder {
         }
         if (homes.pageIds().isEmpty()) {
             homes.save(List.of(RECEPTION_CANARIAS_HOME));
+        }
+    }
+
+    static final String RIU_CLASS_SOURCE = "riu-class";
+    static final String PUSH_SOURCE = "notificaciones-navegador";
+    static final String RIU_CLASS_PAGE = "riu-class-socios";
+    static final String TOOLS_PAGE = "herramientas";
+
+    /**
+     * The registry's examples, each created if missing: Riu Class (the loyalty service's Mateu UI, /_loyalty,
+     * routed on the data plane) and the inbox's {@code <ec-push-toggle>} (a web component every shell's
+     * push.js defines); a remote page that is Riu Class's members screen, and a page «Herramientas» with
+     * the accruals screen and the notifications switch as «Componente remoto» blocks.
+     */
+    void seedUiSources() {
+        if (uiSources.find(RIU_CLASS_SOURCE).isEmpty()) {
+            uiSourceCommands.register(SYSTEM, new io.mateu.ecdemo1.contenthub.domain.uisource.UiSource(RIU_CLASS_SOURCE,
+                    "Riu Class", io.mateu.ecdemo1.contenthub.domain.uisource.UiSourceKind.MATEU_REMOTE, "/_loyalty",
+                    null, Audience.EVERYONE, java.util.Set.of(), true));
+        }
+        if (uiSources.find(PUSH_SOURCE).isEmpty()) {
+            uiSourceCommands.register(SYSTEM, new io.mateu.ecdemo1.contenthub.domain.uisource.UiSource(PUSH_SOURCE,
+                    "Notificaciones en este navegador", io.mateu.ecdemo1.contenthub.domain.uisource.UiSourceKind.WEB_COMPONENT,
+                    "/_inbox/push/push.js", "ec-push-toggle", Audience.EVERYONE, java.util.Set.of(), true));
+        }
+        if (items.find(RIU_CLASS_PAGE).isEmpty()) {
+            itemCommands.createWithId(RIU_CLASS_PAGE, "editora", ItemType.REMOTE_PAGE, "es", new ItemContent("empresa",
+                    Audience.EVERYONE, es("Riu Class · socios", "Los socios del programa de fidelización, en vivo desde Riu Class.", ""),
+                    List.of(), null, null, false, false, null,
+                    io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.of(RIU_CLASS_SOURCE, "/loyalty/members").uri())
+                    .withNotification(false, false));
+            itemCommands.publish(SYSTEM, RIU_CLASS_PAGE, false);
+        }
+        if (items.find(TOOLS_PAGE).isEmpty()) {
+            var blocks = List.of(
+                    new Block("t-intro", BlockType.HTML, null, null,
+                            "<p>Herramientas de otras aplicaciones, aquí mismo: cada una con tus permisos en ella.</p>",
+                            null, null, null, null, null),
+                    new Block("t-acumulaciones", BlockType.REMOTE, null, "Riu Class · acumulaciones", null, null, null,
+                            null, null, null, io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.of(RIU_CLASS_SOURCE,
+                            "/loyalty/accruals")),
+                    new Block("t-push", BlockType.REMOTE, null, "Avisos en este navegador", null, null, null, null,
+                            null, null, io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.of(PUSH_SOURCE, null)));
+            publishPage(TOOLS_PAGE, "empresa", es("Herramientas", "Pantallas de otras aplicaciones dentro de la intranet.", ""),
+                    blocks);
         }
     }
 
