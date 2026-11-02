@@ -90,4 +90,8 @@ public class ContentHubMenu {
     @Menu
     @Label("Analítica")
     AnalyticsPage analitica;
+
+    @Menu
+    @Label("Salud del contenido")
+    HealthListing salud;
 }

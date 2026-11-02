@@ -163,3 +163,19 @@ create table if not exists ch_preview_link (id text primary key, item_id text no
     created_at timestamptz not null, doc jsonb not null);
 create index if not exists ch_preview_link_item on ch_preview_link (item_id, created_at desc);
 create table if not exists ch_preview_key (id int primary key, secret text not null);
+
+-- Content health («Salud del contenido»): each run (the night's claimed by its day, once), the findings of
+-- the last one (replaced by each run, keeping when each was first seen), the «revisado» marks, and what
+-- each external URL last answered (so it is not asked again for a while).
+create table if not exists ch_health_run (id text primary key, trigger text not null, nightly_day date,
+    started_by text, started_at timestamptz not null, finished_at timestamptz, counts jsonb, error text);
+create unique index if not exists ch_health_run_nightly on ch_health_run (nightly_day);
+create table if not exists ch_health_finding (key text primary key, doc jsonb not null, check_name text not null,
+    first_seen timestamptz not null, last_seen timestamptz not null);
+create table if not exists ch_health_snooze (key text primary key, until timestamptz not null, by_user text,
+    note text, at timestamptz not null);
+create table if not exists ch_health_link (url text primary key, outcome text not null, http_status int,
+    detail text, checked_at timestamptz not null);
+-- The images' text alternatives, apart from the medium (which is never modified).
+create table if not exists ch_media_alt (media_id text primary key, alt_text text not null, set_by text,
+    set_at timestamptz not null);

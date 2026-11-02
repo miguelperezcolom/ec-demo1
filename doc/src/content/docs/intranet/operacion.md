@@ -50,6 +50,11 @@ espera a que exista); la imagen es
 | `SEARCH_MAX_DISTANCE` | — | `0.3` | Distancia coseno máxima para que un pasaje cuente como coincidencia por significado |
 | `INTRANET_AGENT_URL`, `INTRANET_AGENT_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-agent`, — | igual, `PT30S` | El agente de la «Respuesta de la IA» |
 | `INTRANET_TRANSLATOR_URL`, `INTRANET_TRANSLATOR_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-translator`, — | igual, `PT60S` | El agente de «Traducir con IA» |
+| `INTRANET_ALT_TEXT_URL`, `INTRANET_ALT_TEXT_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-alt-text`, — | igual, `PT60S` | El agente de «Sugerir texto alternativo con IA» (su modelo tiene que ver imágenes) |
+| `HEALTH_EXPIRY_DAYS`, `HEALTH_STALE_MONTHS`, `HEALTH_UNVIEWED_DAYS` | — | `14`, `12`, `90` | «Salud del contenido»: cuándo avisar de que algo caduca, está desactualizado o nadie lo abre |
+| `HEALTH_STALE_SECTIONS` | — | vacío (todas) | Secciones (ids, separados por comas) donde importa que el contenido esté al día |
+| `HEALTH_EXTERNAL_LINKS`, `HEALTH_MAX_EXTERNAL_PER_RUN` | — | `true`, `300` | Comprobar los enlaces externos, y cuántas URL como mucho por pasada (el resto, en la siguiente) |
+| `HEALTH_NIGHTLY_CRON` | — | `0 15 3 * * *` | La pasada nocturna (hora de Madrid) |
 | `GOOGLE_DRIVE_CREDENTIALS_FILE` | `/etc/google-drive/credentials.json` | vacío | El fichero de clave de la cuenta de servicio de Drive. Sin él, o si no se puede leer, Drive queda apagado |
 | `GOOGLE_DRIVE_IMPERSONATE` | (Secret `ec-google-drive`, opcional) | vacío | Usuario de Workspace por el que actuar con delegación de dominio. Vacío: la cuenta ve lo compartido con su propia dirección |
 
@@ -63,6 +68,32 @@ content-hub **no tiene clave de ningún modelo**. La «Respuesta de la IA» y «
 servicio. Hacen falta dos agentes sin herramientas en el catálogo del plano de control, `intranet-agent` e
 `intranet-translator`. Mientras no existan, o si fallan, el usuario ve un aviso breve; los resultados de la
 búsqueda siguen funcionando y el formulario del editor no cambia. El motivo queda en el log, en `INFO`.
+
+«Sugerir texto alternativo con IA» («Salud del contenido») usa un tercer agente, **`intranet-alt-text`**, con un
+**modelo que vea imágenes** (el Claude por defecto lo hace): la imagen va en el mismo mensaje A2A como parte
+`file` con sus bytes, y `ia-agent` se la pasa al modelo. Prompt de sistema sugerido: «Describes imágenes para
+el atributo alt de una intranet de hoteles: una sola frase en español, de 125 caracteres como mucho, sin
+comillas ni comentarios. Si no recibes ninguna imagen, responde exactamente SIN_IMAGEN.» Sin herramientas ni
+RAG. Sin él, el botón da un aviso y nada cambia.
+
+### Salud del contenido
+
+Una pasada cada noche (`HEALTH_NIGHTLY_CRON`) y las que pidan los editores. La noche se **reclama en la base de
+datos** (`ch_health_run.nightly_day`, único): un segundo disparo, un reinicio o otra réplica esa noche no hace
+nada. Lo que guarda: `ch_health_run` (cada pasada y sus cuentas, o su error), `ch_health_finding` (los avisos
+de la última, con cuándo se vio cada uno por primera vez), `ch_health_snooze` (los «revisado»),
+`ch_health_link` (lo que respondió cada URL externa: lo bueno vale 7 días, lo malo 1) y `ch_media_alt` (los
+textos alternativos). Nada se arregla ni se borra solo.
+
+Los enlaces externos se piden con **HEAD** (GET si el servidor no entiende HEAD, cerrando el cuerpo sin leerlo),
+5 s de espera, **un segundo entre dos peticiones al mismo host**, sin seguir redirecciones solas (se siguen a
+mano, hasta 5) y con el User-Agent `ec-demo1-content-health/1.0 (…)`. **Nunca se pide una dirección interna**
+(loopback, privadas, link-local, CGNAT, `fc00::/7`), ni directamente ni por una redirección: se marca «no se
+comprueba». 401 y 403 cuentan como que existe; 429 se deja para otra pasada. Si el pod no tiene salida a
+internet, las URL externas salen como rotas («no se puede conectar»): apágalo con `HEALTH_EXTERNAL_LINKS=false`.
+
+Qué hosts son «el portal» (sus enlaces se comprueban como rutas internas): el de `PORTAL_URL` y los de
+`content-hub.health.internal-hosts` (separados por comas).
 
 ### Google Drive
 
@@ -165,6 +196,10 @@ llamada se rechaza.
 
 ## Problemas conocidos y límites
 
+- **Salud del contenido**: entre resolver el nombre de un host y pedirle la URL se resuelve otra vez (lo hace el
+  cliente HTTP): un DNS que cambie de respuesta entre las dos podría llevar una petición a una dirección
+  interna. Los avisos se recalculan enteros en cada pasada, en memoria: a la escala de la demo es poco; con
+  decenas de miles de contenidos habría que trocearla.
 - **El saneador de Mateu quita los `<iframe>`.** Los vídeos externos (YouTube, Vimeo, Drive) y los PDF se
   dibujan como marcadores con un enlace, y `embed.js` los convierte en reproductor. Si `embed.js` no carga
   (un shell sin el `@Script`, o la ruta pública quitada del gateway), se ven como enlace o miniatura. Solo

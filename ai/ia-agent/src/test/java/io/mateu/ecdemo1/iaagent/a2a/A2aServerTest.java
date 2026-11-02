@@ -143,6 +143,51 @@ class A2aServerTest {
         assertNull(server.agentCard("off"));
     }
 
+    static String withImage(String text, String mimeType, String base64) {
+        return """
+                {"jsonrpc":"2.0","id":8,"method":"message/send","params":{"message":{
+                  "kind":"message","role":"user","messageId":"m2",
+                  "parts":[{"kind":"text","text":"%s"},{"kind":"file","file":{"name":"x","mimeType":"%s","bytes":"%s"}}]}}}
+                """.formatted(text, mimeType, base64);
+    }
+
+    @Test
+    void anInlineImageBesideTheTextReachesAnExecutorThatTakesImages() {
+        var seen = new ArrayList<A2aServer.Image>();
+        var seeing = new A2aServer(id -> config(id), new A2aServer.Executor() {
+            @Override
+            public String run(AgentConfig config, String text, String contextId, String authorization, A2aHop hop) {
+                return "text only";
+            }
+
+            @Override
+            public String run(AgentConfig config, String text, List<A2aServer.Image> images, String contextId,
+                              String authorization, A2aHop hop) {
+                seen.addAll(images);
+                return "saw " + images.size() + " for " + text;
+            }
+        }, 2, "http://ia-agent:8095");
+        var png = java.util.Base64.getEncoder().encodeToString(new byte[] {(byte) 0x89, 'P', 'N', 'G'});
+        JsonNode response = mapper.valueToTree(seeing.handle("b", withImage("describe", "image/png", png), "Bearer t",
+                A2aHop.origin()));
+
+        assertEquals("saw 1 for describe", response.path("result").path("parts").get(0).path("text").asText());
+        assertEquals("image/png", seen.getFirst().mimeType());
+        assertEquals(4, seen.getFirst().bytes().length);
+    }
+
+    @Test
+    void anImageToAnExecutorWithoutEyesOrAnSvgOrBadBase64IsRefused() {
+        var png = java.util.Base64.getEncoder().encodeToString(new byte[] {1, 2, 3});
+        assertEquals(A2aServer.CONTENT_TYPE_NOT_SUPPORTED,
+                send("b", withImage("describe", "image/png", png), A2aHop.origin()).path("error").path("code").asInt());
+        assertEquals(A2aServer.INVALID_PARAMS,
+                send("b", withImage("describe", "image/png", "@@not base64@@"), A2aHop.origin()).path("error").path("code").asInt());
+        // an SVG is no image here: as any other file part beside a text, it is left out and the text answered
+        send("b", withImage("describe", "image/svg+xml", png), A2aHop.origin());
+        assertEquals(List.of("b:describe:Bearer t"), ran);
+    }
+
     @Test
     void hopsAreReadFromHeadersAndAForeignCallerCountsAsOneHop() {
         var foreign = A2aHop.fromHeaders(null, null, null);
