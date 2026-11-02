@@ -61,6 +61,13 @@
             <artifactId>messaging</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- The intranet's notifications go out on the platform's own topic (notifications,
+             notification-resolutions): communication-service owns the bell and Web Push. -->
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-communication</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <!-- UserFacingErrors: the domain's rule violations reach the user as messages, not as
              "an unexpected error". -->
         <dependency>
@@ -133,6 +140,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.mateu.ecdemo1</groupId>
+            <artifactId>contracts-testing</artifactId>
+            <version>1.0.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>

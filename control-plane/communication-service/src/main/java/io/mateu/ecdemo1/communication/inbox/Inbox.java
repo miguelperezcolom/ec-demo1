@@ -64,7 +64,8 @@ public class Inbox {
         item.title = n.title();
         item.body = n.body();
         item.link = n.link();
-        var plan = routing.plan(n.type().name(), n.hotelCode());
+        item.addressees = n.addressees() == null || n.addressees().isEmpty() ? null : Recipient.join(n.addressees());
+        var plan = routing.plan(n.type().name(), n.hotelCode(), item.addressees);
         item.roles = Recipient.join(plan.inboxRoles());
         item.users = Recipient.join(plan.inboxUsers());
         item.urgent = plan.urgent();

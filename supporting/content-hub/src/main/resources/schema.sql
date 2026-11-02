@@ -70,3 +70,33 @@ create extension if not exists vector;
 create table if not exists ch_chunk (
     item_id text not null, language text not null, chunk_no int not null, version int not null,
     text text not null, embedding vector(384), primary key (item_id, language, chunk_no));
+
+-- Notifications (requirement 1358). An item that becomes effective is a fan-out job, done off the
+-- request by NotificationJobs; what each reader was told, per item version, kind and channel, is a row
+-- (the primary key is the idempotency: an item version reaches a reader once per channel). For a
+-- reminder, version is the item's confirmation version: one reminder per thing to confirm.
+create table if not exists ch_notification_job (item_id text not null, version int not null,
+    created_at timestamptz not null, attempts int not null default 0, done_at timestamptz, outcome text,
+    primary key (item_id, version));
+create index if not exists ch_notification_job_pending on ch_notification_job (created_at) where done_at is null;
+create table if not exists ch_notification_sent (item_id text not null, version int not null, user_id text not null,
+    kind text not null, channel text not null, at timestamptz not null, resolved_at timestamptz,
+    primary key (item_id, version, user_id, kind, channel));
+create index if not exists ch_notification_sent_user on ch_notification_sent (user_id, item_id);
+create index if not exists ch_notification_sent_open on ch_notification_sent (item_id, at)
+    where resolved_at is null and channel = 'IN_APP';
+-- What each reader wants to be told, per channel (no row: everything)
+create table if not exists ch_notification_pref (user_id text primary key, in_app boolean not null,
+    email boolean not null);
+
+-- Usage analytics (requirement 1361). Raw events, kept content-hub.analytics.retention (90 days by
+-- default); a search keeps the reader's profile hash, never who. Aggregated per day (Madrid) into
+-- ch_usage_daily, which is what the charts read and what is kept.
+create table if not exists ch_usage_event (id bigserial primary key, kind text not null, at timestamptz not null,
+    user_id text, profile_hash text, item_id text, query text, results int);
+create index if not exists ch_usage_event_at on ch_usage_event (at);
+create table if not exists ch_usage_daily (day date not null, metric text not null, key text not null,
+    value bigint not null, primary key (day, metric, key));
+-- Per item and reader, for the item's own figures: views and unique readers since it exists.
+create table if not exists ch_item_reader (item_id text not null, user_id text not null, views bigint not null,
+    first_at timestamptz not null, last_at timestamptz not null, primary key (item_id, user_id));

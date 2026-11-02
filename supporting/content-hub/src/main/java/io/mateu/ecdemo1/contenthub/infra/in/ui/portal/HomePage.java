@@ -5,6 +5,7 @@ import io.mateu.ecdemo1.contenthub.application.out.HomePages;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
+import io.mateu.ecdemo1.contenthub.application.usecases.UsageTracker;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Title;
@@ -50,12 +51,15 @@ public class HomePage implements ComponentTreeSupplier {
     final ReaderActions actions;
     final HomePages homes;
     final PageRenderer renderer;
+    final UsageTracker usage;
 
-    public HomePage(PortalSupport portal, ReaderActions actions, HomePages homes, PageRenderer renderer) {
+    public HomePage(PortalSupport portal, ReaderActions actions, HomePages homes, PageRenderer renderer,
+                    UsageTracker usage) {
         this.portal = portal;
         this.actions = actions;
         this.homes = homes;
         this.renderer = renderer;
+        this.usage = usage;
     }
 
     /** The first configured home page this reader can see, if any. */
@@ -67,6 +71,9 @@ public class HomePage implements ComponentTreeSupplier {
     @Override
     public Component component(HttpRequest httpRequest) {
         var reader = portal.reader(httpRequest);
+        if (PortalSupport.opening(httpRequest)) {
+            usage.homeVisited(reader);
+        }
         var today = TODAY.format(LocalDate.now(Ui.ZONE));
         var home = homeOf(reader).map(page -> renderer.home(reader, page))
                 .orElseGet(() -> defaultHome(reader));

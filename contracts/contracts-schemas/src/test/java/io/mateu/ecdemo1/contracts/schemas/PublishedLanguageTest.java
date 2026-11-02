@@ -233,19 +233,25 @@ class PublishedLanguageTest {
                         .example(new PmsReservationChanged("E-3", "XMAR", "123456", "MRU01", "12E45", null, AT)),
                 TopicSpec.topic("notifications")
                         .describedAs("A notification for the people who look after a hotel: a cause opened, a proposal "
-                                + "ready, a write retrying too long… Deduplicated by dedupKey.")
+                                + "ready, a write retrying too long… Deduplicated by dedupKey. With addressees, for "
+                                + "those people only (the intranet's: a new item, a confirmation due).")
                         .ownedBy("communication-service").keyedBy("dedupKey (none from pms-integration's retry watch)")
-                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office")
+                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office", "content-hub")
                         .consumedBy("communication-service")
                         .messages(NotificationRequested.class)
                         .example(new NotificationRequested("N-1", NotificationType.CAUSE_OPENED, "MRU01",
                                 "MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING", "STD-KING has no equivalent",
                                 "ROOM_TYPE STD-KING of hotel MRU01 has no approved equivalent in the PMS",
-                                "/mapping/causes", "cause:MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING", AT)),
+                                "/mapping/causes", "cause:MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING", AT),
+                                new NotificationRequested("N-2", NotificationType.INTRANET_PUBLISHED, null,
+                                        "intranet/item/turnos-canarias/ana", "Nuevos turnos de recepción",
+                                        "Aviso · Recepción. Los turnos de noviembre ya están publicados.",
+                                        "/intranet/noticias/turnos-canarias", "intranet:published:turnos-canarias:v1:ana",
+                                        AT, List.of("ana"))),
                 TopicSpec.topic("notification-resolutions")
                         .describedAs("What a notification was about is resolved: its subject's notifications close.")
                         .ownedBy("communication-service").keyedBy("subject (none from pms-integration's retry watch)")
-                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office")
+                        .producedBy("integrations-service", "mapping-service", "customer-mdm-service", "pms-integration-service", "front-office", "content-hub")
                         .consumedBy("communication-service")
                         .messages(NotificationResolved.class)
                         .example(new NotificationResolved("MISSING_MAPPING:MRU01:ROOM_TYPE:STD-KING", "ana", AT)),

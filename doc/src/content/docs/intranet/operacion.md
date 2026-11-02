@@ -35,6 +35,11 @@ espera a que exista); la imagen es
 | `NEWSLETTER_FROM` | — | `intranet@ec1.mateu.io` | Remitente |
 | `NEWSLETTER_REDIRECT_TO` | `newsletter-demo@example.com` | vacío | **Todo** correo de newsletter va aquí, con el grupo y el idioma en el asunto. Vacío: a los empleados de verdad |
 | `EMBEDDINGS_URL`, `EMBEDDINGS_MODEL` | `http://embeddings`, — | `http://embeddings`, `intfloat/multilingual-e5-small` | El RAG (`/v1/embeddings`) |
+| `NOTIFICATIONS_CATCH_UP` | — | `PT24H` | Lo que se hizo efectivo hace más de esto ya no se notifica |
+| `NOTIFICATIONS_REMINDER_BEFORE` | — | `P2D` | Cuánto antes de la fecha límite se recuerda confirmar |
+| `NOTIFICATIONS_CLOSE_AFTER` | — | `P30D` | A partir de cuánto se cierra sola una notificación |
+| `NOTIFICATIONS_BATCH_SIZE` | — | `200` | Lectores por transacción del reparto, y destinatarios por correo |
+| `ANALYTICS_RETENTION` | — | `P90D` | Cuánto se guardan los eventos de uso en crudo (nunca menos de 30 días) |
 | `PORTAL_URL` | `https://ec1.mateu.io/intranet` | `http://ec1.localhost:8800/intranet` | Los enlaces de la newsletter y el mensaje de «ver como» |
 | `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWKS_URI` | `https://auth.ec1.mateu.io/realms/ec-demo1`, `http://keycloak:8080/…/certs` | iguales | Verificar el token de las llamadas MCP |
 | `MEDIA_SECRET` | — | vacío | Firma las URL de los medios. Vacío: una clave aleatoria por arranque (las URL ya dibujadas dejan de valer al reiniciar) |
@@ -139,6 +144,13 @@ llamada se rechaza.
 - **Consistencia eventual**: entre publicar (o redefinir una audiencia) y verlo pasan unos segundos; el
   formulario del item dice cuándo está aplicado. El chat tarda unos segundos más (los embeddings).
 - **Medios en la base de datos**, hasta 20 MB cada uno: lo grande va por URL externa.
+- **Notificaciones**: `select * from ch_notification_job where done_at is null` dice qué reparto está pendiente y
+  con cuántos intentos; `outcome` dice cómo acabó cada uno. Dependen de `communication-service`: se acumulan en el
+  outbox si Kafka no está, y nada se pierde. Hay una fila abierta en su `inbox_item` por lector y notificación, y
+  su bandeja carga todas las abiertas en memoria en cada refresco de la campana: a la escala de la demo no se nota,
+  a miles de empleados habría que filtrar en la consulta.
+- **El reset de la demo no toca** las notificaciones ni la analítica de la intranet: las bandejas las vacía
+  `communication-service`, pero lo enviado y las cifras se quedan.
 - **El reset de la demo no la restaura todavía**: la semilla de contenido solo corre con la tabla de
   items vacía, y `supporting/demo-reset` no incluye content-hub.
 - **Los atributos no están en el token**: un empleado que aún no está en el directorio (evento en camino)

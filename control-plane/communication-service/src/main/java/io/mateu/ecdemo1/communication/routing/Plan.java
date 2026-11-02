@@ -70,6 +70,16 @@ public record Plan(Set<String> inboxUsers, Set<String> inboxRoles, Set<String> p
         return new Plan(inboxUsers, inboxRoles, pushUsers, pushRoles, emails, spaces, anyone, deskUsers, deskRoles);
     }
 
+    /**
+     * The plan for a notification addressed to some people (the intranet's): their inbox and their
+     * browsers, and nobody else's — no role, no address, no chat space. The recipients table is not
+     * asked: it says who looks after a hotel, not who reads what.
+     */
+    public static Plan addressedTo(Collection<String> users) {
+        var people = new LinkedHashSet<String>(users);
+        return new Plan(people, Set.of(), people, Set.of(), Set.of(), Set.of(), !people.isEmpty());
+    }
+
     /** Urgent is what somebody asked to be e-mailed about: it cannot wait for someone to look. */
     public boolean urgent() {
         return !emails.isEmpty();

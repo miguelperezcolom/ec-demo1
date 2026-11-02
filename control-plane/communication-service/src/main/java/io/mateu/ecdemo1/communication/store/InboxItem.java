@@ -48,6 +48,12 @@ public class InboxItem {
     /** The people whose inbox shows it besides, by username, comma-separated. */
     @Column(length = 1000)
     public String users;
+    /**
+     * The people it was addressed to (the intranet's notifications), comma-separated; empty, it went where
+     * the recipients said. Theirs alone: their inbox and their browsers.
+     */
+    @Column(length = 2000)
+    public String addressees;
     /** Somebody asked to be e-mailed about it. */
     public boolean urgent;
     public Instant createdAt;

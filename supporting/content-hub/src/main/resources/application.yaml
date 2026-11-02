@@ -88,6 +88,17 @@ content-hub:
     # The demo's employees are made up: every newsletter goes here, saying whom it was for.
     redirect-to: ${NEWSLETTER_REDIRECT_TO:}
   portal-url: ${PORTAL_URL:http://ec1.localhost:8800/intranet}
+  # What is published reaches its readers through communication-service (the bell, Web Push) and, if
+  # important, by mail (the newsletter's relay and redirect, above).
+  notifications:
+    # Something that became effective longer ago than this, however it was missed, is no longer news.
+    catch-up: ${NOTIFICATIONS_CATCH_UP:PT24H}
+    reminder-before: ${NOTIFICATIONS_REMINDER_BEFORE:P2D}
+    close-after: ${NOTIFICATIONS_CLOSE_AFTER:P30D}
+    batch-size: ${NOTIFICATIONS_BATCH_SIZE:200}
+  analytics:
+    # How long raw usage events are kept; the daily figures stay. Never less than 30 days (the longest window).
+    retention: ${ANALYTICS_RETENTION:P90D}
   seed:
     enabled: ${CONTENT_SEED:true}
 

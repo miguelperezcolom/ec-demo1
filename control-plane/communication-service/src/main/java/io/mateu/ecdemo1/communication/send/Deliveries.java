@@ -55,6 +55,8 @@ public class Deliveries {
         n.link = request.link();
         n.dedupKey = request.dedupKey();
         n.requestedAt = request.requestedAt();
+        n.addressees = request.addressees() == null || request.addressees().isEmpty() ? null
+                : io.mateu.ecdemo1.communication.store.Recipient.join(request.addressees());
         notifications.save(n);
         // Into the inbox of its people — and from there to the chat spaces and the browsers
         // (Announcements); e-mailed too if somebody asked for it by e-mail.
@@ -77,7 +79,7 @@ public class Deliveries {
     }
 
     void deliver(Notification n) {
-        var plan = routing.plan(n.type.name(), n.hotelCode);
+        var plan = routing.plan(n.type.name(), n.hotelCode, n.addressees);
         var to = plan.emailList();
         n.recipients = String.join(", ", to);
         if (to.isEmpty()) {
