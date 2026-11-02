@@ -22,6 +22,14 @@ public class ContentHubMenu {
     VisualEditorListing visual;
 
     @Menu
+    @Label("Calendario editorial")
+    EditorialCalendarPage calendario;
+
+    @Menu
+    @Label("Historial de versiones")
+    HistoryListing historial;
+
+    @Menu
     @Label("Medios")
     MediaCrud medios;
 
