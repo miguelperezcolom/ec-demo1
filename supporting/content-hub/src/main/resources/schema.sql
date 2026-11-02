@@ -4,6 +4,10 @@
 create table if not exists ch_item (
     id text primary key, doc jsonb not null, type text, status text, title text, author text,
     updated_at timestamptz, pending_changes boolean, in_review boolean);
+-- Each item's history (created, edited, sent to review, published, rejected, retired, restored): who
+-- and when, and for a save or a restore the draft it left (a publication's content is its version).
+create table if not exists ch_item_history (item_id text not null, seq int not null, action text not null,
+    at timestamptz not null, by_user text, version int, note text, snapshot jsonb, primary key (item_id, seq));
 create table if not exists ch_navigation (id text primary key, doc jsonb not null);
 create table if not exists ch_slot (key text primary key, doc jsonb not null);
 create table if not exists ch_named_audience (id text primary key, name text, doc jsonb not null);
