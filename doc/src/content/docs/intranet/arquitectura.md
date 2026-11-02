@@ -164,12 +164,13 @@ empleados. Los atributos son una lista cerrada: `company`, `country`, `region`, 
 
 ## Modelo de dominio
 
-Doce agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
+Trece agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
 
 | Agregado | Contenido | Invariantes |
 | :------- | :-------- | :---------- |
 | **Item** (`domain/item`) | Tipo (`ARTICLE`, `PAGE`, `NOTICE`, `LINK`, `DOCUMENT`), borrador (`ItemContent`: sección, audiencia, traducciones, bloques, fechas, flags, URL), versiones inmutables | Transiciones del workflow; título en el idioma por defecto; caducidad posterior a la publicación; enlaces y documentos con URL; solo las páginas tienen bloques; ids de bloque únicos |
 | **Navegación** (`domain/navigation`) | El árbol entero de secciones, con orden y nombres por idioma | Sin ciclos, orden único entre hermanas |
+| **Menú de un sitio** (`domain/menu/SiteMenu`) | El menú entero de un sitio (`intranet`, o una newsletter): árbol ordenado de entradas —enlaces con destino o submenús—, textos por idioma, audiencia y activa | Cuelga de la raíz o de un submenú del mismo menú, sin ciclos, orden único entre hermanas, texto en el idioma por defecto; un submenú con entradas no recibe destino |
 | **Slot** (`domain/slot`) | Clave `aplicacion.pantalla.nombre`, descripción, fallback, variantes con audiencia y prioridad | Clave inmutable, prioridad única, huérfano en vez de borrado |
 | **Audiencia con nombre** (`domain/audience`) | Nombre y expresión | No se refiere a sí misma |
 | **Edición de newsletter** (`domain/newsletter`) | Título, intro, items en orden, audiencia, fecha, envío por grupo | No se modifica una vez enviada |
@@ -243,6 +244,7 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | Tablas | Qué guardan |
 | :----- | :---------- |
 | `ch_item`, `ch_navigation`, `ch_slot`, `ch_named_audience`, `ch_newsletter`, `ch_favorites` | Los agregados, como documento JSON (más las columnas por las que se lista) |
+| `ch_menu` | El menú de cada sitio, un documento JSON por `site_id` |
 | `ch_ack` | Acuses de lectura y confirmación |
 | `ch_media` | La biblioteca de medios; los ficheros subidos, en `bytea` |
 | `ch_employee`, `ch_profile` | El directorio y el universo de perfiles (hash → atributos) |
@@ -498,6 +500,51 @@ normalizado, cuántos resultados dio y el hash de perfil, **nunca quién**.
   desde que existe el item. **No caduca con la retención**: es un dato por persona, como los acuses de `ch_ack`.
 - El panel es `AnalyticsPage`, el arquetipo `Dashboard` de Mateu con `MetricCard` y `Chart`.
 
+## Menús configurables
+
+El menú del portal es **datos**: un `SiteMenu` por sitio (`ch_menu`), configurado en *Configuración → Menús*
+(`MenusCrud`, `MenuEntryForm`, `MenuPreviewPage`; `content:admin`) y dibujado **por petición** para cada
+lector. El dueño de un menú es un **id de sitio**: `intranet` hoy; cada newsletter será otro sitio con el
+suyo, con la misma pieza.
+
+**Las rutas no son datos.** Siguen saliendo de los campos de `IntranetMenu` (`/intranet/noticias`,
+`/intranet/buscar`…) y de `PortalRoutes` (`/intranet/noticias/{id}`, `/intranet/secciones/{id}`…). El menú
+solo decide qué se muestra, en qué orden, en qué submenús y con qué texto.
+
+```
+SiteMenu (ch_menu) ──► SiteMenus.shown(MenuContext) ──► PortalMenu ──► IntranetMenu (MenuSupplier) ──► Mateu
+                         │ audiencia (VisibilityPolicy)
+                         └ MenuTargetResolver por tipo: PAGE · SECTION · BUILTIN · URL · REMOTE · (los de otro sitio)
+```
+
+- **Destino** (`MenuTarget`: tipo + valor). El tipo es un código abierto: `PAGE` (una página → su ruta, si el
+  lector la ve), `SECTION` (si hay algo visible en ella o debajo), `BUILTIN` (una función del portal,
+  `PortalFunction`, cuya clave es el nombre del campo que la enruta), `URL` (ruta del portal o URL externa) y
+  `REMOTE` (otra interfaz del registro de interfaces: `sourceId` + ruta). Cada tipo lo resuelve un
+  `MenuTargetResolver`; un sitio nuevo añade los suyos declarando otro bean (y `appliesTo(siteId)` lo limita a
+  sus sitios).
+- **Quién ve qué** (`SiteMenus.shown`): una entrada sale si está activa, su audiencia admite al lector (la
+  misma `VisibilityPolicy` que el contenido, evaluada en memoria: un menú son unas decenas de entradas) **y** su
+  destino se resuelve para él. Lo que cuelga de una entrada oculta se oculta con ella; un submenú sin nada
+  visible desaparece. El texto, en el idioma del lector o, si no lo hay, en el del sitio (`es`).
+- **Dibujo** (`PortalMenu`): una función → el `FieldLink` a su campo (la misma entrada que hacía el `@Menu`);
+  una página, sección o ruta → un `RouteLink` a la ruta de siempre; un submenú → un `Menu` **sin path**, para
+  que lo que contiene conserve su ruta; una URL externa → `/intranet/enlace/{sitio}/{entrada}`
+  (`MenuEntryPage`, con el enlace a pestaña nueva: una entrada de menú de Mateu navega dentro de la app); otra
+  interfaz Mateu → un `RemoteMenu` federado; otra que no lo es → `/intranet/ui/{sitio}/{entrada}`, alojada en un
+  marco (`embed.js`, tipo `ui`, solo rutas `/_…` del propio gateway). **Toda función que el menú no muestra en
+  su primer nivel se añade oculta** (`hidden`): enrutada pero no dibujada, así que mover una función a un
+  submenú o quitarla del menú no rompe su URL. `MenuEntryPage` vuelve a resolver la entrada para el lector:
+  quien no la ve en el menú tampoco la abre tecleando la URL.
+- **Siembra** (`MenuSeeder`, al arrancar): si el sitio `intranet` no tiene menú, se guarda el de siempre
+  (`DefaultMenus.intranet()`: las 16 funciones, en su orden y con sus textos) con `insert … on conflict do
+  nothing` —idempotente y seguro con varias réplicas—. Mientras no hay nada guardado, el portal dibuja ese mismo.
+- **Costuras** para otras ramas: `SiteRoutes` (dónde cuelgan las rutas de un sitio; por defecto `/intranet`
+  para todos) y `UiSources` (el registro de interfaces; por defecto vacío, y las entradas `REMOTE` no salen).
+  Se sustituyen declarando un bean del mismo tipo con `@Primary` (`MenuConfig`).
+- Las consolas guardan el menú de un remoto **por usuario** unos 30 s (`RemoteAppDescriptorCache` de Mateu):
+  un cambio de configuración o un «ver como» tarda eso en verse en el shell.
+
 ## Slots
 
 Un **slot** es un hueco en la pantalla de otra aplicación donde va contenido editorial, con clave estable
@@ -533,11 +580,19 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 | La IA por A2A y no con una clave propia | El LLM, la credencial, el consumo y la auditoría se gobiernan en un solo sitio, por persona |
 | El agente sin herramientas: content-hub le manda los pasajes | La visibilidad se decide en un solo sitio y no depende de lo que haga el modelo |
 | Drive por referencia, con cuenta de servicio y sin delegación por defecto | Una sola versión; lo mínimo para funcionar compartiendo ficheros, sin pedir permisos de dominio |
+| El menú como datos, pero las rutas en código | El administrador decide qué se ve y cómo se llama; los enlaces del contenido, de las notificaciones y de la newsletter (`/intranet/noticias/{id}`) no pueden depender de él |
+| Destinos de menú con tipo abierto y un resolver por tipo | La newsletter (otro sitio) y el registro de interfaces añaden sus destinos sin tocar el modelo |
 | Slots por REST provisional | El microfrontend de Mateu aún no está; el contrato (clave, identidad, caché por hash) es el mismo |
 
 ## Pruebas
 
 - `ItemTest`: el workflow y las invariantes del item.
+- `SiteMenuTest`, `SiteMenusTest`, `PortalMenuTest`, `MenuStoreTest` (Testcontainers): las operaciones del árbol del
+  menú, lo que ve cada lector (audiencia, destinos que no puede abrir, submenús vacíos fuera, inactivas, idioma de
+  reserva), la siembra idempotente, un menú por sitio, el permiso `content:admin`, y lo que el `MenuSupplier`
+  devuelve a Mateu (las mismas entradas que antes con la siembra; toda función sigue enrutada);
+  `PortalMenuThroughMateuTest` pasa el menú por el mapeo de Mateu (lo que reciben los shells y cómo resuelve
+  un deep link).
 - `NotificationsTest` (Testcontainers): a quién llega (visibilidad, activos, idioma), por tipo y por decisión del
   editor, una vez por versión, programados y caídas, espera a la proyección, preferencias por canal, lotes que
   fallan y se reanudan, relay caído, recordatorio y qué cierra cada cosa.

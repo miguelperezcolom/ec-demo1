@@ -14,6 +14,10 @@ chat. Tus atributos los mantiene RRHH en el servicio de usuarios; si cambian (ot
 que ves cambia en unos segundos.
 :::
 
+El menú de la izquierda lo configura el equipo de la intranet (ver
+[Menús](/intranet/manual-backoffice/#menús)): puede que tengas entradas que otro no tiene, o submenús. Las
+direcciones de cada pantalla (`/intranet/noticias`, `/intranet/buscar`…) son siempre las mismas.
+
 ## Inicio
 
 *Intranet → Inicio* te saluda por tu nombre y reúne:

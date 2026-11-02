@@ -9,7 +9,7 @@ El backoffice tiene dos caras, en dos consolas:
   confirmaciones—, es un menú de la propia intranet en la consola de datos (`https://ec1.mateu.io`, en
   local `http://ec1.localhost:8800` → *Editorial*). Solo lo ve quien tiene algún **permiso editorial**;
   quien no, ni ve la entrada ni puede abrir sus pantallas tecleando la URL.
-- **Configuración** —secciones, audiencias con nombre, slots, directorio y visibilidad: cómo funciona la
+- **Configuración** —secciones, menús, audiencias con nombre, slots, directorio y visibilidad: cómo funciona la
   intranet, no lo que publica— está en la consola de control (`https://console.ec1.mateu.io`, en local
   `http://console.localhost:8800` → *Intranet*), con el rol `ai-admin` y además `content:admin`.
 
@@ -19,7 +19,7 @@ Los permisos se asignan con roles en *Usuarios* (consola de control):
 | :-- | :------- | :---- |
 | Editor de contenido (`content-editor`) | `content:edit` | Crear y editar contenidos, subir medios, enviar a revisión, componer newsletters |
 | Publicador de contenido (`content-publisher`) | `content:edit`, `content:publish` | Además aprobar, publicar (con o sin revisión), rechazar, retirar, programar el envío de una newsletter y editar el contenido de los slots |
-| Administrador de contenido (`content-admin`) | los tres | Además, en la consola de control, la configuración: secciones, audiencias con nombre, slots, directorio y visibilidad |
+| Administrador de contenido (`content-admin`) | los tres | Además, en la consola de control, la configuración: secciones, menús, audiencias con nombre, slots, directorio y visibilidad |
 
 En la demo: `editora` es editora, `publicador` es publicador y `demo` es administrador (ver
 [Operación](/intranet/operacion/#datos-de-demo)).
@@ -209,6 +209,45 @@ nombre en español, inglés y alemán. Las secciones no tienen audiencia: el por
 ella o una descendiente contiene algo visible para el lector. No se puede borrar una sección con
 subsecciones.
 
+## Menús
+
+*Consola de control → Intranet → Menús*: **el menú del portal** —qué entradas tiene, en qué orden, en qué
+submenús, con qué texto y para quién—. Es configuración, no código: un cambio se ve en el portal en cuanto
+el lector vuelve a cargar la página (como mucho unos 30 s en las consolas, que guardan el menú de cada
+usuario ese tiempo). Lo que no cambia son las **rutas**: `/intranet/noticias`, `/intranet/noticias/{id}`…
+siguen funcionando aunque la entrada se mueva, se renombre o se quite del menú.
+
+El listado tiene una fila por entrada, en el orden del menú; lo que cuelga de un submenú va sangrado («— »)
+y el submenú lleva «▸». Columna **Sitio**: hoy solo `intranet`; cada newsletter tendrá el suyo. Al arrancar
+por primera vez, el menú de la intranet se rellena con **exactamente las entradas de siempre** (Inicio,
+Noticias, Avisos… Mis preferencias), así que nada cambia hasta que alguien lo toque.
+
+La ficha de una entrada:
+
+| Campo | Qué es |
+| :---- | :----- |
+| **Menú del sitio** | De qué sitio es el menú (al crear) |
+| **Dentro de** | El submenú que la contiene; vacío = primer nivel |
+| **Posición** | Entre sus hermanas, 0 = primera (al crear, por defecto, al final) |
+| **Activa** | Una entrada inactiva se conserva pero no la ve nadie, ni lo que cuelga de ella |
+| **Texto (es/en/de)** | El español es obligatorio; quien lea en un idioma sin texto ve el español |
+| **Destino** | Una **función del portal** (Noticias, Buscar, Por aprobar…), una **página** publicada, una **sección** u **otra interfaz** (de las registradas en la plataforma). «Ninguno» = la entrada es un **submenú** |
+| **…o un enlace** | Una ruta del portal (`/intranet/personas?searchText=recepcion`) o una URL `http(s)`; una URL de fuera se abre en una pestaña nueva (el menú lleva a una página con el enlace) |
+| **Ruta dentro de la otra interfaz** | Opcional, con «otra interfaz»: a qué pantalla de ella ir |
+| **Quién lo verá** | El mismo constructor de audiencias que los contenidos; vacío = todos |
+
+En la barra de la ficha, **Subir**, **Bajar**, **Meter en el submenú de encima** y **Sacar del submenú**
+mueven una entrada guardada un paso. **Borrar** un submenú borra lo que contiene.
+
+Quién ve cada entrada: la ve quien cumple su audiencia **y** puede abrir su destino —una página que no puede
+ver, una sección sin nada visible para él, una interfaz para la que no tiene permiso, no le salen—. Un
+submenú que se queda sin nada visible tampoco sale.
+
+*Intranet → Menús: vista previa* dibuja el menú de un sitio **como lo vería un empleado o un perfil** (con la
+misma función que el portal) y dice adónde lleva cada entrada; **Volver al menú inicial** deshace todo lo
+configurado para ese sitio (en la intranet, vuelve el menú de siempre). *Editorial → Ver como* también enseña
+el menú configurado.
+
 ## Audiencias con nombre
 
 *Consola de control → Intranet → Audiencias*: audiencias reutilizables, con un id, un nombre y el mismo
@@ -227,7 +266,8 @@ visibilidad que usa el portal (no es una simulación). Elige uno:
 - **…o un perfil del directorio** (cada combinación de atributos, con su número de empleados);
 - **…o una audiencia con nombre**: se toma su perfil más numeroso.
 
-**Previsualizar** dibuja en la página el perfil (atributos, idioma y hash), su **menú** de secciones y el
+**Previsualizar** dibuja en la página el perfil (atributos, idioma y hash), su **menú** (el configurado en
+*Configuración → Menús*, y las secciones) y el
 **contenido visible**. **Ver la intranet así** hace que el propio portal (`/intranet`) se te muestre como
 ese perfil —inicio, listados, secciones, búsqueda—, con una banda amarilla que lo recuerda, hasta que
 pulses **Salir de ver como** (o pase una hora sin usarlo). Mientras tanto no se registran tus lecturas ni

@@ -228,6 +228,7 @@ En `http://console.localhost:8800`, menú **Intranet**, con un usuario `ai-admin
 | Pantalla | Para qué |
 |---|---|
 | Secciones | El árbol de navegación (La empresa › Noticias, Personas › RRHH y nóminas / Formación, Operaciones › Recepción / Cocina, Dirección), con nombres traducidos. |
+| Menús | El menú del portal como datos: entradas, orden, submenús, textos por idioma, destino (función, página, sección, enlace u otra interfaz) y quién lo verá; «Menús: vista previa» lo enseña como lo vería un empleado. |
 | Audiencias | Audiencias con nombre reutilizables: Recepción Canarias, Dirección de hotel, Hoteles de España, Equipos de cocina. Redefinir una afecta a todo lo que la usa. |
 | Slots | Los huecos de contenido que declaran otras aplicaciones (clave, descripción, texto de reserva). |
 | Directorio | La proyección local de empleados y sus atributos. |
