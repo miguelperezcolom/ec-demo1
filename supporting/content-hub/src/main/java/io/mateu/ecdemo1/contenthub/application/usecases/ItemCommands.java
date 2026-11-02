@@ -63,6 +63,22 @@ public class ItemCommands {
         return id;
     }
 
+    /** As {@link #create}, in a site: a newsletter's page or article. Its section is one of that site's. */
+    @Transactional
+    public String createInSite(Reader reader, String siteId, ItemType type, String defaultLanguage, ItemContent content) {
+        reader.require(EditorialPermission.EDIT);
+        var id = UUID.randomUUID().toString().substring(0, 8);
+        items.save(Item.create(id, siteId, type, reader.userId(), defaultLanguage, sanitized(content), clock.instant()));
+        return id;
+    }
+
+    /** As {@link #createInSite}, with the id given — the seed's. */
+    @Transactional
+    public void createWithIdInSite(String id, String siteId, String author, ItemType type, String defaultLanguage,
+                                   ItemContent content) {
+        items.save(Item.create(id, siteId, type, author, defaultLanguage, sanitized(content), clock.instant()));
+    }
+
     /** As {@link #create}, with the id given — the seed's items keep theirs across resets. */
     @Transactional
     public void createWithId(String id, String author, ItemType type, String defaultLanguage, ItemContent content) {

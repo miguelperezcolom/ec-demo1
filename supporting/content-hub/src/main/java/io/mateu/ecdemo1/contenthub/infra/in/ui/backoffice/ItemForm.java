@@ -58,6 +58,9 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @HiddenInCreate
     @Label("Id")
     String id;
+    /** The site it belongs to (a newsletter's pages and articles are its own): its sections are that site's. */
+    @io.mateu.uidl.annotations.Hidden
+    String siteId;
     @ReadOnly
     @HiddenInCreate
     @Label("Aplicado a los lectores")
@@ -220,6 +223,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
 
     public ItemForm load(Item item, boolean commentsClosed) {
         id = item.id();
+        siteId = item.siteId();
         comentariosCerrados = commentsClosed;
         type = item.type();
         defaultLanguage = item.defaultLanguage();
@@ -313,7 +317,9 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
 
     public String create(HttpRequest httpRequest) {
         var editor = readers.of(httpRequest);
-        var created = commands.create(editor, type, defaultLanguage, content());
+        var created = siteId == null || io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET.equals(siteId)
+                ? commands.create(editor, type, defaultLanguage, content())
+                : commands.createInSite(editor, siteId, type, defaultLanguage, content());
         collaboration.closeComments(editor, created, comentariosCerrados);
         return created;
     }
@@ -494,7 +500,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Override
     public List<Option> options(String fieldName, HttpRequest httpRequest) {
         return switch (fieldName) {
-            case "sectionId" -> Catalog.get().sections();
+            case "sectionId" -> Catalog.get().sections(io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId));
             case "defaultLanguage" -> Catalog.languages();
             case "medioAInsertar" -> Catalog.get().media();
             case "uiSourceId" -> Catalog.get().uiSources();

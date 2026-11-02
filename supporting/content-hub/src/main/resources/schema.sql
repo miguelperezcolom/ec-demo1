@@ -126,3 +126,14 @@ create table if not exists ch_item_reader (item_id text not null, user_id text n
 -- file — refreshed by a job only when GOOGLE_DRIVE_* is configured.
 create table if not exists ch_drive_file (
     file_id text primary key, doc jsonb not null, refreshed_at timestamptz);
+
+-- Sites (2026-11): content-hub hosts several. The intranet is the default one ('intranet'); each newsletter
+-- is another, with its own sections (ch_navigation, one row per site — the intranet's stays 'main'), items
+-- and homes. Everything written before sites existed is the intranet's: the columns default to it.
+create table if not exists ch_site (id text primary key, kind text not null, name text, doc jsonb not null);
+alter table ch_item add column if not exists site_id text not null default 'intranet';
+alter table ch_item_doc add column if not exists site_id text not null default 'intranet';
+create index if not exists ch_item_doc_site on ch_item_doc (site_id, publish_at desc);
+-- the homes of a site other than the intranet (the intranet's stay in ch_home_page)
+create table if not exists ch_site_home_page (site_id text not null, position int not null, item_id text not null,
+    primary key (site_id, position));

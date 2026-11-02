@@ -14,14 +14,20 @@ public class PgNavigationRepository implements NavigationRepository {
     final JdbcTemplate jdbc;
 
     @Override
-    public Navigation get() {
-        return jdbc.query("select doc from ch_navigation where id = 'main'", (rs, i) -> rs.getString(1)).stream()
+    public Navigation get(String siteId) {
+        return jdbc.query("select doc from ch_navigation where id = ?", (rs, i) -> rs.getString(1), key(siteId)).stream()
                 .findFirst().map(d -> Json.read(d, Navigation.class)).orElseGet(Navigation::empty);
     }
 
+    /** The intranet's tree keeps the row it had before sites existed ('main'); a site's is its id. */
+    static String key(String siteId) {
+        var site = io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId);
+        return io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET.equals(site) ? "main" : site;
+    }
+
     @Override
-    public void save(Navigation navigation) {
-        jdbc.update("insert into ch_navigation (id, doc) values ('main', ?::jsonb) "
-                + "on conflict (id) do update set doc = excluded.doc", Json.write(navigation));
+    public void save(String siteId, Navigation navigation) {
+        jdbc.update("insert into ch_navigation (id, doc) values (?, ?::jsonb) "
+                + "on conflict (id) do update set doc = excluded.doc", key(siteId), Json.write(navigation));
     }
 }

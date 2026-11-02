@@ -53,9 +53,15 @@ public class Visibility {
         return visibles(reader, ContentQuery.ids(List.of(itemId))).content().stream().findFirst();
     }
 
+    /** The intranet's sections with something the reader sees. */
     public Set<String> sectionsWithVisibleContent(EmployeeAttributes reader) {
+        return sectionsWithVisibleContent(reader, io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET);
+    }
+
+    /** A site's sections with something the reader sees. */
+    public Set<String> sectionsWithVisibleContent(EmployeeAttributes reader, String siteId) {
         ready(reader);
-        return index.sectionsWithVisibleContent(reader.hash(), clock.instant());
+        return index.sectionsWithVisibleContent(reader.hash(), clock.instant(), siteId);
     }
 
     /** The page's blocks the reader sees: page AND block, as the projection holds it. */

@@ -57,7 +57,12 @@ public class Catalog {
     }
 
     public List<Option> sections() {
-        var nav = navigation.get();
+        return sections(io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET);
+    }
+
+    /** A site's sections. */
+    public List<Option> sections(String siteId) {
+        var nav = navigation.get(siteId);
         return nav.sections().stream().map(s -> new Option(s.id(),
                 "  ".repeat(nav.ancestors(s.id()).size()) + s.name("es"))).toList();
     }

@@ -8,7 +8,17 @@ import java.util.List;
  */
 public interface HomePages {
 
-    List<String> pageIds();
+    /** The intranet's homes. */
+    default List<String> pageIds() {
+        return pageIds(io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET);
+    }
 
-    void save(List<String> pageIds);
+    default void save(List<String> pageIds) {
+        save(io.mateu.ecdemo1.contenthub.domain.site.Site.INTRANET, pageIds);
+    }
+
+    /** A site's homes. */
+    List<String> pageIds(String siteId);
+
+    void save(String siteId, List<String> pageIds);
 }

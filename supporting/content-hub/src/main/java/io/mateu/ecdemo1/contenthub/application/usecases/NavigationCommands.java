@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.contenthub.application.usecases;
 
+import io.mateu.ecdemo1.contenthub.domain.site.Site;
+
 import io.mateu.ecdemo1.contenthub.application.events.DomainEvents;
 import io.mateu.ecdemo1.contenthub.application.out.NavigationRepository;
 import io.mateu.ecdemo1.contenthub.application.security.EditorialPermission;
@@ -17,40 +19,69 @@ public class NavigationCommands {
     final NavigationRepository navigation;
     final DomainEvents events;
 
+    /** In the intranet. */
     @Transactional
     public void add(Reader reader, String id, String parentId, Map<String, String> names) {
-        reader.require(EditorialPermission.ADMIN);
-        var nav = navigation.get();
+        add(reader, Site.INTRANET, id, parentId, names);
+    }
+
+    @Transactional
+    public void add(Reader reader, String siteId, String id, String parentId, Map<String, String> names) {
+        require(reader, siteId);
+        var nav = navigation.get(siteId);
         nav.add(id, blankToNull(parentId), names);
-        navigation.save(nav);
+        navigation.save(siteId, nav);
         events.drain(nav);
     }
 
+    /** In the intranet. */
     @Transactional
     public void rename(Reader reader, String id, Map<String, String> names) {
-        reader.require(EditorialPermission.ADMIN);
-        var nav = navigation.get();
+        rename(reader, Site.INTRANET, id, names);
+    }
+
+    @Transactional
+    public void rename(Reader reader, String siteId, String id, Map<String, String> names) {
+        require(reader, siteId);
+        var nav = navigation.get(siteId);
         nav.rename(id, names);
-        navigation.save(nav);
+        navigation.save(siteId, nav);
         events.drain(nav);
     }
 
+    /** In the intranet. */
     @Transactional
     public void move(Reader reader, String id, String parentId, int position) {
-        reader.require(EditorialPermission.ADMIN);
-        var nav = navigation.get();
-        nav.move(id, blankToNull(parentId), position);
-        navigation.save(nav);
-        events.drain(nav);
+        move(reader, Site.INTRANET, id, parentId, position);
     }
 
     @Transactional
-    public void remove(Reader reader, String id) {
-        reader.require(EditorialPermission.ADMIN);
-        var nav = navigation.get();
-        nav.remove(id);
-        navigation.save(nav);
+    public void move(Reader reader, String siteId, String id, String parentId, int position) {
+        require(reader, siteId);
+        var nav = navigation.get(siteId);
+        nav.move(id, blankToNull(parentId), position);
+        navigation.save(siteId, nav);
         events.drain(nav);
+    }
+
+    /** In the intranet. */
+    @Transactional
+    public void remove(Reader reader, String id) {
+        remove(reader, Site.INTRANET, id);
+    }
+
+    @Transactional
+    public void remove(Reader reader, String siteId, String id) {
+        require(reader, siteId);
+        var nav = navigation.get(siteId);
+        nav.remove(id);
+        navigation.save(siteId, nav);
+        events.drain(nav);
+    }
+
+    /** The intranet's tree is configuration (content:admin); a newsletter's is its editors' (content:edit). */
+    static void require(Reader reader, String siteId) {
+        reader.require(Site.INTRANET.equals(Site.of(siteId)) ? EditorialPermission.ADMIN : EditorialPermission.EDIT);
     }
 
     static String blankToNull(String s) {

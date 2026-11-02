@@ -331,6 +331,43 @@ class ConsumersTest {
         assertThat(visibility.isVisible(ANA, expiring)).isFalse();
     }
 
+    /** Another site's content stays in it: the intranet's listings, sections, search and chat behave as before. */
+    @Test
+    void another_sites_content_stays_out_of_the_intranet() {
+        var intranet = publish(ItemType.ARTICLE, "noticias", Audience.EVERYONE, "Noticia de la intranet", "<p>faro</p>");
+        var nav = new PgNavigationRepository(jdbc);
+        var boletin = nav.get("boletin");
+        boletin.add("editorial", null, Map.of("es", "Editorial"));
+        nav.save("boletin", boletin);
+        var own = itemCommands.createInSite(EDITOR, "boletin", ItemType.ARTICLE, "es", new ItemContent("editorial",
+                Audience.EVERYONE, Map.of("es", new Translation("Artículo del boletín", "", "<p>faro</p>")), List.of(),
+                null, null, false, false, null, null));
+        itemCommands.submitForReview(EDITOR, own);
+        itemCommands.publish(PUBLISHER, own, false);
+
+        assertThat(new PgItemRepository(jdbc).find(own).orElseThrow().siteId()).isEqualTo("boletin");
+        assertThat(new PgItemRepository(jdbc).find(intranet).orElseThrow().siteId()).isEqualTo("intranet");
+        // the intranet, as before: no listing, section or search of it shows the other site's article
+        assertThat(visibility.visibles(ANA, ContentQuery.latest(50)).content()).extracting(VisibleItem::itemId)
+                .contains(intranet).doesNotContain(own);
+        assertThat(visibility.visibles(ANA, ContentQuery.search("faro", 0, 50)).content()).extracting(VisibleItem::itemId)
+                .containsExactly(intranet);
+        assertThat(visibility.sectionsWithVisibleContent(ANA)).doesNotContain("editorial");
+        assertThat(nav.get().find("editorial")).isEmpty();
+        // the site, its own
+        assertThat(visibility.visibles(ANA, ContentQuery.latest(50).in("boletin")).content()).extracting(VisibleItem::itemId)
+                .containsExactly(own);
+        assertThat(visibility.sectionsWithVisibleContent(ANA, "boletin")).containsExactly("editorial");
+        // by id, wherever it is (a newsletter issue links both)
+        assertThat(visibility.item(ANA, own)).isPresent();
+        // homes, apart
+        var homes = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgHomePages(jdbc);
+        homes.save("boletin", List.of(own));
+        assertThat(homes.pageIds("boletin")).containsExactly(own);
+        assertThat(homes.pageIds()).doesNotContain(own);
+        homes.save("boletin", List.of());
+    }
+
     @Test
     void sections_with_nothing_visible_disappear() {
         publish(ItemType.ARTICLE, "nominas", RECEPCION_CANARIAS, "Nómina", "");
