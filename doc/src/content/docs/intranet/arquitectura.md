@@ -534,7 +534,9 @@ SiteMenu (ch_menu) ──► SiteMenus.shown(MenuContext) ──► PortalMenu �
   interfaz Mateu → un `RemoteMenu` federado; otra que no lo es → `/intranet/ui/{sitio}/{entrada}`, alojada en un
   marco (`embed.js`, tipo `ui`, solo rutas `/_…` del propio gateway). **Toda función que el menú no muestra en
   su primer nivel se añade oculta** (`hidden`): enrutada pero no dibujada, así que mover una función a un
-  submenú o quitarla del menú no rompe su URL. `MenuEntryPage` vuelve a resolver la entrada para el lector:
+  submenú o quitarla del menú no rompe su URL. La raíz, `/intranet`, abre el inicio del lector (`PortalRoutes`:
+  el grupo del `MenuSupplier` no tiene página propia y Mateu dibujaría un índice de sus entradas); solo en
+  `/_intranet` y `/_portal` (en `/_content-hub`, «intranet» es la configuración). `MenuEntryPage` vuelve a resolver la entrada para el lector:
   quien no la ve en el menú tampoco la abre tecleando la URL.
 - **Siembra** (`MenuSeeder`, al arrancar): si el sitio `intranet` no tiene menú, se guarda el de siempre
   (`DefaultMenus.intranet()`: las 16 funciones, en su orden y con sus textos) con `insert … on conflict do
