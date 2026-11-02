@@ -81,7 +81,7 @@ public final class NewsletterRenderer {
         var theme = d.theme();
         var html = new StringBuilder();
         html.append("<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;width:100%;margin:0 auto;"
-                + "color:#1f2933;background:#ffffff;line-height:1.5;color-scheme:light\">");
+                + "line-height:1.5;" + pal(v).root() + "\">");
         if (v.mode() == Mode.EMAIL) {
             html.append("<p style=\"font-size:12px;color:#6b7280;text-align:center;margin:4px 0\"><a href=\"")
                     .append(esc(v.links().permalink())).append("\" style=\"color:#6b7280\">")
@@ -90,7 +90,8 @@ public final class NewsletterRenderer {
         }
         // header: the identity
         html.append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:")
-                .append(theme.primary()).append(";color:#ffffff;border-radius:8px 8px 0 0\"><tr><td style=\"padding:16px 20px\">");
+                .append(theme.primary()).append(";color:").append(ink(theme.primary()))
+                .append(";border-radius:8px 8px 0 0\"><tr><td style=\"padding:16px 20px\">");
         var logo = v.links().logo();
         if (logo != null) {
             html.append("<img src=\"").append(esc(logo)).append("\" alt=\"").append(esc(d.name()))
@@ -103,12 +104,12 @@ public final class NewsletterRenderer {
             html.append("<div style=\"font-size:14px;margin-top:8px\">").append(v.links().rich(d.headerHtml())).append("</div>");
         }
         html.append("</td></tr></table>");
-        html.append("<div style=\"padding:8px 20px 16px;border:1px solid #e5e7eb;border-top:0\">");
+        html.append("<div style=\"padding:8px 20px 16px;border:1px solid ").append(pal(v).border()).append(";border-top:0\">");
         html.append("<h1 style=\"font-size:20px;margin:16px 0 8px\">").append(esc(v.issue().subject())).append("</h1>");
         html.append(blocks(v));
         html.append("</div>");
         // footer
-        html.append("<div style=\"padding:12px 20px;font-size:12px;color:#6b7280;border:1px solid #e5e7eb;border-top:0;"
+        html.append("<div style=\"padding:12px 20px;font-size:12px;" + pal(v).muted() + "border:1px solid " + pal(v).border() + ";border-top:0;"
                 + "border-radius:0 0 8px 8px\">");
         if (!d.footerHtml().isBlank()) {
             html.append("<div>").append(v.links().rich(d.footerHtml())).append("</div>");
@@ -116,7 +117,7 @@ public final class NewsletterRenderer {
         html.append("<p style=\"margin:8px 0 0\">").append(es(v)
                         ? "Recibes «" + esc(d.name()) + "» como empleado: solo incluye lo que puedes ver en la intranet. "
                         : "You receive «" + esc(d.name()) + "» as an employee: it only includes what you can see on the intranet. ")
-                .append("<a href=\"").append(esc(v.links().unsubscribe())).append("\" style=\"color:").append(theme.accent())
+                .append("<a href=\"").append(esc(v.links().unsubscribe())).append("\" style=\"color:").append(pal(v).link(theme.accent()))
                 .append("\">").append(es(v) ? "Darte de baja de esta newsletter" : "Unsubscribe from this newsletter")
                 .append("</a></p></div>");
         var pixel = v.links().pixel();
@@ -138,12 +139,12 @@ public final class NewsletterRenderer {
     }
 
     static String block(View v, Block b) {
-        var accent = v.site().definition().theme().accent();
+        var accent = pal(v).link(v.site().definition().theme().accent());
         var title = b.title() == null ? "" : b.title();
         String inner = switch (b.type()) {
             case HTML -> blank(b.html()) ? null : v.links().rich(b.html());
             case BANNER -> blank(b.html()) ? null : "<div style=\"background:" + v.site().definition().theme().primary()
-                    + ";color:#ffffff;padding:16px;border-radius:8px\">" + (title.isBlank() ? ""
+                    + ";color:" + ink(v.site().definition().theme().primary()) + ";padding:16px;border-radius:8px\">" + (title.isBlank() ? ""
                     : "<div style=\"font-weight:bold;font-size:16px\">" + esc(title) + "</div>") + v.links().rich(b.html()) + "</div>";
             case MEDIA -> {
                 if (b.mediaId() == null) {
@@ -186,20 +187,20 @@ public final class NewsletterRenderer {
             return "";
         }
         var heading = title.isBlank() || b.type() == BlockType.BANNER || b.type() == BlockType.GREETING ? ""
-                : "<h2 style=\"font-size:17px;margin:20px 0 6px;color:" + v.site().definition().theme().primary()
-                + ";border-bottom:2px solid " + accent + ";padding-bottom:4px\">" + esc(title) + "</h2>";
+                : "<h2 style=\"font-size:17px;margin:20px 0 6px;color:" + pal(v).link(v.site().definition().theme().primary())
+                + ";border-bottom:2px solid " + v.site().definition().theme().accent() + ";padding-bottom:4px\">" + esc(title) + "</h2>";
         return "<div style=\"margin:12px 0\">" + heading + inner + "</div>";
     }
 
     static String items(View v, List<VisibleItem> list) {
-        var accent = v.site().definition().theme().accent();
+        var accent = pal(v).link(v.site().definition().theme().accent());
         var out = new StringBuilder();
         for (var i : list) {
             out.append("<div style=\"margin:10px 0\"><a href=\"").append(esc(v.links().item(i)))
                     .append("\" style=\"font-weight:bold;font-size:15px;color:").append(accent).append(";text-decoration:none\">")
                     .append(esc(i.title())).append("</a>");
             if (!blank(i.summary())) {
-                out.append("<div style=\"font-size:14px;color:#4b5563\">").append(esc(i.summary())).append("</div>");
+                out.append("<div style=\"font-size:14px;" + pal(v).muted() + "\">").append(esc(i.summary())).append("</div>");
             }
             out.append("</div>");
         }
@@ -211,6 +212,51 @@ public final class NewsletterRenderer {
         var clean = HtmlSanitizer.sanitize(html == null ? "" : html.contains("<") ? html : "<p>" + esc(html) + "</p>");
         return MediaReferences.MARK.matcher(clean).replaceAll(m -> java.util.regex.Matcher.quoteReplacement(
                 "<a href=\"" + esc(permalink) + "\">[ver en la versión web]</a>"));
+    }
+
+    /**
+     * The colours an issue is drawn with. The EMAIL's are fixed and light — what every mail client shows the
+     * same. The WEB version follows the shell's theme, light or dark: it inherits the page's text colour and
+     * background, greys by transparency, and draws the newsletter's colours mixed with the text colour —
+     * darker on a light page, lighter on a dark one — so they keep their hue and stay readable on either.
+     */
+    record Palette(boolean web) {
+        String root() {
+            return web ? "color:inherit;background:transparent;" : "color:#1f2933;background:#ffffff;color-scheme:light;";
+        }
+
+        String muted() {
+            return web ? "opacity:.75;" : "color:#4b5563;";
+        }
+
+        String border() {
+            return web ? "rgba(128,128,128,.35)" : "#e5e7eb";
+        }
+
+        String link(String color) {
+            return web ? "color-mix(in srgb, " + color + " 60%, currentColor)" : color;
+        }
+    }
+
+    static Palette pal(View v) {
+        return new Palette(v.mode() == Mode.WEB);
+    }
+
+    /** Text that reads on a band of this colour: white on a dark one, near-black on a light one. */
+    public static String ink(String hex) {
+        try {
+            var c = Integer.parseInt(hex.substring(1), 16);
+            double r = lin(((c >> 16) & 255) / 255.0), g = lin(((c >> 8) & 255) / 255.0), b = lin((c & 255) / 255.0);
+            var luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            // the one with more contrast (WCAG): white vs #111827
+            return (1.05) / (luminance + 0.05) >= (luminance + 0.05) / (0.0137 + 0.05) ? "#ffffff" : "#111827";
+        } catch (RuntimeException e) {
+            return "#ffffff";
+        }
+    }
+
+    static double lin(double c) {
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     }
 
     static boolean es(View v) {
