@@ -233,20 +233,48 @@
     });
     return texts;
   };
-  let shownTitle = document.title;
-  const onTitle = () => {
-    const t = document.title;
-    const before = shownTitle;
-    shownTitle = t;
-    if (t === before || !t.trim()) return;
+  // Every title the tab has had, in order — read from the mutation records, not only document.title: the
+  // host's SetWindowTitle and the block's can land in ONE observer batch (a hard reload), and the title in
+  // between (the host page's) would be lost; restoring "the one before" then put back the bootstrap's empty
+  // title. The one to put back is the latest non-blank title that is not a block's heading; if there is
+  // none, the tab is left as it is (never emptied).
+  const titles = [];
+  const noteTitle = (text) => {
+    const v = (text || '').trim();
+    if (v && titles[titles.length - 1] !== v) titles.push(v);
+    if (titles.length > 20) titles.shift();
+  };
+  noteTitle(document.title);
+  const inTitle = (node) => node && (node.nodeName === 'TITLE' || (node.parentNode && node.parentNode.nodeName === 'TITLE'));
+  const onTitle = (records) => {
+    let touched = false;
+    for (const r of records) {
+      if (r.type === 'characterData' && inTitle(r.target)) {
+        noteTitle(r.oldValue);
+        touched = true;
+      } else if (r.type === 'childList' && (inTitle(r.target) || [...r.addedNodes, ...r.removedNodes].some(inTitle))) {
+        r.removedNodes.forEach((n) => noteTitle(n.nodeName === 'TITLE' ? n.textContent : n.data));
+        r.addedNodes.forEach((n) => noteTitle(n.nodeName === 'TITLE' ? n.textContent : n.data));
+        touched = true;
+      }
+    }
+    if (!touched) return;
+    const t = (document.title || '').trim();
+    noteTitle(t);
+    if (!t) return;
     const check = () => {
-      if (document.title === t && blockHeadings().has(t.trim())) document.title = before;
+      if ((document.title || '').trim() !== t) return;
+      const headings = blockHeadings();
+      if (!headings.has(t)) return;
+      const host = [...titles].reverse().find((v) => v !== t && !headings.has(v));
+      if (host) document.title = host;
     };
     setTimeout(check, 250);
     setTimeout(check, 1200);
   };
   if (document.head) {
-    new MutationObserver(onTitle).observe(document.head, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(onTitle).observe(document.head,
+      { childList: true, subtree: true, characterData: true, characterDataOldValue: true });
   }
 
   let pending = false;
