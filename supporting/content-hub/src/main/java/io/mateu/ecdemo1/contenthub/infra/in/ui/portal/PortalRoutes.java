@@ -30,18 +30,20 @@ public class PortalRoutes implements RouteResolver {
     /** The UIs that mount the portal; /_content-hub has an "intranet" entry of its own (its configuration). */
     static final Set<String> PORTAL_UIS = Set.of("/_intranet", "/_portal");
 
-    static final Map<String, Class<?>> PAGES = Map.of(
-            ROOT, HomePage.class,
-            "/intranet/noticias/[^/]+", ItemPage.class,
-            "/intranet/personas/[^/]+", PersonPage.class,
-            "/intranet/secciones/[^/]+", SectionPage.class,
-            "/intranet/solicitudes/[^/]+", RequestPage.class,
-            "/intranet/encuestas/[^/]+", SurveyPage.class,
+    static final Map<String, Class<?>> PAGES = Map.ofEntries(
+            Map.entry(ROOT, HomePage.class),
+            Map.entry("/intranet/noticias/[^/]+", ItemPage.class),
+            Map.entry("/intranet/personas/[^/]+", PersonPage.class),
+            Map.entry("/intranet/secciones/[^/]+", SectionPage.class),
+            Map.entry("/intranet/solicitudes/[^/]+", RequestPage.class),
+            Map.entry("/intranet/encuestas/[^/]+", SurveyPage.class),
+            // a reviewer's preview link: a draft, read-only, for anyone logged in who has the link
+            Map.entry("/intranet/vista-previa/[^/]+", PreviewPage.class),
             // what a menu entry opens when the menu cannot: an external link, a hosted UI (MenuEntryPage)
-            "/intranet/enlace/[^/]+/[^/]+", MenuEntryPage.class,
-            "/intranet/ui/[^/]+/[^/]+", MenuEntryPage.class,
+            Map.entry("/intranet/enlace/[^/]+/[^/]+", MenuEntryPage.class),
+            Map.entry("/intranet/ui/[^/]+/[^/]+", MenuEntryPage.class),
             // a newsletter's site: its home, archive, issues, sections and pages (NewsletterSitePage)
-            "/intranet/n/[^/]+(/.*)?", NewsletterSitePage.class);
+            Map.entry("/intranet/n/[^/]+(/.*)?", NewsletterSitePage.class));
 
     @Override
     public Class<?> resolveRoute(String route, String consumedRoute, HttpRequest httpRequest) {
