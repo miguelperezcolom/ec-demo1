@@ -612,6 +612,50 @@ visual. Los shells no cambian: un `MicroFrontend` lo pinta el renderer que cada 
 portal. En la consola de datos lo están los de sus `RemoteMenu`; en `intranet.*`, solo `/_portal`, `/_inbox`
 y los medios.
 
+**Los menús** usan el mismo registro: `UiSources` es uno solo, con el `UiSource` del dominio, y
+`PgUiSourceRepository` es su implementación (`@Primary`). Una entrada `REMOTE` de una UI de Mateu es un
+`RemoteMenu`; una de web component o iframe, `/intranet/ui/{sitio}/{entrada}` (`MenuEntryPage`), dibujada
+como una pantalla externa.
+
+### El cromo de una UI embebida
+
+Un `MicroFrontend` de Mateu dibuja la página del remoto como si fuera la de arriba: una **miga de pan
+automática**, calculada con el menú y la URL **del host** («Intranet › Noticias › Acumulaciones» dentro de un
+bloque), y su **título de ventana** (`SetWindowTitle`) en la pestaña. Mateu no tiene aún una opción de
+«embebido». Mientras tanto:
+
+- `RemoteUiRenderer.Mode`: `BLOCK` (un componente remoto) o `PAGE` (una pantalla externa o una entrada de menú
+  alojada). La isla lleva las clases `ec-remote-ui`, `ec-remote-block` o `ec-remote-page` y, en un bloque con
+  título propio, `ec-remote-notitle`.
+- `embed.js` mete en los shadow roots de cada isla un estilo que quita la miga de pan (`.breadcrumbs-bar`: la
+  de la página es la de la intranet) y, en un bloque con título, el título de la página remota
+  (`.form-header h2`: queda una cabecera compacta, con sus acciones). Vigila esos shadow roots para volver a
+  ponerlo cuando el remoto se repinta.
+- **Guarda del título**: si la pestaña pasa a llamarse como un encabezado dibujado dentro de un bloque remoto,
+  `embed.js` le devuelve el título que tenía (el de la página). Una pantalla externa sí puede dar nombre a la
+  ventana.
+
+Es CSS sobre clases internas del renderer Vaadin de Mateu (`.breadcrumbs-bar`, `.form-header h2`): si cambian,
+vuelve la miga. En Redwood un `MicroFrontend` es una superficie dentro de la página (sin miga propia); la
+guarda del título busca los encabezados dentro de `.ec-remote-ui`, que Redwood quizá no ponga.
+
+#### Lo que Mateu necesitaría
+
+Una opción en `MicroFrontend` —p. ej. `chrome(EmbeddedChrome.NONE | COMPACT | PAGE)`, o un `embedded`
+booleano— que:
+
+1. en el cliente (los dos renderers), para `NONE`/`COMPACT`: no aplique los comandos de ventana que traiga la
+   isla (`SetWindowTitle`, `PushStateToHistory`, `SetFavicon`), no calcule la miga automática
+   (`mateu-content-header.crumbsOf`: tratarla como `level > 0`, igual que hoy `noBreadcrumbs`) y, en `NONE`,
+   tampoco pinte el título de la página (en `COMPACT`, solo sus acciones); para `PAGE`: el título puede nombrar
+   la ventana, pero sin miga propia;
+2. en la petición al remoto, una marca (como la de `_embeddedMediator` que ya mira `CommandMapper`) para que el
+   servidor del remoto no mande esos comandos;
+3. lo mismo en `Resolve.SERVER` (que ya quita los comandos del primer pintado, `MicroFrontendServerResolver.
+   embeddable`), para las interacciones siguientes.
+
+Con eso, `RemoteUiRenderer` pondría la opción y `embed.js` dejaría de tocar el cromo.
+
 ## Slots
 
 Un **slot** es un hueco en la pantalla de otra aplicación donde va contenido editorial, con clave estable

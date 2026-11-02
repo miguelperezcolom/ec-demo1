@@ -459,14 +459,16 @@ Pedido el 2026-11-02 (rama `feat/remote-uis`). Diseño acordado con el usuario:
 
 | # | Paso | Estado |
 |---|---|---|
-| R1 | Dominio: `UiSource`, `RemoteUi`, `BlockType.REMOTE`, `ItemType.REMOTE_PAGE`; validación (rutas del gateway, orígenes permitidos, atributos sin `on*`/`javascript:`) y la audiencia de la fuente en la proyección (`Block.visibilityAudience`, `ItemContent.visibilityAudience`) | hecho (580f74a3), con tests |
-| R2 | Registro: puerto `UiSources` (`find`, `all`), `PgUiSourceRepository` (`ch_ui_source`), `UiSourceCommands`, `RemoteUis`; Configuración → **UIs externas** (`UiSourcesCrud`/`UiSourceForm`, con el constructor de audiencias y «Dónde se usa») | hecho (580f74a3) |
-| R3 | Dibujo: portal (`MicroFrontend` para Mateu, `<ec-ui-source>` de `embed.js` para web component e iframe), editor visual (una tarjeta), correo (`RemoteUiRenderer.fallbackHtml`/`fallbackText`: «ver en la web») | hecho (580f74a3, a7d39263) |
-| R4 | Editores: pantalla externa en `ItemForm`; campos del bloque en `BlockForm` y en el editor visual (el registro como lista) | hecho (a7d39263) |
-| R5 | Ejemplos en la semilla: Riu Class (`/_loyalty`) y `<ec-push-toggle>`; «Riu Class · socios» (pantalla externa) y «Herramientas» (página con dos componentes remotos) | hecho (0c7c96d2) |
-| R6 | Desplegar en local y probar en el navegador, Vaadin y Redwood, en `ws.localhost:8800` (el gateway enruta `/_loyalty` en el plano de datos) | pendiente (lo coordina el agente principal) |
+| R1 | Dominio: `UiSource`, `RemoteUi`, `BlockType.REMOTE`, `ItemType.REMOTE_PAGE`; validación (rutas del gateway, orígenes permitidos, atributos sin `on*`/`javascript:`) y la audiencia de la fuente en la proyección (`Block.visibilityAudience`, `ItemContent.visibilityAudience`) | hecho (1551b214), con tests |
+| R2 | Registro: puerto `UiSources` (`find`, `all`), `PgUiSourceRepository` (`ch_ui_source`), `UiSourceCommands`, `RemoteUis`; Configuración → **UIs externas** (`UiSourcesCrud`/`UiSourceForm`, con el constructor de audiencias y «Dónde se usa») | hecho (1551b214) |
+| R3 | Dibujo: portal (`MicroFrontend` para Mateu, `<ec-ui-source>` de `embed.js` para web component e iframe), editor visual (una tarjeta), correo (`RemoteUiRenderer.fallbackHtml`/`fallbackText`: «ver en la web») | hecho (1551b214, 7aa42c0a) |
+| R4 | Editores: pantalla externa en `ItemForm`; campos del bloque en `BlockForm` y en el editor visual (el registro como lista) | hecho (7aa42c0a) |
+| R5 | Ejemplos en la semilla: Riu Class (`/_loyalty`) y `<ec-push-toggle>`; «Riu Class · socios» (pantalla externa) y «Herramientas» (página con dos componentes remotos) | hecho (fa73a62c) |
+| R6 | Desplegar en local y probar en el navegador, Vaadin y Redwood, en `ws.localhost:8800` (el gateway enruta `/_loyalty` en el plano de datos) | en parte: Vaadin, «Herramientas» con sus dos bloques (ver R10); Redwood y la pantalla externa, pendientes |
 | R7 | En el host propio de la intranet (`intranet.*`) el gateway solo enruta `/_portal`, `/_inbox` y los medios: una UI de Mateu de otro servicio necesita su ruta allí (decidir cuáles) | pendiente |
 | R8 | Manual del backoffice, arquitectura y operación | hecho |
+| R9 | Un menú con `REMOTE` (rama de menús, #279): un solo `UiSources` con el `UiSource` del dominio; `PgUiSourceRepository` `@Primary`, sin el bean vacío de `MenuConfig`; `MenuEntryPage` dibuja web components e iframes con `RemoteUiRenderer` | hecho (rebase sobre master con #279) |
+| R10 | Probado en el navegador (ws.localhost, Vaadin, ana.perez): «Herramientas» pinta los dos bloques remotos; pero la isla traía su cromo (miga «Intranet › Noticias › Acumulaciones» y el título de la pestaña). Arreglo en ec-demo1 (`RemoteUiRenderer.Mode`, clases `ec-remote-*`, estilo y guarda del título en `embed.js`) mientras Mateu no tenga una opción de «embebido» (lo que necesitaría: arquitectura → UIs externas) | hecho (8ed58aaa); falta volver a probarlo en el navegador (Vaadin y Redwood) |
 
 Limitaciones conocidas:
 - dentro de una pantalla externa, un enlace de la UI remota navega a su propia ruta (p. ej. `/loyalty/members/…`):
