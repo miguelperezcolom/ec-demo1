@@ -189,6 +189,9 @@ public final class ContentReferences {
             }
         }
         html(add, null, Subject.ITEM, id, title, b.html(), where);
+        // a block's other languages: their own HTML (links, images, media); URLs and ids are the same in all
+        b.translations().forEach((language, text) -> html(add, null, Subject.ITEM, id, title, text.html(),
+                where + " (" + language + ")"));
     }
 
     /** The links, images and media marks of a piece of HTML. */
@@ -244,12 +247,13 @@ public final class ContentReferences {
                 out.add(b.mediaId());
             }
             marks(b.html(), out);
+            b.translations().values().forEach(t -> marks(t.html(), out));
         }
     }
 
     static void signed(ItemContent c, Set<String> out) {
         c.translations().values().forEach(t -> marks(t.body(), out));
-        c.blocks().forEach(b -> marks(b.html(), out));
+        blocks(c.blocks(), out);
     }
 
     static void marks(String html, Set<String> out) {

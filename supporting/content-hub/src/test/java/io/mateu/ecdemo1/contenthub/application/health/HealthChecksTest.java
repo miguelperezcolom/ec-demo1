@@ -249,6 +249,24 @@ class HealthChecksTest {
         }
 
         @Test
+        void a_blocks_other_languages_are_checked_and_their_media_are_in_use() {
+            var english = new Block.BlockText("Links", "<p>[[media:soloEn]] <a href=\"/intranet/noticias/nadie\">x</a>"
+                    + " <img src=\"/en.png\"></p>", null);
+            var block = new Block("h", BlockType.HTML, Audience.EVERYONE, "Enlaces", "<p>bien</p>", null, null, null,
+                    List.of(), null, null, Map.of("en", english));
+            var s = snapshot().media(image("soloEn", 10, NOW.minus(Duration.ofDays(30))))
+                    .item(published("p", ItemType.PAGE, content("s1", "", List.of(block), null), NOW.minus(Duration.ofDays(1))));
+            s.alts.put("soloEn", "Logo");
+            var built = s.build();
+
+            assertThat(of(HealthCheck.ORPHAN_MEDIA, built)).isEmpty();
+            assertThat(of(HealthCheck.BROKEN_LINKS, built)).singleElement()
+                    .satisfies(f -> assertThat(f.problem()).contains("«nadie» no existe").contains("(en)"));
+            assertThat(of(HealthCheck.MISSING_ALT, built)).singleElement()
+                    .satisfies(f -> assertThat(f.target()).isEqualTo("/en.png"));
+        }
+
+        @Test
         void page_templates_have_their_blocks_checked_and_their_media_are_in_use() {
             var s = snapshot()
                     .media(image("enPlantilla", 10, NOW.minus(Duration.ofDays(30))))
