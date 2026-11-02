@@ -13,8 +13,8 @@ import io.mateu.uidl.data.Button;
 import io.mateu.uidl.data.ButtonStyle;
 import io.mateu.uidl.data.FieldDataType;
 import io.mateu.uidl.data.FormField;
-import io.mateu.uidl.data.HeroSearchPage;
 import io.mateu.uidl.data.HorizontalLayout;
+import io.mateu.uidl.data.MultimediaContentPage;
 import io.mateu.uidl.data.Text;
 import io.mateu.uidl.data.VerticalAlignment;
 import io.mateu.uidl.data.VerticalLayout;
@@ -37,7 +37,8 @@ import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.mu
 import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.small;
 
 /**
- * The portal's search on Mateu's hero search template: the box; the AI's answer, for a query that reads as a
+ * The portal's search, on the multimedia content template and not on HeroSearchPage: on Redwood that one
+ * brings its own search box, tied to a listing, which this page's content does not fit. The box; the AI's answer, for a query that reads as a
  * question (for any other, a button that asks for it); what the reader may see, by words and by meaning, each
  * result with the passage that matched; and the people the query names, as a group of their own.
  *
@@ -89,7 +90,7 @@ public class SearchPage implements ComponentTreeSupplier {
         }
         return Form.builder().title("Buscar en la intranet")
                 .subtitle("Por palabras y por significado, entre lo que puedes ver; y a quien se llame así")
-                .template(new HeroSearchPage(PortalComponents.TONE.name()))
+                .template(new MultimediaContentPage(PortalComponents.TONE.name()))
                 .content(content)
                 .build();
     }

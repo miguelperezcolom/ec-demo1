@@ -302,8 +302,8 @@ encontrado solo por significado se vuelve a pedir a `Visibility`. El subtítulo 
 que coincidió, recortado alrededor de la palabra (`Snippets`). Sin el servicio de embeddings se busca solo por
 palabras (un timeout de 10 s para las preguntas, que tienen a alguien esperando) y la página lo dice.
 
-`SearchPage` es un `Form` con el template `HeroSearchPage` y no un listado, porque respuesta, resultados y
-personas dependen de la misma consulta. No pagina: los 20 mejores.
+`SearchPage` es un `Form` con el template `MultimediaContentPage` y no un listado, porque respuesta, resultados
+y personas dependen de la misma consulta (`HeroSearchPage` trae en Redwood su propia caja, atada a un listado). No pagina: los 20 mejores.
 
 **Mateu llama a `component()` más de una vez por petición** (para localizar el botón de la acción y para
 dibujar), así que la página guarda lo calculado por consulta en un campo `final`: sin eso cada búsqueda llamaba

@@ -14,6 +14,7 @@ import io.mateu.uidl.data.EmptyState;
 import io.mateu.uidl.data.FieldDataType;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.data.FormField;
+import io.mateu.uidl.data.FormLayout;
 import io.mateu.uidl.data.Message;
 import io.mateu.uidl.data.MultimediaContentPage;
 import io.mateu.uidl.data.Notice;
@@ -79,7 +80,9 @@ public class SurveyPage implements ComponentTreeSupplier, Identifiable {
             content.add(Notice.builder().text(survey.anonymous()
                     ? "Es anónima: se anota que has respondido, para que no se responda dos veces, pero tus respuestas no llevan nada que te identifique."
                     : "No es anónima: los responsables verán tu nombre junto a tus respuestas.").build());
-            content.add(section(null, PortalComponents.column(survey.questions().stream().map(SurveyPage::field).toList())));
+            // a FormLayout: Redwood draws a radio or a checkbox set only there, and a loose field as a text box
+            content.add(section(null, FormLayout.builder().maxColumns(1)
+                    .content(survey.questions().stream().map(SurveyPage::field).toList()).build()));
             if (reader.viewingAs() == null) {
                 toolbar.add(Button.builder().label("Enviar").actionId("enviar").buttonStyle(ButtonStyle.primary).build());
             }
