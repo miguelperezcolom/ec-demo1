@@ -6,7 +6,8 @@
     "test": "playwright test",
     "report": "playwright show-report",
     "demo": "playwright test --config demo.config.ts",
-    "demo:ui": "playwright test --config demo-ui.config.ts"
+    "demo:ui": "playwright test --config demo-ui.config.ts",
+    "intranet": "./intranet/run-local.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0"
