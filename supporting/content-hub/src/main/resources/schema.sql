@@ -153,3 +153,13 @@ create unique index if not exists ch_nl_issue_number on ch_nl_issue (newsletter_
 create unique index if not exists ch_nl_issue_slot on ch_nl_issue (newsletter_id, slot);
 create table if not exists ch_nl_subscription (user_id text not null, newsletter_id text not null,
     subscribed boolean not null, sections text[] not null, primary key (user_id, newsletter_id));
+
+-- Page templates: where a new page starts from (its blocks and default audience), one JSON document each.
+create table if not exists ch_page_template (id text primary key, name text, doc jsonb not null,
+    updated_at timestamptz);
+-- Reviewer preview links: a draft shown, signed and expiring, to whoever logged in opens the link; the
+-- views go with the link. The signing key, made once, when MEDIA_SECRET does not give one.
+create table if not exists ch_preview_link (id text primary key, item_id text not null,
+    created_at timestamptz not null, doc jsonb not null);
+create index if not exists ch_preview_link_item on ch_preview_link (item_id, created_at desc);
+create table if not exists ch_preview_key (id int primary key, secret text not null);
