@@ -150,6 +150,56 @@ Lo que se ve es el **borrador** de la página, con sus bloques dibujados como en
 
 Necesita un permiso editorial; guardar, `content:edit`.
 
+### Plantillas de página
+
+Una **plantilla** es de dónde sale una página nueva: un nombre, para qué sirve, los bloques que suele llevar
+(con textos de ejemplo que se cambian) y, si quieres, la audiencia con la que empieza. La página que sale de
+una plantilla es un borrador normal: se copia, no se enlaza (cambiar la plantilla luego no cambia ninguna
+página hecha con ella).
+
+- **Nueva página desde plantilla** (*Editorial → Nueva página desde plantilla*, `/editorial/nuevaPagina`,
+  cualquier editor): elige el **sitio** (la intranet o una newsletter), la **plantilla** (las globales y las
+  de ese sitio, descritas abajo con sus bloques y su audiencia; *Ver la plantilla elegida* la marca), el
+  **título** y, si quieres, la **sección** del sitio. **Crear y abrir el formulario** abre el formulario del
+  contenido; **Crear y editar sobre la página**, el editor visual.
+- **Plantillas** (*Editorial → Plantillas*, `/editorial/plantillas`, solo **publicadores** y
+  administradores, `content:publish`/`content:admin`): crear, editar y borrar plantillas. Las definen quienes
+  deciden lo que se publica, como el contenido de los slots, porque son el punto de partida de todos los
+  editores. *Sitio* vacío: la plantilla es **global** (sirve en la intranet y en cada newsletter); con sitio,
+  solo en él (p. ej. una página especial de una newsletter con sus bloques de sección).
+- **Guardar como plantilla** (botón del formulario de una página, publicadores): hace una plantilla con los
+  bloques y la audiencia **guardados** de la página (guarda antes tus cambios), llamada «Plantilla: …», y la
+  abre para que le pongas nombre y descripción. La de una página de una newsletter es de esa newsletter; la
+  de una página de la intranet, global.
+
+La demo trae tres: **Home de equipo o departamento** (saludo, banner, pendientes, enlaces, avisos y
+noticias), **Página de bienvenida** (banner, texto, enlaces imprescindibles y últimas noticias) y **Landing de
+campaña** (banner, qué es, un medio, cómo participar y novedades). Se crean al arrancar si faltan; una que
+hayas cambiado no se toca.
+
+### Enlaces de vista previa para revisores
+
+Para que alguien que no es editor —el jefe del departamento al que va la página, quien tiene que dar el visto
+bueno— revise un **borrador** antes de publicarlo, sin darle permisos editoriales:
+
+1. En el formulario del contenido (de cualquier tipo), **Enlace de vista previa** abre sus enlaces
+   (`/editorial/vistaPrevia/{id}`).
+2. Elige cuántos **días** vale (7 por defecto, de 1 a 30) y, si quieres, **Enseñarlo como** un perfil del
+   directorio: el revisor lo verá como lo verá ese perfil (como *Ver como*). **Crear enlace de vista previa**
+   te da la URL (`…/intranet/vista-previa/{id}.{firma}`) para copiarla y mandarla.
+3. La lista enseña cada enlace con su estado (*Activo*, *Caducado*, *Revocado*, *Sin efecto: ya se ha
+   publicado*), quién lo creó, cuándo caduca, cuántas veces se ha abierto, cuántas personas y quiénes las
+   últimas. También sale, de solo lectura, en el formulario, en *Enlaces de vista previa*.
+4. **Revocar enlace** (elige cuál) lo anula. **Publicar** el contenido anula todos sus enlaces: lo que
+   enseñaban ya está publicado o ha quedado viejo. Un contenido publicado sin cambios no tiene borrador que
+   enseñar; edítalo y crea un enlace nuevo.
+
+Quien abre el enlace tiene que **iniciar sesión** en la intranet (cualquier empleado; sin sesión no se enseña
+nada) y ve el borrador **de solo lectura**, marcado «Borrador — vista previa». *Editorial → Enlaces de vista
+previa* lista los contenidos con enlaces, cuántos siguen activos y cuántas vistas llevan. Crear y revocar
+enlaces lo puede cualquiera con un permiso editorial. Funciona igual con las páginas y artículos de una
+newsletter (son contenidos); los **números** de una newsletter no tienen todavía enlace de vista previa.
+
 ### El workflow
 
 | Botón | Quién | Qué hace |

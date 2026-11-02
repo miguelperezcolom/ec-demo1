@@ -30,6 +30,19 @@ public class ContentHubMenu {
     HistoryListing historial;
 
     @Menu
+    @Label("Nueva página desde plantilla")
+    NewPageFromTemplatePage nuevaPagina;
+
+    @Menu
+    @Label("Plantillas")
+    @Publishers
+    TemplatesCrud plantillas;
+
+    @Menu
+    @Label("Enlaces de vista previa")
+    PreviewLinksListing vistaPrevia;
+
+    @Menu
     @Label("Medios")
     MediaCrud medios;
 
