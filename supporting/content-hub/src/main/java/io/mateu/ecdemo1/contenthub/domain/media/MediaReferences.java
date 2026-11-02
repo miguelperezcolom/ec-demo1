@@ -23,6 +23,7 @@ public final class MediaReferences {
                 out.add(b.mediaId());
             }
             collect(b.html(), out);
+            b.translations().values().forEach(t -> collect(t.html(), out));
         }
         return out;
     }
