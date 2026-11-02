@@ -26,6 +26,7 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal, sin *Editorial*; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
 | **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, UIs externas, directorio y visibilidad |
 | **UIs externas** | `UiSource` (registro, `ch_ui_source`), `RemoteUis`, `RemoteUiRenderer`; `<ec-ui-source>` en `embed.js` | Pantallas de otras aplicaciones como páginas (`REMOTE_PAGE`) y bloques (`REMOTE`) de la intranet (ver [UIs externas](#uis-externas)) |
+| **Plantillas y vista previa** | `PageTemplate` (`ch_page_template`), `Templates`, `TemplatesCrud`/`TemplateForm`, `NewPageFromTemplatePage`, `TemplateSeeder`; `PreviewLink` (`ch_preview_link`), `PreviewLinks`, `PreviewLinksSigner`, `PreviewLinksPage`/`PreviewLinksListing` y, en el portal, `PreviewPage` (`/intranet/vista-previa/{id}.{firma}`) | Páginas nuevas a partir de plantillas (globales o de un sitio), y enlaces firmados y caducables con los que un revisor con sesión ve un borrador (ver [Plantillas y vista previa](#plantillas-y-vista-previa)) |
 | **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea: contenido (`preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`) y directorio (`buscar_personas`, `ficha_persona`) |
 | **Remoto de slots** | `GET /_intranet/api/slots/{key}` (`SlotController`) | La variante visible de un slot, como JSON (provisional). La consumen el inicio del data plane (`data-plane.inicio.novedades`), el del control plane (`control-plane.inicio.avisos`) y la bienvenida del front office (`front-office.bienvenida.destacado`), en servidor con el token del usuario (`ui-commons` `ContentSlots`) |
 | **Medios** | `GET /_intranet/media/{id}` (`MediaController`) | Los ficheros de la biblioteca, con URL firmada |
@@ -306,6 +307,8 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | `ch_survey_participation`, `ch_survey_response` | Quién ha respondido y qué se ha respondido, en dos tablas que no se apuntan entre sí |
 | `ch_notification_job`, `ch_notification_sent`, `ch_notification_pref` | Los repartos pendientes, qué se ha dicho a quién (item, versión, lector, tipo, canal) y cómo quiere cada uno que se le avise |
 | `ch_usage_event`, `ch_usage_daily`, `ch_item_reader` | El uso: eventos en crudo (con retención), sus agregados por día y las vistas por item y lector |
+| `ch_page_template` | Las plantillas de página (documento JSON: bloques, audiencia por defecto, sitio o ninguno) |
+| `ch_preview_link`, `ch_preview_key` | Los enlaces de vista previa (documento JSON con sus vistas, las 200 últimas) y la clave con que se firman si no hay `MEDIA_SECRET` |
 | `ch_drive_file` | Lo último que Drive dijo de cada fichero referenciado (documento JSON): metadatos, nunca el fichero |
 
 La **búsqueda de texto** es el FTS de PostgreSQL: `ch_item_doc.tsv` (configuración `simple`, índice GIN),
@@ -346,6 +349,14 @@ páginas y contadores solo cuentan lo visible.
   no dice quién. Los textos libres y la exportación van ordenados por su contenido, no por llegada. Cambiar la clave
   permitiría responder otra vez a las encuestas abiertas. Quien tenga la clave y la base podría comprobar si alguien
   concreto respondió, pero no qué respondió.
+- **Enlaces de vista previa.** `…/intranet/vista-previa/{id}.{firma}` es una página del portal: el gateway
+  pide sesión antes de llegar aquí, y `PreviewLinks.open` rechaza a quien no trae usuario. La firma es la de la
+  newsletter (`NewsletterLinksSigner`: HMAC-SHA256, base64url, 22 caracteres) sobre `preview|id|item|caducidad`,
+  con `MEDIA_SECRET` o, sin él, una clave aleatoria creada una vez y guardada en `ch_preview_key` (un enlace
+  dura días y tiene que sobrevivir a un reinicio). Que el enlace siga valiendo lo dice su registro: caducidad,
+  revocación y publicación (guarda cuántas versiones tenía el item; publicar añade una). Enseña el borrador con
+  medios firmados `EDITOR` y sin acciones; lee como el usuario real o como el perfil del enlace, nunca con los
+  permisos editoriales de nadie.
 - **MCP.** El servidor MCP no pasa por el gateway (es interno del clúster): aquí sí se verifica el token
   que reenvía `ia-agent` contra Keycloak (`KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI`) y una llamada sin él
   se rechaza. Cada herramienta lee como el usuario real (nunca como su "ver como").
@@ -784,6 +795,20 @@ Mientras Mateu no publique el microfrontend resuelto en servidor y `@ContentSlot
 repositorio de Mateu), el remoto es **REST provisional**: `GET /_intranet/api/slots/{key}` con el token del
 usuario devuelve `{key, variant, priority, title, html, link, cacheKey}` o **204** (la aplicación pinta el
 fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicación cachee por él.
+
+## Plantillas y vista previa
+
+- **Plantilla** (`PageTemplate`): nombre, descripción, `Block`s (los mismos de una página, con la regla de que
+  un bloque solo estrecha la audiencia) y audiencia por defecto opcional; `siteId` nulo es global, si no, solo
+  vale en ese sitio. `Templates.newPage` copia los bloques en un borrador `PAGE` nuevo vía `ItemCommands.create`
+  o `createInSite` (saneado y con autor como cualquiera). Usarla pide `content:edit`; definirla, guardar una
+  página como plantilla o borrarla, `content:publish` (o `content:admin`), como el contenido de los slots.
+  `TemplateSeeder` siembra tres por id, solo si faltan.
+- **Enlace de vista previa** (`PreviewLink`): item, quién y cuándo, caducidad (7 días por defecto, máximo 30),
+  perfil «ver como» opcional, revocación y vistas (quién y cuándo). Su estado se calcula, sin eventos ni jobs:
+  revocado, publicado después (`versions().size() > versionsAtCreation`), caducado o activo. Solo se crea si
+  hay borrador que enseñar. Crear y revocar piden un permiso editorial cualquiera; abrir, solo sesión. Una vista
+  se registra cuando se enseña el borrador y la página se abre (no en cada redibujado).
 
 ## Decisiones y por qué
 

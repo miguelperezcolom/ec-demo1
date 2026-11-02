@@ -514,6 +514,27 @@ editorial. Rama `feat/history-calendar`.
 | V7 | Tests (diff por palabras y de HTML, diferencias, restaurar, agregación del calendario, store) y documentación (manual del backoffice, arquitectura) | hecho |
 | V8 | Probar en local en Vaadin | primera prueba del coordinador: el calendario fallaba (lector sin permisos: Mateu evaluaba el campo sin petición) y los selects del historial eran de solo lectura (ficha de un listado). Corregido: lector desde la petición en curso; selects como `FormField` en `detailContent`. Falta volver a probarlo, y Redwood |
 
+## P — Plantillas y vista previa (2026-11-02)
+
+Pedido: (A) **plantillas de página** — nombre, descripción, bloques con textos de ejemplo y audiencia por
+defecto opcional; «Nueva página desde plantilla» y «Guardar como plantilla»; tres de ejemplo; por sitio si el
+concepto de sitio está —lo está (#281)—, con plantillas globales. (B) **enlaces de vista previa para
+revisores** — firmados, caducables (7 días), revocables, listados en el item; enseñan el BORRADOR como lo verán
+los lectores (opcionalmente «ver como» un perfil) a cualquiera con sesión, de solo lectura, marcados «Borrador —
+vista previa», registrando las vistas; revocar o publicar los anula.
+
+**Permisos (decididos):** usar una plantilla, `content:edit` (solo hace un borrador); definirlas, `content:publish`
+o `content:admin` (`@Publishers`), como el contenido de slots: son el punto de partida de todos. Enlaces: crear
+y revocar, cualquier permiso editorial; abrir, cualquier empleado con sesión.
+
+| # | Paso | Estado |
+|---|---|---|
+| P1 | Dominio `PageTemplate` (bloques que solo estrechan, audiencia por defecto, `siteId` o global, `fromPage`, `newPageContent`) y `PreviewLink` (`PreviewLinkStatus`: activo, caducado, revocado, publicado; vistas) | hecho: `domain/template`, `domain/preview`, tests de dominio |
+| P2 | `Templates` (CRUD con `content:publish`, `newPage` con `content:edit` en el sitio elegido, `saveFromPage`, `seed`) y `PreviewLinks` (`create`/`revoke` con permiso editorial, `open` con sesión y firma); `PgTemplateRepository`, `PgPreviewLinkRepository`, `ch_page_template`, `ch_preview_link`, `ch_preview_key`; `PreviewLinksSigner` (HMAC como `NewsletterLinksSigner`, clave persistida sin `MEDIA_SECRET`) | hecho: `TemplatesTest`, `PreviewLinksTest`, `TemplatePreviewJsonTest` |
+| P3 | Backoffice: *Plantillas* (`TemplatesCrud`, `@Publishers`), *Nueva página desde plantilla* (`/editorial/nuevaPagina`: sitio, plantilla, título, sección → formulario o editor visual), *Guardar como plantilla* en el formulario de una página; tres plantillas sembradas (`TemplateSeeder`) | hecho; falta probarlo en el navegador |
+| P4 | Vista previa: *Enlace de vista previa* en el formulario → `PreviewLinksPage` (`/editorial/vistaPrevia/{id}`: días, ver como, crear, lista con estado y vistas, revocar); lista de solo lectura en el formulario; *Enlaces de vista previa* en el menú; `PreviewPage` en el portal (`/intranet/vista-previa/{id}.{firma}`) | hecho: `PreviewPageTest` (sesión, firma, caducidad, revocación, publicación, ver como); falta probarlo en el navegador |
+| P5 | Números de newsletter: enlace de vista previa de un número, y plantillas como maqueta de número | pendiente (las páginas y artículos de una newsletter sí tienen ambas cosas: son items) |
+
 ## Cómo retomar
 
 1. Leer este fichero y mirar la columna **Estado**.

@@ -233,6 +233,20 @@ sabe lo que tú puedes leer.
 Confirmar una lectura **no** se hace desde el chat: abre el enlace y confírmala en el portal. Un contenido
 recién publicado tarda unos segundos en estar disponible para el chat.
 
+## Si te mandan un enlace de vista previa
+
+Un editor te puede pedir que revises algo antes de publicarlo mandándote un enlace
+`…/intranet/vista-previa/…`. Ábrelo con tu sesión de la intranet (sin sesión no se ve nada): verás el
+**borrador** tal como lo verán sus lectores, con la marca **«Borrador — vista previa»**, para quién es y hasta
+cuándo vale el enlace. Si el editor lo hizo «como» un perfil (p. ej. recepción de un hotel), verás lo que vería
+ese perfil, y te avisa si ese perfil no lo vería en absoluto; si no, verás todos los bloques, y los que solo ve
+una parte de la audiencia dicen para quién son.
+
+Es de **solo lectura**: no hay «Me gusta», comentarios, favoritos ni confirmación, y no cuenta como lectura.
+El editor sí ve que lo has abierto (quién y cuándo). El enlace deja de valer cuando caduca (7 días por
+defecto), cuando el editor lo revoca o cuando el contenido se publica: entonces te dice por qué y, si ya está
+publicado, te lleva a él.
+
 ## Si un editor te enseña "ver como"
 
 Un editor que usa *Ver como* en el backoffice ve el portal como otro perfil, con una banda amarilla
