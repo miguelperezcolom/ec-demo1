@@ -166,7 +166,7 @@ integrations:
   pms-integration-url: ${PMS_INTEGRATION_URL:http://localhost:8123}
   mapping-url: ${MAPPING_URL:http://localhost:8122}
   partners-url: ${ERP_URL:http://localhost:8120}
-  console-url: ${CONSOLE_URL:https://console.ec1.mateu.io}
+  console-url: ${CONSOLE_URL:https://rw-console.ec1.mateu.io}
   crypto-key: ${INTEGRATIONS_CRYPTO_KEY:}
   gate-check: ${GATE_CHECK:5s}
   recheck: ${GATE_RECHECK:30s}
@@ -199,7 +199,7 @@ integrations:
     engine-db-username: ${ENGINE_DB_USERNAME:${DB_USERNAME:workflow}}
     engine-db-password: ${ENGINE_DB_PASSWORD:${DB_PASSWORD:}}
     # Where the engine's process pages are (/workflow/processes/<id>).
-    data-console-url: ${DATA_CONSOLE_URL:https://ec1.mateu.io}
+    data-console-url: ${DATA_CONSOLE_URL:https://rw.ec1.mateu.io}
     booking-url: ${BOOKING_URL:http://localhost:8108}
     # What check-demo-health asks after a reset: name=url, each a Spring Boot health.
     health: ${DEMO_HEALTH:booking=http://localhost:8108/actuator/health/readiness}

@@ -192,7 +192,7 @@ class PaymentHandlersTest {
             assertThat(criteria.path("cashierId").asLong()).isEqualTo(69721441L);
         });
         verify(outcomes).charge("XMAR", "39486034", "GSX4AK", "PAY:P-1", false, false, "En el folio de Opera", "88731245");
-        verify(integration).resolveCauseIfOpen(eq("PMS_REJECTED:MRU01:GSX4AK:refund-payment"), anyString());
+        verify(integration).releaseRefusal(eq("MRU01"), eq("GSX4AK"), eq("refund-payment"), anyString());
     }
 
     @Test

@@ -29,7 +29,8 @@ import java.util.List;
 // Sus propios colores, para no parecer una consola más: la barra superior y la franja de color en
 // azul petróleo (la línea Health de Redwood) — static/theme/console-theme.js.
 @io.mateu.uidl.annotations.Script(src = "/theme/console-theme.js")
-@io.mateu.uidl.annotations.Logo("/images/riu.svg")
+// La marca, y qué consola es: cada una su etiqueta (Data plane, Control plane, Front office)
+@io.mateu.uidl.annotations.Logo("/images/riu-front-office.svg")
 @io.mateu.uidl.annotations.FavIcon("/images/riu.svg")
 // Web Push at the desk: the inbox's script, through the gateway (front.ec1's /_inbox/push/**). It
 // offers "Activar avisos" once, and the user menu says and switches the state. What reaches the desk

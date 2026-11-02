@@ -1,0 +1,21 @@
+{
+  "hotel": "MRU01",
+  "pmsHotel": "XMAR",
+  "roomTypes": {
+    "STD-KING": "STDK",
+    "DBL-GARDEN": "DBJB",
+    "DBL-POOL": "DBPB",
+    "DBL-SIDESEA": "DBLB",
+    "JS-STD": "SJSB",
+    "JS-STD-KING": "SJSK",
+    "JS-STD-SPECIAL": "SJSE",
+    "JS-ACCESSIBLE": "SJSM",
+    "JS-SIDESEA-KING": "SJLK",
+    "JS-SIDESEA": "SJLB",
+    "JS-SEA": "SJMB",
+    "JS-SEA-KING": "SJMK",
+    "FAMILY": "FAM",
+    "JS-SWIMOUT": "SJPE",
+    "SUITE-SWIMUP": "SUPE"
+  }
+}

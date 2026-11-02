@@ -34,6 +34,14 @@ cuenta donde se hace.
   nuestras de la última hora, llamadas a Opera de hoy—. Al pulsarlas se abre *APIs externas*
   (`/usage/apis`), con la cuota de la org, las nuestras frente a las de otros, las rechazadas y los
   desgloses por propósito y por endpoint de OHIP.
+- **El cupo de Opera**, solo en la página de inicio de la **consola de datos**: la tarjeta **«Opera —
+  cupo próximas 2 semanas»** dice qué tipos de habitación se quedan sin cupo alguna de las próximas 14
+  noches, y cuándo («2 tipos sin cupo alguna noche — DBPB 16/11–17/11 · SJLB 17/11»), o «Con cupo». Al
+  pulsarla se abre **`/opera/cupo`**: una rejilla de habitaciones libres por tipo y noche —sin ninguna
+  en rojo, una o dos en ámbar, «5+» es cinco o más, lo que la lectura sabe contar—. La consola lo lee de
+  `pms-integration-service` (`GET /availability/calendar`, la propiedad en servicio; `PMS_INTEGRATION_URL`,
+  `http://pms-integration-service:8123` por defecto), que lo relee cada 9 min y lo sirve de esa lectura
+  (vale 15 min): **ver la página no suele gastar llamadas a Opera**. Cómo se cuenta, en [De CRS a Opera](/integracion/crs-a-opera/#el-tenant-real).
 - **Alertas que avisan**: si OHIP o Salesforce dejan de contestar, o el cupo se acaba, la bandeja de los
   administradores lo dice (ver [Observabilidad](/operacion/observabilidad/#quién-se-entera)).
 - **Grafana**: el dashboard *External APIs* y las alertas de

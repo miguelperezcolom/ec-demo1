@@ -42,8 +42,6 @@ import static org.mockito.Mockito.when;
  */
 class SupersededRefusalTest {
 
-    static final String UPSERT_REFUSAL = "PMS_REJECTED:MRU01:ZMPBEY:upsert-reservation";
-    static final String PROFILE_REFUSAL = "PMS_REJECTED:MRU01:ZMPBEY:ensure-guest-profile";
 
     IntegrationClients integration = mock(IntegrationClients.class);
     OperaReservations reservations = mock(OperaReservations.class);
@@ -109,8 +107,8 @@ class SupersededRefusalTest {
         assertThat(run().writeOutcome()).isEqualTo("DONE");
 
         verify(reservations).update(eq("XMAR"), any(), any());
-        verify(integration).resolveCauseIfOpen(UPSERT_REFUSAL, "pms-integration: v3 is in Opera");
-        verify(integration).resolveCauseIfOpen(PROFILE_REFUSAL, "pms-integration: v3 is in Opera");
+        verify(integration).releaseRefusal("MRU01", "ZMPBEY", "upsert-reservation", "pms-integration: v3 is in Opera");
+        verify(integration).releaseRefusal("MRU01", "ZMPBEY", "ensure-guest-profile", "pms-integration: v3 is in Opera");
         // Whoever consumes the PMS — the front office's integration — is told, to read it from Opera.
         verify(events).written(eq("XMAR"), any(), eq("MRU01"), eq("ZMPBEY"), eq("proyectar-reserva"));
     }
@@ -125,7 +123,7 @@ class SupersededRefusalTest {
         assertThat(run().writeOutcome()).isEqualTo("STALE");
 
         verify(reservations, never()).update(any(), any(), any());
-        verify(integration).resolveCauseIfOpen(UPSERT_REFUSAL, "pms-integration: v3 is in Opera");
+        verify(integration).releaseRefusal("MRU01", "ZMPBEY", "upsert-reservation", "pms-integration: v3 is in Opera");
         // Opera had it already: it is read again all the same (a merge in the MDM projects the same version).
         verify(events).written(eq("XMAR"), any(), eq("MRU01"), eq("ZMPBEY"), eq("proyectar-reserva"));
     }
@@ -135,7 +133,7 @@ class SupersededRefusalTest {
         when(integration.reservation("MRU01", "ZMPBEY")).thenReturn(version(1));
         when(reservations.byLocator("XMAR", "ZMPBEY")).thenReturn(Optional.empty());
         when(reservations.create(eq("XMAR"), any())).thenReturn("39484599");
-        doThrow(new IllegalStateException("mapping down")).when(integration).resolveCauseIfOpen(anyString(), anyString());
+        doThrow(new IllegalStateException("mapping down")).when(integration).releaseRefusal(anyString(), anyString(), anyString(), anyString());
 
         assertThat(run()).isEqualTo(new TaskHandlers.Write("DONE", "39484599"));
     }

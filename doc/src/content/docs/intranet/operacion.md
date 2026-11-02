@@ -60,7 +60,7 @@ En el clúster local (`deploy/local/up.sh`, ver [Entorno local](/desarrollo/ento
 Redesplegar tras un cambio en `supporting/content-hub`:
 
 ```sh
-deploy/local/load-images.sh 0.76.0 supporting/content-hub   # el tag de 90-content-hub.yaml
+deploy/local/load-images.sh 0.84.0 supporting/content-hub   # el tag de 90-content-hub.yaml
 KUBECONFIG=$LOCAL_HOME/kubeconfig kubectl -n ec-demo1 rollout restart deploy/content-hub
 ```
 

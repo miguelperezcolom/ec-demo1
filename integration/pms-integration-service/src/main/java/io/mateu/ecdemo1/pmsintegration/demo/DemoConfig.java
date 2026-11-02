@@ -21,9 +21,11 @@ public class DemoConfig {
         return kubernetes ? KubernetesRunConfig.inCluster() : RunConfig.NONE;
     }
 
+    /** The new context's prefix: ECDEMO1 on ec1, ECLOCAL on deploy/local (OPERA_RUN_PREFIX, set by up.sh). */
     @Bean
-    NewOperaContext newOperaContext(OperaContext context, RunConfig runConfig, Clock clock) {
-        return new NewOperaContext(context, runConfig, clock);
+    NewOperaContext newOperaContext(OperaContext context, RunConfig runConfig, Clock clock,
+                                    @Value("${pms-integration.demo.run-prefix:ECDEMO1}") String prefix) {
+        return new NewOperaContext(context, runConfig, clock, prefix);
     }
 
     /**

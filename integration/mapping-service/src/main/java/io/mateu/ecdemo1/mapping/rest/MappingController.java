@@ -51,6 +51,7 @@ public class MappingController {
     final MappingEntryRepository entries;
     final CauseRecordRepository causeRecords;
     final WaiterRepository waiters;
+    final io.mateu.ecdemo1.mapping.store.WaiterCauseRepository waiterCauses;
     final PartnerProfileRepository partnerProfiles;
     final Gaps gaps;
     final io.mateu.ecdemo1.mapping.proposals.AgentProposals agentProposals;
@@ -71,11 +72,14 @@ public class MappingController {
                               List<Variable> variables, List<Cause> causes, String engineProcessId) {
     }
 
+    /** @param onRequestSince since when a person lets what waits on it in on request; null if nobody did */
     public record CauseView(String key, String type, String description, String hotelCode, String status,
-                            long waiting, int openings, String openedAt, String resolvedAt, String resolvedBy) {
+                            long waiting, int openings, String openedAt, String resolvedAt, String resolvedBy,
+                            String onRequestSince, String onRequestBy) {
         static CauseView of(CauseRecord c, long waiting) {
             return new CauseView(c.causeKey, c.type.name(), c.description, c.hotelCode, c.status.name(), waiting,
-                    c.openings, String.valueOf(c.openedAt), String.valueOf(c.resolvedAt), c.resolvedBy);
+                    c.openings, String.valueOf(c.openedAt), String.valueOf(c.resolvedAt), c.resolvedBy,
+                    c.onRequestSince == null ? null : c.onRequestSince.toString(), c.onRequestBy);
         }
     }
 
@@ -124,10 +128,47 @@ public class MappingController {
     }
 
     @GetMapping("/causes")
-    @Operation(summary = "Causes, open ones first, with how many processes wait on each")
-    public List<CauseView> causes(@RequestParam(defaultValue = "true") boolean openOnly) {
+    @Operation(summary = "Causes, open ones first, with how many processes wait on each; with a subject (a reservation's "
+            + "locator), only those its processes wait or waited on — a shared refusal does not name it in its key")
+    public List<CauseView> causes(@RequestParam(defaultValue = "true") boolean openOnly,
+                                  @RequestParam(required = false) String subject) {
         var list = openOnly ? causeRecords.findByStatusOrderByOpenedAtAsc(CauseStatus.OPEN) : causeRecords.findAll();
+        if (subject != null && !subject.isBlank()) {
+            var keys = java.util.Set.copyOf(waiterCauses.causesOfSubject(subject));
+            list = list.stream().filter(c -> keys.contains(c.causeKey)).toList();
+        }
         return list.stream().map(c -> CauseView.of(c, waiters.countWaitingOn(c.causeKey))).toList();
+    }
+
+    /** Every cause, or the open ones (the MCP tools' view). */
+    public List<CauseView> causes(boolean openOnly) {
+        return causes(openOnly, null);
+    }
+
+    @PostMapping("/causes/on-request")
+    @Operation(summary = "Let the reservations Opera refused for want of room in on request (on=true), or withdraw it: on "
+            + "request, each goes in by itself once Opera has room for its stay")
+    public void onRequest(@RequestParam String key, @RequestParam(defaultValue = "true") boolean on,
+                          @RequestParam(defaultValue = "admin") String by) {
+        if (on) {
+            causes.letInOnRequest(key, by);
+        } else {
+            causes.withdrawOnRequest(key, by);
+        }
+    }
+
+    @GetMapping("/causes/waiting")
+    @Operation(summary = "The processes waiting on a cause now, with the hotel and the subject (a reservation's locator)")
+    public List<Causes.WaitingProcess> waitingOn(@RequestParam String key) {
+        return causes.waitingOn(key);
+    }
+
+    @PostMapping("/causes/release-refusal")
+    @Operation(summary = "A reservation's refusal of a step has nothing left to wait for: its own refusal is resolved, and "
+            + "its processes are taken off the shared refusals of that step at that hotel, which the others keep waiting on")
+    public void releaseRefusal(@RequestParam String hotelCode, @RequestParam String locator, @RequestParam String step,
+                               @RequestParam(defaultValue = "admin") String by) {
+        causes.releaseRefusal(hotelCode, locator, step, by);
     }
 
     @PostMapping("/causes/resolve")
