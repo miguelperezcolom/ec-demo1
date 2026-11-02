@@ -19,6 +19,7 @@ import io.mateu.ecdemo1.contenthub.domain.uisource.UiSourceKind;
 import io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer;
 import io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer;
 import io.mateu.uidl.data.Element;
+import io.mateu.uidl.data.EmbeddedChrome;
 import io.mateu.uidl.data.MicroFrontend;
 import org.junit.jupiter.api.Test;
 
@@ -85,12 +86,14 @@ class RemoteBlockRenderingTest {
         assertThat(mf.baseUrl()).isEqualTo("/_loyalty");
         assertThat(mf.route()).isEqualTo("/loyalty/members");
         assertThat(mf.resolvedByServer()).as("the renderer asks for it, with the reader's token").isFalse();
-        // a block: embed.js takes its breadcrumb and window title off, and its page title (the block has one)
+        // a block: Mateu draws it embedded (no breadcrumb, no window title); titled, only the remote's actions stay
+        assertThat(mf.chrome()).isEqualTo(EmbeddedChrome.COMPACT);
         assertThat(mf.cssClasses()).isEqualTo("ec-remote-ui ec-remote-block ec-remote-notitle");
         var untitled = new Block("b2", BlockType.REMOTE, null, null, null, null, null, null, null, null,
                 RemoteUi.of("riu-class", "/loyalty/members"));
         assertThat(((MicroFrontend) renderer.content(reader("CANARIAS"), untitled)).cssClasses())
                 .as("no title of its own: the remote's stays").isEqualTo("ec-remote-ui ec-remote-block");
+        assertThat(((MicroFrontend) renderer.content(reader("CANARIAS"), untitled)).chrome()).isEqualTo(EmbeddedChrome.PAGE);
     }
 
     @Test

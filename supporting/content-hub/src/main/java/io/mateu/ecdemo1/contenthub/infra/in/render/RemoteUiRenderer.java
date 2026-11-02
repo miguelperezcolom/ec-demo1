@@ -7,6 +7,7 @@ import io.mateu.ecdemo1.contenthub.domain.uisource.UiSource;
 import io.mateu.ecdemo1.contenthub.domain.uisource.UiSourceKind;
 import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.data.Element;
+import io.mateu.uidl.data.EmbeddedChrome;
 import io.mateu.uidl.data.MicroFrontend;
 import io.mateu.uidl.fluent.Component;
 import lombok.RequiredArgsConstructor;
@@ -54,11 +55,9 @@ public class RemoteUiRenderer {
      *   the breadcrumb is the intranet's (the host page's), not one the remote derives from the host URL.</li>
      * </ul>
      *
-     * <p>Mateu has no "embedded / no chrome" option on a {@link MicroFrontend} yet: the island draws its
-     * page like a top-level one (an automatic breadcrumb from the HOST's menu and URL, and the remote's
-     * SetWindowTitle). Until it has, the island is marked with CSS classes ({@code ec-remote-ui},
-     * {@code ec-remote-block|ec-remote-page}, {@code ec-remote-notitle}) and {@code embed.js} takes the chrome
-     * off (see there). docs: arquitectura → UIs externas → «Lo que Mateu necesitaría».
+     * <p>Mateu draws it as a block of the host page ({@link EmbeddedChrome}): it never names the window nor
+     * touches the address bar, and draws no breadcrumb of its own. The CSS classes ({@code ec-remote-ui},
+     * {@code ec-remote-block|ec-remote-page}, {@code ec-remote-notitle}) only mark the island.
      */
     public enum Mode { BLOCK, PAGE }
 
@@ -80,13 +79,19 @@ public class RemoteUiRenderer {
                     .route(use.route() == null ? "" : use.route())
                     .style("display:block;width:100%;")
                     .cssClasses(classes)
+                    .chrome(chrome(mode, titled))
                     .build();
             case WEB_COMPONENT, IFRAME -> new Element(ELEMENT, attributes(source, use), Map.of(), "",
                     "display:block;width:100%;", classes, false);
         };
     }
 
-    /** The classes embed.js keys off: {@code ec-remote-ui}, the mode, and whether the remote's title is hidden. */
+    /** A titled block keeps only the remote's actions (the block has its own title); else its header, without breadcrumb. */
+    static EmbeddedChrome chrome(Mode mode, boolean titled) {
+        return mode == Mode.BLOCK && titled ? EmbeddedChrome.COMPACT : EmbeddedChrome.PAGE;
+    }
+
+    /** The classes that mark the island: {@code ec-remote-ui}, the mode, and whether the remote's title is hidden. */
     public static String chromeClasses(Mode mode, boolean titled) {
         return "ec-remote-ui " + (mode == Mode.BLOCK ? "ec-remote-block" : "ec-remote-page")
                 + (mode == Mode.BLOCK && titled ? " ec-remote-notitle" : "");

@@ -178,105 +178,6 @@
   }
   if (window.customElements && !customElements.get('ec-ui-source')) customElements.define('ec-ui-source', EcUiSource);
 
-  // Mateu UIs embedded by content-hub (a MicroFrontend: a «Componente remoto» block, a remote page),
-  // marked with CSS classes by RemoteUiRenderer. Mateu draws the island's page as a top-level one — an
-  // automatic breadcrumb worked out from the HOST's menu and URL, and the remote's SetWindowTitle on the
-  // browser tab — and has no "embedded" option yet. Until it has, this takes that chrome off:
-  //  - every island (ec-remote-ui): no breadcrumb of its own — the intranet's is the page's;
-  //  - a titled block (ec-remote-notitle): no page title either (the block has its own): a compact header;
-  //  - a block (ec-remote-block): the tab keeps the host page's title (see the title guard below).
-  // A remote page (ec-remote-page) may name the window.
-  const ISLAND_CSS = '.breadcrumbs-bar{display:none!important}';
-  const NOTITLE_CSS = '.form-header h2{display:none!important}';
-  const dressed = new WeakMap();
-  const watched = new WeakSet();
-  const shadowRootsIn = (el, fn) => {
-    const visit = (node) => {
-      if (!node.shadowRoot) return;
-      fn(node.shadowRoot);
-      node.shadowRoot.querySelectorAll('*').forEach(visit);
-    };
-    visit(el);
-    el.querySelectorAll('*').forEach(visit);
-  };
-  const dressIsland = (island) => {
-    const css = ISLAND_CSS + (island.classList.contains('ec-remote-notitle') ? NOTITLE_CSS : '');
-    shadowRootsIn(island, (root) => {
-      if (dressed.get(root) !== css) {
-        let style = [...root.children].find((c) => c.tagName === 'STYLE' && c.hasAttribute('data-ec-remote'));
-        if (!style) {
-          style = document.createElement('style');
-          style.setAttribute('data-ec-remote', '');
-          root.appendChild(style);
-        }
-        style.textContent = css;
-        dressed.set(root, css);
-      }
-      // the island re-renders inside its own shadow roots, which the page's observer does not see
-      if (!watched.has(root)) {
-        watched.add(root);
-        new MutationObserver(() => schedule()).observe(root, { childList: true, subtree: true });
-      }
-    });
-  };
-
-  // The title guard: a block's remote names the window when it loads (SetWindowTitle). When the tab's
-  // title changes to a heading drawn inside a block island, it goes back to what it was — the host page's.
-  // Checked a moment later, once the island has drawn the heading it named the window after.
-  const blockHeadings = () => {
-    const texts = new Set();
-    eachDeep(document, '.ec-remote-ui.ec-remote-block', (island) => {
-      const take = (root) => root.querySelectorAll('h1,h2,h3,[role=heading]')
-        .forEach((h) => texts.add((h.textContent || '').trim()));
-      take(island);
-      shadowRootsIn(island, take);
-    });
-    return texts;
-  };
-  // Every title the tab has had, in order — read from the mutation records, not only document.title: the
-  // host's SetWindowTitle and the block's can land in ONE observer batch (a hard reload), and the title in
-  // between (the host page's) would be lost; restoring "the one before" then put back the bootstrap's empty
-  // title. The one to put back is the latest non-blank title that is not a block's heading; if there is
-  // none, the tab is left as it is (never emptied).
-  const titles = [];
-  const noteTitle = (text) => {
-    const v = (text || '').trim();
-    if (v && titles[titles.length - 1] !== v) titles.push(v);
-    if (titles.length > 20) titles.shift();
-  };
-  noteTitle(document.title);
-  const inTitle = (node) => node && (node.nodeName === 'TITLE' || (node.parentNode && node.parentNode.nodeName === 'TITLE'));
-  const onTitle = (records) => {
-    let touched = false;
-    for (const r of records) {
-      if (r.type === 'characterData' && inTitle(r.target)) {
-        noteTitle(r.oldValue);
-        touched = true;
-      } else if (r.type === 'childList' && (inTitle(r.target) || [...r.addedNodes, ...r.removedNodes].some(inTitle))) {
-        r.removedNodes.forEach((n) => noteTitle(n.nodeName === 'TITLE' ? n.textContent : n.data));
-        r.addedNodes.forEach((n) => noteTitle(n.nodeName === 'TITLE' ? n.textContent : n.data));
-        touched = true;
-      }
-    }
-    if (!touched) return;
-    const t = (document.title || '').trim();
-    noteTitle(t);
-    if (!t) return;
-    const check = () => {
-      if ((document.title || '').trim() !== t) return;
-      const headings = blockHeadings();
-      if (!headings.has(t)) return;
-      const host = [...titles].reverse().find((v) => v !== t && !headings.has(v));
-      if (host) document.title = host;
-    };
-    setTimeout(check, 250);
-    setTimeout(check, 1200);
-  };
-  if (document.head) {
-    new MutationObserver(onTitle).observe(document.head,
-      { childList: true, subtree: true, characterData: true, characterDataOldValue: true });
-  }
-
   let pending = false;
   const schedule = () => {
     if (!pending) {
@@ -286,7 +187,6 @@
   };
   const scan = () => {
     pending = false;
-    eachDeep(document, '.ec-remote-ui', dressIsland);
     eachDeep(document, '[data-ec-embed]', upgrade);
     if (window.customElements && !customElements.get(EDITOR) && !editorLoading) {
       eachDeep(document, EDITOR, loadEditor);
