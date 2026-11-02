@@ -22,7 +22,7 @@ import java.util.Set;
  */
 public interface ContentIndex {
 
-    enum Kind { ITEM, BLOCK, VARIANT }
+    enum Kind { ITEM, BLOCK, VARIANT, SURVEY }
 
     /** A subject of the projection: its effective audience and the hashes that currently see it. */
     record Subject(Kind kind, String key, Audience audience, Set<String> hashes) {
@@ -37,6 +37,9 @@ public interface ContentIndex {
     void indexItem(Item item, Set<String> hashes, Map<String, Set<String>> blockHashes);
 
     void indexSlot(Slot slot, Map<String, Set<String>> variantHashes);
+
+    /** Replaces the survey's document with its current state and the hashes that see it (not for drafts). */
+    void indexSurvey(io.mateu.ecdemo1.contenthub.domain.survey.Survey survey, Set<String> hashes);
 
     List<Subject> subjects();
 
@@ -98,6 +101,13 @@ public interface ContentIndex {
     boolean isMediaVisible(String mediaId, String hash, Instant now);
 
     record Page<T>(List<T> content, long total) {
+    }
+
+    /** The surveys open now that the hash sees (one, when surveyId is given), closing soonest first. */
+    List<VisibleSurvey> openSurveys(String hash, Instant now, String surveyId);
+
+    record VisibleSurvey(String surveyId, String title, String description, Instant opensAt, Instant closesAt,
+                         boolean anonymous) {
     }
 
     record VisibleVariant(String slotKey, String variantId, int priority, String title, String html, String linkUrl) {

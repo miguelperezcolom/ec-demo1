@@ -36,7 +36,7 @@ modificación. **Nuevo** crea uno; un item **no se borra**: se retira.
 | **Contenido** | **Tipo** (Artículo, Página, Aviso, Enlace, Documento; no se cambia después), **Sección** del árbol, **Idioma por defecto** |
 | **Español / English / Deutsch** | Por idioma: título, resumen y cuerpo (texto enriquecido). Un idioma sin título no se publica; al lector sin traducción en su idioma se le muestra el idioma por defecto, que **debe** tener título |
 | **Audiencia** | Quién lo verá (ver [El constructor de audiencias](#el-constructor-de-audiencias)) |
-| **Publicación** | *Publicar a partir de* (vacío: en el momento de publicar), *Caduca el*, *URL* (obligatoria en enlaces y documentos; vale `media:id` para un fichero de la biblioteca), *Seguimiento de lectura*, *Confirmación obligatoria* y *Confirmar antes del*, *Al publicar, exigir reconfirmar* |
+| **Publicación** | *Publicar a partir de* (vacío: en el momento de publicar), *Caduca el*, *URL* (obligatoria en enlaces y documentos; vale `media:id` para un fichero de la biblioteca), *Seguimiento de lectura*, *Confirmación obligatoria* y *Confirmar antes del*, *Al publicar, exigir reconfirmar*, *Comentarios cerrados* (se aplica al guardar, sin esperar a publicar: ver [Comentarios](#comentarios)) |
 | **Bloques (solo páginas)** | Los bloques de una página (ver abajo) |
 | **Avisos** | Lo que conviene revisar antes de publicar: una audiencia que no cumple nadie, un bloque que nadie vería |
 
@@ -229,6 +229,41 @@ Para los items con **confirmación obligatoria**:
 - **Pendientes de confirmar** — quién falta, con su email, hotel y departamento: la lista para reclamar.
 
 Las dos se **exportan** a CSV o Excel desde el propio listado.
+
+## Comentarios
+
+*Editorial → Comentarios* lista todos los comentarios de todos los contenidos, también los ocultos, el más
+reciente primero, y se puede buscar por texto, contenido o autor. Hace falta `content:edit`.
+
+- **Ocultar**: al abrir un comentario, lo quita del portal. No se borra: queda quién lo ocultó y cuándo, y
+  **Mostrar** lo devuelve.
+- **Cerrar los comentarios** de un contenido: *Comentarios cerrados*, en la sección *Publicación* de su formulario.
+  Actúa al guardar, sin crear una versión nueva. Los comentarios que hay se siguen viendo.
+
+## Encuestas
+
+*Editorial → Encuestas* lista todas, con su estado y cuántas respuestas tienen. Las encuestas **no se borran**: se
+cierran, porque sus respuestas se perderían con ellas.
+
+| Sección del formulario | Qué se rellena |
+| :--------------------- | :------------- |
+| **Audiencia** | Quién la verá, con el mismo [constructor](#el-constructor-de-audiencias) que los contenidos |
+| **Encuesta** | *Título*, *Descripción*, *Abre el* (vacío: al publicarla), *Cierra el* (vacío: hasta cerrarla a mano), *Anónima* |
+| **Preguntas** | Enunciado, *Tipo* (opción única, opción múltiple, valoración de 1 a 5, texto libre), *Obligatoria* y, si son de opciones, una por línea (al menos dos) |
+| **Resultados** | Al verla una vez publicada: lo que se ha respondido |
+
+**Publicar** (`content:publish`) la abre a su audiencia en cuanto llegue su fecha. Desde ese momento **sus
+preguntas y si es anónima ya no se pueden cambiar**, para que las respuestas sigan significando lo mismo; su
+título, descripción, audiencia y fechas sí. **Cerrar** (`content:publish`) la termina antes de tiempo; una
+encuesta cerrada ya no se modifica. Llegar a la fecha de cierre deja de admitir respuestas sin hacer nada más.
+
+**Resultados**, pregunta a pregunta: una tarta para la opción única, barras para la múltiple y la valoración
+(con su media), con el recuento y el porcentaje sobre quienes respondieron esa pregunta, y los textos libres,
+por orden alfabético.
+
+*Editorial → Respuestas de encuestas* da cada respuesta en una fila, para buscar y **exportar a CSV o Excel**. Las
+de una encuesta anónima no dicen quién ni cuándo, y las filas van ordenadas por respuesta para que no se puedan
+reconstruir las respuestas de una misma persona.
 
 ## Directorio y visibilidad
 

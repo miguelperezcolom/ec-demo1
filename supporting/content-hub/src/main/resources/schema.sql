@@ -70,3 +70,20 @@ create extension if not exists vector;
 create table if not exists ch_chunk (
     item_id text not null, language text not null, chunk_no int not null, version int not null,
     text text not null, embedding vector(384), primary key (item_id, language, chunk_no));
+
+-- Collaboration (requirement 1364): comments and likes on items, one document per item, apart from it.
+create table if not exists ch_discussion (item_id text primary key, doc jsonb not null, comments int not null);
+create table if not exists ch_likes (item_id text primary key, doc jsonb not null, likes int not null);
+-- Forms and surveys (requirement 1362). Who answered (participation: their id, or a keyed hash in an
+-- anonymous survey) is kept apart from what they answered (responses, which carry no key at all).
+create table if not exists ch_survey (id text primary key, doc jsonb not null, status text not null, title text,
+    updated_at timestamptz);
+create table if not exists ch_survey_participation (survey_id text not null, respondent text not null,
+    primary key (survey_id, respondent));
+create table if not exists ch_survey_response (id text primary key, survey_id text not null, doc jsonb not null);
+create index if not exists ch_survey_response_survey on ch_survey_response (survey_id);
+-- The surveys' projection: published surveys with the hashes that see them, filtered like ch_item_doc.
+create table if not exists ch_survey_doc (
+    survey_id text primary key, status text not null, title text, description text, opens_at timestamptz,
+    closes_at timestamptz, anonymous boolean not null, audience jsonb not null, hashes text[] not null);
+create index if not exists ch_survey_doc_hashes on ch_survey_doc using gin (hashes);

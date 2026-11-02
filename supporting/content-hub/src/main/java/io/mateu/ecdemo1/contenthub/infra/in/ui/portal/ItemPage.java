@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
+import io.mateu.ecdemo1.contenthub.application.usecases.Collaboration;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
@@ -7,7 +8,12 @@ import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.data.Anchor;
 import io.mateu.uidl.data.Button;
 import io.mateu.uidl.data.ButtonStyle;
+import io.mateu.uidl.data.Comment;
+import io.mateu.uidl.data.CommentThread;
 import io.mateu.uidl.data.EmptyState;
+import io.mateu.uidl.data.FieldDataType;
+import io.mateu.uidl.data.FieldStereotype;
+import io.mateu.uidl.data.FormField;
 import io.mateu.uidl.data.Message;
 import io.mateu.uidl.data.MultimediaContentPage;
 import io.mateu.uidl.data.Notice;
@@ -28,9 +34,10 @@ import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PageRenderer.sectio
 /**
  * An item as a reader sees it — only reachable when the visibility function says they may — on
  * Mateu's multimedia content page template (Redwood draws Spectra's): a banner with the title, what
- * it is and when, and the summary, its actions (star it, confirm having read it) as the banner's
- * calls to action; under it the body, the medium or link it points at and, for a page, its blocks,
- * each a section. Opening it records the read (for items with read tracking).
+ * it is and when, and the summary, its actions (star it, like it, confirm having read it) as the
+ * banner's calls to action; under it the body, the medium or link it points at and, for a page, its
+ * blocks, each a section; last, its comments and the box to add one (unless an editor closed them).
+ * Opening it records the read (for items with read tracking).
  */
 @Service
 @Scope("prototype")
@@ -38,14 +45,19 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
 
     String id;
 
+    /** The comment being written (the box under the comments). */
+    String comentario;
+
     final PortalSupport portal;
     final PageRenderer renderer;
     final ReaderActions actions;
+    final Collaboration collaboration;
 
-    public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions) {
+    public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions, Collaboration collaboration) {
         this.portal = portal;
         this.renderer = renderer;
         this.actions = actions;
+        this.collaboration = collaboration;
     }
 
     public ItemPage load(String id, HttpRequest httpRequest) {
@@ -90,6 +102,8 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
         if (ItemType.PAGE.name().equals(item.type())) {
             content.addAll(renderer.sections(reader, item.itemId()));
         }
+        var social = collaboration.social(reader, id);
+        content.add(comments(reader, social));
         var toolbar = new ArrayList<io.mateu.uidl.fluent.UserTrigger>();
         if (confirmable) {
             toolbar.add(Button.builder().label("Confirmar lectura").actionId("confirmarLectura")
@@ -97,6 +111,10 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
         }
         toolbar.add(Button.builder().label(actions.isFavorite(reader, id) ? "Quitar de favoritos" : "Añadir a favoritos")
                 .actionId("favorito").build());
+        if (reader.viewingAs() == null) {
+            toolbar.add(Button.builder().label((social.liked() ? "Ya no me gusta" : "Me gusta")
+                    + " (" + social.likes() + ")").actionId("meGusta").build());
+        }
         return Form.builder()
                 .title(item.title())
                 .overline(PortalComponents.about(item, portal.sectionNames(reader.attributes().language())))
@@ -105,6 +123,51 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
                 .toolbar(toolbar)
                 .content(content)
                 .build();
+    }
+
+    /**
+     * The comments readers see (hidden ones are not), with Mateu's comment thread, and the box to add
+     * one — unless the editors closed the item to comments, or this is an editor's «ver como».
+     */
+    Component comments(io.mateu.ecdemo1.contenthub.application.security.Reader reader, Collaboration.Social social) {
+        var list = social.comments();
+        var parts = new ArrayList<Component>();
+        if (list.isEmpty()) {
+            parts.add(PortalComponents.muted("Todavía no hay comentarios."));
+        } else {
+            parts.add(CommentThread.builder().id("comentarios").comments(list.stream().map(c -> {
+                var author = c.authorName() == null || c.authorName().isBlank() ? c.authorId() : c.authorName();
+                return new Comment(c.id(), author, People.initials(author), c.text(), Ui.when(c.at()), List.of());
+            }).toList()).build());
+        }
+        if (!social.open()) {
+            parts.add(PortalComponents.muted("Los comentarios de este contenido están cerrados."));
+        } else if (reader.viewingAs() == null) {
+            parts.add(FormField.builder().id("comentario").label("Tu comentario").dataType(FieldDataType.string)
+                    .stereotype(FieldStereotype.textarea).placeholder("Escribe un comentario para tus compañeros")
+                    .build());
+            parts.add(Button.builder().label("Comentar").actionId("comentar").buttonStyle(ButtonStyle.secondary).build());
+        }
+        return section("Comentarios (" + list.size() + ")", PortalComponents.column(parts));
+    }
+
+    @Action
+    public Object comentar(HttpRequest httpRequest) {
+        var text = comentario;
+        if ((text == null || text.isBlank()) && httpRequest.runActionRq() != null
+                && httpRequest.runActionRq().componentState() != null) {
+            text = (String) httpRequest.runActionRq().componentState().get("comentario");
+        }
+        // a refusal (empty, too long, closed, not visible) reaches the reader as a message: UserFacingErrors
+        collaboration.comment(portal.reader(httpRequest), id, text);
+        comentario = null;
+        return List.of(this, Message.success("Comentario publicado"));
+    }
+
+    @Action
+    public Object meGusta(HttpRequest httpRequest) {
+        var now = collaboration.toggleLike(portal.reader(httpRequest), id);
+        return List.of(this, Message.success(now ? "Te gusta" : "Ya no te gusta"));
     }
 
     @Action

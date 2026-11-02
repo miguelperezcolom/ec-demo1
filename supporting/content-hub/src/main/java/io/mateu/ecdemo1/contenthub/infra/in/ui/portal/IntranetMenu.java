@@ -59,6 +59,10 @@ public class IntranetMenu {
     ApprovalsListing porAprobar;
 
     @Menu
+    @Label("Encuestas")
+    SurveysListing encuestas;
+
+    @Menu
     @Label("Mis preferencias")
     PreferencesPage preferencias;
 }

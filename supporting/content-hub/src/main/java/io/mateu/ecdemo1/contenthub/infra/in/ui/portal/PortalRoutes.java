@@ -24,7 +24,8 @@ public class PortalRoutes implements RouteResolver {
             "/intranet/noticias/[^/]+", ItemPage.class,
             "/intranet/personas/[^/]+", PersonPage.class,
             "/intranet/secciones/[^/]+", SectionPage.class,
-            "/intranet/solicitudes/[^/]+", RequestPage.class);
+            "/intranet/solicitudes/[^/]+", RequestPage.class,
+            "/intranet/encuestas/[^/]+", SurveyPage.class);
 
     @Override
     public Class<?> resolveRoute(String route, String consumedRoute, HttpRequest httpRequest) {

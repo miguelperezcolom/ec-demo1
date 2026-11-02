@@ -6,7 +6,8 @@ package io.mateu.ecdemo1.contenthub.domain.shared;
  */
 public sealed interface DomainEvent permits ContentEvents.ItemPublished, ContentEvents.ItemRetired,
         ContentEvents.ItemBecameEffective, ContentEvents.ItemExpired, ContentEvents.AudienceRedefined,
-        ContentEvents.SlotVariantPublished, ContentEvents.NavigationChanged, ContentEvents.EmployeeChanged {
+        ContentEvents.SlotVariantPublished, ContentEvents.NavigationChanged, ContentEvents.EmployeeChanged,
+        CollaborationEvents.Event {
 
     /** What the event is about: an item id, an audience id, a slot key… */
     String subject();

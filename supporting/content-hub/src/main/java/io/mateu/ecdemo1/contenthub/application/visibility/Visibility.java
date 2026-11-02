@@ -75,6 +75,18 @@ public class Visibility {
         return index.isMediaVisible(mediaId, reader.hash(), clock.instant());
     }
 
+    /** The surveys open now that the reader's audience sees. */
+    public List<ContentIndex.VisibleSurvey> openSurveys(EmployeeAttributes reader) {
+        ready(reader);
+        return index.openSurveys(reader.hash(), clock.instant(), null);
+    }
+
+    /** One survey, if it is open now and for the reader. */
+    public Optional<ContentIndex.VisibleSurvey> openSurvey(EmployeeAttributes reader, String surveyId) {
+        ready(reader);
+        return index.openSurveys(reader.hash(), clock.instant(), surveyId).stream().findFirst();
+    }
+
     private void ready(EmployeeAttributes reader) {
         if (!index.knowsProfile(reader.hash())) {
             projection.materialise(reader);

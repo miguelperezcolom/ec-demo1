@@ -1,6 +1,6 @@
 ---
 title: Manual del portal
-description: La intranet para el empleado — inicio, noticias, avisos y documentos, secciones, búsqueda, personas y organigrama, solicitudes, favoritos, confirmar lectura, preferencias de la newsletter y preguntar al chat.
+description: La intranet para el empleado — inicio, noticias, avisos y documentos, comentarios y «Me gusta», encuestas, secciones, búsqueda, personas y organigrama, solicitudes, favoritos, confirmar lectura, preferencias de la newsletter y preguntar al chat.
 ---
 
 La intranet está en la consola del plano de datos, en el menú **Intranet** (`https://ec1.mateu.io`, en
@@ -19,6 +19,7 @@ que ves cambia en unos segundos.
 *Intranet → Inicio* te saluda por tu nombre y reúne:
 
 - **⚠️ Pendientes de confirmar**, arriba y solo si los hay: los contenidos que debes confirmar haber leído.
+- **Encuestas por responder**, solo si las hay: las encuestas abiertas para ti que aún no has respondido.
 - **📢 Avisos**: los cinco últimos avisos.
 - **📰 Últimas noticias**: las ocho últimas noticias y páginas.
 
@@ -120,6 +121,31 @@ Sin responsable en el directorio no se puede hacer una solicitud: RRHH tiene que
   que puedes ver.
 
 Nunca te llegará nada que no puedas ver en la intranet, elijas lo que elijas.
+
+## Comentarios y «Me gusta»
+
+Debajo de cada contenido están sus **comentarios**. Escribe en *Tu comentario* y pulsa **Comentar**: lo verá
+cualquiera que pueda ver ese contenido, con tu nombre y la hora. Un comentario no se edita ni lo borra quien lo
+escribe, y tiene un máximo de 2.000 caracteres.
+
+**Me gusta**, arriba junto a *Añadir a favoritos*, muestra cuántos van. Solo cuenta uno por persona; pulsarlo
+otra vez lo retira.
+
+Los editores pueden **cerrar los comentarios** de un contenido (los que hay se siguen viendo, pero no se añaden
+más) y **ocultar** un comentario concreto, que deja de verse.
+
+## Encuestas
+
+*Intranet → Encuestas* lista las encuestas abiertas ahora que van dirigidas a ti, con su estado (*Por responder*
+o *Respondida*), cuándo cierran y si son anónimas. Abre una, contesta y pulsa **Enviar**: las preguntas
+obligatorias hay que responderlas.
+
+- **Se responde una sola vez, y no se puede cambiar después.** Revisa antes de enviar.
+- **Anónima**: se anota que has respondido, para que no se responda dos veces, pero tus respuestas no llevan
+  nada que te identifique. La página lo dice antes de que respondas.
+- **Con tu nombre**: los responsables ven quién ha respondido qué. La página también lo dice.
+
+Fuera de sus fechas, o si no es para ti, la encuesta no aparece y su enlace dice que no está disponible.
 
 ## Confirmar lectura
 

@@ -61,6 +61,10 @@ public class ContentSeeder {
     final MediaRepository media;
     final NewsletterService newsletter;
     final io.mateu.ecdemo1.contenthub.application.out.HomePages homes;
+    final io.mateu.ecdemo1.contenthub.application.usecases.Surveys surveys;
+    final io.mateu.ecdemo1.contenthub.application.out.SurveyRepository surveyRepository;
+    final io.mateu.ecdemo1.contenthub.application.out.DiscussionRepository discussions;
+    final io.mateu.ecdemo1.contenthub.application.out.LikesRepository likes;
     final Clock clock;
 
     @Value("${content-hub.seed.enabled:true}")
@@ -81,6 +85,9 @@ public class ContentSeeder {
             seedSlots();
             // the same for the example home: an environment seeded before homes existed gets it
             seedHomes();
+            // and the collaboration examples: a survey, and comments and likes on the welcome article
+            seedSurvey();
+            seedComments();
         } catch (RuntimeException e) {
             log.error("Could not seed the demo content", e);
         }
@@ -117,6 +124,57 @@ public class ContentSeeder {
         if (homes.pageIds().isEmpty()) {
             homes.save(List.of(RECEPTION_CANARIAS_HOME));
         }
+    }
+
+    static final String EXAMPLE_SURVEY = "clima-laboral";
+
+    /** An anonymous survey for everyone, with one question of each type, open with no closing date. Created if missing. */
+    void seedSurvey() {
+        if (surveyRepository.find(EXAMPLE_SURVEY).isPresent()) {
+            return;
+        }
+        surveys.createWithId(EXAMPLE_SURVEY, "editora", new io.mateu.ecdemo1.contenthub.domain.survey.Survey.Definition(
+                "Encuesta de clima laboral", "Cuatro preguntas, dos minutos. Es anónima: cuéntanos de verdad cómo va.",
+                Audience.EVERYONE, null, null, true, List.of(
+                new io.mateu.ecdemo1.contenthub.domain.survey.Question("satisfaccion", "¿Cómo de a gusto estás en tu equipo?",
+                        io.mateu.ecdemo1.contenthub.domain.survey.QuestionType.RATING, List.of(), true),
+                new io.mateu.ecdemo1.contenthub.domain.survey.Question("recomendarias", "¿Recomendarías trabajar aquí?",
+                        io.mateu.ecdemo1.contenthub.domain.survey.QuestionType.SINGLE_CHOICE,
+                        List.of("Sí", "Depende", "No"), true),
+                new io.mateu.ecdemo1.contenthub.domain.survey.Question("mejoras", "¿Qué mejorarías primero?",
+                        io.mateu.ecdemo1.contenthub.domain.survey.QuestionType.MULTIPLE_CHOICE,
+                        List.of("Turnos", "Formación", "Comunicación interna", "Instalaciones"), false),
+                new io.mateu.ecdemo1.contenthub.domain.survey.Question("comentarios", "¿Algo más que quieras contarnos?",
+                        io.mateu.ecdemo1.contenthub.domain.survey.QuestionType.FREE_TEXT, List.of(), false))));
+        surveys.publish(SYSTEM, EXAMPLE_SURVEY);
+        log.info("Example survey seeded: {}", EXAMPLE_SURVEY);
+    }
+
+    static final String COMMENTED_ITEM = "bienvenida";
+
+    /**
+     * Two comments and two likes on the welcome article, once: comments are never deleted, so an empty
+     * discussion means it was never seeded, and a like an employee takes back does not come back.
+     * Straight to the aggregates: these employees' profiles may not be in the projection yet.
+     */
+    void seedComments() {
+        if (items.find(COMMENTED_ITEM).isEmpty() || !discussions.get(COMMENTED_ITEM).comments().isEmpty()) {
+            return;
+        }
+        var now = clock.instant();
+        var discussion = discussions.get(COMMENTED_ITEM);
+        discussion.post("c-seed-1", "ana.perez", "Ana Pérez", "¡Por fin todo en un sitio! Los avisos del hotel se encuentran mucho mejor.",
+                now.minus(Duration.ofHours(26)));
+        discussion.post("c-seed-2", "klaus.schmidt", "Klaus Schmidt", "Sehr gut. ¿Habrá también la app para el móvil?",
+                now.minus(Duration.ofHours(3)));
+        discussion.popEvents();
+        discussions.save(discussion);
+        var liked = likes.get(COMMENTED_ITEM);
+        liked.toggle("ana.perez");
+        liked.toggle("klaus.schmidt");
+        liked.popEvents();
+        likes.save(liked);
+        log.info("Example comments and likes seeded on {}", COMMENTED_ITEM);
     }
 
     /**

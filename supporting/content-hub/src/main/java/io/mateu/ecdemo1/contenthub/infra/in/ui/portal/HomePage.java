@@ -5,6 +5,7 @@ import io.mateu.ecdemo1.contenthub.application.out.HomePages;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
+import io.mateu.ecdemo1.contenthub.application.usecases.Surveys;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Title;
@@ -36,8 +37,8 @@ import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.wi
  * The intranet's home: Mateu's welcome page template (Redwood draws Spectra's welcome page) — a
  * banner greeting the reader, and tiles under it. A reader whose profile sees one of the configured
  * home pages (Configuración → Inicio) gets the first of them, its blocks as the tiles; anyone else
- * gets the default home: their pending confirmations, the notices and the latest news — all through
- * the visibility function.
+ * gets the default home: their pending confirmations, the surveys they have not answered, the notices
+ * and the latest news — all through the visibility function.
  */
 @Service
 @Scope("prototype")
@@ -50,12 +51,15 @@ public class HomePage implements ComponentTreeSupplier {
     final ReaderActions actions;
     final HomePages homes;
     final PageRenderer renderer;
+    final Surveys surveys;
 
-    public HomePage(PortalSupport portal, ReaderActions actions, HomePages homes, PageRenderer renderer) {
+    public HomePage(PortalSupport portal, ReaderActions actions, HomePages homes, PageRenderer renderer,
+                    Surveys surveys) {
         this.portal = portal;
         this.actions = actions;
         this.homes = homes;
         this.renderer = renderer;
+        this.surveys = surveys;
     }
 
     /** The first configured home page this reader can see, if any. */
@@ -95,6 +99,11 @@ public class HomePage implements ComponentTreeSupplier {
             if (!pending.isEmpty()) {
                 panels.add(panel("pendientes", "Pendiente de confirmar (" + pending.size() + ")",
                         withLink(items(pending, ""), "Ver lo pendiente", Ui.PORTAL + "/pendientes"), 3));
+            }
+            var surveysToAnswer = surveys.pending(reader);
+            if (!surveysToAnswer.isEmpty()) {
+                panels.add(panel("encuestas", "Encuestas por responder (" + surveysToAnswer.size() + ")",
+                        withLink(SurveyPage.links(surveysToAnswer), "Ver las encuestas", Ui.PORTAL + "/encuestas"), 3));
             }
         }
         panels.add(panel("avisos", "Avisos", withLink(items(portal.latest(reader,

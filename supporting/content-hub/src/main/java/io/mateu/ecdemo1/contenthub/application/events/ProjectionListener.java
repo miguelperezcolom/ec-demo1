@@ -66,6 +66,9 @@ public class ProjectionListener {
                     cache.invalidateHash(e.oldHash());
                 }
             }
+            // comments, likes and surveys: the surveys' projection has its own listener (SurveyProjection)
+            case io.mateu.ecdemo1.contenthub.domain.shared.CollaborationEvents.Event e -> {
+            }
         }
     }
 }

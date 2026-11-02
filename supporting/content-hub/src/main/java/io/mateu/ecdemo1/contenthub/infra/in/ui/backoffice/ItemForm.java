@@ -122,6 +122,9 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     LocalDateTime confirmationDeadline;
     @Label("Al publicar, exigir reconfirmar")
     boolean requireReconfirmation;
+    @Label("Comentarios cerrados")
+    @io.mateu.uidl.annotations.Help("Nadie más puede comentar; los comentarios que hay se siguen viendo. Se aplica al guardar, sin esperar a publicar.")
+    boolean comentariosCerrados;
 
     @Section("Bloques (solo páginas)")
     @Label("Bloques")
@@ -151,11 +154,13 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     final Readers readers;
     final io.mateu.ecdemo1.contenthub.application.out.Translator translator;
     final io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer;
+    final io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration;
 
     public ItemForm(ItemCommands commands, ItemRepository items, ContentIndex index, AudienceCommands audienceCommands,
                     NamedAudiences namedAudiences, Readers readers,
                     io.mateu.ecdemo1.contenthub.application.out.Translator translator,
-                    io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer) {
+                    io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer renderer,
+                    io.mateu.ecdemo1.contenthub.application.usecases.Collaboration collaboration) {
         this.commands = commands;
         this.items = items;
         this.index = index;
@@ -164,10 +169,12 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         this.readers = readers;
         this.translator = translator;
         this.renderer = renderer;
+        this.collaboration = collaboration;
     }
 
-    public ItemForm load(Item item) {
+    public ItemForm load(Item item, boolean commentsClosed) {
         id = item.id();
+        comentariosCerrados = commentsClosed;
         type = item.type();
         defaultLanguage = item.defaultLanguage();
         var c = item.draft();
@@ -232,11 +239,17 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     }
 
     public String create(HttpRequest httpRequest) {
-        return commands.create(readers.of(httpRequest), type, defaultLanguage, content());
+        var editor = readers.of(httpRequest);
+        var created = commands.create(editor, type, defaultLanguage, content());
+        collaboration.closeComments(editor, created, comentariosCerrados);
+        return created;
     }
 
     public void save(HttpRequest httpRequest) {
-        commands.edit(readers.of(httpRequest), id, content());
+        var editor = readers.of(httpRequest);
+        commands.edit(editor, id, content());
+        // kept with the item's comments, not in its content: it acts at once, without a new version
+        collaboration.closeComments(editor, id, comentariosCerrados);
     }
 
     /**

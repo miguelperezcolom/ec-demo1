@@ -21,8 +21,8 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 
 | Componente | Dónde | Qué hace |
 | :--------- | :---- | :------- |
-| **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, personas y organigrama (`People`, `PeopleListing`, `PersonPage`, `OrgChartPage`), favoritos, pendientes |
-| **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, ver como y confirmaciones |
+| **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, personas y organigrama (`People`, `PeopleListing`, `PersonPage`, `OrgChartPage`), favoritos, pendientes; comentarios y «Me gusta» en `ItemPage`, encuestas (`SurveysListing`, `SurveyPage`) |
+| **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, encuestas y sus respuestas, moderación de comentarios, ver como y confirmaciones |
 | **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal, sin *Editorial*; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
 | **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, directorio y visibilidad |
 | **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea: contenido (`preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`) y directorio (`buscar_personas`, `ficha_persona`) |
@@ -75,7 +75,7 @@ flowchart TB
   P["Publicar / retirar item<br/>Redefinir audiencia<br/>Publicar variante de slot"] --> E["evento de dominio"]
   E -- after commit --> L["ProjectionListener"]
   L --> PR["Projection<br/>(VisibilityPolicy evalúa<br/>sobre el universo de perfiles)"]
-  PR --> T[("ch_item_doc / ch_block_doc /<br/>ch_slot_variant_doc<br/>hashes text[]")]
+  PR --> T[("ch_item_doc / ch_block_doc /<br/>ch_slot_variant_doc / ch_survey_doc<br/>hashes text[]")]
   R["Petición de un lector"] --> V["Visibility"]
   V -- "¿hash conocido?<br/>si no: materialise()" --> PR
   V -- "hashes && array[hash,'TODOS']<br/>+ estado y fechas" --> T
@@ -113,6 +113,12 @@ Reglas que salen de ahí:
 Los medios siguen la misma regla: un fichero se sirve solo a quien ve un item publicado que lo usa
 (`ch_item_media`, cruzado con la proyección).
 
+Las **encuestas** son un sujeto más de la proyección (`ch_survey_doc`): `Visibility.openSurveys` filtra por hash,
+estado y fechas en la consulta, y el recálculo y la materialización de un hash nuevo las cubren como a cualquier
+sujeto. Se reproyectan al publicarlas, cambiarlas o cerrarlas (`SurveyProjection`), en línea tras el commit. Los
+**comentarios y «Me gusta»** no son sujetos: comentar, reaccionar o leerlos pregunta antes a `Visibility.isVisible`
+por el item (`Collaboration`), y un contenido retirado o caducado deja de admitirlos.
+
 ### Las audiencias
 
 Una audiencia es un árbol `AND`/`OR` cuyas hojas son `atributo IN (valores)`, o una **audiencia con
@@ -122,7 +128,7 @@ empleados. Los atributos son una lista cerrada: `company`, `country`, `region`, 
 
 ## Modelo de dominio
 
-Ocho agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
+Doce agregados, referenciados entre sí solo por id, y un servicio de dominio (`VisibilityPolicy`).
 
 | Agregado | Contenido | Invariantes |
 | :------- | :-------- | :---------- |
@@ -134,6 +140,10 @@ Ocho agregados, referenciados entre sí solo por id, y un servicio de dominio (`
 | **Empleado** (`domain/employee`) | Atributos y hash; responsable, teléfono y etiquetas de los códigos (para el directorio) | Solo lo escribe el consumidor del directorio |
 | **Favoritos** (`domain/favorites`) | Uno por empleado, items por id | Sin duplicados |
 | **Acuse** (`domain/ack`) | (item, versión, empleado, tipo `READ`/`CONFIRMATION`) | Idempotente |
+| **Conversación** (`domain/collaboration/Discussion`) | Los comentarios de un item y si está cerrado a comentarios | Texto no vacío, hasta 2.000 caracteres; cerrada no admite más; un comentario no se borra: se oculta, con quién y cuándo |
+| **Me gusta** (`domain/collaboration/Likes`) | Quién ha dado «Me gusta» a un item | Uno por lector |
+| **Encuesta** (`domain/survey/Survey`) | Título, descripción, audiencia, fechas, anónima o no, preguntas (`DRAFT → PUBLISHED → CLOSED`) | Publicar exige preguntas y cierre futuro; publicada, no cambia preguntas ni anonimato; las respuestas se comprueban aquí (abierta, obligatorias, opciones válidas, valoración de 1 a 5) |
+| **Respuesta** (`domain/survey/SurveyResponse`) | Las respuestas de un lector; en una anónima, sin quién y con el día en lugar del instante | Solo se construye si la encuesta la acepta |
 
 ### El workflow de un item
 
@@ -174,7 +184,7 @@ que pone el gateway; sin esa cabecera (el gateway no pudo preguntar), un usuario
 | :---- | :------ | :-------- |
 | `employee-directory` | users → content-hub | `EmployeeUpserted` (el empleado entero: nombre, email, activo, `managerId` y `phone` si los tiene, atributos como códigos del catálogo e idioma, `labels` con la etiqueta de cada código) y `EmployeeRemoved`; clave el id de usuario |
 | `employee-directory-requests` | content-hub → users | `{"requestId", "requestedBy"}`: pide una copia completa del directorio. Se manda al arrancar con el directorio vacío, o a mano desde *Visibilidad* |
-| `content-events` | content-hub → quien quiera | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`. Clave el sujeto. Hoy nadie los consume fuera del servicio |
+| `content-events` | content-hub → quien quiera | Los eventos de dominio: `ItemPublished`, `ItemRetired`, `ItemBecameEffective`, `ItemExpired`, `AudienceRedefined`, `SlotVariantPublished`, `NavigationChanged`, `EmployeeChanged`, y los de colaboración (`CollaborationEvents`): `CommentPosted`, `CommentModerated`, `ItemLiked`, `SurveyPublished`, `SurveyUpdated`, `SurveyClosed`, `SurveyAnswered` (este nunca dice quién). Clave el sujeto. Hoy nadie los consume fuera del servicio |
 
 Todo sale por el **outbox** de `supporting/messaging`, en la misma transacción que el cambio, y
 `employee-directory` entra por el **inbox** (cada mensaje una vez, por su `eventId`). En el servicio de
@@ -201,6 +211,9 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | `ch_item_doc`, `ch_block_doc`, `ch_slot_variant_doc` | **La proyección**: cada traducción publicada, bloque y variante con sus `hashes text[]` (GIN) |
 | `ch_item_media`, `ch_projection_state` | Qué medios usa cada item; qué versión está ya aplicada |
 | `ch_chunk` | Los pasajes del RAG con su `vector(384)` |
+| `ch_discussion`, `ch_likes` | Comentarios y «Me gusta», un documento por item, aparte de él |
+| `ch_survey`, `ch_survey_doc` | Las encuestas, y su proyección con los `hashes text[]` que las ven |
+| `ch_survey_participation`, `ch_survey_response` | Quién ha respondido y qué se ha respondido, en dos tablas que no se apuntan entre sí |
 
 La **búsqueda de texto** es el FTS de PostgreSQL: `ch_item_doc.tsv` (configuración `simple`, índice GIN),
 consulta por **prefijo** («vacac» encuentra «vacaciones»), filtrada por visibilidad en la misma consulta:
@@ -233,6 +246,13 @@ páginas y contadores solo cuentan lo visible.
   editor solo se guardan el proveedor y el id: el reproductor se construye desde ellos, nunca desde lo
   pegado.
 - **El HTML de los cuerpos se sanea** al guardarlo (`HtmlSanitizer`).
+- **Anonimato de las encuestas.** Para no admitir dos respuestas, una encuesta anónima guarda en
+  `ch_survey_participation` un HMAC-SHA256 de encuesta y usuario (`ParticipationKey`), con la clave
+  `SURVEY_SECRET` (por defecto, `MEDIA_SECRET`) y la sal propia de la encuesta: la base de datos sola no dice quién
+  respondió. `ch_survey_response` no lleva ni esa clave, ni el usuario, ni la hora (solo el día), y `SurveyAnswered`
+  no dice quién. Los textos libres y la exportación van ordenados por su contenido, no por llegada. Cambiar la clave
+  permitiría responder otra vez a las encuestas abiertas. Quien tenga la clave y la base podría comprobar si alguien
+  concreto respondió, pero no qué respondió.
 - **MCP.** El servidor MCP no pasa por el gateway (es interno del clúster): aquí sí se verifica el token
   que reenvía `ia-agent` contra Keycloak (`KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI`) y una llamada sin él
   se rechaza. Cada herramienta lee como el usuario real (nunca como su "ver como").
@@ -293,6 +313,9 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 | La base en `cp-postgres` | Es la que tiene pgvector, que necesita el RAG |
 | Medios en la base de datos, con límite de 20 MB | Una sola copia de seguridad y la misma visibilidad; lo grande va a YouTube, Vimeo o Drive por URL |
 | Marcadores + `embed.js` en vez de iframes | El saneador de Mateu quita los iframes; la lista cerrada de hosts mantiene fuera el HTML arbitrario |
+| Una encuesta se responde una vez, sin editar | Editar exigiría poder volver a encontrar la respuesta de alguien, que es justo lo que una anónima no debe permitir |
+| Comentarios y «Me gusta» aparte del item, con el cierre de comentarios en la conversación | Comentar no compite con el borrador de un editor, y cerrarlos actúa al momento, sin una versión nueva |
+| Un candado consultivo (`pg_advisory_xact_lock`) por item al comentar o reaccionar | Son un solo documento por item: dos a la vez se pisarían; y el primero no tiene aún fila que bloquear |
 | Slots por REST provisional | El microfrontend de Mateu aún no está; el contrato (clave, identidad, caché por hash) es el mismo |
 
 ## Pruebas
@@ -300,6 +323,10 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 - `ItemTest`: el workflow y las invariantes del item.
 - `VisibilityPolicyPropertiesTest` (jqwik): con expresiones y perfiles generados, **la proyección es igual a
   evaluar cada expresión para cada perfil**.
+- `DiscussionTest`, `SurveyTest`: las reglas de comentarios, moderación, «Me gusta» y encuestas (una respuesta por
+  lector, obligatorias, cerrada, anonimato, resultados).
+- `CollaborationConsumersTest` (Testcontainers): nadie comenta, reacciona ni responde lo que no puede ver, audiencias
+  y fechas de las encuestas en la consulta, y que una respuesta anónima no deja en la base nada que diga de quién es.
 - `ConsumersTest` (Testcontainers con `pgvector/pgvector`): los criterios de aceptación de la spec —un item
   que el lector no cumple no aparece en ningún consumidor, bloques, programados y caducados sin job,
   secciones vacías, paginación, idioma de fallback, cambio de atributos y caché compartida, favoritos, slots,
