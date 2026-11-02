@@ -1,6 +1,6 @@
 package io.mateu.ecdemo1.contenthub.application.menu;
 
-import io.mateu.ecdemo1.contenthub.application.out.UiSources;
+import io.mateu.ecdemo1.contenthub.domain.uisource.UiSource;
 
 /**
  * Where a shown entry takes the reader, once its target is resolved for them — what a renderer needs,
@@ -21,6 +21,6 @@ public sealed interface MenuLink permits MenuLink.Function, MenuLink.Route, Menu
     }
 
     /** Another UI, from the registry of UI sources, and a route inside it ("" for its home). */
-    record Remote(UiSources.UiSource source, String route) implements MenuLink {
+    record Remote(UiSource source, String route) implements MenuLink {
     }
 }

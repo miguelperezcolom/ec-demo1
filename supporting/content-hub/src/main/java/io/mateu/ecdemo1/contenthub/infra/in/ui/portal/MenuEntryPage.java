@@ -30,10 +30,16 @@ public class MenuEntryPage implements ComponentTreeSupplier, Identifiable {
 
     final SiteMenus menus;
     final PortalSupport portal;
+    final io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis;
+    final io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote;
 
-    public MenuEntryPage(SiteMenus menus, PortalSupport portal) {
+    public MenuEntryPage(SiteMenus menus, PortalSupport portal,
+                         io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis,
+                         io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote) {
         this.menus = menus;
         this.portal = portal;
+        this.remoteUis = remoteUis;
+        this.remote = remote;
     }
 
     @Override
@@ -51,12 +57,14 @@ public class MenuEntryPage implements ComponentTreeSupplier, Identifiable {
                     PortalComponents.small("Este enlace sale de la intranet: se abre en una pestaña nueva."),
                     new Anchor(entry.label() + " ↗", e.url(), "_blank", "", ""))).build();
             case MenuLink.Remote r -> {
-                var url = r.source().basePath() + r.route();
-                yield Form.builder().title(entry.label()).content(List.of(Html.block(
-                        "<div data-ec-embed=\"" + Html.escape(url) + "\" data-ec-embed-kind=\"ui\" "
-                                + "style=\"width:100%;height:80vh\"><a href=\"" + Html.escape(url)
-                                + "\" target=\"_blank\" rel=\"noopener\">" + Html.escape(r.source().name())
-                                + " ↗</a></div>"))).build();
+                // a web component or an iframe, hosted in this page as a remote page draws it (<ec-ui-source>),
+                // checked again at the door (RemoteUis.usable: active, scopes, audience, iframe origin)
+                var use = io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.of(r.source().id(),
+                        r.route() == null || r.route().isBlank() ? null : r.route());
+                var reader = portal.reader(httpRequest);
+                yield Form.builder().title(entry.label()).content(List.of(remoteUis.usable(reader, use)
+                        .map(s -> remote.component(s, use))
+                        .orElseGet(() -> EmptyState.builder().title("No puedes usar esta aplicación").build()))).build();
             }
             default -> Form.builder().title(entry.label()).content(List.of(
                     EmptyState.builder().title("Esta entrada se abre desde el menú").build())).build();

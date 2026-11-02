@@ -102,6 +102,11 @@ content-hub:
     # The demo's employees are made up: every newsletter goes here, saying whom it was for.
     redirect-to: ${NEWSLETTER_REDIRECT_TO:}
   portal-url: ${PORTAL_URL:http://ec1.localhost:8800/intranet}
+  # The registry of external UIs (Configuración → UIs externas). A Mateu UI or a web component is a path the
+  # gateway routes; an iframe may point at another origin only if it is listed here (https://host[:port],
+  # comma-separated). Empty: no iframe source can be registered.
+  ui-sources:
+    iframe-origins: ${UI_SOURCES_IFRAME_ORIGINS:}
   surveys:
     # Keys who answered an anonymous survey (with each survey's salt): set it, and the database alone
     # cannot tell whether someone answered. Changing it lets everyone answer the open ones once more.

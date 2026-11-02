@@ -2,6 +2,8 @@ package io.mateu.ecdemo1.contenthub.application.menu;
 
 import io.mateu.ecdemo1.contenthub.application.out.MenuRepository;
 import io.mateu.ecdemo1.contenthub.application.out.UiSources;
+import io.mateu.ecdemo1.contenthub.domain.uisource.UiSource;
+import io.mateu.ecdemo1.contenthub.domain.uisource.UiSourceKind;
 import io.mateu.ecdemo1.contenthub.application.security.EditorialPermission;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.visibility.NamedAudiences;
@@ -110,8 +112,8 @@ class SiteMenusTest {
 
     MemoryMenus store;
     SiteMenus menus;
-    UiSources.UiSource usersUi = new UiSources.UiSource("users", "Usuarios", UiSources.Kind.MATEU_REMOTE, "/_users",
-            null, Set.of("users:admin"));
+    UiSource usersUi = new UiSource("users", "Usuarios", UiSourceKind.MATEU_REMOTE, "/_users",
+            null, null, Set.of("users:admin"), true);
 
     @BeforeEach
     void setUp() {

@@ -66,7 +66,7 @@ public class PgContentIndex implements ContentIndex {
         var content = version.content();
         var status = item.status() == ItemStatus.PUBLISHED ? "PUBLISHED" : item.status().name();
         jdbc.update("delete from ch_item_doc where item_id = ?", item.id());
-        var audience = Json.write(content.audience());
+        var audience = Json.write(content.visibilityAudience(item.type()));
         for (var e : content.translations().entrySet()) {
             var t = e.getValue();
             jdbc.update("insert into ch_item_doc (item_id, language, is_default, version, type, section_id, status, "
@@ -95,7 +95,7 @@ public class PgContentIndex implements ContentIndex {
         for (var block : content.blocks()) {
             jdbc.update("insert into ch_block_doc (item_id, block_id, position, audience, hashes) "
                             + "values (?, ?, ?, ?::jsonb, ?::text[])", item.id(), block.id(), position++,
-                    Json.write(Audience.effective(content.audience(), block.audience())),
+                    Json.write(Audience.effective(content.visibilityAudience(item.type()), block.visibilityAudience())),
                     Sql.array(blockHashes.getOrDefault(block.id(), Set.of())));
         }
         jdbc.update("delete from ch_item_media where item_id = ?", item.id());

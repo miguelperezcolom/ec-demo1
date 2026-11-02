@@ -2,6 +2,7 @@ package io.mateu.ecdemo1.contenthub.domain.item;
 
 import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
+import io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -16,9 +17,16 @@ import java.util.Set;
  * @param limit     AUTOMATIC_LISTING: how many
  * @param links     QUICK_LINKS
  * @param mediaId   MEDIA: the media asset shown
+ * @param remote    REMOTE: the registered UI source shown, and its route or attributes
  */
 public record Block(String id, BlockType type, Audience audience, String title, String html, String itemId,
-                    String sectionId, Integer limit, List<Link> links, String mediaId) {
+                    String sectionId, Integer limit, List<Link> links, String mediaId, RemoteUi remote) {
+
+    /** A block that shows no external UI — every type but REMOTE. */
+    public Block(String id, BlockType type, Audience audience, String title, String html, String itemId,
+                 String sectionId, Integer limit, List<Link> links, String mediaId) {
+        this(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, null);
+    }
 
     public record Link(String label, String url) {
     }
@@ -54,5 +62,25 @@ public record Block(String id, BlockType type, Audience audience, String title, 
         }
         audience = audience == null ? Audience.EVERYONE : audience;
         links = links == null ? List.of() : List.copyOf(links);
+        if (type == BlockType.REMOTE && remote == null) {
+            throw new IllegalArgumentException("Un componente remoto necesita su UI externa");
+        }
+        if (type != BlockType.REMOTE) {
+            remote = null;
+        }
+    }
+
+    /**
+     * The block's own audience as the visibility function projects it: what the editor chose, ANDed — for
+     * a remote component — with who may use its source ({@link RemoteUi#audienceReference}). The editor
+     * still sees and edits only {@link #audience}; the page's is ANDed on top ({@link Audience#effective}).
+     */
+    public Audience visibilityAudience() {
+        return remote == null ? audience : Audience.effective(audience, remote.audienceReference());
+    }
+
+    /** The same block with another text (the sanitiser's), everything else kept. */
+    public Block withHtml(String html) {
+        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote);
     }
 }

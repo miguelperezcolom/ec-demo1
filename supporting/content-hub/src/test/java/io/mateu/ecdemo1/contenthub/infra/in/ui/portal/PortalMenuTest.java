@@ -3,7 +3,8 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 import io.mateu.ecdemo1.contenthub.application.menu.MenuLink;
 import io.mateu.ecdemo1.contenthub.application.menu.PortalFunction;
 import io.mateu.ecdemo1.contenthub.application.menu.ShownEntry;
-import io.mateu.ecdemo1.contenthub.application.out.UiSources;
+import io.mateu.ecdemo1.contenthub.domain.uisource.UiSource;
+import io.mateu.ecdemo1.contenthub.domain.uisource.UiSourceKind;
 import io.mateu.uidl.data.FieldLink;
 import io.mateu.uidl.data.Menu;
 import io.mateu.uidl.data.RemoteMenu;
@@ -68,8 +69,8 @@ class PortalMenuTest {
 
     @Test
     void pages_links_and_other_uis_go_where_the_existing_routes_are() {
-        var users = new UiSources.UiSource("users", "Usuarios", UiSources.Kind.MATEU_REMOTE, "/_users", null, Set.of());
-        var frame = new UiSources.UiSource("bi", "BI", UiSources.Kind.IFRAME, "/_bi", null, Set.of());
+        var users = new UiSource("users", "Usuarios", UiSourceKind.MATEU_REMOTE, "/_users", null, null, Set.of(), true);
+        var frame = new UiSource("bi", "BI", UiSourceKind.IFRAME, "https://bi.example.com", null, null, Set.of(), true);
         var shown = List.of(
                 new ShownEntry("p", "Procedimiento", new MenuLink.Route("/intranet/noticias/proc"), List.of()),
                 new ShownEntry("ext", "Riu", new MenuLink.External("https://www.riu.com"), List.of()),

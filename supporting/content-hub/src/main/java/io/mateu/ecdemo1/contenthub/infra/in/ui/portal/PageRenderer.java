@@ -50,6 +50,8 @@ public class PageRenderer {
     final ItemRepository items;
     final ContentRenderer renderer;
     final ReaderActions actions;
+    final io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis;
+    final io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote;
 
     /** A page as a reader's home: the welcome banner's overline and subtitle, and its tiles. */
     public record Home(String overline, String subtitle, List<Component> panels) {
@@ -75,7 +77,8 @@ public class PageRenderer {
             }
             var content = content(reader, b);
             if (content != null) {
-                panels.add(panel(b.id(), title(b), content, b.type() == BlockType.HTML || b.type() == BlockType.MEDIA ? 3 : 1));
+                panels.add(panel(b.id(), title(b), content, b.type() == BlockType.HTML || b.type() == BlockType.MEDIA
+                        || b.type() == BlockType.REMOTE ? 3 : 1));
             }
         }
         return new Home(overline, subtitle, panels);
@@ -163,6 +166,8 @@ public class PageRenderer {
                         null, null, 0, b.limit() == null ? 5 : b.limit())).content();
                 yield list.isEmpty() ? null : items(list, "");
             }
+            // a registered UI, live, if the reader may use its source (the remote then applies its own permissions)
+            case REMOTE -> remoteUis.usable(reader, b.remote()).map(s -> remote.component(s, b.remote())).orElse(null);
         };
     }
 
@@ -202,6 +207,7 @@ public class PageRenderer {
                         null, null, 0, b.limit() == null ? 5 : b.limit())).content();
                 yield list.isEmpty() ? null : list(list);
             }
+            case REMOTE -> remote.editorHtml(b.remote());
         };
         if (inner == null) {
             return "";

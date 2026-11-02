@@ -31,6 +31,7 @@ public class Catalog {
     final NavigationRepository navigation;
     final ItemRepository items;
     final io.mateu.ecdemo1.contenthub.application.out.MediaRepository media;
+    final io.mateu.ecdemo1.contenthub.application.out.UiSources uiSources;
 
     @PostConstruct
     void register() {
@@ -77,6 +78,12 @@ public class Catalog {
     public List<Option> media() {
         return media.search("", 0, 200).stream()
                 .map(m -> new Option(m.id(), m.title() + " (" + m.kind().name().toLowerCase() + ")")).toList();
+    }
+
+    /** The registry of external UIs: what a remote page or a «Componente remoto» block may show. */
+    public List<Option> uiSources() {
+        return uiSources.all().stream().map(s -> new Option(s.id(), s.name() + " (" + s.kind().label()
+                + (s.active() ? "" : ", inactiva") + ")")).toList();
     }
 
     public static List<Option> languages() {
