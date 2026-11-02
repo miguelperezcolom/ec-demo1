@@ -76,6 +76,9 @@ el atributo alt de una intranet de hoteles: una sola frase en español, de 125 c
 comillas ni comentarios. Si no recibes ninguna imagen, responde exactamente SIN_IMAGEN.» Sin herramientas ni
 RAG. Sin él, el botón da un aviso y nada cambia.
 
+Los tres agentes viven solo en la base de datos del plano de control (tabla `agent`), no en el repositorio:
+en un entorno nuevo hay que crearlos (en la consola del plano de control, «Agentes», o con un `insert`).
+
 ### Salud del contenido
 
 Una pasada cada noche (`HEALTH_NIGHTLY_CRON`) y las que pidan los editores. La noche se **reclama en la base de
