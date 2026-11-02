@@ -40,17 +40,49 @@
     }
   };
 
-  const eachDeep = (root, fn) => {
-    root.querySelectorAll('[data-ec-embed]').forEach(fn);
+  const eachDeep = (root, selector, fn) => {
+    root.querySelectorAll(selector).forEach(fn);
     root.querySelectorAll('*').forEach((node) => {
-      if (node.shadowRoot) eachDeep(node.shadowRoot, fn);
+      if (node.shadowRoot) eachDeep(node.shadowRoot, selector, fn);
     });
+  };
+
+  // The backoffice's visual editor (<ec-visual-editor>, VisualEditorPage): its code is for editors, so it
+  // is not public at the gateway like this script — it is fetched with the user's token (the one the
+  // bootstrap page keeps in localStorage) the first time the tag shows up, and the element upgrades.
+  const EDITOR = 'ec-visual-editor';
+  let editorLoading = false;
+  const loadEditor = async (el) => {
+    if (editorLoading || !window.customElements || customElements.get(EDITOR)) return;
+    editorLoading = true;
+    const api = el.getAttribute('api') || '/_intranet/api/editor';
+    try {
+      let token = null;
+      for (let i = 0; i < 40 && !(token = localStorage.getItem('__mateu_auth_token')); i++) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      const answer = await fetch(api + '/visual-editor.js', {
+        headers: token ? { Authorization: 'Bearer ' + token } : {},
+        credentials: 'same-origin',
+      });
+      if (!answer.ok) throw new Error('HTTP ' + answer.status);
+      const code = await answer.text();
+      const script = document.createElement('script');
+      script.src = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+      document.head.appendChild(script);
+    } catch (e) {
+      editorLoading = false;
+      el.textContent = 'No se ha podido cargar el editor visual (' + e.message + '). Recarga la página.';
+    }
   };
 
   let pending = false;
   const scan = () => {
     pending = false;
-    eachDeep(document, upgrade);
+    eachDeep(document, '[data-ec-embed]', upgrade);
+    if (window.customElements && !customElements.get(EDITOR) && !editorLoading) {
+      eachDeep(document, EDITOR, loadEditor);
+    }
   };
   new MutationObserver(() => {
     if (!pending) {

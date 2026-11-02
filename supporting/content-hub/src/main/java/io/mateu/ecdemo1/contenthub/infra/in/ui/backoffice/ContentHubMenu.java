@@ -18,6 +18,10 @@ public class ContentHubMenu {
     ItemsCrud contenidos;
 
     @Menu
+    @Label("Editor visual")
+    VisualEditorListing visual;
+
+    @Menu
     @Label("Medios")
     MediaCrud medios;
 

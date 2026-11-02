@@ -110,15 +110,33 @@ Rama de ec-demo1: `feat/content-hub`, o una nueva desde ella.
 | 1.6 | Vista previa junto al formulario que se refresca al editar (hoy "Previsualizar" repinta la página: ver commit d5ecd95a). | hecho (27956308): sección «Medios y vista previa» (vista previa del idioma por defecto + «Insertar medio»). botones bajo el formulario de edición: Mateu #1005 (beta.36) + #1014 (beta.37, la respuesta llega a un CRUD colgado del menú de una app y el formulario se repinta, así que la vista previa sigue a lo editado); probado en el navegador: insertar un vídeo lo muestra en la vista previa sin guardar, y «Traducir con IA» rellena en/de |
 | 1.7 | Probar en local (kind, `deploy/local/up.sh`) en Vaadin y Redwood (`console.localhost:8800` / `rw.localhost:8800`, editorial → contenidos), con el usuario editor de la seed. Actualizar el manual de usuario de la intranet (docs) y el recorrido con capturas. | probado en el Chrome del Mac (2026-11-01), Vaadin y Redwood: editor de texto rico en ambos, bloques y enlaces, vista previa; recorrido con capturas (sección 5). Repetido con 3.0-beta.37 (2026-11-02): botones en edición, campos por tipo en bloques y fechas en es (Mateu #1004), todo bien |
 
-## Nivel 3 — edición sobre la página (por decidir)
+## Nivel 3 — edición sobre la página
 
-Idea, sin compromiso:
-- Un componente embebido en el backoffice que pinta la página con el mismo `PageRenderer` del portal.
-- Clic en un bloque → edición en sitio (el editor rico del nivel 2).
-- "+" entre bloques para añadir; arrastrar para reordenar.
-- Panel lateral con tipo y audiencia del bloque; "Ver como…" sin salir.
-- Punto delicado: estrechar la audiencia del bloque sin perder de vista la de la página.
-- Decidir tras usar 1 y 2.
+Decidido con el usuario el 2026-11-02 (rama `feat/editor-visual`):
+- un web component propio (`<ec-visual-editor>`, JS sin framework) alojado como `Element` de Mateu en
+  una ruta del backoffice, que funciona en los dos shells;
+- pinta los bloques del **borrador** con los datos del portal (`PageRenderer`), en el idioma por defecto
+  (los bloques son monolingües);
+- texto de HTML/Banner editable en el sitio; panel lateral con el tipo, los campos del tipo y la
+  audiencia del bloque como estrechamiento de la de la página, con el recuento;
+- guardar por el mismo servicio y validaciones que el formulario; la revisión y la publicación, en el
+  formulario.
+
+| # | Paso | Estado |
+|---|---|---|
+| 3.1 | Dominio y aplicación: `Block.isNarrowing`, `ItemCommands.editBlocks` (+ tests) | hecho |
+| 3.2 | API `VisualEditorController` (`/_intranet/api/editor`: página, preview/ver como, guardar, medio, código), autorizada como el backoffice (`Readers`) + `PageRenderer.draftHtml` (+ tests de autorización) | hecho |
+| 3.3 | Componente `visual-editor.js` (seleccionar, texto en el sitio con barra, medios, pegado limpio, panel, audiencia y recuento, +, arrastrar/↑↓, eliminar, ver como, guardar, aviso de cambios sin guardar); `embed.js` lo carga con el token del usuario | hecho |
+| 3.4 | Backoffice: Editorial → Editor visual (`/editorial/visual/{id}`) y «Editar sobre la página» en el formulario de una página | hecho |
+| 3.5 | Desplegar en local y probar sin navegador (API con token de `demo`, en una página de prueba) | hecho (2026-11-02): página de prueba «Prueba editor visual»; leer, preview, ver como, guardar, 400 con un valor que el directorio no tiene, 409 con una versión vieja |
+| 3.6 | Probar en el navegador, Vaadin (`ws.localhost:8800`) y Redwood (`rw.localhost:8800`) | hecho con Chromium sin cabeza (Playwright) en los dos: el componente carga, seleccionar, escribir, panel y recuento, ver como, guardar; falta una prueba a mano (arrastrar, pegar, insertar medio, tema oscuro) |
+| 3.7 | Manual del backoffice y arquitectura | hecho |
+
+Limitaciones conocidas:
+- el aviso de «cambios sin guardar» al salir cubre cerrar/recargar la pestaña y los clics en menús,
+  botones y enlaces fuera del editor; no la tecla «atrás» del navegador;
+- el texto de los bloques solo en el idioma por defecto (los bloques no tienen traducciones);
+- en Safari, la selección dentro de un shadow root es limitada: probado en Chrome.
 
 ---
 

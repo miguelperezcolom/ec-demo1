@@ -61,6 +61,31 @@ public class ItemCommands {
         items.save(item);
     }
 
+    /**
+     * The page's blocks, replaced in its draft — the visual editor's save. Everything else in the draft
+     * (texts, audience, dates) stays as it is; the blocks go through the same sanitising and validation as
+     * the form's save. A block's audience may only narrow the page's ({@link Block#isNarrowing}).
+     */
+    @Transactional
+    public void editBlocks(Reader reader, String pageId, List<Block> blocks) {
+        reader.require(EditorialPermission.EDIT);
+        var item = items.find(pageId).orElseThrow(() -> new IllegalArgumentException("No existe el contenido " + pageId));
+        if (item.type() != ItemType.PAGE) {
+            throw new IllegalStateException("Solo las páginas tienen bloques");
+        }
+        for (var block : blocks) {
+            if (!Block.isNarrowing(block.audience())) {
+                throw new IllegalArgumentException("La audiencia del bloque «" + (block.title() == null || block.title().isBlank()
+                        ? block.id() : block.title()) + "» solo puede estrechar la de la página (departamentos, hoteles, puestos)");
+            }
+        }
+        var d = item.draft();
+        var content = new ItemContent(d.sectionId(), d.audience(), d.translations(), blocks, d.publishAt(), d.expireAt(),
+                d.readTracking(), d.confirmationRequired(), d.confirmationDeadline(), d.url());
+        item.editDraft(sanitized(content), clock.instant());
+        items.save(item);
+    }
+
     @Transactional
     public void submitForReview(Reader reader, String id) {
         reader.require(EditorialPermission.EDIT);
