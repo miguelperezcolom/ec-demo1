@@ -5,7 +5,7 @@ import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.data.Anchor;
 import io.mateu.uidl.data.OrgChart;
-import io.mateu.uidl.data.OrgNode;
+import io.mateu.uidl.data.OrgChartDisplay;
 import io.mateu.uidl.data.EmptyState;
 import io.mateu.uidl.data.FieldDataType;
 import io.mateu.uidl.data.FormField;
@@ -97,34 +97,20 @@ public class PersonPage implements ComponentTreeSupplier, Identifiable {
     }
 
     /**
-     * The person among the others, as the org chart draws people: the chain above them down to
-     * them; them over their direct reports; their department at their workplace over its people.
+     * The person among the others: the company's org chart in focus on them — their managers above,
+     * their reports below, a click away from anyone else's — and their team (same department, same
+     * workplace).
      */
     TabLayout tabs(Employee person) {
-        var reports = people.reportsOf(person.userId());
         var team = people.teamOf(person);
         var tabs = new ArrayList<Tab>();
-        var chain = people.chainOf(person);
-        if (!chain.isEmpty()) {
-            OrgNode node = OrgChartPage.node(person, people, List.of());
-            for (var manager : chain) {
-                node = OrgChartPage.node(manager, people, List.of(node));
-            }
-            tabs.add(new Tab("Reporta a", new OrgChart("person-chain", node, null, null)));
-        }
-        if (!reports.isEmpty()) {
-            tabs.add(new Tab("Su equipo directo (" + reports.size() + ")", new OrgChart("person-reports",
-                    OrgChartPage.node(person, people, reports.stream()
-                            .map(e -> OrgChartPage.node(e, people, List.of())).toList()), null, null)));
-        }
+        tabs.add(new Tab("Organigrama", OrgChart.builder().id("person-org").root(OrgChartPage.managers(people))
+                .display(OrgChartDisplay.focus).focus(OrgChartPage.PERSON + person.userId()).build()));
         if (!team.isEmpty()) {
             tabs.add(new Tab("Mismo equipo (" + team.size() + ")", new OrgChart("person-team",
                     OrgChartPage.group("team", department + " · " + workplace, team.size() + 1,
                             java.util.stream.Stream.concat(java.util.stream.Stream.of(person), team.stream())
                                     .map(e -> OrgChartPage.node(e, people, List.of())).toList()), null, null)));
-        }
-        if (tabs.isEmpty()) {
-            tabs.add(new Tab("Equipo", EmptyState.builder().title("No reporta a nadie ni tiene equipo en el directorio").build()));
         }
         return TabLayout.builder().id("person-tabs").tabs(tabs).build();
     }

@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.contenthub.domain.employee.Employee;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.OrgChart;
+import io.mateu.uidl.data.OrgChartDisplay;
 import io.mateu.uidl.data.OrgNode;
 import io.mateu.uidl.data.Tab;
 import io.mateu.uidl.data.TabLayout;
@@ -47,7 +48,9 @@ public class OrgChartPage implements ComponentTreeSupplier {
     public Component component(HttpRequest httpRequest) {
         portal.reader(httpRequest);
         var tabs = List.of(
-                new Tab("Por jefes", new OrgChart("org-managers", managers(), null, null)),
+                // in focus (Redwood: Spectra's hierarchy viewer): the company reads one level at a time
+                new Tab("Por jefes", OrgChart.builder().id("org-managers").root(managers(people))
+                        .display(OrgChartDisplay.focus).build()),
                 new Tab("Por estructura", new OrgChart("org-structure", structure(), null, null)));
         return Form.builder().title("Organigrama")
                 .subtitle(people.all().size() + " personas")
@@ -56,11 +59,11 @@ public class OrgChartPage implements ComponentTreeSupplier {
     }
 
     /** The heads (nobody in the directory above them) and everyone below; one root, or the company over several. */
-    OrgNode managers() {
+    static OrgNode managers(People people) {
         var all = people.all();
         var heads = all.stream().filter(e -> e.managerId() == null || people.find(e.managerId()).isEmpty()).toList();
         var seen = new HashSet<String>();
-        var roots = heads.stream().map(h -> reportsTree(h, seen)).toList();
+        var roots = heads.stream().map(h -> reportsTree(h, people, seen)).toList();
         if (roots.size() == 1) {
             return roots.getFirst();
         }
@@ -68,11 +71,11 @@ public class OrgChartPage implements ComponentTreeSupplier {
         return OrgNode.builder().id("company").title(company).subtitle("Dirección").children(roots).build();
     }
 
-    OrgNode reportsTree(Employee e, Set<String> seen) {
+    static OrgNode reportsTree(Employee e, People people, Set<String> seen) {
         seen.add(e.userId());
         var children = people.reportsOf(e.userId()).stream().filter(r -> !seen.contains(r.userId()))
-                .map(r -> reportsTree(r, seen)).toList();
-        return node(e, children);
+                .map(r -> reportsTree(r, people, seen)).toList();
+        return node(e, people, children);
     }
 
     OrgNode structure() {
