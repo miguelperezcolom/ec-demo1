@@ -61,6 +61,10 @@ public class SurveyPage implements ComponentTreeSupplier, Identifiable {
 
     @Override
     public Component component(HttpRequest httpRequest) {
+        return PortalComponents.namingTheTab(httpRequest, draw(httpRequest));
+    }
+
+    Component draw(HttpRequest httpRequest) {
         if (id == null) {
             id = httpRequest.lastPathItem();
         }

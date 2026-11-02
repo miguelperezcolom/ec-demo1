@@ -18,6 +18,8 @@ import io.mateu.uidl.data.TextSize;
 import io.mateu.uidl.data.VerticalAlignment;
 import io.mateu.uidl.data.VerticalLayout;
 import io.mateu.uidl.fluent.Component;
+import io.mateu.uidl.fluent.Form;
+import io.mateu.uidl.interfaces.HttpRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,17 @@ import java.util.stream.Collectors;
  * overview) the screens fill. Only what editors write (an item's body, an HTML block) stays HTML.
  */
 public final class PortalComponents {
+
+    /**
+     * Names the browser tab after the page's title. Mateu names it after a page it reflects; a page drawn
+     * here (a {@link Form} from {@code component}) left the tab empty, or with the previous page's title.
+     */
+    public static Component namingTheTab(HttpRequest httpRequest, Component page) {
+        if (page instanceof Form form && form.title() != null && !form.title().isBlank()) {
+            httpRequest.setAttribute("windowTitle", form.title());
+        }
+        return page;
+    }
 
     /** The intranet's own colour in the welcome banners, as each console has its own. */
     public static final HeroTone TONE = HeroTone.teal;
