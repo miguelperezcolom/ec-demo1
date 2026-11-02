@@ -1,72 +1,42 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
-import io.mateu.uidl.annotations.Label;
-import io.mateu.uidl.annotations.Menu;
+import io.mateu.ecdemo1.contenthub.domain.menu.SiteMenu;
+import io.mateu.uidl.interfaces.Actionable;
+import io.mateu.uidl.interfaces.HttpRequest;
+import io.mateu.uidl.interfaces.MenuSupplier;
 
-/** The portal's entries: the routes hang from the field names (/intranet/noticias/{id}…). */
-public class IntranetMenu {
+import java.util.List;
 
-    @Menu
-    @Label("Inicio")
+/**
+ * The portal's entries. What the menu shows — which entries, in which order, under which submenus, with
+ * which labels, to whom — is data: the intranet's menu, configured on the control console
+ * (Configuración → Menús) and drawn per reader by {@link PortalMenu}.
+ *
+ * <p>The routes are not data: they hang from these fields' names (/intranet/noticias/{id}…), as they
+ * always have. Each one is a portal function ({@code PortalFunction}'s key), and every one stays routed
+ * whether the menu shows it or not — deep links, reloads and links from the content keep working.
+ */
+public class IntranetMenu implements MenuSupplier {
+
     HomePage inicio;
-
-    @Menu
-    @Label("Noticias")
     NewsListing noticias;
-
-    @Menu
-    @Label("Avisos")
     NoticesListing avisos;
-
-    @Menu
-    @Label("Documentos")
     DocumentsListing documentos;
-
-    @Menu
-    @Label("Secciones")
     SectionsListing secciones;
-
-    @Menu
-    @Label("Personas")
     PeopleListing personas;
-
-    @Menu
-    @Label("Organigrama")
     OrgChartPage organigrama;
-
-    @Menu
-    @Label("Buscar")
     SearchPage buscar;
-
-    @Menu
-    @Label("Documentos de Drive")
     DriveFilesListing documentosDrive;
-
-    @Menu
-    @Label("Mis favoritos")
     FavoritesListing favoritos;
-
-    @Menu
-    @Label("Pendientes")
     PendingListing pendientes;
-
-    @Menu
-    @Label("Nueva solicitud")
     NewRequestPage nuevaSolicitud;
-
-    @Menu
-    @Label("Mis solicitudes")
     MyRequestsListing solicitudes;
-
-    @Menu
-    @Label("Por aprobar")
     ApprovalsListing porAprobar;
-
-    @Menu
-    @Label("Encuestas")
     SurveysListing encuestas;
-
-    @Menu
-    @Label("Mis preferencias")
     PreferencesPage preferencias;
+
+    @Override
+    public List<Actionable> menu(HttpRequest httpRequest) {
+        return PortalMenu.get().actionables(SiteMenu.INTRANET, IntranetMenu.class, httpRequest);
+    }
 }

@@ -25,7 +25,10 @@ public class PortalRoutes implements RouteResolver {
             "/intranet/personas/[^/]+", PersonPage.class,
             "/intranet/secciones/[^/]+", SectionPage.class,
             "/intranet/solicitudes/[^/]+", RequestPage.class,
-            "/intranet/encuestas/[^/]+", SurveyPage.class);
+            "/intranet/encuestas/[^/]+", SurveyPage.class,
+            // what a menu entry opens when the menu cannot: an external link, a hosted UI (MenuEntryPage)
+            "/intranet/enlace/[^/]+/[^/]+", MenuEntryPage.class,
+            "/intranet/ui/[^/]+/[^/]+", MenuEntryPage.class);
 
     @Override
     public Class<?> resolveRoute(String route, String consumedRoute, HttpRequest httpRequest) {

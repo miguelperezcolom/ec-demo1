@@ -9,10 +9,12 @@
   const HOSTS = ['www.youtube-nocookie.com', 'player.vimeo.com', 'drive.google.com'];
   const OWN = /^\/_(intranet|content-hub)\/media\//;
 
-  const allowed = (src) => {
+  // kind "ui": another UI of the platform a menu entry hosts (MenuEntryPage) — only behind our own gateway
+  const allowed = (src, kind) => {
     try {
       const u = new URL(src, location.href);
-      if (u.origin === location.origin) return OWN.test(u.pathname);
+      if (u.origin === location.origin) return kind === 'ui' ? /^\/_[a-z0-9-]+(\/|$)/.test(u.pathname) : OWN.test(u.pathname);
+      if (kind === 'ui') return false;
       return u.protocol === 'https:' && HOSTS.includes(u.hostname);
     } catch (e) {
       return false;
@@ -23,7 +25,7 @@
     if (el.dataset.ecEmbedDone) return;
     el.dataset.ecEmbedDone = '1';
     const src = el.getAttribute('data-ec-embed');
-    if (!src || !allowed(src)) return;
+    if (!src || !allowed(src, el.dataset.ecEmbedKind)) return;
     const frame = document.createElement('iframe');
     frame.src = src;
     frame.loading = 'lazy';
