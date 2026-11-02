@@ -33,6 +33,7 @@ public class IntranetMenu implements MenuSupplier {
     MyRequestsListing solicitudes;
     ApprovalsListing porAprobar;
     SurveysListing encuestas;
+    NewslettersListing newsletters;
     PreferencesPage preferencias;
 
     @Override

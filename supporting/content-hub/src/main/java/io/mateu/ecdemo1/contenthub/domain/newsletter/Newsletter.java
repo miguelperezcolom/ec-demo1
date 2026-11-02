@@ -36,7 +36,7 @@ public class Newsletter extends AggregateRoot {
      */
     public record Settings(List<Block> layout, Map<String, List<String>> sources, Cadence cadence, boolean autoSend) {
         public Settings {
-            layout = layout == null ? List.of() : List.copyOf(layout);
+            layout = layout == null ? List.of() : layout.stream().filter(java.util.Objects::nonNull).toList();
             var copy = new LinkedHashMap<String, List<String>>();
             if (sources != null) {
                 sources.forEach((k, v) -> copy.put(k, v == null ? List.of() : List.copyOf(v)));

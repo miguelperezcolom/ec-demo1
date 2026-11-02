@@ -48,15 +48,19 @@ public final class StandardTargets {
 
         @Override
         public Optional<MenuLink> resolve(MenuContext context, MenuTarget target) {
-            return visibility.isVisible(context.reader().attributes(), target.value())
-                    ? Optional.of(new MenuLink.Route(routes.page(context.siteId(), target.value())))
-                    : Optional.empty();
+            if (!visibility.isVisible(context.reader().attributes(), target.value())) {
+                return Optional.empty();
+            }
+            // under the site the page belongs to (a newsletter's own pages, under the newsletter)
+            var site = items.find(target.value()).map(i -> i.siteId()).orElse(context.siteId());
+            return Optional.of(new MenuLink.Route(routes.page(site, target.value())));
         }
 
         @Override
         public List<Choice> choices(String siteId) {
             return items.findAll().stream()
                     .filter(i -> i.type() == ItemType.PAGE && i.status() == ItemStatus.PUBLISHED)
+                    .filter(i -> i.siteId().equals(io.mateu.ecdemo1.contenthub.domain.site.Site.of(siteId)))
                     .map(i -> new Choice(i.id(), i.draft().in(i.defaultLanguage(), i.defaultLanguage()).title()))
                     .toList();
         }
@@ -83,8 +87,9 @@ public final class StandardTargets {
 
         @Override
         public Optional<MenuLink> resolve(MenuContext context, MenuTarget target) {
-            Set<String> shown = context.memo("sections.shown", () -> navigation.get()
-                    .shown(visibility.sectionsWithVisibleContent(context.reader().attributes())));
+            // the site's own tree, and what of it the reader sees
+            Set<String> shown = context.memo("sections.shown", () -> navigation.get(context.siteId())
+                    .shown(visibility.sectionsWithVisibleContent(context.reader().attributes(), context.siteId())));
             return shown.contains(target.value())
                     ? Optional.of(new MenuLink.Route(routes.section(context.siteId(), target.value())))
                     : Optional.empty();
@@ -92,7 +97,7 @@ public final class StandardTargets {
 
         @Override
         public List<Choice> choices(String siteId) {
-            var nav = navigation.get();
+            var nav = navigation.get(siteId);
             return nav.sections().stream().map(s -> new Choice(s.id(),
                     "  ".repeat(nav.ancestors(s.id()).size()) + s.name("es"))).toList();
         }

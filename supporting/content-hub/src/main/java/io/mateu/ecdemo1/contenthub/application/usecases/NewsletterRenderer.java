@@ -76,7 +76,7 @@ public final class NewsletterRenderer {
         var theme = d.theme();
         var html = new StringBuilder();
         html.append("<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;width:100%;margin:0 auto;"
-                + "color:#1f2933;line-height:1.5\">");
+                + "color:#1f2933;background:#ffffff;line-height:1.5;color-scheme:light\">");
         if (v.mode() == Mode.EMAIL) {
             html.append("<p style=\"font-size:12px;color:#6b7280;text-align:center;margin:4px 0\"><a href=\"")
                     .append(esc(v.links().permalink())).append("\" style=\"color:#6b7280\">")
@@ -168,6 +168,8 @@ public final class NewsletterRenderer {
                 }
                 yield items(v, list);
             }
+            // a block type a newsletter does not draw (one added since: another UI…): nothing in the issue
+            default -> null;
         };
         if (inner == null) {
             return "";

@@ -84,6 +84,6 @@ class PortalMenuThroughMateuTest {
                 assertThat(((FieldLink) a).serverSideType()).isEqualTo(IntranetMenu.class.getName());
             });
         }
-        assertThat(PortalFunction.values()).hasSize(16);
+        assertThat(PortalFunction.values()).hasSize(17); // «Newsletters» since the newsletters
     }
 }

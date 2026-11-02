@@ -94,7 +94,7 @@ public class NewsletterIssue extends AggregateRoot {
         if (subject == null || subject.isBlank()) {
             throw new IllegalArgumentException("El número necesita un asunto");
         }
-        for (var b : blocks == null ? List.<Block>of() : blocks) {
+        for (var b : blocks == null ? List.<Block>of() : blocks.stream().filter(java.util.Objects::nonNull).toList()) {
             if (!Block.isNarrowing(b.audience())) {
                 throw new IllegalArgumentException("La audiencia del bloque «" + b.id()
                         + "» solo puede estrechar la de la newsletter (departamentos, hoteles, puestos)");
@@ -102,7 +102,7 @@ public class NewsletterIssue extends AggregateRoot {
         }
         this.subject = subject.trim();
         this.date = date == null ? (this.date == null ? LocalDate.ofInstant(now, Cadence.ZONE) : this.date) : date;
-        this.blocks = new ArrayList<>(blocks == null ? List.of() : blocks);
+        this.blocks = new ArrayList<>(blocks == null ? List.of() : blocks.stream().filter(java.util.Objects::nonNull).toList());
         var copy = new LinkedHashMap<String, List<String>>();
         if (sections != null) {
             sections.forEach((k, v) -> copy.put(k, List.copyOf(new LinkedHashSet<>(v == null ? List.of() : v))));
@@ -236,7 +236,7 @@ public class NewsletterIssue extends AggregateRoot {
     }
 
     public List<Block> blocks() {
-        return List.copyOf(blocks);
+        return blocks.stream().filter(java.util.Objects::nonNull).toList();
     }
 
     public Map<String, List<String>> sections() {

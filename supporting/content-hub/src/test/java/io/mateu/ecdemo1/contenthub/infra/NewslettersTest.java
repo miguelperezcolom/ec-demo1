@@ -384,6 +384,56 @@ class NewslettersTest {
         assertThat(issues.find(issueId).orElseThrow().status()).isEqualTo(NewsletterIssue.Status.SENT);
     }
 
+    /** Its menu is the configurable one (owned by its site), seeded with its home, sections, archive and pages. */
+    @Test
+    void a_newsletters_menu_is_its_sites_configurable_menu() {
+        jdbc.update("delete from ch_menu");
+        var itemRepo = new PgItemRepository(jdbc);
+        var sites = new PgSiteRepository(jdbc);
+        var nav = new PgNavigationRepository(jdbc);
+        var routes = new io.mateu.ecdemo1.contenthub.infra.config.SiteAwareRoutes();
+        var store = new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgMenuRepository(jdbc);
+        var siteMenus = new io.mateu.ecdemo1.contenthub.application.menu.SiteMenus(store,
+                new NamedAudiences(new PgNamedAudienceRepository(jdbc)), List.of(
+                new io.mateu.ecdemo1.contenthub.application.menu.StandardTargets.Pages(visibility, itemRepo, routes),
+                new io.mateu.ecdemo1.contenthub.application.menu.StandardTargets.Sections(visibility, nav, routes),
+                new io.mateu.ecdemo1.contenthub.application.menu.NewsletterTargets.Home(sites, routes),
+                new io.mateu.ecdemo1.contenthub.application.menu.NewsletterTargets.Archive(sites, routes),
+                new io.mateu.ecdemo1.contenthub.application.menu.NewsletterTargets.Issue(sites, issues, routes)));
+        var newsletterMenus = new io.mateu.ecdemo1.contenthub.application.menu.NewsletterMenus(siteMenus, store, sites, nav, itemRepo);
+        editorial.withMenus(newsletterMenus);
+        var id = bulletin(false, Audience.EVERYONE);
+        var own = publish(id, "editorial", Audience.EVERYONE, "Carta");
+        var page = editorial.newPage(EDITOR, id, "Quiénes somos");
+        items.submitForReview(EDITOR, page);
+        items.publish(PUBLISHER, page, false);
+
+        var ana = new Reader("ana", "Ana", ConsumersTest.ANA, Set.of(), null);
+        var shown = siteMenus.shown(new io.mateu.ecdemo1.contenthub.application.menu.MenuContext(id, ana, Set.of()));
+        // home, its sections with something visible (only Editorial so far), archive, its page — under its routes
+        assertThat(shown).extracting(e -> ((io.mateu.ecdemo1.contenthub.application.menu.MenuLink.Route) e.link()).path())
+                .containsExactly("/intranet/n/" + id, "/intranet/n/" + id + "/secciones/editorial",
+                        "/intranet/n/" + id + "/archivo", "/intranet/n/" + id + "/p/" + page);
+        assertThat(siteMenus.sites()).contains(id);
+        // newsletter kinds apply to newsletter sites only
+        assertThat(siteMenus.targetKinds(id)).extracting(r -> r.kind()).contains("ARCHIVE", "ISSUE", "NEWSLETTER_HOME");
+        assertThat(siteMenus.targetKinds("intranet")).extracting(r -> r.kind()).doesNotContain("ARCHIVE", "ISSUE");
+        // seeding again changes nothing
+        assertThat(newsletterMenus.seedIfAbsent(id)).isFalse();
+        assertThat(own).isNotBlank();
+        editorial.withMenus(null);
+    }
+
+    @Test
+    void an_item_with_a_block_of_an_unknown_type_is_read_without_it() {
+        var id = publish(null, "noticias", Audience.EVERYONE, "Con bloque raro");
+        jdbc.update("update ch_item set doc = jsonb_set(doc, '{draft,blocks}', "
+                + "'[{\"id\":\"r1\",\"type\":\"REMOTE\"},{\"id\":\"h1\",\"type\":\"HTML\",\"html\":\"<p>x</p>\"}]'::jsonb) where id = ?", id);
+        var item = new PgItemRepository(jdbc).find(id).orElseThrow();
+        assertThat(item.draft().blocks()).extracting(Block::id).containsExactly("h1");
+        assertThat(new PgItemRepository(jdbc).findAll()).extracting(i -> i.id()).contains(id);
+    }
+
     @Test
     void the_editions_of_before_become_issues_of_the_bulletin_once() {
         // two editions as they were stored, one sent with its opens, and two preferences

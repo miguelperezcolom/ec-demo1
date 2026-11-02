@@ -172,7 +172,7 @@ public class NewsletterService {
             case FEATURED, AUTOMATIC_LISTING, LATEST, NOTICES -> !listing(b, group.profile()).isEmpty();
             case MEDIA -> b.mediaId() != null;
             case QUICK_LINKS -> !b.links().isEmpty();
-            case GREETING, PENDING -> false;
+            default -> false; // greeting, pending, and any block type a newsletter does not draw
         });
     }
 

@@ -60,6 +60,7 @@ public class ContentSeeder {
     final MediaRepository media;
     final io.mateu.ecdemo1.contenthub.application.usecases.NewsletterEditorial newsletters;
     final io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites;
+    final io.mateu.ecdemo1.contenthub.application.menu.NewsletterMenus newsletterMenus;
     final io.mateu.ecdemo1.contenthub.application.out.HomePages homes;
     final io.mateu.ecdemo1.contenthub.application.usecases.Surveys surveys;
     final io.mateu.ecdemo1.contenthub.application.out.SurveyRepository surveyRepository;
@@ -416,6 +417,7 @@ public class ContentSeeder {
                             "<p>Comunicación interna · Servicios centrales</p>", null, null, null, null, null)),
                     null, null, false, false, null, null).withNotification(false, false));
             itemCommands.publish(SYSTEM, BULLETIN_ABOUT, false);
+            newsletterMenus.addPage(BULLETIN, BULLETIN_ABOUT, "Quiénes somos");
         }
     }
 

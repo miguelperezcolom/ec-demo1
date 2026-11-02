@@ -69,6 +69,15 @@ public class NewsletterEditorial {
     final Visibility visibility;
     final ItemCommands itemCommands;
     final Clock clock;
+    /** Its menu (SiteMenus, owned by the site); none in tests that do not need it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    io.mateu.ecdemo1.contenthub.application.menu.NewsletterMenus menus;
+
+    /** With its menus (outside Spring: the tests). */
+    public NewsletterEditorial withMenus(io.mateu.ecdemo1.contenthub.application.menu.NewsletterMenus menus) {
+        this.menus = menus;
+        return this;
+    }
 
     /** A section of the newsletter as an editor sets it: its id, its name, and the intranet sections it takes. */
     public record SectionSpec(String id, String name, List<String> sources) {
@@ -99,6 +108,9 @@ public class NewsletterEditorial {
         apply(nav, sections, definition.languages());
         navigation.save(id, nav);
         newsletters.save(Newsletter.create(id, complete(settings, nav, sections), clock.instant()));
+        if (menus != null) {
+            menus.seedIfAbsent(id);
+        }
     }
 
     /** Changes a newsletter: its site (identity, audience…), its sections and its settings. */
@@ -179,9 +191,13 @@ public class NewsletterEditorial {
         newsletter(siteId);
         var site = sites.find(siteId).orElseThrow();
         var language = site.definition().languages().isEmpty() ? "es" : site.definition().languages().getFirst();
-        return itemCommands.createInSite(reader, siteId, ItemType.PAGE, language, new ItemContent(null, null,
-                Map.of(language, new Translation(title == null || title.isBlank() ? "Nueva página" : title, "", "")),
-                List.of(), null, null, false, false, null, null));
+        var name = title == null || title.isBlank() ? "Nueva página" : title;
+        var id = itemCommands.createInSite(reader, siteId, ItemType.PAGE, language, new ItemContent(null, null,
+                Map.of(language, new Translation(name, "", "")), List.of(), null, null, false, false, null, null));
+        if (menus != null) {
+            menus.addPage(siteId, id, name);
+        }
+        return id;
     }
 
     /** The newsletter's own pages, published or not — its menu's (the portal shows the published ones a reader sees). */

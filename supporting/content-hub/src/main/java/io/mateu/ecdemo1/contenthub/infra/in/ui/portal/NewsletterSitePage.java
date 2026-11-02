@@ -117,11 +117,11 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
         String current;
         switch (w.view()) {
             case "archivo" -> {
-                current = "archivo";
+                current = NewsletterNavigation.base(site.id()) + "/archivo";
                 body = identity(reader, site) + archive(site, Integer.MAX_VALUE);
             }
             case "numeros" -> {
-                current = "home";
+                current = NewsletterNavigation.base(site.id());
                 var issue = w.ref() == null ? null : newsletters.readableIssue(reader, site.id(), w.ref()).orElse(null);
                 if (issue == null) {
                     return unavailable("Este número no existe, no ha salido todavía o no es de esta newsletter");
@@ -129,11 +129,11 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
                 body = issue(reader, site, issue) + archive(site, 5);
             }
             case "secciones" -> {
-                current = "s:" + w.ref();
+                current = NewsletterNavigation.base(site.id()) + "/secciones/" + w.ref();
                 body = identity(reader, site) + section(reader, site, w.ref());
             }
             case "p" -> {
-                current = "p:" + w.ref();
+                current = NewsletterNavigation.base(site.id()) + "/p/" + w.ref();
                 var page = page(reader, site, w.ref());
                 if (page == null) {
                     return unavailable("Esta página no existe o no la puedes ver");
@@ -141,7 +141,7 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
                 body = identity(reader, site) + page;
             }
             default -> {
-                current = "home";
+                current = NewsletterNavigation.base(site.id());
                 var latest = newsletters.latestSent(site.id()).orElse(null);
                 body = latest == null ? identity(reader, site)
                         + "<p style=\"opacity:.75\">Todavía no ha salido ningún número.</p>"
@@ -149,7 +149,7 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
             }
         }
         var out = new ArrayList<Component>(PortalComponents.viewingAs(reader.viewingAs()));
-        out.add(Html.block("<div style=\"max-width:760px;margin:0 auto;width:100%\">" + nav(reader, site, current) + body + "</div>"));
+        out.add(Html.block("<div style=\"max-width:760px;margin:0 auto;width:100%;box-sizing:border-box;background:#ffffff;color:#1f2933;color-scheme:light;padding:1rem;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.25)\">" + nav(httpRequest, site, current) + body + "</div>"));
         out.addAll(subscription(reader, site, preference));
         var toolbar = new ArrayList<UserTrigger>();
         if (reader.viewingAs() == null) {
@@ -163,12 +163,17 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
     }
 
     /** The menu: the seam (NewsletterNavigation), drawn as a bar that wraps on a narrow screen. */
-    String nav(Reader reader, Site site, String current) {
+    String nav(HttpRequest httpRequest, Site site, String current) {
         var theme = site.definition().theme();
         var html = new StringBuilder("<nav style=\"display:flex;flex-wrap:wrap;gap:.25rem .5rem;margin:0 0 1rem;"
                 + "padding:.5rem 0;border-bottom:2px solid " + theme.accent() + "\">");
-        for (var e : menu.menu(reader, site)) {
-            var on = e.key().equals(current);
+        for (var e : menu.menu(httpRequest, site)) {
+            if (e.href() == null) { // a submenu: its label, then its entries
+                html.append("<span style=\"padding:.25rem .3rem;font-size:.8rem;opacity:.65;align-self:center\">")
+                        .append(Html.escape(e.label())).append("</span>");
+                continue;
+            }
+            var on = e.href().equals(current);
             html.append("<a href=\"").append(Html.escape(e.href())).append("\" style=\"padding:.25rem .6rem;border-radius:999px;"
                     + "text-decoration:none;font-size:.9rem;").append(on ? "background:" + theme.primary() + ";color:#fff"
                     : "color:" + theme.primary()).append("\">").append(Html.escape(e.label())).append("</a>");

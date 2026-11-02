@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 public class SiteBootstrap {
 
     final Sites sites;
+    final io.mateu.ecdemo1.contenthub.application.menu.NewsletterMenus newsletterMenus;
 
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -29,6 +30,20 @@ public class SiteBootstrap {
             }
         } catch (RuntimeException e) {
             log.error("Could not store the intranet as a site", e);
+        }
+    }
+
+    /** After the migration and the seed: every newsletter site gets its menu, if it has none (idempotent). */
+    @EventListener(ApplicationReadyEvent.class)
+    @Order(Ordered.LOWEST_PRECEDENCE)
+    public void menus() {
+        try {
+            var n = newsletterMenus.seedAll();
+            if (n > 0) {
+                log.info("Menus seeded for {} newsletter site(s)", n);
+            }
+        } catch (RuntimeException e) {
+            log.error("Could not seed the newsletters' menus", e);
         }
     }
 }
