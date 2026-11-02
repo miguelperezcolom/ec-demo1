@@ -117,3 +117,8 @@ create table if not exists ch_usage_daily (day date not null, metric text not nu
 -- Per item and reader, for the item's own figures: views and unique readers since it exists.
 create table if not exists ch_item_reader (item_id text not null, user_id text not null, views bigint not null,
     first_at timestamptz not null, last_at timestamptz not null, primary key (item_id, user_id));
+
+-- Google Drive (requirement 1350): what Drive last said of each referenced file — its metadata, never the
+-- file — refreshed by a job only when GOOGLE_DRIVE_* is configured.
+create table if not exists ch_drive_file (
+    file_id text primary key, doc jsonb not null, refreshed_at timestamptz);

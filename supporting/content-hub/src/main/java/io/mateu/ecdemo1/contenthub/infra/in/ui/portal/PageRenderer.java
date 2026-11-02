@@ -106,6 +106,11 @@ public class PageRenderer {
                 ? renderer.medium(item.url().substring(6), PORTAL_BASE, reader.attributes().hash()) : null;
     }
 
+    /** A Drive file an item points at by its URL: Google's live preview. */
+    public String drive(io.mateu.ecdemo1.contenthub.domain.drive.DriveFileRef ref, String title) {
+        return renderer.drive(ref, title);
+    }
+
     public static DashboardPanel panel(String id, String title, Component content, int colSpan) {
         return DashboardPanel.builder().id(id).title(title).content(content).colSpan(colSpan).build();
     }

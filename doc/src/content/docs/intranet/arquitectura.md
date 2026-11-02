@@ -32,7 +32,9 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **`embed.js`** | `GET /_intranet/embed.js` | Convierte los marcadores de vídeo y PDF en reproductores (ver [Seguridad](#seguridad)) |
 | **Solicitudes** | `RequestService`; portal `NewRequestPage`, `MyRequestsListing`, `ApprovalsListing`/`ApprovalPage` | Las solicitudes de los empleados las decide el proceso `solicitud-empleado` de EventConductor (ec-definitions). El content-hub lo arranca por su outbox (`process-creation-requested` en `upstream`, clave `solicitud:<id>`). Sigue su estado en el topic `solicitudes` (`RequestEventsListener`). Aprobar o rechazar completa la tarea del motor de formularios por REST con el token del propio usuario (`FormsHumanTasks`), que el motor acepta (`WORKFLOW_SECURITY_TRUST_FORWARDED_TOKEN`) |
 | **Directorio** | `EmployeeDirectoryListener` | Copia local de los empleados —atributos, responsable (`managerId`), teléfono y etiquetas de los códigos— desde `employee-directory`. De ella salen las audiencias, la newsletter y el directorio de personas |
-| **Trabajos** | `ContentJobs`, `NotificationJobs` | Cruces de fechas, newsletter, embeddings del RAG y limpieza de perfiles huérfanos; reparto de notificaciones, recordatorios y agregados diarios de uso |
+| **Búsqueda** | `IntranetSearch`; portal `SearchPage` | Híbrida (palabras y significado), con la respuesta de la IA y el grupo de personas (ver [Búsqueda](#búsqueda-híbrida-y-respuesta-de-la-ia)) |
+| **Google Drive** | `DriveDocuments`; portal `DriveFilesListing`, `ItemPage` | Referencias a ficheros, nunca copias, y sus metadatos (ver [Google Drive](#google-drive)) |
+| **Trabajos** | `ContentJobs`, `NotificationJobs` | Cruces de fechas, newsletter, embeddings del RAG, metadatos de Drive y limpieza de perfiles huérfanos; reparto de notificaciones, recordatorios y agregados diarios de uso |
 
 Portal y trabajo editorial son la misma UI, en `ec1.mateu.io`, donde trabajan los empleados y los
 editores; **la configuración** —cómo funciona la intranet, no lo que publica— va en la consola de control,
@@ -52,6 +54,8 @@ flowchart LR
   CH -- content-events --> K[("Kafka")]
   CH -- SMTP --> PF["postfix"]
   CH -- "/v1/embeddings" --> EMB["embeddings (TEI)"]
+  CH -- "A2A + token del usuario" --> AG
+  CH -- "Drive API v3 (metadatos)" --> GD["Google Drive"]
   CH --- DB[("cp-postgres<br/>content_hub + pgvector")]
 ```
 
@@ -218,6 +222,7 @@ initContainer del manifiesto. Las tablas las crea `schema.sql` al arrancar, solo
 | `ch_survey_participation`, `ch_survey_response` | Quién ha respondido y qué se ha respondido, en dos tablas que no se apuntan entre sí |
 | `ch_notification_job`, `ch_notification_sent`, `ch_notification_pref` | Los repartos pendientes, qué se ha dicho a quién (item, versión, lector, tipo, canal) y cómo quiere cada uno que se le avise |
 | `ch_usage_event`, `ch_usage_daily`, `ch_item_reader` | El uso: eventos en crudo (con retención), sus agregados por día y las vistas por item y lector |
+| `ch_drive_file` | Lo último que Drive dijo de cada fichero referenciado (documento JSON): metadatos, nunca el fichero |
 
 La **búsqueda de texto** es el FTS de PostgreSQL: `ch_item_doc.tsv` (configuración `simple`, índice GIN),
 consulta por **prefijo** («vacac» encuentra «vacaciones»), filtrada por visibilidad en la misma consulta:
@@ -281,6 +286,109 @@ páginas y contadores solo cuentan lo visible.
 
 El servidor se registra en el plano de control de IA como el MCP **`intranet`**
 (`gitops/example/ia/mcp/intranet.yaml`, SSE a `http://content-hub:8135`) y lo usa `console-agent`.
+
+## Búsqueda híbrida y respuesta de la IA
+
+`IntranetSearch` lanza dos búsquedas y las mezcla. Las dos pasan por `Visibility`, con el filtro dentro de la
+misma consulta:
+
+- **Por palabras**: el FTS de `ch_item_doc`, como siempre.
+- **Por significado**: la consulta se embebe y se buscan los pasajes más cercanos de `ch_chunk`, descartando
+  los que pasan de `content-hub.search.max-distance`.
+
+`HybridRanking` las une por **fusión de rangos recíprocos** (`Σ 1 / (60 + rango)`): rangos y no puntuaciones,
+porque `ts_rank` y la distancia coseno no están en la misma escala. Lo que aparece en las dos listas sube. Un item
+encontrado solo por significado se vuelve a pedir a `Visibility`. El subtítulo de cada resultado es el pasaje
+que coincidió, recortado alrededor de la palabra (`Snippets`). Sin el servicio de embeddings se busca solo por
+palabras (un timeout de 10 s para las preguntas, que tienen a alguien esperando) y la página lo dice.
+
+`SearchPage` es un `Form` con el template `HeroSearchPage` y no un listado, porque respuesta, resultados y
+personas dependen de la misma consulta. No pagina: los 20 mejores.
+
+**Mateu llama a `component()` más de una vez por petición** (para localizar el botón de la acción y para
+dibujar), así que la página guarda lo calculado por consulta en un campo `final`: sin eso cada búsqueda llamaba
+dos veces al agente, a cuenta del presupuesto del lector.
+
+### La respuesta
+
+**Se calcula en la misma petición** cuando la consulta parece una pregunta (`looksLikeQuestion`: signo de
+interrogación, partícula interrogativa al principio o seis palabras o más): resultados y respuesta llegan
+juntos, a costa de esperar al agente, 30 s como máximo. Para el resto, un botón **Preguntar a la IA**: ninguna
+llamada que nadie haya pedido. Es lo sencillo para la demo; a escala real convendría cargar la respuesta aparte
+para no retrasar los resultados.
+
+1. content-hub recupera hasta 6 pasajes cercanos **entre los visibles** (sin embeddings, el texto de los items
+   encontrados por palabras, visibles también). El agente no tiene herramientas: **lo único que conoce es lo que
+   se le manda**, así que la regla de visibilidad se cumple aquí y no depende de él.
+2. Los manda numerados por A2A, escapados para que su texto no pueda cerrar la etiqueta:
+
+   ```text
+   <passages>
+   <passage number="1" item="ID" title="TÍTULO">
+   TEXTO
+   </passage>
+   </passages>
+
+   <question>PREGUNTA</question>
+   ```
+
+3. La respuesta es texto con citas `[n]`. `IntranetSearch.cited` traduce cada número al item del pasaje, las
+   renumera por orden de aparición (dos pasajes de un item son una cita) y **tira cualquier número que no se
+   mandó**. Cada cita es un enlace a `/intranet/noticias/{id}`.
+
+Cualquier fallo (sin token, agente fuera del catálogo, error JSON-RPC, timeout, respuesta vacía) acaba en el
+mismo aviso breve; el motivo va al log.
+
+## La IA por el plano de control
+
+content-hub no llama a ningún modelo ni tiene clave. `A2aClient` manda un mensaje de texto a `ia-agent`
+(`message/send`, bloqueante), y de ahí salen el LLM, la credencial y la auditoría:
+
+- **El token es el de la persona que pulsa**, leído de la cabecera `Authorization` de la petición de Mateu, la
+  misma con la que `ApprovalPage` completa tareas. Sin él no se llama: **nunca se sustituye por uno de servicio**,
+  porque el consumo se carga a quien llama.
+- **Cada llamada es una conversación nueva** (sin `contextId`): el texto de un lector no entra en el historial
+  de otro. Va con `X-A2A-No-Delegation`.
+- **Un agente por tarea**, porque el prompt de sistema es distinto: `intranet-agent` e `intranet-translator`.
+
+**Lo que el plano aplica y lo que no por esta vía** (leído en el código de `ia-agent`): el consumo se registra a
+nombre de quien llama, y con eso cuenta para sus presupuestos, pero **no se rechaza por presupuesto antes de
+gastar ni corren los guardarraíles**. Ambas cosas están en la resolución del chat (`IaAgentController`); el
+endpoint A2A pide la configuración por id, sin identidad.
+
+### Traducir con IA
+
+`AgentTranslator` manda un JSON por idioma (`from`, `to`, `title`, `summary`, `body`), que lleva el HTML sin
+ningún escapado propio, y espera otro con `title`, `summary` y `body`. El modelo lo decide el plano y **no
+garantiza el formato**, así que la respuesta se lee con tolerancia (bloques de código, comentarios alrededor,
+saltos de línea dentro de las cadenas) y se comprueba con dureza. Es un fallo, y el formulario no cambia:
+
+- que no haya un objeto JSON con título y cuerpo;
+- que el cuerpo venga vacío cuando el original no lo estaba;
+- que cambien las marcas `[[media:…]]`;
+- que cambien las etiquetas, su orden o los `href` y `src` del cuerpo, comparados tras sanearlos.
+
+El cuerpo se sanea como cualquier contenido, y el editor revisa y guarda: nada se publica desde aquí.
+
+## Google Drive
+
+El agregado de medios ya admitía URL externas. `DriveFileRef` entiende lo que pega un editor (`file/d/…`,
+`open?id=`, `uc?id=`, los editores de Docs, Sheets, Slides, Forms y Drawings, con `/u/N/` o `/a/dominio/`, sin
+esquema o dentro de un `<iframe>`) y rechaza carpetas y copias «publicadas en la web». De un fichero se guarda
+la referencia, **nunca una copia**: una sola versión, la de Drive.
+
+- **Sin configurar**: vista previa `drive.google.com/file/d/{id}/preview` por `embed.js`, y enlaces a Drive y
+  al editor (`docs.google.com/{tipo}/d/{id}/edit`). La vista previa va con la sesión de Google del lector.
+- **Con cuenta de servicio** (`GoogleDriveClient`, detrás del puerto `DriveClient`): `ContentJobs` refresca los
+  metadatos de cada fichero referenciado con `files.get` de la API v3. Se firma un JWT con la clave de
+  `GOOGLE_DRIVE_CREDENTIALS_FILE` y se cambia por un token con el alcance `drive.metadata.readonly`, que no da
+  acceso al contenido. `sub` solo se manda si hay `GOOGLE_DRIVE_IMPERSONATE`. Sin librería de Google: son dos
+  llamadas HTTP. La configuración de despliegue está en [Operación](./operacion/#google-drive).
+
+*Documentos de Drive* lista los ficheros de los items que devuelve la función de visibilidad
+(`visibleGoogleUrls`: la URL del item o un medio externo que use). El trabajo, en cambio, refresca **todo** lo
+referenciado, también borradores: son metadatos de una caché que solo se enseñan a través de un item visible. Lo
+que no controla la intranet es quién abre el fichero en Google: eso lo deciden los permisos de Drive.
 
 ## Newsletter
 
@@ -388,6 +496,10 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 | Un candado consultivo (`pg_advisory_xact_lock`) por item al comentar o reaccionar | Son un solo documento por item: dos a la vez se pisarían; y el primero no tiene aún fila que bloquear |
 | Notificaciones por `notifications` con `addressees`, no un canal propio | La campana y Web Push ya existen y son de `communication-service`; una notificación por lector, y no una por audiencia, deja cerrar la de cada uno cuando la lee, y los `users` de la bandeja no crecen sin límite |
 | Mirar las fechas para notificar, no escuchar `ItemBecameEffective` | Ese evento se pierde si el servicio está caído al cruzar la fecha, y el reparto tiene que esperar a la proyección de todos modos |
+| Búsqueda híbrida por rangos recíprocos | `ts_rank` y la distancia coseno no se pueden comparar; los rangos no necesitan calibrarse |
+| La IA por A2A y no con una clave propia | El LLM, la credencial, el consumo y la auditoría se gobiernan en un solo sitio, por persona |
+| El agente sin herramientas: content-hub le manda los pasajes | La visibilidad se decide en un solo sitio y no depende de lo que haga el modelo |
+| Drive por referencia, con cuenta de servicio y sin delegación por defecto | Una sola versión; lo mínimo para funcionar compartiendo ficheros, sin pedir permisos de dominio |
 | Slots por REST provisional | El microfrontend de Mateu aún no está; el contrato (clave, identidad, caché por hash) es el mismo |
 
 ## Pruebas
@@ -408,4 +520,11 @@ fallback), con `X-Content-Cache-Key` = el hash del perfil, para que la aplicaci�
 - `ConsumersTest` (Testcontainers con `pgvector/pgvector`): los criterios de aceptación de la spec —un item
   que el lector no cumple no aparece en ningún consumidor, bloques, programados y caducados sin job,
   secciones vacías, paginación, idioma de fallback, cambio de atributos y caché compartida, favoritos, slots,
-  newsletter, reconfirmación, editor sin publicar, hash desconocido y proyección desde cero.
+  newsletter, reconfirmación, editor sin publicar, hash desconocido y proyección desde cero; y también que la
+  búsqueda, los pasajes que recibe el agente y la lista de Drive son solo lo que el lector puede ver.
+- `HybridRankingTest`, `SnippetsTest`, `IntranetSearchTest`: la mezcla, los subtítulos, las citas y cada
+  degradación de la búsqueda.
+- `AgentAnswersTest`, `AgentTranslatorTest` (contra un endpoint A2A falso): el mensaje exacto, el token reenviado,
+  los fallos, y que una traducción mal formada o sin el formato del cuerpo nunca se aplica.
+- `DriveFileRefTest`, `DriveDocumentsTest` (con un Drive falso), `GoogleDriveClientTest` (contra un servidor local
+  que hace de Google): las formas de URL, el trabajo de metadatos, el JWT firmado y un fichero que no se puede ver.

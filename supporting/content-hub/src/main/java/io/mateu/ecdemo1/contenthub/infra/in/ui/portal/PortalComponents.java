@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
+import io.mateu.ecdemo1.contenthub.application.drive.DriveDocuments;
 import io.mateu.ecdemo1.contenthub.application.out.VisibleItem;
 import io.mateu.ecdemo1.contenthub.domain.employee.Employee;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
@@ -64,6 +65,35 @@ public final class PortalComponents {
             parts.add("hasta el " + Ui.day(i.expireAt()));
         }
         return String.join(" · ", parts);
+    }
+
+    /** Text that is not ours (a passage, the AI's answer): Mateu reads ${…} in a Text as a template. */
+    public static String literal(String text) {
+        return text == null ? "" : text.replace("${", "$ {");
+    }
+
+    /** A Drive file: who last touched it, as far as Drive said, and the ways to it, which open Google's. */
+    public static Component driveFile(DriveDocuments.Document d) {
+        var links = new ArrayList<Component>();
+        links.add(new Anchor("Abrir en Drive", d.ref().openUrl(), "_blank", "", ""));
+        d.ref().editUrl().ifPresent(edit -> links.add(new Anchor("Editar en Drive", edit, "_blank", "", "")));
+        var content = new ArrayList<Component>();
+        var line = driveModified(d);
+        if (!line.isEmpty()) {
+            content.add(small(line));
+        }
+        content.add(HorizontalLayout.builder().spacing(true).wrap(true).content(links).build());
+        return column(content);
+    }
+
+    /** «Modificado por X el …», as far as Drive said; empty when it never did (no Drive configured). */
+    public static String driveModified(DriveDocuments.Document d) {
+        var m = d.metadata();
+        if (m == null || m.modifiedTime() == null) {
+            return "";
+        }
+        return "Modificado" + (m.lastModifiedBy() == null ? "" : " por " + m.lastModifiedBy()) + " el "
+                + Ui.when(m.modifiedTime());
     }
 
     /** A person: their initials, their name opening their card, their job beneath. */

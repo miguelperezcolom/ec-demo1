@@ -83,6 +83,20 @@ content-hub:
   embeddings:
     url: ${EMBEDDINGS_URL:http://embeddings}
     model: ${EMBEDDINGS_MODEL:intfloat/multilingual-e5-small}
+  # The portal's search: a passage further than this (cosine distance) is no match by meaning.
+  search:
+    max-distance: ${SEARCH_MAX_DISTANCE:0.3}
+    # «Respuesta de la IA»: the IA control plane's agent, over A2A, with the reader's token.
+    agent-url: ${INTRANET_AGENT_URL:http://ia-agent:8095/a2a/intranet-agent}
+    agent-timeout: ${INTRANET_AGENT_TIMEOUT:PT30S}
+  # «Traducir con IA»: the same, with the editor's token.
+  translation:
+    agent-url: ${INTRANET_TRANSLATOR_URL:http://ia-agent:8095/a2a/intranet-translator}
+    agent-timeout: ${INTRANET_TRANSLATOR_TIMEOUT:PT60S}
+  # Optional: without a service account key file the Drive references work from the URL alone, with no metadata.
+  drive:
+    credentials-file: ${GOOGLE_DRIVE_CREDENTIALS_FILE:}
+    impersonate: ${GOOGLE_DRIVE_IMPERSONATE:}
   newsletter:
     from: ${NEWSLETTER_FROM:intranet@ec1.mateu.io}
     # The demo's employees are made up: every newsletter goes here, saying whom it was for.

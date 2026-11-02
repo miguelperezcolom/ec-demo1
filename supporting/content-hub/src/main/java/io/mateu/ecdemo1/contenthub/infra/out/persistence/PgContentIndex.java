@@ -378,6 +378,25 @@ public class PgContentIndex implements ContentIndex {
         return sb.append(']').toString();
     }
 
+    /** A Google Drive or Docs URL, as an editor may have pasted it. */
+    static final String GOOGLE = "'(drive|docs)\\.google\\.com/'";
+
+    @Override
+    public List<ExternalReference> visibleGoogleUrls(String hash, String language, Instant now) {
+        var who = who(hash);
+        return jdbc.query("select item_id, title, url from ("
+                        + "select d.item_id, d.title, d.url, d.publish_at from ch_item_doc d where" + VISIBLE + " and "
+                        + LANGUAGE + " and d.url ~* " + GOOGLE
+                        + " union "
+                        + "select d.item_id, d.title, m.external_url, d.publish_at from ch_item_doc d join ch_media m "
+                        + "on (d.url = 'media:' || m.id or exists (select 1 from ch_item_media im where "
+                        + "im.item_id = d.item_id and im.media_id = m.id)) where" + VISIBLE + " and " + LANGUAGE
+                        + " and m.kind = 'EXTERNAL' and m.external_url ~* " + GOOGLE
+                        + ") r order by publish_at desc, item_id",
+                (rs, i) -> new ExternalReference(rs.getString(1), rs.getString(2), rs.getString(3)),
+                who, Sql.ts(now), Sql.ts(now), language, language, who, Sql.ts(now), Sql.ts(now), language, language);
+    }
+
     @Override
     public boolean isMediaVisible(String mediaId, String hash, Instant now) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists (select 1 from ch_item_media m join ch_item_doc d "

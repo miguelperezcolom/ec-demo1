@@ -9,8 +9,12 @@ import io.mateu.ecdemo1.contenthub.domain.item.Translation;
  */
 public interface Translator {
 
-    /** Whether a model is configured; without one the editor does not offer the action. */
+    /** Whether a translator is configured; without one the editor does not offer the action. */
     boolean available();
 
-    Translation translate(Translation source, String fromLanguage, String toLanguage);
+    /**
+     * @param authorization the editor's own {@code Authorization} header: it is who is charged for it
+     * @throws RuntimeException with a brief message for the editor when there is no usable translation
+     */
+    Translation translate(Translation source, String fromLanguage, String toLanguage, String authorization);
 }

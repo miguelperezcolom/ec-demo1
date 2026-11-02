@@ -3,7 +3,11 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
 import io.mateu.ecdemo1.contenthub.application.out.MediaRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.MediaCommands;
+import io.mateu.ecdemo1.contenthub.application.drive.DriveDocuments;
+import io.mateu.ecdemo1.contenthub.domain.drive.DriveFileRef;
 import io.mateu.ecdemo1.contenthub.domain.media.MediaAsset;
+import io.mateu.ecdemo1.contenthub.domain.media.MediaKind;
+import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer;
 import io.mateu.ecdemo1.contenthub.infra.in.render.MediaUrls;
 import io.mateu.ecdemo1.contenthub.infra.in.security.Readers;
@@ -51,7 +55,7 @@ public class MediaForm implements SimpleCrud.CrudForm, VisibilitySupplier {
     @Label("Fichero")
     String file;
 
-    @Section("…o indicar dónde está (YouTube, Vimeo, Drive, cualquier URL)")
+    @Section("…o indicar dónde está (YouTube, Vimeo, Google Drive, Docs, Sheets, Slides, cualquier URL)")
     @Label("URL o código de inserción")
     @Stereotype(FieldStereotype.textarea)
     String externalUrl;
@@ -71,12 +75,15 @@ public class MediaForm implements SimpleCrud.CrudForm, VisibilitySupplier {
     final MediaRepository media;
     final ContentRenderer renderer;
     final Readers readers;
+    final DriveDocuments drive;
 
-    public MediaForm(MediaCommands commands, MediaRepository media, ContentRenderer renderer, Readers readers) {
+    public MediaForm(MediaCommands commands, MediaRepository media, ContentRenderer renderer, Readers readers,
+                     DriveDocuments drive) {
         this.commands = commands;
         this.media = media;
         this.renderer = renderer;
         this.readers = readers;
+        this.drive = drive;
     }
 
     public MediaForm load(MediaAsset a) {
@@ -85,8 +92,25 @@ public class MediaForm implements SimpleCrud.CrudForm, VisibilitySupplier {
         mark = "[[media:" + a.id() + "]]";
         externalUrl = a.externalUrl();
         details = a.kind().label() + (a.size() > 0 ? " · " + (a.size() / 1024) + " KB · " + a.contentType() : "")
-                + " · subido por " + a.uploadedBy();
+                + " · subido por " + a.uploadedBy() + driveDetails(a);
         return this;
+    }
+
+    /** A Drive medium: what kind of file, and what Drive last said of it, or why it did not say. */
+    String driveDetails(MediaAsset a) {
+        if (a.kind() != MediaKind.EXTERNAL || a.external().drive().isEmpty()) {
+            return "";
+        }
+        var ref = a.external().drive().get();
+        var known = drive.metadata(ref.fileId()).orElse(null);
+        if (known == null) {
+            return " · " + ref.type().label() + (drive.configured() ? " · aún sin datos de Drive" : "");
+        }
+        return " · " + DriveFileRef.Type.ofMimeType(known.mimeType()).label()
+                + (known.name() == null ? "" : " · en Drive: «" + known.name() + "»")
+                + (known.modifiedTime() == null ? "" : " · modificado "
+                + (known.lastModifiedBy() == null ? "" : "por " + known.lastModifiedBy() + " ") + "el " + Ui.when(known.modifiedTime()))
+                + (known.error() == null ? "" : " · Drive: " + known.error());
     }
 
     Component preview() {

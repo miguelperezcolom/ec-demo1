@@ -1,6 +1,7 @@
 package io.mateu.ecdemo1.contenthub.infra.in.render;
 
 import io.mateu.ecdemo1.contenthub.application.out.MediaRepository;
+import io.mateu.ecdemo1.contenthub.domain.drive.DriveFileRef;
 import io.mateu.ecdemo1.contenthub.domain.media.MediaAsset;
 import io.mateu.ecdemo1.contenthub.domain.media.MediaReferences;
 import io.mateu.ecdemo1.uicommons.html.Html;
@@ -65,6 +66,9 @@ public class ContentRenderer {
 
     String external(MediaAsset a, String title) {
         var ext = a.external();
+        if (ext.drive().isPresent()) {
+            return drive(ext.drive().get(), a.title());
+        }
         var href = Html.escape(ext.url());
         var embed = ext.embedUrl();
         if (embed.isEmpty()) {
@@ -76,6 +80,12 @@ public class ContentRenderer {
                         + "<span style=\"position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:3rem\">▶</span></a>")
                 .orElse("<a href=\"" + href + "\" target=\"_blank\" rel=\"noopener\">▶ " + title + "</a>");
         return placeholder(embed.get(), "video", "16/9", inner);
+    }
+
+    /** Google's live preview of a Drive file (embed.js makes it an iframe), with a way to it if it cannot. */
+    public String drive(DriveFileRef ref, String title) {
+        return placeholder(ref.previewUrl(), "pdf", "4/3", "<a href=\"" + Html.escape(ref.openUrl())
+                + "\" target=\"_blank\" rel=\"noopener\">📄 " + Html.escape(title) + "</a>");
     }
 
     static String placeholder(String embedUrl, String kind, String ratio, String inner) {

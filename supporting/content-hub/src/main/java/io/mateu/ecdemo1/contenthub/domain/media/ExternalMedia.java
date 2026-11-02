@@ -1,5 +1,7 @@
 package io.mateu.ecdemo1.contenthub.domain.media;
 
+import io.mateu.ecdemo1.contenthub.domain.drive.DriveFileRef;
+
 import java.net.URI;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -17,7 +19,6 @@ public record ExternalMedia(Provider provider, String url, String videoId) {
     static final Pattern YOUTUBE = Pattern.compile(
             "(?:youtube(?:-nocookie)?\\.com/(?:watch\\?(?:[^\"'\\s]*&)?v=|embed/|shorts/|live/)|youtu\\.be/)([A-Za-z0-9_-]{6,})");
     static final Pattern VIMEO = Pattern.compile("vimeo\\.com/(?:video/)?(\\d+)");
-    static final Pattern DRIVE = Pattern.compile("drive\\.google\\.com/(?:file/d/|open\\?id=)([A-Za-z0-9_-]{10,})");
     static final Pattern IFRAME_SRC = Pattern.compile("<iframe[^>]*\\ssrc\\s*=\\s*[\"']([^\"']+)[\"']",
             Pattern.CASE_INSENSITIVE);
 
@@ -46,10 +47,10 @@ public record ExternalMedia(Provider provider, String url, String videoId) {
         if (vimeo.find()) {
             return new ExternalMedia(Provider.VIMEO, "https://vimeo.com/" + vimeo.group(1), vimeo.group(1));
         }
-        var drive = DRIVE.matcher(u);
-        if (drive.find()) {
-            return new ExternalMedia(Provider.DRIVE, "https://drive.google.com/file/d/" + drive.group(1) + "/view",
-                    drive.group(1));
+        // any Drive file or Doc/Sheet/Slides: a reference to the one version in Drive, never a copy
+        var drive = DriveFileRef.parse(u);
+        if (drive.isPresent()) {
+            return new ExternalMedia(Provider.DRIVE, drive.get().canonicalUrl(), drive.get().fileId());
         }
         return new ExternalMedia(Provider.OTHER, u, null);
     }
@@ -59,9 +60,14 @@ public record ExternalMedia(Provider provider, String url, String videoId) {
         return switch (provider) {
             case YOUTUBE -> Optional.of("https://www.youtube-nocookie.com/embed/" + videoId);
             case VIMEO -> Optional.of("https://player.vimeo.com/video/" + videoId);
-            case DRIVE -> Optional.of("https://drive.google.com/file/d/" + videoId + "/preview");
+            case DRIVE -> Optional.of(new DriveFileRef(videoId, null).previewUrl());
             case OTHER -> Optional.empty();
         };
+    }
+
+    /** The Drive file it references, for a Drive medium. */
+    public Optional<DriveFileRef> drive() {
+        return provider == Provider.DRIVE ? DriveFileRef.parse(url) : Optional.empty();
     }
 
     /** A thumbnail anyone can load, when the provider gives one by id. */

@@ -1,5 +1,6 @@
 package io.mateu.ecdemo1.contenthub.infra.in.jobs;
 
+import io.mateu.ecdemo1.contenthub.application.drive.DriveDocuments;
 import io.mateu.ecdemo1.contenthub.application.events.DomainEvents;
 import io.mateu.ecdemo1.contenthub.application.out.ItemRepository;
 import io.mateu.ecdemo1.contenthub.application.usecases.NewsletterService;
@@ -33,6 +34,7 @@ public class ContentJobs {
     final Projection projection;
     final TransactionTemplate transactions;
     final Clock clock;
+    final DriveDocuments drive;
 
     Instant lastCrossing;
 
@@ -99,6 +101,19 @@ public class ContentJobs {
             }
         } catch (RuntimeException e) {
             log.debug("Embeddings pass failed (will retry): {}", e.getMessage());
+        }
+    }
+
+    /** What Drive says now of the files the intranet references; nothing without Drive configured. */
+    @Scheduled(fixedDelayString = "${content-hub.jobs.drive:PT15M}", initialDelayString = "PT1M")
+    public void driveMetadata() {
+        try {
+            var n = drive.refresh();
+            if (n > 0) {
+                log.info("Drive: metadata of {} files refreshed", n);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Drive pass failed: {}", e.getMessage());
         }
     }
 

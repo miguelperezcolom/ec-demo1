@@ -56,11 +56,37 @@ más reciente primero.
 
 ## Buscar
 
-*Buscar* busca en todo lo que puedes ver: título, resumen y cuerpo. Las palabras valen **por su
-principio**: «vacac» encuentra «vacaciones», «turn» encuentra «turnos». Sin texto, muestra lo último.
+*Buscar* busca en todo lo que puedes ver, de dos formas a la vez:
 
-Los resultados, las páginas y el total solo cuentan lo que puedes ver: nunca verás «20 resultados» de los
-que te faltan la mitad.
+- **por palabras**, en título, resumen y cuerpo. Valen **por su principio**: «vacac» encuentra «vacaciones»,
+  «turn» encuentra «turnos»;
+- **por significado**: «días libres» puede encontrar la política de vacaciones aunque no use esas palabras.
+
+Salen los 20 mejores, con el trozo de texto que coincide bajo cada título. Todo lo que aparece es algo que
+puedes abrir. Si el buscador por significado no responde, lo dice y busca solo por palabras.
+
+**Respuesta de la IA.** Si lo que escribes parece una pregunta («¿cuántos días de vacaciones tengo?»), arriba
+de los resultados aparece una respuesta redactada por la IA **solo con contenidos que puedes leer**, y debajo
+los contenidos en los que se apoya, como enlaces. Tarda unos segundos más; compruébala en las fuentes. Si
+escribes solo unas palabras, pulsa **Preguntar a la IA** para pedirla. Si la IA no está disponible, se dice en
+una línea y los resultados siguen ahí.
+
+**Personas.** Si lo que escribes coincide con alguien del directorio, sale aparte, en el grupo *Personas*,
+con un enlace a su ficha.
+
+## Documentos de Drive
+
+Un contenido puede enlazar un fichero de Google Drive, Docs, Sheets o Slides. La intranet guarda solo la
+referencia, nunca una copia, así que **siempre ves la versión que hay en Drive**. Al abrir el contenido:
+
+- verás la **vista previa** de Google, si tu cuenta de Google tiene acceso al fichero;
+- **Abrir en Drive** lo abre en Google, y **Editar en Drive** en su editor (Docs, Sheets y Slides; un PDF u
+  otro fichero solo se abre);
+- si el despliegue está conectado a Drive, verás también **«Modificado por X el …»** y el nombre actual.
+
+*Documentos de Drive*, en el menú, lista los ficheros de los contenidos que puedes ver; cada fila abre su
+contenido. Quién puede abrir el fichero lo decide Google, con los permisos del propio fichero: que aparezca
+aquí no te da acceso.
 
 ## Personas y organigrama
 

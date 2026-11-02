@@ -113,7 +113,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     LocalDateTime publishAt;
     @Label("Caduca el")
     LocalDateTime expireAt;
-    @Label("URL (enlace o documento; o media:id)")
+    @Label("URL (enlace, documento, fichero de Google Drive, Docs, Sheets o Slides; o media:id)")
     String url;
     @Label("Seguimiento de lectura")
     boolean readTracking;
@@ -313,7 +313,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
                 continue;
             }
             try {
-                set(to, translator.translate(source, from, to));
+                set(to, translator.translate(source, from, to, httpRequest.getHeaderValue("Authorization")));
                 done.add(to);
             } catch (RuntimeException e) {
                 return Message.error("No se ha podido traducir a «" + to + "»: " + e.getMessage());
