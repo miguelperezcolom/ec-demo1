@@ -65,6 +65,7 @@ public class HealthConfig {
                                 SurveyRepository surveys, NewsletterRepository newsletters,
                                 io.mateu.ecdemo1.contenthub.application.out.NewsletterIssueRepository issues,
                                 io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites, UsageRepository usage,
+                                io.mateu.ecdemo1.contenthub.application.out.TemplateRepository templates,
                                 HealthRepository store, LinkChecker links, AltTextGenerator ai, HealthSettings settings,
                                 Clock clock,
                                 @Value("${content-hub.portal-url:http://ec1.localhost:8800/intranet}") String portalUrl,
@@ -80,7 +81,7 @@ public class HealthConfig {
             // no portal URL: only the configured hosts are ours
         }
         return new ContentHealth(new ContentHealth.Sources(items, media, descriptions, slots, homes, navigation, menus,
-                uiSources, directory, surveys, newsletters, issues, sites, usage), store, links, ai, settings, hosts, clock,
+                uiSources, directory, surveys, newsletters, issues, sites, usage, templates), store, links, ai, settings, hosts, clock,
                 Executors.newVirtualThreadPerTaskExecutor());
     }
 

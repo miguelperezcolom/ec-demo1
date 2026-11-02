@@ -324,6 +324,7 @@ public final class HealthChecks {
         var fix = switch (r.subject()) {
             case ITEM -> Fix.EDIT_ITEM;
             case ISSUE -> Fix.EDIT_ISSUE;
+            case TEMPLATE -> Fix.EDIT_TEMPLATE;
             default -> Fix.CONFIGURE;
         };
         var f = Finding.of(check, r.subject(), r.subjectId(), r.subjectTitle(), target, problem, fix)

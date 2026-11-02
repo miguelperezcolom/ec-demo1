@@ -23,7 +23,7 @@ public record Finding(String key, HealthCheck check, Subject subject, String sub
 
     /** What a finding is about, and so where its link goes. */
     public enum Subject {
-        ITEM("Contenido"), MEDIA("Medio"), SLOT("Slot"), HOMES("Inicios"), MENU("Menú"), ISSUE("Número de newsletter");
+        ITEM("Contenido"), MEDIA("Medio"), SLOT("Slot"), HOMES("Inicios"), MENU("Menú"), ISSUE("Número de newsletter"), TEMPLATE("Plantilla");
 
         private final String label;
 
@@ -42,6 +42,8 @@ public record Finding(String key, HealthCheck check, Subject subject, String sub
         EDIT_ITEM,
         /** Open the newsletter issue's form (while it can still be edited). */
         EDIT_ISSUE,
+        /** Open the page template's form: what new pages start from. */
+        EDIT_TEMPLATE,
         /** Open the medium in the library. */
         OPEN_MEDIA,
         /** Ask the AI for a text alternative, to review and apply. */

@@ -67,7 +67,8 @@ public class ContentHealth {
                           MenuRepository menus, UiSources uiSources, EmployeeDirectory directory,
                           SurveyRepository surveys, NewsletterRepository newsletters,
                           io.mateu.ecdemo1.contenthub.application.out.NewsletterIssueRepository issues,
-                          io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites, UsageRepository usage) {
+                          io.mateu.ecdemo1.contenthub.application.out.SiteRepository sites, UsageRepository usage,
+                          io.mateu.ecdemo1.contenthub.application.out.TemplateRepository templates) {
     }
 
     /** A finding as the screen shows it: with its «revisado» mark while it lasts. */
@@ -205,7 +206,7 @@ public class ContentHealth {
         var uiSources = new java.util.LinkedHashMap<String, Boolean>();
         s.uiSources().all().forEach(u -> uiSources.put(u.id(), u.active()));
         return new ContentSnapshot(now, s.items().findAll(), media, s.descriptions().all(), s.slots().findAll(),
-                sites, homes, sections, menus, s.issues().findAll(), layouts, uiSources,
+                sites, homes, sections, menus, s.issues().findAll(), layouts, s.templates().findAll(), uiSources,
                 s.directory().all().stream().map(Employee::userId).collect(Collectors.toSet()),
                 s.surveys().findAll().stream().map(x -> x.id()).collect(Collectors.toSet()),
                 internalHosts, viewed, analyticsSince);

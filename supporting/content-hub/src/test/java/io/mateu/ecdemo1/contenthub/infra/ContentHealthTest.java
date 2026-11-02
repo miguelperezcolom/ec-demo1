@@ -149,7 +149,8 @@ class ContentHealthTest {
                 new PgHomePages(jdbc), new PgNavigationRepository(jdbc), new PgMenuRepository(jdbc), noSources,
                 new PgEmployeeDirectory(jdbc), new PgSurveyRepository(jdbc), new PgNewsletterRepository(jdbc),
                 new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgNewsletterIssueRepository(jdbc),
-                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgSiteRepository(jdbc), new PgUsageRepository(jdbc)), store, new LinkChecker(probe, store, settings, clock, d -> { }), ai,
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgSiteRepository(jdbc), new PgUsageRepository(jdbc),
+                new io.mateu.ecdemo1.contenthub.infra.out.persistence.PgTemplateRepository(jdbc)), store, new LinkChecker(probe, store, settings, clock, d -> { }), ai,
                 settings, Set.of("ec1.localhost"), clock, Runnable::run);
     }
 

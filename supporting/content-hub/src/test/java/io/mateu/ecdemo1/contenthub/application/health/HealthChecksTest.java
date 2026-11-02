@@ -249,6 +249,34 @@ class HealthChecksTest {
         }
 
         @Test
+        void page_templates_have_their_blocks_checked_and_their_media_are_in_use() {
+            var s = snapshot()
+                    .media(image("enPlantilla", 10, NOW.minus(Duration.ofDays(30))))
+                    .media(image("enBloque", 10, NOW.minus(Duration.ofDays(30))));
+            s.alts.put("enPlantilla", "Logo");
+            s.alts.put("enBloque", "Cabecera");
+            s.templates.add(io.mateu.ecdemo1.contenthub.domain.template.PageTemplate.create("bienvenida", "Bienvenida", "",
+                    List.of(new Block("h", BlockType.HTML, Audience.EVERYONE, "Intro",
+                                    "<p>[[media:enPlantilla]] <a href=\"/intranet/noticias/nadie\">x</a> <img src=\"/a.png\"></p>",
+                                    null, null, null, List.of(), null),
+                            new Block("m", BlockType.MEDIA, Audience.EVERYONE, "Foto", null, null, null, null, List.of(), "enBloque"),
+                            new Block("r", BlockType.REMOTE, Audience.EVERYONE, "Fidelidad", null, null, null, null, List.of(), null,
+                                    RemoteUi.of("loyalty", ""))),
+                    null, "demo", NOW));
+            var built = s.build();
+
+            assertThat(of(HealthCheck.ORPHAN_MEDIA, built)).isEmpty();
+            assertThat(of(HealthCheck.BROKEN_LINKS, built)).hasSize(2).allSatisfy(f -> {
+                assertThat(f.subject()).isEqualTo(Subject.TEMPLATE);
+                assertThat(f.subjectId()).isEqualTo("bienvenida");
+                assertThat(f.fix()).isEqualTo(Fix.EDIT_TEMPLATE);
+                assertThat(f.subjectTitle()).isEqualTo("Plantilla «Bienvenida»");
+            });
+            assertThat(of(HealthCheck.MISSING_ALT, built)).singleElement()
+                    .satisfies(f -> assertThat(f.subject()).isEqualTo(Subject.TEMPLATE));
+        }
+
+        @Test
         void remote_blocks_pages_and_menu_entries_need_an_active_source_of_the_registry() {
             var s = snapshot()
                     .item(published("p", ItemType.PAGE, content("s1", "", List.of(

@@ -63,7 +63,8 @@ public final class ContentReferences {
 
     /**
      * Everything live content points at, on every site: published items that have not expired, slots, homes,
-     * menus and the newsletter issues still to be sent (a sent one cannot change any more).
+     * menus, the newsletter issues still to be sent (a sent one cannot change any more) and the page templates
+     * (what new pages are made of). Preview links show an item's draft, which {@link #mediaInUse} already counts.
      */
     public static List<Reference> live(ContentSnapshot s) {
         var out = new ArrayList<Reference>();
@@ -126,6 +127,14 @@ public final class ContentReferences {
             for (var b : issue.blocks()) {
                 block(r -> out.add(new Reference(site, Subject.ISSUE, issue.id(), title, r.kind(), r.value(), r.where())),
                         issue.id(), title, b, where(b));
+            }
+        }
+        for (var template : s.templates()) {
+            var title = "Plantilla «" + template.name() + "»";
+            var site = template.siteId();
+            for (var b : template.blocks()) {
+                block(r -> out.add(new Reference(site, Subject.TEMPLATE, template.id(), title, r.kind(), r.value(), r.where())),
+                        template.id(), title, b, where(b));
             }
         }
         return out;
@@ -205,8 +214,9 @@ public final class ContentReferences {
     }
 
     /**
-     * Every medium anything stored uses — drafts, every version, slots, every newsletter issue and layout — so
-     * nothing an old version, a sent issue or an unpublished draft still shows is called an orphan.
+     * Every medium anything stored uses — drafts, every version, slots, every newsletter issue and layout, every page template — so
+     * nothing an old version, a sent issue, a template or an unpublished draft (what a preview link shows) still
+     * shows is called an orphan.
      */
     public static Set<String> mediaInUse(ContentSnapshot s) {
         var out = new LinkedHashSet<String>();
@@ -224,6 +234,7 @@ public final class ContentReferences {
         }
         s.issues().forEach(i -> blocks(i.blocks(), out));
         s.layouts().values().forEach(l -> blocks(l, out));
+        s.templates().forEach(t -> blocks(t.blocks(), out));
         return out;
     }
 

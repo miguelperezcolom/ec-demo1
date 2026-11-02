@@ -553,13 +553,12 @@ arregla ni se borra solo.
 | S5 | Pantalla: `HealthListing` (`/editorial/salud`: cuentas por comprobación en el subtítulo, filtros por comprobación, estado y sitio; «Comprobar ahora»; «Marcar como revisados») y `FindingPage` (abrir contenido / número / medio, sugerir y aplicar `alt`, borrar huérfano, revisado N días con nota) | hecho |
 | S6 | Todos los sitios (tras #279–#281): secciones e inicios por sitio, rutas de newsletter (`/intranet/n/{sitio}/…`), bloques de los números sin enviar, entradas de menú de cada sitio (también `ISSUE`), y UIs externas borradas o desactivadas en bloques `REMOTE`, pantallas externas y menús `REMOTE` | hecho, con tests |
 | S7 | Crear el agente `intranet-alt-text` en el catálogo del plano de control (modelo con visión; prompt en Operación) | pendiente (no se despliega en esta rama) |
+| S9 | Plantillas de página (#286): sus bloques se comprueban (enlaces, medios, `alt`, UIs externas; aviso «Plantilla», *Abrir la plantilla*) y sus medios cuentan como usados; los enlaces de vista previa enseñan el borrador, que ya contaba | hecho, con tests |
 | S8 | Desplegar en local y probar en el navegador (Vaadin y Redwood): la lista, el subtítulo con las cuentas, los filtros `Set<Enum>`, las acciones de la fila y la IA con un agente real | pendiente |
 
 Limitaciones conocidas:
 - los avisos de slots, inicios y menús dicen dónde arreglarlo (consola de control), pero no navegan allí: es otra UI;
 - «sin visitas» necesita al menos dos semanas de analítica y solo mira páginas (no inicios);
-- las plantillas de contenido (rama `feat/templates-preview-links`) aún no están en master: cuando entren, sus
-  bloques deben contar como uso de un medio (`ContentReferences.mediaInUse`).
 
 ## Cómo retomar
 

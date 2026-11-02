@@ -82,6 +82,7 @@ final class HealthFixtures {
         final List<SiteMenu> menus = new ArrayList<>();
         final List<io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue> issues = new ArrayList<>();
         final Map<String, Boolean> uiSources = new HashMap<>(Map.of("crs", true));
+        final List<io.mateu.ecdemo1.contenthub.domain.template.PageTemplate> templates = new ArrayList<>();
         Set<String> viewed = Set.of();
         Instant analyticsSince;
         Instant now = NOW;
@@ -101,7 +102,7 @@ final class HealthFixtures {
             allHomes.put("intranet", homes);
             return new ContentSnapshot(now, items, media, alts, slots, Map.of("intranet", "Intranet", "boletin", "Boletín"),
                     allHomes, Map.of("intranet", Set.of("s1", "s2"), "boletin", Set.of("nl1")), menus, issues, Map.of(),
-                    uiSources, Set.of("ana.perez"), Set.of("enc1"), Set.of(HOST), viewed, analyticsSince);
+                    templates, uiSources, Set.of("ana.perez"), Set.of("enc1"), Set.of(HOST), viewed, analyticsSince);
         }
     }
 

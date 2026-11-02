@@ -27,6 +27,7 @@ import java.util.Set;
  * @param menus           every site's configurable menu
  * @param issues          the newsletters' issues
  * @param layouts         each newsletter's layout blocks (what every new issue starts from): site → blocks
+ * @param templates       the page templates (what new pages start from)
  * @param uiSources       the registry of UI sources: id → whether it is active
  * @param personIds       the employees (a /intranet/personas/{id} link)
  * @param internalHosts   the hosts whose URLs are the portal's own (the portal URL's)
@@ -36,7 +37,9 @@ import java.util.Set;
 public record ContentSnapshot(Instant now, List<Item> items, List<MediaAsset> media, Map<String, String> altTexts,
                               List<Slot> slots, Map<String, String> sites, Map<String, List<String>> homes,
                               Map<String, Set<String>> sections, List<SiteMenu> menus, List<NewsletterIssue> issues,
-                              Map<String, List<Block>> layouts, Map<String, Boolean> uiSources, Set<String> personIds,
+                              Map<String, List<Block>> layouts,
+                              List<io.mateu.ecdemo1.contenthub.domain.template.PageTemplate> templates,
+                              Map<String, Boolean> uiSources, Set<String> personIds,
                               Set<String> surveyIds, Set<String> internalHosts, Set<String> viewedItemIds,
                               Instant analyticsSince) {
 
@@ -51,6 +54,7 @@ public record ContentSnapshot(Instant now, List<Item> items, List<MediaAsset> me
         menus = menus == null ? List.of() : List.copyOf(menus);
         issues = issues == null ? List.of() : List.copyOf(issues);
         layouts = layouts == null ? Map.of() : Map.copyOf(layouts);
+        templates = templates == null ? List.of() : List.copyOf(templates);
         uiSources = uiSources == null ? Map.of() : Map.copyOf(uiSources);
         personIds = personIds == null ? Set.of() : Set.copyOf(personIds);
         surveyIds = surveyIds == null ? Set.of() : Set.copyOf(surveyIds);

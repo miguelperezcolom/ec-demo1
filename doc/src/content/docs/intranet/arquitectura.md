@@ -837,7 +837,7 @@ avisos guardados (pantalla: *Editorial → Salud del contenido*).
 - **Una foto y funciones puras.** `ContentHealth.snapshot()` lee una vez items, medios, textos alternativos,
   slots, sitios con sus inicios y secciones, menús, números y maquetas de newsletter, el registro de UIs,
   directorio, encuestas y analítica (`ContentSnapshot`). `ContentReferences` saca de ahí a qué apunta lo vivo
-  —items publicados sin caducar, slots, inicios, entradas de menú activas y números aún sin enviar—, cada
+  —items publicados sin caducar, slots, inicios, entradas de menú activas, números aún sin enviar y plantillas de página—, cada
   referencia con su sitio y dónde está. `HealthChecks` son funciones de la foto: sin E/S, y así se prueban.
 - **Qué es un enlace.** Una URL del host del portal (o una ruta, con o sin `/_intranet`/`/_portal`) es una ruta:
   `/intranet/{función}`, `/intranet/noticias|secciones|personas|encuestas/{id}`, `/intranet/enlace|ui/{sitio}/{entrada}`
@@ -846,7 +846,7 @@ avisos guardados (pantalla: *Editorial → Salud del contenido*).
   **caducidad**, con su fecha. `ui:<fuente>…` (pantallas externas, bloques «Componente remoto», menús `REMOTE`)
   necesita una fuente del registro **activa**.
 - **Huérfanos, con prudencia.** Cuenta como uso cualquier borrador, cualquier versión (también las viejas), los
-  slots y todos los números y maquetas de newsletter, enviados o no. Borrar lo hace un administrador, y antes se
+  slots, todos los números y maquetas de newsletter (enviados o no) y las plantillas de página. Un enlace de vista previa enseña el borrador, que ya cuenta. Borrar lo hace un administrador, y antes se
   vuelve a mirar.
 - **El aviso es lo que es, no cómo se dice.** Su clave es un hash de comprobación, sujeto y objetivo (la URL, el
   medio, el contenido enlazado), nunca del texto: «caduca en 5 días» y «en 4» son el mismo aviso, y su
