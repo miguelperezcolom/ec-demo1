@@ -10,12 +10,8 @@ import io.mateu.ecdemo1.contenthub.infra.in.security.Readers;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.annotations.Action;
-import io.mateu.uidl.annotations.Colspan;
-import io.mateu.uidl.annotations.Help;
 import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.Label;
-import io.mateu.uidl.annotations.Section;
-import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.data.Message;
@@ -24,44 +20,41 @@ import io.mateu.uidl.data.UICommand;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
-import io.mateu.uidl.interfaces.OptionsSupplier;
+import io.mateu.uidl.interfaces.DetailContentSupplier;
+import io.mateu.uidl.data.FieldDataType;
+import io.mateu.uidl.data.FormField;
+import io.mateu.uidl.data.HorizontalLayout;
+import io.mateu.uidl.data.VerticalLayout;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /**
  * An item's reviewer preview links ({@code /editorial/vistaPrevia/{itemId}}, «Enlace de vista previa» in its
  * form): make one — how many days, and optionally as which profile it shows the draft —, see each with its
  * state and views, revoke one. The link opens a page of the portal that anyone logged in can see.
+ *
+ * <p>The listing opens this as its record's page, which Mateu draws read-only from the fields: the inputs
+ * are fluent {@link FormField}s in {@link #detailContent} instead (as HistoryPage and ApprovalPage do),
+ * bound by id to the hidden fields the actions read.
  */
 @Service
 @Scope("prototype")
 @Editors
-public class PreviewLinksPage implements Identifiable, OptionsSupplier {
+public class PreviewLinksPage implements Identifiable, DetailContentSupplier {
 
     @Hidden
     String id;
     @Hidden
     String title;
 
-    @Section("Nuevo enlace")
-    @Label("Válido durante (días)")
-    @Help("De 1 a 30. Deja de valer antes si lo revocas o si se publica el contenido.")
+    @Hidden
     Integer dias = (int) PreviewLink.DEFAULT_VALIDITY.toDays();
-    @Label("Enseñarlo como (opcional)")
-    @Help("Un perfil del directorio: el revisor ve el borrador como lo verá ese perfil (como «Ver como»). Vacío: como él mismo.")
-    @Stereotype(FieldStereotype.select)
+    @Hidden
     String verComo;
-
-    @Section("Enlaces de este contenido")
-    @Label("")
-    @Colspan(2)
-    Callable<Component> enlaces = this::links;
-    @Label("Enlace a revocar")
-    @Stereotype(FieldStereotype.select)
+    @Hidden
     String enlaceARevocar;
 
     final PreviewLinks previewLinks;
@@ -83,8 +76,28 @@ public class PreviewLinksPage implements Identifiable, OptionsSupplier {
         return this;
     }
 
-    Component links() {
-        return Html.block(PreviewLinksPage.list(previewLinks, id));
+    @Override
+    public Component detailContent(HttpRequest httpRequest) {
+        var profiles = audiences.allProfiles().values().stream().map(p -> new Option(p.hash(),
+                p.attributes().canonical().replace(";", " · ") + " — " + p.employees() + " empleado(s)")).toList();
+        var active = id == null ? List.<Option>of() : previewLinks.ofItem(id).stream()
+                .filter(l -> previewLinks.status(l) == PreviewLinkStatus.ACTIVE)
+                .map(l -> new Option(l.id(), "Creado el " + Ui.when(l.createdAt()) + " por " + l.createdBy()
+                        + " · " + l.viewCount() + " vista(s)")).toList();
+        var content = new java.util.ArrayList<Component>();
+        content.add(Html.block("<h3 style=\"margin:0\">Nuevo enlace</h3>"));
+        content.add(HorizontalLayout.builder().spacing(true).style("flex-wrap: wrap; align-items: flex-end;").content(List.of(
+                FormField.builder().id("dias").label("Válido durante (días)").dataType(FieldDataType.integer)
+                        .initialValue(dias).description("De 1 a 30. Deja de valer antes si lo revocas o si se publica el contenido.")
+                        .style("min-width: 12rem;").build(),
+                FormField.builder().id("verComo").label("Enseñarlo como (opcional)").dataType(FieldDataType.string)
+                        .stereotype(FieldStereotype.select).options(profiles).initialValue(verComo)
+                        .description("Un perfil del directorio: el revisor ve el borrador como lo verá ese perfil. Vacío: como él mismo.")
+                        .style("min-width: 22rem;").build())).build());
+        content.add(Html.block("<h3 style=\"margin:.5rem 0 0\">Enlaces de este contenido</h3>" + list(previewLinks, id)));
+        content.add(FormField.builder().id("enlaceARevocar").label("Enlace a revocar").dataType(FieldDataType.string)
+                .stereotype(FieldStereotype.select).options(active).initialValue(enlaceARevocar).style("min-width: 22rem;").build());
+        return VerticalLayout.builder().fullWidth(true).spacing(true).content(content).build();
     }
 
     /** An item's links as markup: the backoffice's list, here and in the item's form. */
@@ -155,23 +168,6 @@ public class PreviewLinksPage implements Identifiable, OptionsSupplier {
     @Action
     public Object volverAlFormulario(HttpRequest httpRequest) {
         return UICommand.navigateTo(VisualEditorPage.formRoute(id));
-    }
-
-    @Override
-    public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
-        return "verComo".equals(fieldName) || "enlaceARevocar".equals(fieldName);
-    }
-
-    @Override
-    public List<Option> options(String fieldName, HttpRequest httpRequest) {
-        return switch (fieldName) {
-            case "verComo" -> audiences.allProfiles().values().stream().map(p -> new Option(p.hash(),
-                    p.attributes().canonical().replace(";", " · ") + " — " + p.employees() + " empleado(s)")).toList();
-            default -> id == null ? List.of() : previewLinks.ofItem(id).stream()
-                    .filter(l -> previewLinks.status(l) == PreviewLinkStatus.ACTIVE)
-                    .map(l -> new Option(l.id(), "Creado el " + Ui.when(l.createdAt()) + " por " + l.createdBy()
-                            + " · " + l.viewCount() + " vista(s)")).toList();
-        };
     }
 
     public static String route(String itemId) {
