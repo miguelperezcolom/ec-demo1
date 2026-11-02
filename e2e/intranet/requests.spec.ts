@@ -85,7 +85,9 @@ async function approve(s: Session, portal: string, dates: string, comment: strin
     await s.checkpoint('approving')
     await s.action(/^Aprobar$/)
     await s.confirmIfAsked()
-    await s.waitText(/Aprobada: pasa a RRHH|Aprobada\. Se le comunica al empleado/, `${s.user}'s approval was not acknowledged`)
+    // the toast lasts 3 s and may be gone by the time it is looked for; the page then says the task is decided
+    await s.waitText(/Aprobada: pasa a RRHH|Aprobada\. Se le comunica al empleado|Ya no está pendiente/,
+        `${s.user}'s approval was not acknowledged`)
 }
 
 function escape(text: string) {

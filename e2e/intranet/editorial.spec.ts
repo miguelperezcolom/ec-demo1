@@ -123,7 +123,13 @@ test.describe('Editorial', () => {
         await expect(editor.getByText('Enlaces', { exact: true }).first(), 'the Quick links editor has no «Enlaces»').toBeVisible()
         await expect(editor.getByText(/^Texto( \(.+\))?$/).first(), 'the links are not a table with Texto / URL').toBeVisible()
         await expect(editor.getByText(/^URL( \(.+\))?$/).first()).toBeVisible()
-        await expect(editor.getByText('Portal del empleado').first(), 'the seeded link is not in the table').toBeVisible()
+        // a read-only cell (text) or an editable one (an input's value: Redwood)
+        await expect.poll(async () => await editor.getByText('Portal del empleado').filter({ visible: true }).count() > 0
+            || await editor.evaluate((root) => {
+                const values = (n: Element | ShadowRoot): string[] => [...n.querySelectorAll('*')].flatMap((e) =>
+                    [...(e instanceof HTMLInputElement ? [e.value] : []), ...(e.shadowRoot ? values(e.shadowRoot) : [])])
+                return values(root).includes('Portal del empleado')
+            }), { message: 'the seeded link is not in the table' }).toBe(true)
         // …and none of the other types' fields
         for (const other of [/Item destacado/, /Sección listada/, /^Cuántos$/, /Contenido( \(.+\))? \(incrusta medios/, /^Medio de la biblioteca$/]) {
             await expect(editor.getByText(other).filter({ visible: true }), `the Quick links editor shows ${other}`).toHaveCount(0)
