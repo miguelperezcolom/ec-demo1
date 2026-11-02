@@ -71,8 +71,36 @@ public class EditorialCalendarPage extends CalendarPage {
         return List.of(CalendarView.month, CalendarView.week, CalendarView.list);
     }
 
+    // the request the page is drawn for: wiring, not state (transient keeps it off the wire)
+    private transient HttpRequest request;
+
+    @Override
+    public void bindRequest(HttpRequest httpRequest) {
+        super.bindRequest(httpRequest);
+        this.request = httpRequest;
+    }
+
+    /**
+     * Who is looking. Mateu may evaluate the calendar's field before it hands the page its request (the
+     * archetype then passes a null one): then the request being served on this thread is read directly,
+     * so the editor's scopes are never lost.
+     */
+    io.mateu.ecdemo1.contenthub.application.security.Reader reader(HttpRequest httpRequest) {
+        for (var r : java.util.Arrays.asList(httpRequest, request)) {
+            if (r != null) {
+                var reader = readers.of(r);
+                if (!reader.permissions().isEmpty()) {
+                    return reader;
+                }
+            }
+        }
+        var servlet = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()
+                instanceof org.springframework.web.context.request.ServletRequestAttributes a ? a.getRequest() : null;
+        return readers.of(servlet == null ? h -> null : servlet::getHeader);
+    }
+
     List<CalendarEntry> entries(LocalDate month, HttpRequest httpRequest) {
-        return calendar.entries(readers.of(httpRequest), month.withDayOfMonth(1), month.withDayOfMonth(month.lengthOfMonth()),
+        return calendar.entries(reader(httpRequest),month.withDayOfMonth(1), month.withDayOfMonth(month.lengthOfMonth()),
                 new EditorialCalendar.Filter(blankToNull(_type), blankToNull(_section), blankToNull(_status)));
     }
 
