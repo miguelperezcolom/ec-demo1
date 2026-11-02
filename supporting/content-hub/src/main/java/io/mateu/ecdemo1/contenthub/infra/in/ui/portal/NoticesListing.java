@@ -6,7 +6,6 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -15,8 +14,8 @@ import org.springframework.stereotype.Service;
 @Title("Avisos")
 public class NoticesListing extends VisibleListing implements Searchable {
 
-    public NoticesListing(PortalSupport portal, ObjectProvider<ItemPage> pages) {
-        super(portal, pages);
+    public NoticesListing(PortalSupport portal) {
+        super(portal);
     }
 
     @Override

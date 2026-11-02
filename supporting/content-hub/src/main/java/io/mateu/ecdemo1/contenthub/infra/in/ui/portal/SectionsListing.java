@@ -9,8 +9,7 @@ import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
-import io.mateu.uidl.interfaces.Navigable;
-import org.springframework.beans.factory.ObjectProvider;
+import io.mateu.uidl.annotations.RowRoute;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -22,24 +21,23 @@ import java.util.stream.Collectors;
  * The navigation as the reader sees it: a section shows when something in it or below it is visible to
  * them; the empty ones are not there. Cached per profile hash and language.
  */
+@RowRoute("/intranet/secciones/${row.id}")
 @Service
 @Scope("prototype")
 @Title("Secciones")
-public class SectionsListing implements Listing<SectionRow>, Navigable<SectionPage, String> {
+public class SectionsListing implements Listing<SectionRow> {
 
     final PortalSupport portal;
     final Visibility visibility;
     final NavigationRepository navigation;
     final ProjectionCache cache;
-    final ObjectProvider<SectionPage> pages;
 
     public SectionsListing(PortalSupport portal, Visibility visibility, NavigationRepository navigation,
-                           ProjectionCache cache, ObjectProvider<SectionPage> pages) {
+                           ProjectionCache cache) {
         this.portal = portal;
         this.visibility = visibility;
         this.navigation = navigation;
         this.cache = cache;
-        this.pages = pages;
     }
 
     @Override
@@ -63,8 +61,4 @@ public class SectionsListing implements Listing<SectionRow>, Navigable<SectionPa
                 "No hay secciones con contenido para ti");
     }
 
-    @Override
-    public SectionPage view(String id, HttpRequest httpRequest) {
-        return pages.getObject().load(id, httpRequest);
-    }
 }

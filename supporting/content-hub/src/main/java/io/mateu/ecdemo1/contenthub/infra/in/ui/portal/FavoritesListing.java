@@ -5,7 +5,6 @@ import io.mateu.uidl.annotations.Title;
 import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -17,8 +16,8 @@ public class FavoritesListing extends VisibleListing {
 
     final ReaderActions actions;
 
-    public FavoritesListing(PortalSupport portal, ObjectProvider<ItemPage> pages, ReaderActions actions) {
-        super(portal, pages);
+    public FavoritesListing(PortalSupport portal, ReaderActions actions) {
+        super(portal);
         this.actions = actions;
     }
 

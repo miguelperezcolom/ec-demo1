@@ -6,9 +6,8 @@ import io.mateu.uidl.data.Page;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Listing;
-import io.mateu.uidl.interfaces.Navigable;
+import io.mateu.uidl.annotations.RowRoute;
 import io.mateu.uidl.interfaces.Searchable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -16,19 +15,18 @@ import org.springframework.stereotype.Service;
  * The people of the company, by name, job, department, hotel or region ("recepción tenerife"). Each
  * row opens the person's card.
  */
+@RowRoute("/intranet/personas/${row.id}")
 @Service
 @Scope("prototype")
 @Title("Personas")
-public class PeopleListing implements Listing<PersonRow>, Searchable, Navigable<PersonPage, String> {
+public class PeopleListing implements Listing<PersonRow>, Searchable {
 
     final PortalSupport portal;
     final People people;
-    final ObjectProvider<PersonPage> pages;
 
-    public PeopleListing(PortalSupport portal, People people, ObjectProvider<PersonPage> pages) {
+    public PeopleListing(PortalSupport portal, People people) {
         this.portal = portal;
         this.people = people;
-        this.pages = pages;
     }
 
     @Override
@@ -48,8 +46,4 @@ public class PeopleListing implements Listing<PersonRow>, Searchable, Navigable<
                 text.isEmpty() ? "El directorio está vacío" : "Nadie coincide con «" + text + "»");
     }
 
-    @Override
-    public PersonPage view(String id, HttpRequest httpRequest) {
-        return pages.getObject().load(id, httpRequest);
-    }
 }

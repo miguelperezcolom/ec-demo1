@@ -7,21 +7,38 @@ import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.application.visibility.Visibility;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
+import io.mateu.ecdemo1.contenthub.domain.item.BlockType;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
+import io.mateu.uidl.data.Anchor;
+import io.mateu.uidl.data.Card;
+import io.mateu.uidl.data.DashboardPanel;
+import io.mateu.uidl.data.Element;
+import io.mateu.uidl.data.Text;
+import io.mateu.uidl.data.TextContainer;
+import io.mateu.uidl.fluent.Component;
 import lombok.RequiredArgsConstructor;
+import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui.esc;
+import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.column;
+import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.items;
+import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PortalComponents.muted;
 
 /**
- * Draws an item for a reader: its body with the media expanded, and — for a page — the blocks the
- * visibility function says they see (page AND block), each filled through the same function.
+ * Draws a page's blocks for a reader — the ones the visibility function says they see (page AND
+ * block), each filled through the same function — as Mateu components: the tiles of a home (the
+ * welcome page's panels) or the sections of a page read as an item (the multimedia content page's
+ * cards). Only what editors write in HTML (an HTML or banner block, a medium) stays markup.
  */
 @Service
 @RequiredArgsConstructor
@@ -34,112 +51,149 @@ public class PageRenderer {
     final ContentRenderer renderer;
     final ReaderActions actions;
 
-    public String item(Reader reader, VisibleItem item, Map<String, String> sectionNames) {
-        var hash = reader.attributes().hash();
-        var html = new StringBuilder("<article style=\"max-width:860px\">");
-        html.append("<div style=\"opacity:.7;font-size:.85rem;margin-bottom:.5rem\">")
-                .append(Ui.chip(ItemType.valueOf(item.type()).label(), "#2f6f8f"))
-                .append(item.sectionId() == null ? "" : esc(sectionNames.getOrDefault(item.sectionId(), "")) + " · ")
-                .append(Ui.day(item.publishAt()))
-                .append(item.expireAt() == null ? "" : " · hasta el " + Ui.day(item.expireAt()))
-                .append("</div>");
-        if (item.summary() != null && !item.summary().isBlank()) {
-            html.append("<p style=\"font-size:1.1rem;opacity:.85\">").append(esc(item.summary())).append("</p>");
-        }
-        if (item.confirmationRequired()) {
-            html.append(Ui.card("⚠️ <b>Este contenido requiere tu confirmación de lectura</b>"
-                    + (item.confirmationDeadline() == null ? "" : " antes del " + Ui.day(item.confirmationDeadline()))
-                    + ". Usa el botón «Confirmar lectura»."));
-        }
-        html.append(renderer.body(item.body(), PORTAL_BASE, hash));
-        if (item.url() != null && !item.url().isBlank()) {
-            if (item.url().startsWith("media:")) {
-                html.append(renderer.medium(item.url().substring(6), PORTAL_BASE, hash));
-            } else {
-                html.append("<p><a href=\"").append(esc(item.url())).append("\" target=\"_blank\" rel=\"noopener\">")
-                        .append(item.type().equals("DOCUMENT") ? "📄 Abrir el documento" : "🔗 Abrir el enlace")
-                        .append("</a></p>");
-            }
-        }
-        if (ItemType.PAGE.name().equals(item.type())) {
-            html.append(blocks(reader, item.itemId()));
-        }
-        return html.append("</article>").toString();
+    /** A page as a reader's home: the welcome banner's overline and subtitle, and its tiles. */
+    public record Home(String overline, String subtitle, List<Component> panels) {
     }
 
     /**
-     * A page used as the reader's home: its body and its blocks, without the item's header (type,
-     * date, summary) — a home is not read as an article.
+     * A page used as the reader's home. Its banner block, if any, becomes the welcome banner's
+     * overline (the block's title) and subtitle (its text); the greeting is the banner's title, so
+     * that block draws nothing; every other block is a tile.
      */
-    public String home(Reader reader, VisibleItem page) {
-        return "<div>" + renderer.body(page.body(), PORTAL_BASE, reader.attributes().hash())
-                + blocks(reader, page.itemId()) + "</div>";
+    public Home home(Reader reader, VisibleItem page) {
+        String overline = null;
+        String subtitle = null;
+        var panels = new ArrayList<Component>();
+        for (var b : visibleBlocks(reader, page.itemId())) {
+            if (b.type() == BlockType.GREETING) {
+                continue;
+            }
+            if (b.type() == BlockType.BANNER && overline == null && subtitle == null) {
+                overline = blank(b.title()) ? null : b.title();
+                subtitle = blank(b.html()) ? null : Jsoup.parse(b.html()).text();
+                continue;
+            }
+            var content = content(reader, b);
+            if (content != null) {
+                panels.add(panel(b.id(), title(b), content, b.type() == BlockType.HTML || b.type() == BlockType.MEDIA ? 3 : 1));
+            }
+        }
+        return new Home(overline, subtitle, panels);
     }
 
-    String blocks(Reader reader, String pageId) {
+    /** A page's blocks as the sections of the page read as an item: a card each. */
+    public List<Component> sections(Reader reader, String pageId) {
+        var out = new ArrayList<Component>();
+        for (var b : visibleBlocks(reader, pageId)) {
+            var content = b.type() == BlockType.GREETING
+                    ? Text.builder().text("Hola, " + reader.name()).container(TextContainer.h2).build()
+                    : content(reader, b);
+            if (content != null) {
+                out.add(section(title(b), content));
+            }
+        }
+        return out;
+    }
+
+    /** An item's body, its media expanded, for the reader. */
+    public String body(Reader reader, VisibleItem item) {
+        return renderer.body(item.body(), PORTAL_BASE, reader.attributes().hash());
+    }
+
+    /** The medium or document an item points at, as markup; null when it points at none. */
+    public String medium(Reader reader, VisibleItem item) {
+        return item.url() != null && item.url().startsWith("media:")
+                ? renderer.medium(item.url().substring(6), PORTAL_BASE, reader.attributes().hash()) : null;
+    }
+
+    public static DashboardPanel panel(String id, String title, Component content, int colSpan) {
+        return DashboardPanel.builder().id(id).title(title).content(content).colSpan(colSpan).build();
+    }
+
+    public static Card section(String title, Component content) {
+        var card = Card.builder().content(content).cssClasses("mateu-section");
+        if (!blank(title)) {
+            card.title(Text.builder().text(title).container(TextContainer.h3).build());
+        }
+        return card.build();
+    }
+
+    List<Block> visibleBlocks(Reader reader, String pageId) {
         var visible = new HashSet<>(visibility.visibleBlockIds(reader.attributes(), pageId));
         var page = items.find(pageId).flatMap(i -> i.latestVersion()).orElse(null);
         if (page == null) {
-            return "";
+            return List.of();
         }
-        var out = new StringBuilder();
-        for (var block : page.content().blocks()) {
-            if (visible.contains(block.id())) {
-                out.append(block(reader, block));
-            }
-        }
-        return out.toString();
+        return page.content().blocks().stream().filter(b -> visible.contains(b.id())).toList();
     }
 
-    String block(Reader reader, Block b) {
+    /** What a block shows, or null when it shows nothing for this reader. */
+    Component content(Reader reader, Block b) {
         var hash = reader.attributes().hash();
-        var title = b.title() == null || b.title().isBlank() ? "" : "<h3 style=\"margin:.25rem 0 .5rem\">" + esc(b.title()) + "</h3>";
         return switch (b.type()) {
-            case HTML -> "<section style=\"margin:1rem 0\">" + title + renderer.body(b.html(), PORTAL_BASE, hash) + "</section>";
-            case BANNER -> "<section style=\"margin:1rem 0;padding:1.25rem;border-radius:12px;"
-                    + "background:linear-gradient(90deg,#1d5c7a,#2f8f8f);color:#fff\">" + title
-                    + renderer.body(b.html(), PORTAL_BASE, hash) + "</section>";
-            case MEDIA -> "<section style=\"margin:1rem 0\">" + title
-                    + (b.mediaId() == null ? "" : renderer.medium(b.mediaId(), PORTAL_BASE, hash)) + "</section>";
-            case QUICK_LINKS -> Ui.card(title + "<ul>" + b.links().stream()
-                    .map(l -> "<li><a href=\"" + esc(l.url()) + "\"" + (l.url() != null && l.url().startsWith("/") ? ""
-                            : " target=\"_blank\" rel=\"noopener\"") + ">" + esc(l.label()) + "</a></li>")
-                    .collect(Collectors.joining()) + "</ul>");
-            case FEATURED -> b.itemId() == null ? "" : visibility.item(reader.attributes(), b.itemId())
-                    .map(i -> Ui.card(title + "<h2 style=\"margin:.25rem 0\"><a href=\"" + Ui.itemLink(i.itemId()) + "\">"
-                            + esc(i.title()) + "</a></h2><p>" + esc(i.summary()) + "</p>"))
-                    .orElse("");
-            case GREETING -> "<h1 style=\"margin:.25rem 0 1rem\">Hola, " + esc(reader.name()) + "</h1>";
+            case HTML, BANNER -> blank(b.html()) ? null : html(b.id(), renderer.body(b.html(), PORTAL_BASE, hash));
+            case MEDIA -> b.mediaId() == null ? null : html(b.id(), renderer.medium(b.mediaId(), PORTAL_BASE, hash));
+            case QUICK_LINKS -> b.links().isEmpty() ? null : column(b.links().stream()
+                    .map(l -> (Component) new Anchor(l.label(), l.url(), l.url() != null && l.url().startsWith("/")
+                            ? null : "_blank", "", "")).toList());
+            case FEATURED -> b.itemId() == null ? null : visibility.item(reader.attributes(), b.itemId())
+                    .map(i -> column(blank(i.summary())
+                            ? List.of(new Anchor(i.title(), Ui.itemLink(i.itemId())))
+                            : List.of(new Anchor(i.title(), Ui.itemLink(i.itemId())), Text.builder().text(i.summary()).build())))
+                    .orElse(null);
+            case GREETING -> null;
             case PENDING -> {
                 if (reader.viewingAs() != null) {
-                    yield "";
+                    yield null;
                 }
                 var pending = actions.pendingConfirmations(reader);
-                yield pending.isEmpty() ? "" : Ui.card("<h3 style=\"margin-top:0\">⚠️ " + (title.isEmpty()
-                        ? "Tienes " + pending.size() + " contenido(s) pendiente(s) de confirmar" : esc(b.title()))
-                        + "</h3>" + list(pending));
+                yield pending.isEmpty() ? null : items(pending, "");
             }
-            case NOTICES -> latest(reader, b, java.util.Set.of(ItemType.NOTICE), "📢 Avisos", "Sin avisos.");
-            case LATEST -> latest(reader, b, java.util.Set.of(ItemType.ARTICLE, ItemType.PAGE), "📰 Últimas noticias",
-                    "Sin noticias.");
+            case NOTICES -> PortalComponents.withLink(latest(reader, b, Set.of(ItemType.NOTICE), "Sin avisos."),
+                    "Todos los avisos", Ui.PORTAL + "/avisos");
+            case LATEST -> PortalComponents.withLink(latest(reader, b, Set.of(ItemType.ARTICLE, ItemType.PAGE), "Sin noticias."),
+                    "Todas las noticias", Ui.PORTAL + "/noticias");
             case AUTOMATIC_LISTING -> {
-                var list = visibility.visibles(reader.attributes(), new ContentQuery(java.util.Set.of(), b.sectionId(),
+                var list = visibility.visibles(reader.attributes(), new ContentQuery(Set.of(), b.sectionId(),
                         null, null, 0, b.limit() == null ? 5 : b.limit())).content();
-                yield list.isEmpty() ? "" : Ui.card(title + list(list));
+                yield list.isEmpty() ? null : items(list, "");
             }
         };
     }
 
-    /** The latest visible items of some types (and a section, if the block names one), as a card. */
-    String latest(Reader reader, Block b, java.util.Set<ItemType> types, String defaultTitle, String empty) {
-        var list = visibility.visibles(reader.attributes(), new ContentQuery(types, b.sectionId(), null, null, 0,
-                b.limit() == null ? 5 : b.limit())).content();
-        var heading = "<h3 style=\"margin-top:0\">" + esc(b.title() == null || b.title().isBlank() ? defaultTitle : b.title())
-                + "</h3>";
-        return Ui.card(heading + (list.isEmpty() ? "<p style=\"opacity:.7\">" + empty + "</p>" : list(list)));
+    /** A block's heading: its own title, else the one its type stands for. */
+    static String title(Block b) {
+        if (!blank(b.title())) {
+            return b.title();
+        }
+        return switch (b.type()) {
+            case PENDING -> "Pendiente de confirmar";
+            case NOTICES -> "Avisos";
+            case LATEST -> "Últimas noticias";
+            case QUICK_LINKS -> "Enlaces";
+            case FEATURED -> "Destacado";
+            default -> "";
+        };
     }
 
-    public static String list(java.util.List<VisibleItem> items) {
+    /** The latest visible items of some types (and a section, if the block names one). */
+    Component latest(Reader reader, Block b, Set<ItemType> types, String empty) {
+        var list = visibility.visibles(reader.attributes(), new ContentQuery(types, b.sectionId(), null, null, 0,
+                b.limit() == null ? 5 : b.limit())).content();
+        return list.isEmpty() ? muted(empty) : items(list, empty);
+    }
+
+    /** Markup an editor wrote, in a box of its own (the id keeps two of them apart). */
+    static Element html(String id, String markup) {
+        return Element.html("div", Map.of("id", "block-" + id, "style", "width: 100%;"), markup);
+    }
+
+    static boolean blank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    /** Items as a list of links, for the backoffice's preview (Ver como), which is still markup. */
+    public static String list(List<VisibleItem> items) {
         return "<ul style=\"list-style:none;padding:0;margin:0\">" + items.stream()
                 .map(i -> "<li style=\"padding:.4rem 0;border-bottom:1px solid rgba(128,128,128,.15)\">"
                         + "<a href=\"" + Ui.itemLink(i.itemId()) + "\"><b>" + esc(i.title()) + "</b></a>"

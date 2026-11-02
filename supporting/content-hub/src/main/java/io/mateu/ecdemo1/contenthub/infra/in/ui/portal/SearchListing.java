@@ -6,7 +6,6 @@ import io.mateu.uidl.data.ListingData;
 import io.mateu.uidl.data.SearchRequest;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Searchable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -20,8 +19,8 @@ import org.springframework.stereotype.Service;
 @Title("Buscar en la intranet")
 public class SearchListing extends VisibleListing implements Searchable {
 
-    public SearchListing(PortalSupport portal, ObjectProvider<ItemPage> pages) {
-        super(portal, pages);
+    public SearchListing(PortalSupport portal) {
+        super(portal);
     }
 
     @Override

@@ -2,41 +2,45 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.portal;
 
 import io.mateu.ecdemo1.contenthub.domain.employee.Employee;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
-import io.mateu.ecdemo1.uicommons.html.Html;
-import io.mateu.uidl.annotations.Colspan;
-import io.mateu.uidl.annotations.Hidden;
-import io.mateu.uidl.annotations.Label;
+import io.mateu.uidl.annotations.Action;
+import io.mateu.uidl.data.Anchor;
+import io.mateu.uidl.data.OrgChart;
+import io.mateu.uidl.data.OrgNode;
+import io.mateu.uidl.data.EmptyState;
+import io.mateu.uidl.data.FieldDataType;
+import io.mateu.uidl.data.FormField;
+import io.mateu.uidl.data.ItemOverviewPage;
+import io.mateu.uidl.data.Tab;
+import io.mateu.uidl.data.TabLayout;
+import io.mateu.uidl.data.TemplateImage;
 import io.mateu.uidl.fluent.Component;
+import io.mateu.uidl.fluent.Form;
+import io.mateu.uidl.interfaces.ComponentTreeSupplier;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.Identifiable;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
-
-import static io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui.esc;
 
 /**
- * A person's card: who they are and where, how to reach them, the chain of managers above them, the
- * people who report to them and their team (same department, same hotel). Every person in it links to
- * their own card.
+ * A person's card on Mateu's item overview page template (Redwood draws Spectra's): the overview
+ * panel — their initials, name and job, where they work and how to reach them — beside tabs with the
+ * chain of managers above them, the people who report to them and their team (same department, same
+ * hotel). Every person in it opens their own card.
  */
 @Service
 @Scope("prototype")
-public class PersonPage implements Identifiable {
+public class PersonPage implements ComponentTreeSupplier, Identifiable {
 
-    @Hidden
     String id;
-    @Hidden
-    String title;
-    @Hidden
-    String html;
-
-    @Label("")
-    @Colspan(2)
-    Callable<Component> content = () -> Html.block(html == null ? "" : html);
+    // What the overview panel's property rows read from the state.
+    String department;
+    String workplace;
+    String region;
+    String email;
+    String phone;
 
     final PortalSupport portal;
     final People people;
@@ -47,61 +51,93 @@ public class PersonPage implements Identifiable {
     }
 
     public PersonPage load(String id, HttpRequest httpRequest) {
-        portal.reader(httpRequest);
         this.id = id;
-        var person = people.find(id).orElse(null);
-        if (person == null) {
-            title = "No encontrado";
-            html = "<p>No hay nadie con ese usuario en el directorio.</p>";
-            return this;
-        }
-        title = People.name(person);
-        html = card(person);
         return this;
     }
 
-    String card(Employee e) {
-        var where = people.hotel(e).isEmpty() ? "Servicios centrales" : people.hotel(e);
-        var html = new StringBuilder();
-        html.append("<div style=\"display:flex;gap:1.25rem;align-items:center;margin-bottom:1rem\">")
-                .append(People.avatar(e, 72)).append("<div><h1 style=\"margin:0\">").append(esc(People.name(e)))
-                .append("</h1><div style=\"font-size:1.1em;opacity:.8\">").append(esc(people.jobTitle(e)))
-                .append("</div><div style=\"opacity:.7\">").append(esc(join(people.department(e), where,
-                        people.region(e)))).append("</div></div></div>");
-        var contact = new StringBuilder();
-        if (e.email() != null) {
-            contact.append("<div>✉️ <a href=\"mailto:").append(esc(e.email())).append("\">").append(esc(e.email()))
-                    .append("</a></div>");
+    @Override
+    public Component component(HttpRequest httpRequest) {
+        if (id == null) {
+            id = httpRequest.lastPathItem();
         }
-        if (e.phone() != null) {
-            contact.append("<div>📞 <a href=\"tel:").append(esc(e.phone().replace(" ", ""))).append("\">")
-                    .append(esc(e.phone())).append("</a></div>");
+        portal.reader(httpRequest);
+        var person = people.find(id).orElse(null);
+        if (person == null) {
+            return Form.builder().title("No encontrado")
+                    .content(List.of(EmptyState.builder().title("No hay nadie con ese usuario en el directorio").build()))
+                    .build();
         }
-        if (!contact.isEmpty()) {
-            html.append(Ui.card("<h3 style=\"margin-top:0\">Contacto</h3>" + contact));
+        department = people.department(person);
+        workplace = people.hotel(person).isEmpty() ? "Servicios centrales" : people.hotel(person);
+        region = people.region(person);
+        email = person.email();
+        phone = person.phone();
+        var body = new ArrayList<Component>();
+        body.add(row("department", "Departamento"));
+        body.add(row("workplace", "Dónde"));
+        if (!region.isEmpty()) {
+            body.add(row("region", "Región"));
         }
-        var chain = people.chainOf(e);
+        if (email != null) {
+            body.add(new Anchor(email, "mailto:" + email));
+        }
+        if (phone != null) {
+            body.add(new Anchor(phone, "tel:" + phone.replace(" ", "")));
+        }
+        return Form.builder()
+                .title(People.name(person))
+                .subtitle(people.jobTitle(person))
+                .template(ItemOverviewPage.builder()
+                        .avatar(new TemplateImage(null, People.initials(People.name(person))))
+                        .body(body)
+                        .footerItem(new Anchor("Ver el organigrama", Ui.PORTAL + "/organigrama"))
+                        .build())
+                .content(List.of(tabs(person)))
+                .build();
+    }
+
+    /**
+     * The person among the others, as the org chart draws people: the chain above them down to
+     * them; them over their direct reports; their department at their workplace over its people.
+     */
+    TabLayout tabs(Employee person) {
+        var reports = people.reportsOf(person.userId());
+        var team = people.teamOf(person);
+        var tabs = new ArrayList<Tab>();
+        var chain = people.chainOf(person);
         if (!chain.isEmpty()) {
-            html.append(Ui.card("<h3 style=\"margin-top:0\">Reporta a</h3>" + chain.stream().map(people::chip)
-                    .collect(Collectors.joining("<div style=\"margin:.25rem 0 .25rem 1rem;opacity:.5\">↑</div>"))));
+            OrgNode node = OrgChartPage.node(person, people, List.of());
+            for (var manager : chain) {
+                node = OrgChartPage.node(manager, people, List.of(node));
+            }
+            tabs.add(new Tab("Reporta a", new OrgChart("person-chain", node, null, null)));
         }
-        html.append(section("Su equipo directo", people.reportsOf(e.userId())));
-        html.append(section("Mismo equipo", people.teamOf(e)));
-        html.append("<p><a href=\"").append(Ui.PORTAL).append("/organigrama\">Ver el organigrama completo</a></p>");
-        return html.toString();
+        if (!reports.isEmpty()) {
+            tabs.add(new Tab("Su equipo directo (" + reports.size() + ")", new OrgChart("person-reports",
+                    OrgChartPage.node(person, people, reports.stream()
+                            .map(e -> OrgChartPage.node(e, people, List.of())).toList()), null, null)));
+        }
+        if (!team.isEmpty()) {
+            tabs.add(new Tab("Mismo equipo (" + team.size() + ")", new OrgChart("person-team",
+                    OrgChartPage.group("team", department + " · " + workplace, team.size() + 1,
+                            java.util.stream.Stream.concat(java.util.stream.Stream.of(person), team.stream())
+                                    .map(e -> OrgChartPage.node(e, people, List.of())).toList()), null, null)));
+        }
+        if (tabs.isEmpty()) {
+            tabs.add(new Tab("Equipo", EmptyState.builder().title("No reporta a nadie ni tiene equipo en el directorio").build()));
+        }
+        return TabLayout.builder().id("person-tabs").tabs(tabs).build();
     }
 
-    String section(String title, List<Employee> list) {
-        if (list.isEmpty()) {
-            return "";
-        }
-        return Ui.card("<h3 style=\"margin-top:0\">" + esc(title) + " (" + list.size() + ")</h3>"
-                + "<div style=\"display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem\">"
-                + list.stream().map(people::chip).collect(Collectors.joining()) + "</div>");
+    /** A person's node was clicked: their card. */
+    @Action
+    public Object abrirPersona(HttpRequest httpRequest) {
+        return OrgChartPage.open(httpRequest);
     }
 
-    static String join(String... parts) {
-        return java.util.Arrays.stream(parts).filter(p -> p != null && !p.isBlank()).collect(Collectors.joining(" · "));
+    static FormField row(String id, String label) {
+        return FormField.builder().id(id).label(label).dataType(FieldDataType.string).readOnly(true)
+                .propertyRow(true).build();
     }
 
     @Override
@@ -111,6 +147,6 @@ public class PersonPage implements Identifiable {
 
     @Override
     public String toString() {
-        return title == null ? "Persona" : title;
+        return "Persona";
     }
 }
