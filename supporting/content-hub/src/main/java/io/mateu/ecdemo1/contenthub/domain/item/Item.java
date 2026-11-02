@@ -152,6 +152,12 @@ public class Item extends AggregateRoot {
         if ((type == ItemType.LINK || type == ItemType.DOCUMENT) && (content.url() == null || content.url().isBlank())) {
             throw new IllegalStateException("Un " + type.label().toLowerCase() + " necesita su URL");
         }
+        if (type == ItemType.REMOTE_PAGE) {
+            if (!io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.isRemote(content.url())) {
+                throw new IllegalStateException("Una pantalla externa necesita su UI externa (y su ruta)");
+            }
+            io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.parse(content.url()); // refuses a malformed one
+        }
         var ids = new HashSet<String>();
         for (var block : content.blocks()) {
             if (!ids.add(block.id())) {

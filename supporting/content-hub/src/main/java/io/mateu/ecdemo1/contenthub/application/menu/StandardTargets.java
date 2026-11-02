@@ -176,7 +176,8 @@ public final class StandardTargets {
             VisibilityPolicy policy = context.memo("audiences.policy", namedAudiences::policy);
             return sources.find(target.remoteSource())
                     .filter(s -> policy.admits(s.audience(), context.reader().attributes()))
-                    .filter(s -> context.scopes().containsAll(s.requiredScopes()))
+                    // active, and every scope it requires (RemoteUis.usable's rule)
+                    .filter(s -> s.usableWith(context.scopes()))
                     .map(s -> new MenuLink.Remote(s, target.remoteRoute()));
         }
 
@@ -187,7 +188,7 @@ public final class StandardTargets {
 
         @Override
         public String describe(String siteId, MenuTarget target) {
-            var source = sources.find(target.remoteSource()).map(UiSources.UiSource::name)
+            var source = sources.find(target.remoteSource()).map(io.mateu.ecdemo1.contenthub.domain.uisource.UiSource::name)
                     .orElse(target.remoteSource() + " (no registrada)");
             return source + target.remoteRoute();
         }

@@ -17,7 +17,12 @@ public enum BlockType {
     /** The latest notices the reader can see; how many in {@code limit}. */
     NOTICES("Últimos avisos"),
     /** The latest news and pages the reader can see, of a section or of all; how many in {@code limit}. */
-    LATEST("Últimas noticias");
+    LATEST("Últimas noticias"),
+    /**
+     * A screen or element of a registered external UI (a UI source): a Mateu UI federated, a web component
+     * or, as a last resort, an iframe. In an e-mail, a link to see it on the web.
+     */
+    REMOTE("Componente remoto");
 
     private final String label;
 

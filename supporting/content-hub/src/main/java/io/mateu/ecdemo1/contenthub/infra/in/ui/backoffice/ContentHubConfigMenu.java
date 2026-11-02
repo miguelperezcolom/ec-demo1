@@ -31,6 +31,10 @@ public class ContentHubConfigMenu {
     HomesPage inicio;
 
     @Menu
+    @Label("UIs externas")
+    UiSourcesCrud uis;
+
+    @Menu
     @Label("Directorio")
     DirectoryListing directorio;
 

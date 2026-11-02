@@ -46,10 +46,12 @@ public class Projection {
         var policy = namedAudiences.policy();
         var universe = index.profiles().values();
         var content = item.latestVersion().get().content();
-        var hashes = policy.hashesSeeing(content.audience(), universe);
+        // the item's and its blocks' audiences as projected: a remote page or component also needs its UI source's
+        var audience = content.visibilityAudience(item.type());
+        var hashes = policy.hashesSeeing(audience, universe);
         var blockHashes = new LinkedHashMap<String, Set<String>>();
         for (var block : content.blocks()) {
-            blockHashes.put(block.id(), policy.hashesSeeing(Audience.effective(content.audience(), block.audience()),
+            blockHashes.put(block.id(), policy.hashesSeeing(Audience.effective(audience, block.visibilityAudience()),
                     universe));
         }
         index.indexItem(item, hashes, blockHashes);

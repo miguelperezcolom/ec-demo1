@@ -5,6 +5,7 @@ import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
 import io.mateu.ecdemo1.contenthub.domain.item.BlockType;
+import io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi;
 import io.mateu.uidl.annotations.HiddenInList;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Stereotype;
@@ -53,6 +54,17 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
     @Stereotype(FieldStereotype.select)
     public String mediaId;
     @HiddenInList
+    @Label("UI externa")
+    @Stereotype(FieldStereotype.select)
+    public String remoteSourceId;
+    @HiddenInList
+    @Label("Ruta (una UI de Mateu o un iframe: /loyalty/members…)")
+    public String remoteRoute;
+    @HiddenInList
+    @Label("Atributos (un web component: nombre=valor, uno por línea)")
+    @Stereotype(FieldStereotype.textarea)
+    public String remoteAttributes;
+    @HiddenInList
     @Label("Solo estos departamentos")
     @Stereotype(FieldStereotype.multiSelect)
     public List<String> blockDepartments;
@@ -79,6 +91,11 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
         f.limit = b.limit();
         f.mediaId = b.mediaId();
         f.links = new java.util.ArrayList<>(b.links().stream().map(l -> LinkForm.of(l.label(), l.url())).toList());
+        if (b.remote() != null) {
+            f.remoteSourceId = b.remote().sourceId();
+            f.remoteRoute = b.remote().route();
+            f.remoteAttributes = b.remote().attributeLines();
+        }
         var parsed = AudienceFields.parse(b.audience());
         f.blockDepartments = parsed.values().get(Attribute.DEPARTMENT);
         f.blockHotels = parsed.values().get(Attribute.HOTEL);
@@ -96,9 +113,16 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
                 .filter(l -> l != null && l.url != null && !l.url.isBlank())
                 .map(l -> new Block.Link(l.label == null || l.label.isBlank() ? l.url.trim() : l.label.trim(), l.url.trim()))
                 .toList();
+        var t = type == null ? BlockType.HTML : type;
+        RemoteUi remote = null;
+        if (t == BlockType.REMOTE) {
+            if (blank(remoteSourceId) == null) {
+                throw new IllegalArgumentException("Elige la UI externa del componente remoto");
+            }
+            remote = new RemoteUi(blank(remoteSourceId), remoteRoute, RemoteUi.attributesOf(remoteAttributes));
+        }
         return new Block(id == null || id.isBlank() ? "b" + UUID.randomUUID().toString().substring(0, 6) : id,
-                type == null ? BlockType.HTML : type, audience, title, html, blank(itemId), blank(sectionId), limit,
-                parsedLinks, blank(mediaId));
+                t, audience, title, html, blank(itemId), blank(sectionId), limit, parsedLinks, blank(mediaId), remote);
     }
 
     static String blank(String s) {
@@ -108,7 +132,7 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
     @Override
     public boolean supports(Class<?> fieldType, String fieldName, Class<?> formType) {
         return "itemId".equals(fieldName) || "sectionId".equals(fieldName) || "mediaId".equals(fieldName)
-                || AudienceFields.supports(fieldName);
+                || "remoteSourceId".equals(fieldName) || AudienceFields.supports(fieldName);
     }
 
     @Override
@@ -117,30 +141,34 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
             case "itemId" -> Catalog.get().publishedItems();
             case "sectionId" -> Catalog.get().sections();
             case "mediaId" -> Catalog.get().media();
+            case "remoteSourceId" -> Catalog.get().uiSources();
             default -> AudienceFields.options(fieldName);
         };
     }
 
     /** The fields each type uses (what PageRenderer reads); the title and the audience, always. */
-    static final java.util.Map<BlockType, java.util.Set<String>> FIELDS_OF = java.util.Map.of(
-            BlockType.HTML, java.util.Set.of("html"),
-            BlockType.BANNER, java.util.Set.of("html"),
-            BlockType.FEATURED, java.util.Set.of("itemId"),
-            BlockType.AUTOMATIC_LISTING, java.util.Set.of("sectionId", "limit"),
-            BlockType.QUICK_LINKS, java.util.Set.of("links"),
-            BlockType.MEDIA, java.util.Set.of("mediaId"),
-            BlockType.GREETING, java.util.Set.of(),
-            BlockType.PENDING, java.util.Set.of(),
-            BlockType.NOTICES, java.util.Set.of("limit"),
-            BlockType.LATEST, java.util.Set.of("sectionId", "limit"));
+    static final java.util.Map<BlockType, java.util.Set<String>> FIELDS_OF = java.util.Map.ofEntries(
+            java.util.Map.entry(BlockType.HTML, java.util.Set.of("html")),
+            java.util.Map.entry(BlockType.BANNER, java.util.Set.of("html")),
+            java.util.Map.entry(BlockType.FEATURED, java.util.Set.of("itemId")),
+            java.util.Map.entry(BlockType.AUTOMATIC_LISTING, java.util.Set.of("sectionId", "limit")),
+            java.util.Map.entry(BlockType.QUICK_LINKS, java.util.Set.of("links")),
+            java.util.Map.entry(BlockType.MEDIA, java.util.Set.of("mediaId")),
+            java.util.Map.entry(BlockType.GREETING, java.util.Set.of()),
+            java.util.Map.entry(BlockType.PENDING, java.util.Set.of()),
+            java.util.Map.entry(BlockType.NOTICES, java.util.Set.of("limit")),
+            java.util.Map.entry(BlockType.LATEST, java.util.Set.of("sectionId", "limit")),
+            java.util.Map.entry(BlockType.REMOTE, java.util.Set.of("remoteSourceId", "remoteRoute", "remoteAttributes")));
 
     /** The type's own fields, in the form's order — what the visual editor's side panel shows for it. */
     public static List<String> fieldsOf(BlockType type) {
         var own = FIELDS_OF.getOrDefault(type, java.util.Set.of());
-        return java.util.stream.Stream.of("html", "itemId", "sectionId", "limit", "links", "mediaId").filter(own::contains).toList();
+        return BY_TYPE_ORDER.stream().filter(own::contains).toList();
     }
 
-    static final java.util.Set<String> BY_TYPE = java.util.Set.of("html", "itemId", "sectionId", "limit", "links", "mediaId");
+    static final List<String> BY_TYPE_ORDER = List.of("html", "itemId", "sectionId", "limit", "links", "mediaId",
+            "remoteSourceId", "remoteRoute", "remoteAttributes");
+    static final java.util.Set<String> BY_TYPE = java.util.Set.copyOf(BY_TYPE_ORDER);
 
     @Override
     public boolean isHidden(String fieldName, HttpRequest httpRequest) {

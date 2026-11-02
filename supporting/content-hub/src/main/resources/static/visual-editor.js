@@ -46,7 +46,7 @@
     button:disabled { opacity:.5; cursor:default; }
     button.primary { background:var(--ve-accent); border-color:var(--ve-accent); color:#fff; }
     button.danger { color:#c62828; }
-    select, input[type=text], input[type=url], input[type=number], input[type=search] {
+    select, textarea, input[type=text], input[type=url], input[type=number], input[type=search] {
       background:transparent; border:1px solid var(--ve-line); border-radius:6px; padding:.3rem .45rem; width:100%; }
     select option { background:var(--ve-bg); color:inherit; }
     .bar { display:flex; flex-wrap:wrap; gap:.5rem .75rem; align-items:center; padding:.5rem 0 .75rem;
@@ -217,7 +217,20 @@
     normal(b) {
       return { id: b.id || newId(), type: b.type || 'HTML', title: b.title || '', html: b.html || '', itemId: b.itemId || '',
         sectionId: b.sectionId || '', limit: b.limit == null ? null : b.limit, links: (b.links || []).map((l) => ({ label: l.label || '', url: l.url || '' })),
-        mediaId: b.mediaId || '', departments: b.departments || [], hotels: b.hotels || [], jobTitles: b.jobTitles || [] };
+        mediaId: b.mediaId || '', departments: b.departments || [], hotels: b.hotels || [], jobTitles: b.jobTitles || [],
+        // a «Componente remoto»: a registered UI and its route, or its attributes (edited as name=value lines)
+        remoteSourceId: b.remoteSourceId || '', remoteRoute: b.remoteRoute || '',
+        remoteAttributes: Object.entries(b.remoteAttributes || {}).map(([k, v]) => k + '=' + v).join('\n') };
+    }
+
+    // name=value lines into the attributes the server checks (it refuses event handlers, javascript: and the like)
+    attrsOf(text) {
+      const out = {};
+      (text || '').split(/\r?\n/).forEach((line) => {
+        const i = line.indexOf('=');
+        if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      });
+      return out;
     }
 
     wire() {
@@ -229,6 +242,9 @@
         links: b.type === 'QUICK_LINKS' ? b.links.filter((l) => l.url && l.url.trim()) : [],
         mediaId: b.type === 'MEDIA' ? (b.mediaId || null) : null,
         departments: b.departments, hotels: b.hotels, jobTitles: b.jobTitles,
+        remoteSourceId: b.type === 'REMOTE' ? (b.remoteSourceId || null) : null,
+        remoteRoute: b.type === 'REMOTE' ? (b.remoteRoute || null) : null,
+        remoteAttributes: b.type === 'REMOTE' ? this.attrsOf(b.remoteAttributes) : {},
       }));
     }
 
@@ -454,6 +470,7 @@
         case 'QUICK_LINKS': return 'añade enlaces en el panel';
         case 'PENDING': return 'se pinta solo a quien tiene algo pendiente de confirmar';
         case 'AUTOMATIC_LISTING': return 'no hay contenidos visibles en esa sección';
+        case 'REMOTE': return b.remoteSourceId ? '' : 'elige la UI externa en el panel';
         default: return '';
       }
     }
@@ -876,6 +893,19 @@
           + (m && m.thumb ? '<img src="' + esc(m.thumb) + '" alt="" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:.35rem">' : '')
           + '<button class="pick" style="margin-top:.35rem">Elegir en la biblioteca…</button></div>';
       }
+      if (f.has('remoteSourceId')) {
+        html += '<div class="field"><label for="f-remote">UI externa</label><select id="f-remote" class="f-remote">'
+          + opt(cat.uiSources || [], b.remoteSourceId, '— elige una UI registrada —') + '</select>'
+          + '<p class="note">Las registra la configuración de la intranet. En el portal se ve en vivo, con los permisos de cada lector.</p></div>';
+      }
+      if (f.has('remoteRoute')) {
+        html += '<div class="field"><label for="f-route">Ruta (UI de Mateu o iframe)</label><input id="f-route" type="text" class="f-route"'
+          + ' placeholder="/loyalty/members" value="' + esc(b.remoteRoute) + '"></div>';
+      }
+      if (f.has('remoteAttributes')) {
+        html += '<div class="field"><label for="f-attrs">Atributos (web component: nombre=valor, uno por línea)</label>'
+          + '<textarea id="f-attrs" class="f-attrs" rows="3">' + esc(b.remoteAttributes) + '</textarea></div>';
+      }
       if (f.has('links')) {
         html += '<div class="field"><label>Enlaces</label><table class="links"><tbody>' + b.links.map((l, i) =>
           '<tr><td><input type="text" aria-label="Texto del enlace ' + (i + 1) + '" placeholder="Texto" data-l="' + i + '" data-k="label" value="' + esc(l.label) + '"></td>'
@@ -913,6 +943,10 @@
       on('.f-section', 'change', (e) => { b.sectionId = e.target.value; this.changed(); });
       on('.f-limit', 'change', (e) => { b.limit = e.target.value === '' ? null : Math.max(1, Math.min(50, Number(e.target.value))); this.changed(); });
       on('.f-media', 'change', (e) => { b.mediaId = e.target.value; this.changed(); });
+      on('.f-remote', 'change', (e) => { b.remoteSourceId = e.target.value; this.changed(); });
+      // typed: the model and the preview follow; the panel is not redrawn (see the links, below)
+      on('.f-route', 'input', (e) => { b.remoteRoute = e.target.value; this.dirty(); this.refresh(); });
+      on('.f-attrs', 'input', (e) => { b.remoteAttributes = e.target.value; this.dirty(); this.refresh(); });
       on('.pick', 'click', () => this.pickMedium((m) => { b.mediaId = m.value; this.changed(); }));
       // as the editor types: the model and the preview follow, the panel is NOT redrawn — redrawing it
       // swapped the inputs under the cursor, and what was typed next went to a detached one

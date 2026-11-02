@@ -7,6 +7,8 @@ create table if not exists ch_item (
 create table if not exists ch_navigation (id text primary key, doc jsonb not null);
 create table if not exists ch_slot (key text primary key, doc jsonb not null);
 create table if not exists ch_named_audience (id text primary key, name text, doc jsonb not null);
+-- The registry of external UIs (UiSource): what remote pages and «Componente remoto» blocks may show
+create table if not exists ch_ui_source (id text primary key, name text, doc jsonb not null);
 create table if not exists ch_newsletter (
     id text primary key, doc jsonb not null, status text, scheduled_at timestamptz);
 create table if not exists ch_favorites (user_id text primary key, doc jsonb not null);

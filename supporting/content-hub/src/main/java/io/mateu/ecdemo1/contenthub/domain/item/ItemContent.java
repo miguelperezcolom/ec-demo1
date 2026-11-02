@@ -57,6 +57,18 @@ public record ItemContent(String sectionId, Audience audience, Map<String, Trans
         return notifyReaders != null ? notifyReaders : type == ItemType.NOTICE;
     }
 
+    /**
+     * The item's audience as the visibility function projects it: the editor's, ANDed — for a remote page —
+     * with who may use the UI source it shows ({@link io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi}).
+     */
+    public Audience visibilityAudience(ItemType type) {
+        if (type != ItemType.REMOTE_PAGE) {
+            return audience;
+        }
+        return io.mateu.ecdemo1.contenthub.domain.uisource.RemoteUi.parse(url)
+                .map(r -> Audience.effective(audience, r.audienceReference())).orElse(audience);
+    }
+
     /** The text in a language, falling back to the default language's. */
     public Translation in(String language, String defaultLanguage) {
         var t = translations.get(language);

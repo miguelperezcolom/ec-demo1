@@ -5,7 +5,6 @@ import io.mateu.ecdemo1.contenthub.application.menu.MenuLink;
 import io.mateu.ecdemo1.contenthub.application.menu.ShownEntry;
 import io.mateu.ecdemo1.contenthub.application.menu.SiteMenus;
 import io.mateu.ecdemo1.contenthub.application.menu.SiteRoutes;
-import io.mateu.ecdemo1.contenthub.application.out.UiSources;
 import io.mateu.ecdemo1.contenthub.infra.in.security.Readers;
 import io.mateu.uidl.data.FieldLink;
 import io.mateu.uidl.data.Menu;
@@ -108,7 +107,7 @@ public class PortalMenu {
             case MenuLink.Function f -> fieldLink(functionsOwner, f.key(), entry.label());
             case MenuLink.Route r -> routeLink(r.path(), entry.label());
             case MenuLink.External e -> routeLink(routes.externalLink(siteId, entry.id()), entry.label());
-            case MenuLink.Remote r when r.source().kind() == UiSources.Kind.MATEU_REMOTE ->
+            case MenuLink.Remote r when r.source().kind() == io.mateu.ecdemo1.contenthub.domain.uisource.UiSourceKind.MATEU_REMOTE ->
                     new RemoteMenu(r.source().basePath(), r.route()).withLabel(entry.label())
                             .withPath("/" + r.source().id());
             case MenuLink.Remote r -> routeLink(routes.hostedUi(siteId, entry.id()), entry.label());
