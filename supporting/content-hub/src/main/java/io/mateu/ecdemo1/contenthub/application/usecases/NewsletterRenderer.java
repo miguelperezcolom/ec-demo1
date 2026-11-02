@@ -127,12 +127,16 @@ public final class NewsletterRenderer {
         return html.append("</div>").toString();
     }
 
-    /** The blocks the view shows, in order; a block with nothing for it draws nothing. */
+    /**
+     * The blocks the view shows, in order, in its language (the group's): a block's text the newsletter's first
+     * language's where it has none in it. A block with nothing for it draws nothing.
+     */
     public static String blocks(View v) {
         var out = new StringBuilder();
+        var defaultLanguage = v.site().defaultLanguage();
         for (var b : v.issue().blocks()) {
             if (v.blockShown().test(b)) {
-                out.append(block(v, b));
+                out.append(block(v, b.in(v.language(), defaultLanguage)));
             }
         }
         return out.toString();

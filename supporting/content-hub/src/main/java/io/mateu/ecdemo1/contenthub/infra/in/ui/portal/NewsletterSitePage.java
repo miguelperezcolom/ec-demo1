@@ -301,7 +301,7 @@ public class NewsletterSitePage implements ComponentTreeSupplier, Identifiable {
         }
         html.append(pages.body(reader, item));
         var hash = reader.attributes().hash();
-        for (var b : pages.visibleBlocks(reader, itemId)) {
+        for (var b : pages.visibleBlocks(reader, itemId, site.languageFor(reader.attributes().language()))) {
             html.append(pages.blockHtml(reader, b, hash));
         }
         return html.toString();

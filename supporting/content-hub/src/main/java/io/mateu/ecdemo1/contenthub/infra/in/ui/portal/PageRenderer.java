@@ -126,14 +126,24 @@ public class PageRenderer {
         return card.build();
     }
 
-    /** The blocks of a page the reader sees (page AND block). */
+    /** The blocks of a page the reader sees (page AND block), in their language. */
     public List<Block> visibleBlocks(Reader reader, String pageId) {
+        return visibleBlocks(reader, pageId, reader.attributes().language());
+    }
+
+    /**
+     * The blocks of a page the reader sees (page AND block), their text in {@code language} — part by part, the
+     * page's default language's where a block has none in it, as an item's text falls back.
+     */
+    public List<Block> visibleBlocks(Reader reader, String pageId, String language) {
         var visible = new HashSet<>(visibility.visibleBlockIds(reader.attributes(), pageId));
-        var page = items.find(pageId).flatMap(i -> i.latestVersion()).orElse(null);
+        var item = items.find(pageId).orElse(null);
+        var page = item == null ? null : item.latestVersion().orElse(null);
         if (page == null) {
             return List.of();
         }
-        return page.content().blocks().stream().filter(b -> visible.contains(b.id())).toList();
+        return page.content().blocks().stream().filter(b -> visible.contains(b.id()))
+                .map(b -> b.in(language, item.defaultLanguage())).toList();
     }
 
     /** What a block shows, or null when it shows nothing for this reader. */
