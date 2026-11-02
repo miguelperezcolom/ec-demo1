@@ -8,9 +8,6 @@ import io.mateu.uidl.data.Anchor;
 import io.mateu.uidl.data.Button;
 import io.mateu.uidl.data.ButtonStyle;
 import io.mateu.uidl.data.EmptyState;
-import io.mateu.uidl.data.FieldDataType;
-import io.mateu.uidl.data.FieldStereotype;
-import io.mateu.uidl.data.FormField;
 import io.mateu.uidl.data.Message;
 import io.mateu.uidl.data.MultimediaContentPage;
 import io.mateu.uidl.data.Notice;
@@ -40,8 +37,6 @@ import static io.mateu.ecdemo1.contenthub.infra.in.ui.portal.PageRenderer.sectio
 public class ItemPage implements ComponentTreeSupplier, Identifiable {
 
     String id;
-    /** The body, its media expanded: the page's rich text field reads it from the state. */
-    String body;
 
     final PortalSupport portal;
     final PageRenderer renderer;
@@ -79,10 +74,11 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
                     + (item.confirmationDeadline() == null ? "" : " antes del " + Ui.day(item.confirmationDeadline()))
                     + ". Usa «Confirmar lectura».").build());
         }
-        body = renderer.body(reader, item);
+        // the body as the editor wrote it, in an element: a read-only html field sanitises it on Redwood,
+        // dropping the embeds' placeholders (<div data-ec-embed>) that embed.js turns into players
+        var body = renderer.body(reader, item);
         if (!PageRenderer.blank(body)) {
-            content.add(section(null, FormField.builder().id("body").label("").dataType(FieldDataType.string)
-                    .stereotype(FieldStereotype.html).readOnly(true).build()));
+            content.add(section(null, html("body", body)));
         }
         var medium = renderer.medium(reader, item);
         if (medium != null) {
