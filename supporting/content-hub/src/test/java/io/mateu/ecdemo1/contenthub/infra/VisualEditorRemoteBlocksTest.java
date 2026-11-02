@@ -102,7 +102,7 @@ class VisualEditorRemoteBlocksTest {
                 new Option("push", "Avisos (Web component)")));
         var controller = new VisualEditorController(new Readers(mock(EmployeeDirectory.class), mock(ContentIndex.class)),
                 items, commands, mock(AudienceCommands.class), named, renderer, mock(ContentRenderer.class),
-                mock(MediaRepository.class), mock(MediaUrls.class), catalog);
+                mock(MediaRepository.class), mock(MediaUrls.class), catalog, mock(io.mateu.ecdemo1.contenthub.application.out.Translator.class));
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
         stored.put("p1", Item.create("p1", ItemType.PAGE, "eva", "es", new ItemContent("s1", Audience.EVERYONE,
                 Map.of("es", new Translation("Herramientas", "", "")),
@@ -164,14 +164,14 @@ class VisualEditorRemoteBlocksTest {
         assertThat(BlockForm.fieldsOf(BlockType.REMOTE)).containsExactly("remoteSourceId", "remoteRoute", "remoteAttributes");
         assertThat(BlockForm.fieldsOf(BlockType.HTML)).containsExactly("html");
         var f = BlockForm.of(new Block("r", BlockType.REMOTE, null, "x", null, null, null, null, null, null,
-                new RemoteUi("push", "/a", Map.of("mode", "compact", "label", "Hola"))));
+                new RemoteUi("push", "/a", Map.of("mode", "compact", "label", "Hola"))), "es");
         assertThat(f.remoteSourceId).isEqualTo("push");
         assertThat(f.remoteAttributes).isEqualTo("label=Hola\nmode=compact");
         assertThat(f.isHidden("remoteRoute", null)).isFalse();
-        assertThat(f.isHidden("html", null)).isTrue();
-        assertThat(f.toBlock().remote()).isEqualTo(new RemoteUi("push", "/a", Map.of("mode", "compact", "label", "Hola")));
+        assertThat(f.isHidden("htmlEs", null)).isTrue();
+        assertThat(f.toBlock("es").remote()).isEqualTo(new RemoteUi("push", "/a", Map.of("mode", "compact", "label", "Hola")));
         f.type = BlockType.HTML;
         assertThat(f.isHidden("remoteSourceId", null)).isTrue();
-        assertThat(f.toBlock().remote()).as("only a remote block keeps a UI").isNull();
+        assertThat(f.toBlock("es").remote()).as("only a remote block keeps a UI").isNull();
     }
 }

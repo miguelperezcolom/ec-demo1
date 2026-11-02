@@ -22,6 +22,20 @@ public final class HtmlSanitizer {
         return html == null ? "" : Jsoup.clean(html, SAFE);
     }
 
+    /**
+     * Whether two HTML texts say the same, as drawn: sanitised, parsed and written back the same way, white space
+     * collapsed — what an editor in a browser gives back of what it was shown, untouched, is the same.
+     */
+    public static boolean same(String a, String b) {
+        return normal(a).equals(normal(b));
+    }
+
+    static String normal(String html) {
+        var doc = Jsoup.parseBodyFragment(sanitize(html));
+        doc.outputSettings().prettyPrint(false);
+        return doc.body().html().replace(' ', ' ').replace("&nbsp;", " ").replaceAll("\\s+", " ").replace("> <", "><").trim();
+    }
+
     public static String text(String html) {
         return html == null ? "" : Jsoup.parse(html).text();
     }

@@ -90,7 +90,7 @@ class VisualEditorControllerTest {
         });
         var controller = new VisualEditorController(new Readers(mock(EmployeeDirectory.class), mock(ContentIndex.class)),
                 items, commands, audiences, named, renderer, mock(ContentRenderer.class), mock(MediaRepository.class),
-                mock(MediaUrls.class), catalog);
+                mock(MediaUrls.class), catalog, mock(io.mateu.ecdemo1.contenthub.application.out.Translator.class));
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
         stored.put("p1", Item.create("p1", ItemType.PAGE, "eva", "es", new ItemContent("s1", Audience.in(Attribute.HOTEL, "TFS01"),
                 Map.of("es", new Translation("Recepción", "", "")),

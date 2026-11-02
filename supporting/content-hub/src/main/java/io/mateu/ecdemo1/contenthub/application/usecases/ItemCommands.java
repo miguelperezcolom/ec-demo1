@@ -243,7 +243,7 @@ public class ItemCommands {
         content.translations().forEach((lang, t) ->
                 translations.put(lang, new Translation(t.title(), t.summary(), HtmlSanitizer.sanitize(t.body()))));
         var blocks = content.blocks().stream()
-                .map(b -> b.withHtml(b.html() == null ? null : HtmlSanitizer.sanitize(b.html())))
+                .map(b -> b.mapHtml(HtmlSanitizer::sanitize)) // every language's
                 .toList();
         return new ItemContent(content.sectionId(), content.audience(), translations, blocks, content.publishAt(),
                 content.expireAt(), content.readTracking(), content.confirmationRequired(),

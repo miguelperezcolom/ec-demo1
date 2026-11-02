@@ -77,13 +77,13 @@ public class TemplateForm extends AudienceForm implements SimpleCrud.CrudForm {
         name = t.name();
         description = t.description();
         siteId = t.siteId();
-        blocks = new ArrayList<>(t.blocks().stream().map(BlockForm::of).toList());
+        blocks = new ArrayList<>(t.blocks().stream().map(b -> BlockForm.of(b, PageTemplate.LANGUAGE)).toList());
         audience(t.defaultAudience() == null ? Audience.EVERYONE : t.defaultAudience(), audienceCommands, namedAudiences);
         return this;
     }
 
     List<io.mateu.ecdemo1.contenthub.domain.item.Block> blockList() {
-        return blocks == null ? List.of() : blocks.stream().map(BlockForm::toBlock).toList();
+        return blocks == null ? List.of() : blocks.stream().map(b -> b.toBlock(PageTemplate.LANGUAGE)).toList();
     }
 
     @Override

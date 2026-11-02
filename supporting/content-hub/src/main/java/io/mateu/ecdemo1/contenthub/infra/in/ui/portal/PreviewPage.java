@@ -138,7 +138,7 @@ public class PreviewPage implements ComponentTreeSupplier, Identifiable {
                 if (profile != null && !policy.admits(effective, attributes)) {
                     continue;
                 }
-                var markup = pages.draftHtml(as, b);
+                var markup = pages.draftHtml(as, b.in(attributes.language(), item.defaultLanguage()));
                 if (markup.isBlank()) {
                     continue;
                 }

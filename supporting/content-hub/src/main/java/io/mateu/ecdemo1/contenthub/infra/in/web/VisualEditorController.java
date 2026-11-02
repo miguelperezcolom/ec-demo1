@@ -6,6 +6,8 @@ import io.mateu.ecdemo1.contenthub.application.security.EditorialPermission;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.AudienceCommands;
 import io.mateu.ecdemo1.contenthub.application.usecases.ItemCommands;
+import io.mateu.ecdemo1.contenthub.application.usecases.BlockTranslation;
+import io.mateu.ecdemo1.contenthub.application.out.Translator;
 import io.mateu.ecdemo1.contenthub.application.visibility.NamedAudiences;
 import io.mateu.ecdemo1.contenthub.domain.audience.Attribute;
 import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
@@ -42,6 +44,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -81,6 +84,7 @@ public class VisualEditorController {
     final MediaRepository media;
     final MediaUrls urls;
     final Catalog catalog;
+    final Translator translator;
 
     // ── the wire ────────────────────────────────────────────────────────────────────────────────────
 
@@ -91,22 +95,37 @@ public class VisualEditorController {
     public record BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
                            Integer limit, List<LinkDto> links, String mediaId, List<String> departments,
                            List<String> hotels, List<String> jobTitles, String remoteSourceId, String remoteRoute,
-                           Map<String, String> remoteAttributes) {
+                           Map<String, String> remoteAttributes, Boolean untranslated) {
+
+        /** A block in the language it is edited in. */
+        public BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
+                        Integer limit, List<LinkDto> links, String mediaId, List<String> departments,
+                        List<String> hotels, List<String> jobTitles, String remoteSourceId, String remoteRoute,
+                        Map<String, String> remoteAttributes) {
+            this(id, type, title, html, itemId, sectionId, limit, links, mediaId, departments, hotels, jobTitles,
+                    remoteSourceId, remoteRoute, remoteAttributes, null);
+        }
 
         /** A block that shows no external UI. */
         public BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
                         Integer limit, List<LinkDto> links, String mediaId, List<String> departments,
                         List<String> hotels, List<String> jobTitles) {
             this(id, type, title, html, itemId, sectionId, limit, links, mediaId, departments, hotels, jobTitles,
-                    null, null, null);
+                    null, null, null, null);
         }
     }
 
     public record LinkDto(String label, String url) {
     }
 
-    /** What the editor sends to preview or save: the blocks in order, and — to save — the version it started from. */
-    public record BlocksRequest(List<BlockDto> blocks, String viewAs, String updatedAt) {
+    /**
+     * What the editor sends to preview, translate or save: the blocks in order, their text in {@code language}
+     * (null: the default language), and — to save — the version it started from.
+     */
+    public record BlocksRequest(List<BlockDto> blocks, String viewAs, String updatedAt, String language) {
+        public BlocksRequest(List<BlockDto> blocks, String viewAs, String updatedAt) {
+            this(blocks, viewAs, updatedAt, null);
+        }
     }
 
     /** One block as drawn: its HTML, whether the profile sees it, and who that is. */
@@ -125,18 +144,26 @@ public class VisualEditorController {
                 .body(new ClassPathResource("static/visual-editor.js"));
     }
 
+    /** The page, its blocks' text in {@code language} (none: the page's default one). */
     @GetMapping("/pages/{id}")
-    public Map<String, Object> page(@PathVariable String id, HttpServletRequest request) {
+    public Map<String, Object> page(@PathVariable String id, @RequestParam(required = false) String language,
+                                    HttpServletRequest request) {
         var reader = editor(request);
-        return pagePayload(reader, page(id));
+        var item = page(id);
+        return pagePayload(reader, item, language(language, item.defaultLanguage()));
     }
 
-    /** Draws blocks that are not saved, as the editor or as a profile ({@code viewAs}: a profile's hash). */
+    /**
+     * Draws blocks that are not saved, as the editor or as a profile ({@code viewAs}: a profile's hash), in the
+     * language they are edited in.
+     */
     @PostMapping("/pages/{id}/preview")
     public Map<String, Object> preview(@PathVariable String id, @RequestBody BlocksRequest body, HttpServletRequest request) {
         var reader = editor(request);
         var item = page(id);
-        var blocks = blocks(body);
+        var language = language(body.language(), item.defaultLanguage());
+        var all = merged(item.draft().blocks(), blocks(body), language, item.defaultLanguage());
+        var blocks = in(all, language, item.defaultLanguage());
         var out = new LinkedHashMap<String, Object>();
         Reader as = reader;
         if (body.viewAs() != null && !body.viewAs().isBlank()) {
@@ -151,7 +178,30 @@ public class VisualEditorController {
         }
         out.put("blocks", render(as, item.draft().audience(), blocks, as != reader));
         out.put("media", mediaOf(blocks));
-        out.put("warnings", commands.warnings(withBlocks(item.draft(), blocks)));
+        out.put("warnings", commands.warnings(withBlocks(item.draft(), all)));
+        return out;
+    }
+
+    /**
+     * «Traducir con IA» in the editor: what the language being edited lacks of the blocks' text, translated from
+     * the default language's (BlockTranslation: the markup and the media marks kept). Nothing is saved: the
+     * blocks come back for the editor to review and save.
+     */
+    @PostMapping("/pages/{id}/translate")
+    public Map<String, Object> translate(@PathVariable String id, @RequestBody BlocksRequest body, HttpServletRequest request) {
+        var reader = editor(request);
+        reader.require(EditorialPermission.EDIT);
+        var item = page(id);
+        var language = language(body.language(), item.defaultLanguage());
+        var all = merged(item.draft().blocks(), blocks(body), language, item.defaultLanguage());
+        var title = item.draft().in(item.defaultLanguage(), item.defaultLanguage()).title();
+        var result = translated(all, item.defaultLanguage(), language, title, request);
+        var out = new LinkedHashMap<String, Object>();
+        var shown = in(result.blocks(), language, item.defaultLanguage());
+        out.put("blocks", dtos(result.blocks(), language, item.defaultLanguage()));
+        out.put("rendered", render(reader, item.draft().audience(), shown, false));
+        out.put("media", mediaOf(shown));
+        out.put("translated", result.parts());
         return out;
     }
 
@@ -163,8 +213,9 @@ public class VisualEditorController {
             throw new Conflict("Alguien ha cambiado esta página desde que la abriste. Recarga para ver sus cambios "
                     + "(perderás los tuyos) o cópialos antes.");
         }
-        commands.editBlocks(reader, id, blocks(body));
-        var payload = pagePayload(reader, page(id));
+        var language = language(body.language(), item.defaultLanguage());
+        commands.editBlocks(reader, id, merged(item.draft().blocks(), blocks(body), language, item.defaultLanguage()));
+        var payload = pagePayload(reader, page(id), language);
         payload.put("saved", true);
         return payload;
     }
@@ -179,14 +230,15 @@ public class VisualEditorController {
 
     // ── payloads ────────────────────────────────────────────────────────────────────────────────────
 
-    Map<String, Object> pagePayload(Reader reader, Item item) {
+    Map<String, Object> pagePayload(Reader reader, Item item, String language) {
         var draft = item.draft();
-        var t = draft.in(item.defaultLanguage(), item.defaultLanguage());
+        var t = draft.in(language, item.defaultLanguage());
+        var shown = in(draft.blocks(), language, item.defaultLanguage());
         var out = new LinkedHashMap<String, Object>();
         var page = new LinkedHashMap<String, Object>();
         page.put("id", item.id());
         page.put("title", t.title());
-        page.put("language", item.defaultLanguage());
+        languages(page, language, item.defaultLanguage());
         page.put("status", item.status().label() + (item.draftInReview() ? " · cambios en revisión"
                 : item.hasVersions() && item.draftChanged() ? " · cambios sin publicar" : ""));
         page.put("published", item.status() == ItemStatus.PUBLISHED);
@@ -195,9 +247,9 @@ public class VisualEditorController {
         page.put("count", audiences.count(draft.audience()));
         page.put("canEdit", reader.may(EditorialPermission.EDIT));
         out.put("page", page);
-        out.put("blocks", draft.blocks().stream().map(VisualEditorController::dto).toList());
-        out.put("rendered", render(reader, draft.audience(), draft.blocks(), false));
-        out.put("media", mediaOf(draft.blocks()));
+        out.put("blocks", dtos(draft.blocks(), language, item.defaultLanguage()));
+        out.put("rendered", render(reader, draft.audience(), shown, false));
+        out.put("media", mediaOf(shown));
         out.put("warnings", commands.warnings(draft));
         out.put("catalog", catalog());
         out.put("profiles", audiences.allProfiles().values().stream()
@@ -276,18 +328,71 @@ public class VisualEditorController {
 
     // ── conversions ─────────────────────────────────────────────────────────────────────────────────
 
-    static BlockDto dto(Block b) {
-        var f = BlockForm.of(b);
+    /** A block as edited in {@code language}: its text there — the default language's where it has none, flagged. */
+    static BlockDto dto(Block stored, String language, String defaultLanguage) {
+        var b = stored.in(language, defaultLanguage);
+        var f = BlockForm.of(b, defaultLanguage);
         return new BlockDto(b.id(), b.type().name(), b.title(), b.html(), b.itemId(), b.sectionId(), b.limit(),
                 b.links().stream().map(l -> new LinkDto(l.label(), l.url())).toList(), b.mediaId(),
                 nonNull(f.blockDepartments), nonNull(f.blockHotels), nonNull(f.blockJobTitles),
                 b.remote() == null ? null : b.remote().sourceId(), b.remote() == null ? null : b.remote().route(),
-                b.remote() == null ? Map.of() : b.remote().attributes());
+                b.remote() == null ? Map.of() : b.remote().attributes(), stored.untranslatedIn(language, defaultLanguage));
+    }
+
+    static List<BlockDto> dtos(List<Block> blocks, String language, String defaultLanguage) {
+        return blocks.stream().map(b -> dto(b, language, defaultLanguage)).toList();
+    }
+
+    /** The blocks as a reader of {@code language} sees them. */
+    static List<Block> in(List<Block> blocks, String language, String defaultLanguage) {
+        return blocks.stream().map(b -> b.in(language, defaultLanguage)).toList();
     }
 
     /**
-     * The blocks as {@link BlockForm} turns them into the domain's — the form's own conversion — after
-     * checking what the form's selects would have: a known type, and audience values the directory has.
+     * The blocks the editor sent — their text in {@code language} — over the stored ones: their other languages
+     * kept, what was shown as the fallback and left alone still untranslated ({@link Block#edited}).
+     */
+    static List<Block> merged(List<Block> stored, List<Block> edited, String language, String defaultLanguage) {
+        var byId = new LinkedHashMap<String, Block>();
+        stored.forEach(b -> byId.putIfAbsent(b.id(), b));
+        return edited.stream().map(e -> Block.edited(byId.get(e.id()), e, language, defaultLanguage,
+                io.mateu.ecdemo1.contenthub.application.usecases.HtmlSanitizer::same)).toList();
+    }
+
+    /** The language asked for, if the editor offers it; none: the default one. */
+    static String language(String asked, String defaultLanguage) {
+        if (asked == null || asked.isBlank()) {
+            return defaultLanguage;
+        }
+        if (!BlockForm.LANGUAGES.contains(asked)) {
+            throw new IllegalArgumentException("Idioma desconocido: " + asked);
+        }
+        return asked;
+    }
+
+    /** What the editor's language switch needs: the language edited, the default one and the ones there are. */
+    void languages(Map<String, Object> page, String language, String defaultLanguage) {
+        page.put("language", language);
+        page.put("defaultLanguage", defaultLanguage);
+        page.put("languages", BlockForm.LANGUAGES);
+        page.put("canTranslate", translator.available());
+    }
+
+    BlockTranslation.Result translated(List<Block> blocks, String from, String to, String title, HttpServletRequest request) {
+        if (!translator.available()) {
+            throw new IllegalStateException("La traducción con IA no está configurada");
+        }
+        if (to.equals(from)) {
+            throw new IllegalArgumentException("Elige el idioma al que traducir: los bloques ya están en el idioma por "
+                    + "defecto (" + from + ")");
+        }
+        return BlockTranslation.translate(blocks, from, to, title, translator, request.getHeader("Authorization"));
+    }
+
+    /**
+     * The blocks as {@link BlockForm} turns them into the domain's — the form's own conversion — after checking
+     * what the form's selects would have: a known type, and audience values the directory has. Their text is
+     * the one of the language they were edited in ({@link #merged} puts them with the rest).
      */
     List<Block> blocks(BlocksRequest body) {
         if (body == null || body.blocks() == null) {
@@ -311,8 +416,9 @@ public class VisualEditorController {
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Tipo de bloque desconocido: " + d.type());
             }
-            f.title = d.title();
-            f.html = d.html();
+            // the text, as one language's — the block's own; merged() says which language it is
+            f.title(BlockForm.LANGUAGES.getFirst(), d.title());
+            f.html(BlockForm.LANGUAGES.getFirst(), d.html());
             f.itemId = d.itemId();
             f.sectionId = d.sectionId();
             f.limit = d.limit();
@@ -320,7 +426,7 @@ public class VisualEditorController {
                 throw new IllegalArgumentException("«Cuántos» va de 1 a 50");
             }
             f.links = new ArrayList<>(d.links() == null ? List.of() : d.links().stream().filter(Objects::nonNull)
-                    .map(l -> LinkForm.of(l.label(), l.url())).toList());
+                    .map(l -> LinkForm.of(BlockForm.LANGUAGES.getFirst(), l.label(), l.url())).toList());
             f.mediaId = d.mediaId();
             f.remoteSourceId = d.remoteSourceId();
             f.remoteRoute = d.remoteRoute();
@@ -330,7 +436,7 @@ public class VisualEditorController {
             f.blockDepartments = checked(Attribute.DEPARTMENT, d.departments(), known);
             f.blockHotels = checked(Attribute.HOTEL, d.hotels(), known);
             f.blockJobTitles = checked(Attribute.JOB_TITLE, d.jobTitles(), known);
-            out.add(f.toBlock());
+            out.add(f.toBlock(BlockForm.LANGUAGES.getFirst()));
         }
         return out;
     }

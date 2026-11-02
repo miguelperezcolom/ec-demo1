@@ -267,7 +267,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         confirmationDeadline = Ui.local(c.confirmationDeadline());
         notificar = c.notifyReaders() == null ? NOTIFY_BY_TYPE : c.notifyReaders() ? NOTIFY_YES : NOTIFY_NO;
         importante = c.important();
-        blocks = new ArrayList<>(c.blocks().stream().map(BlockForm::of).toList());
+        blocks = new ArrayList<>(c.blocks().stream().map(b -> BlockForm.of(b, item.defaultLanguage())).toList());
         audience(c.audience(), audienceCommands, namedAudiences);
         estado = status(item);
         var figures = analytics.ofItem(item.id(), item.confirmationVersion());
@@ -308,11 +308,16 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             translations.put("de", new Translation(titleDe, summaryDe, bodyDe));
         }
         return new ItemContent(sectionId == null || sectionId.isBlank() ? null : sectionId, audience(), translations,
-                type == ItemType.PAGE && blocks != null ? blocks.stream().map(BlockForm::toBlock).toList() : List.of(),
+                type == ItemType.PAGE && blocks != null ? blocks.stream().map(b -> b.toBlock(language())).toList() : List.of(),
                 Ui.instant(publishAt), Ui.instant(expireAt), readTracking, confirmationRequired,
                 Ui.instant(confirmationDeadline), url())
                 .withNotification(NOTIFY_YES.equals(notificar) ? Boolean.TRUE : NOTIFY_NO.equals(notificar) ? Boolean.FALSE : null,
                         importante);
+    }
+
+    /** The item's default language — its blocks' own text is this language's. */
+    String language() {
+        return defaultLanguage == null || defaultLanguage.isBlank() ? "es" : defaultLanguage;
     }
 
     /** The URL as stored: a remote page's is its UI (ui:source/route), the rest as typed. */
@@ -368,12 +373,41 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
                 return Message.error("No se ha podido traducir a «" + to + "»: " + e.getMessage());
             }
         }
-        if (done.isEmpty()) {
-            return Message.warning("Todos los idiomas tienen ya título: vacía uno para traducirlo");
+        // a page's blocks: what each language lacks of them, from the default language's
+        var blocksDone = new java.util.ArrayList<String>();
+        if (type == ItemType.PAGE && blocks != null && !blocks.isEmpty()) {
+            var current = blocks.stream().map(b -> b.toBlock(from)).toList();
+            for (var to : List.of("es", "en", "de")) {
+                if (to.equals(from)) {
+                    continue;
+                }
+                try {
+                    var result = io.mateu.ecdemo1.contenthub.application.usecases.BlockTranslation.translate(current, from,
+                            to, source.title(), translator, httpRequest.getHeaderValue("Authorization"));
+                    if (result.parts() > 0) {
+                        current = result.blocks();
+                        blocksDone.add(to);
+                    }
+                } catch (RuntimeException e) {
+                    return Message.error("No se han podido traducir los bloques a «" + to + "»: " + e.getMessage());
+                }
+            }
+            blocks = new ArrayList<>(current.stream().map(b -> BlockForm.of(b, from)).toList());
+        }
+        if (done.isEmpty() && blocksDone.isEmpty()) {
+            return Message.warning("Todos los idiomas tienen ya título" + (type == ItemType.PAGE ? " y los bloques, su texto" : "")
+                    + ": vacía uno para traducirlo");
         }
         // the form with the translated fields (its state goes back only when the action returns it),
         // and the message
-        return List.of(this, Message.success("Traducido con IA a " + String.join(", ", done) + ". Revísalo y guarda."));
+        var what = new java.util.ArrayList<String>();
+        if (!done.isEmpty()) {
+            what.add("el contenido a " + String.join(", ", done));
+        }
+        if (!blocksDone.isEmpty()) {
+            what.add("los bloques a " + String.join(", ", blocksDone));
+        }
+        return List.of(this, Message.success("Traducido con IA " + String.join(" y ", what) + ". Revísalo y guarda."));
     }
 
     /** Puts the chosen medium at the end of the default language's body, where the editor moves it to. */

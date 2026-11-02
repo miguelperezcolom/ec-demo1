@@ -25,6 +25,13 @@ import java.util.Map;
  */
 public class PageTemplate {
 
+    /**
+     * The language of a template's blocks' own text (the backoffice's); their other languages are their
+     * translations. A page in another language gets its own language's text as the blocks' own
+     * ({@link Block#rebased}).
+     */
+    public static final String LANGUAGE = "es";
+
     private String id;
     private String name;
     private String description;
@@ -58,7 +65,8 @@ public class PageTemplate {
             throw new IllegalArgumentException("Solo una página se guarda como plantilla");
         }
         var audience = page.draft().audience() instanceof Audience.Everyone ? null : page.draft().audience();
-        var template = create(id, name, description, page.draft().blocks(), audience, by, now);
+        var template = create(id, name, description, page.draft().blocks().stream()
+                .map(b -> b.rebased(page.defaultLanguage(), LANGUAGE)).toList(), audience, by, now);
         // a newsletter's page makes a template of that newsletter (its blocks may be its sections); the
         // intranet's, a global one
         template.restrictTo(Site.INTRANET.equals(page.siteId()) ? null : page.siteId());
@@ -110,7 +118,8 @@ public class PageTemplate {
         var lang = language == null || language.isBlank() ? "es" : language;
         return new ItemContent(sectionId == null || sectionId.isBlank() ? null : sectionId,
                 defaultAudience == null ? Audience.EVERYONE : defaultAudience,
-                Map.of(lang, new Translation(title.trim(), "", "")), blocks, null, null, false, false,
+                Map.of(lang, new Translation(title.trim(), "", "")),
+                blocks.stream().map(b -> b.rebased(LANGUAGE, lang)).toList(), null, null, false, false,
                 null, null);
     }
 

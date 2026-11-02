@@ -105,6 +105,12 @@ public class Site extends AggregateRoot {
         return siteId == null || siteId.isBlank() ? INTRANET : siteId;
     }
 
+    /** The language it is written in first — its blocks' default language, what a reader of another gets. */
+    public String defaultLanguage() {
+        var languages = definition.languages();
+        return languages.isEmpty() ? "es" : languages.getFirst();
+    }
+
     public void configure(Definition definition) {
         this.definition = definition;
     }

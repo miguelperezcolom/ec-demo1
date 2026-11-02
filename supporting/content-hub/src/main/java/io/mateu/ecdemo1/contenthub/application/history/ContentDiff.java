@@ -152,6 +152,7 @@ public final class ContentDiff {
             out.add(TextDiff.changed(diff) ? new Change(BLOCKS, field + " · contenido", Kind.CHANGED, null, null, diff)
                     : new Change(BLOCKS, field + " · contenido", Kind.CHANGED, null, FORMAT_ONLY, List.of()));
         }
+        translations(out, field, a, b);
         if (!Objects.equals(a.audience(), b.audience())) {
             out.add(new Change(BLOCKS, field + " · audiencia", Kind.CHANGED, audience(a.audience(), namedLabel),
                     audience(b.audience(), namedLabel), List.of()));
@@ -163,6 +164,36 @@ public final class ContentDiff {
         scalar(out, BLOCKS, field + " · enlaces", links(a), links(b));
         scalar(out, BLOCKS, field + " · medio", a.mediaId(), b.mediaId());
         scalar(out, BLOCKS, field + " · componente remoto", remote(a), remote(b));
+    }
+
+    /**
+     * A block's text in its other languages, language by language: what its own fields (the default language's,
+     * above) do not say. «· título (en)», «· contenido (en)», «· textos de los enlaces (en)».
+     */
+    static void translations(List<Change> out, String field, Block a, Block b) {
+        var languages = new TreeSet<String>();
+        languages.addAll(a.translations().keySet());
+        languages.addAll(b.translations().keySet());
+        for (var language : languages) {
+            var ta = a.translations().getOrDefault(language, Block.BlockText.NONE);
+            var tb = b.translations().getOrDefault(language, Block.BlockText.NONE);
+            var suffix = " (" + language + ")";
+            if (!Objects.equals(nz(ta.title()), nz(tb.title()))) {
+                out.add(new Change(BLOCKS, field + " · título" + suffix, Kind.CHANGED, null, null,
+                        TextDiff.diff(nz(ta.title()), nz(tb.title()))));
+            }
+            if (!Objects.equals(nz(ta.html()), nz(tb.html()))) {
+                var diff = TextDiff.ofHtml(ta.html(), tb.html());
+                out.add(TextDiff.changed(diff) ? new Change(BLOCKS, field + " · contenido" + suffix, Kind.CHANGED, null, null, diff)
+                        : new Change(BLOCKS, field + " · contenido" + suffix, Kind.CHANGED, null, FORMAT_ONLY, List.of()));
+            }
+            scalar(out, BLOCKS, field + " · textos de los enlaces" + suffix, labels(ta), labels(tb));
+        }
+    }
+
+    static String labels(Block.BlockText text) {
+        return text.labels().isEmpty() ? null
+                : text.labels().entrySet().stream().map(e -> e.getValue() + " → " + e.getKey()).collect(Collectors.joining("; "));
     }
 
     /** A REMOTE block's UI as one line: {@code ui:<source><route>?attributes}. */

@@ -42,6 +42,23 @@ class PageTemplateTest {
     }
 
     @Test
+    void a_page_in_another_language_takes_its_languages_block_text_as_its_own() {
+        var block = html("b1", "Hola", null).withText("en", "es", new Block.BlockText("Hello", null, null));
+        var t = PageTemplate.create("t1", "Home", "", List.of(block), null, "pablo", NOW);
+        var english = t.newPageContent("Home", "en", null).blocks().getFirst();
+        assertThat(english.title()).isEqualTo("Hello");
+        assertThat(english.html()).as("no English HTML: the Spanish one").isEqualTo("<p>Hola</p>");
+        assertThat(english.in("es", "en").title()).isEqualTo("Hola");
+        assertThat(t.newPageContent("Inicio", "es", null).blocks().getFirst()).isEqualTo(block);
+        // and back: a template from an English page keeps Spanish as the blocks' own text
+        var page = Item.create("p1", ItemType.PAGE, "eva", "en", new ItemContent(null, null,
+                Map.of("en", new Translation("Home", "", "")), List.of(english), null, null, false, false, null, null), NOW);
+        var again = PageTemplate.fromPage("t2", page, "Otra", "", "pablo", NOW).blocks().getFirst();
+        assertThat(again.title()).isEqualTo("Hola");
+        assertThat(again.in("en", "es").title()).isEqualTo("Hello");
+    }
+
+    @Test
     void without_a_default_audience_a_page_is_for_everyone() {
         var t = PageTemplate.create("t1", "Landing", "", List.of(), Audience.EVERYONE, "pablo", NOW);
         assertThat(t.defaultAudience()).isNull();
