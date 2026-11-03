@@ -125,6 +125,11 @@
     .ec-media::after { content:'medio · ' attr(data-ec-media); position:absolute; top:.2rem; right:.3rem; font-size:.7rem;
       background:rgba(0,0,0,.55); color:#fff; padding:0 .3rem; border-radius:4px; }
     span.ec-media { display:inline-block; }
+    .ec-media .media-del { position:absolute; top:.25rem; left:.25rem; z-index:2; width:1.5rem; height:1.5rem; padding:0; line-height:1;
+      background:var(--ve-bg); color:#c62828; display:none; }
+    .ec-media:hover .media-del, .ec-media .media-del:focus { display:block; }
+    .code summary { cursor:pointer; font-size:.85rem; margin:.5rem 0 .25rem; }
+    .code textarea { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.8rem; line-height:1.4; }
     /* while editing, a player is a picture: a click on it selects its block (an iframe would swallow it) */
     .canvas.editing .blk iframe, .canvas.editing .blk video, .canvas.editing .blk audio { pointer-events:none; }
     .panel { position:sticky; top:3.5rem; border:1px solid var(--ve-line); border-radius:10px; padding:.75rem .9rem; background:var(--ve-bg);
@@ -725,10 +730,21 @@
     }
 
     // [[media:id]] → the medium as drawn, not editable; a mark alone in its paragraph becomes a block.
+    /** A medium in a text: not editable, and with its way out. fromEditable turns all of it back into the mark. */
+    mediaBox(id, tag, inner) {
+      return '<' + tag + ' class="ec-media" contenteditable="false" data-ec-media="' + esc(id) + '">'
+        + '<button class="media-del" title="Quitar este medio" aria-label="Quitar este medio">✕</button>' + inner + '</' + tag + '>';
+    }
+
+    /** Sees the text as the code panel holds it, when it's open. */
+    syncCode(id) {
+      const code = this.root.querySelector('.panel .f-html');
+      if (code && this.state.selected === id) code.value = this.block(id).html || '';
+    }
+
     toEditable(html) {
       const media = this.state.media;
-      const box = (id, tag) => '<' + tag + ' class="ec-media" contenteditable="false" data-ec-media="' + esc(id) + '">'
-        + (media[id] || '<p style="opacity:.6">[medio ' + esc(id) + ']</p>') + '</' + tag + '>';
+      const box = (id, tag) => this.mediaBox(id, tag, media[id] || '<p style="opacity:.6">[medio ' + esc(id) + ']</p>');
       return String(html || '')
         .replace(/<p>\s*\[\[media:([A-Za-z0-9_-]+)]]\s*<\/p>/g, (m, id) => box(id, 'div'))
         .replace(MARK, (m, id) => box(id, 'span'));
@@ -868,6 +884,17 @@
             this.block(id).html = this.fromEditable(body);
             this.dirty();
             this.translated(id);
+            this.syncCode(id);
+          });
+          body.addEventListener('click', (e) => {
+            const remove = e.target.closest && e.target.closest('.media-del');
+            if (!remove) return;
+            e.preventDefault();
+            remove.closest('.ec-media').remove();
+            this.block(id).html = this.fromEditable(body);
+            this.dirty();
+            this.translated(id);
+            this.syncCode(id);
           });
           body.addEventListener('paste', (e) => this.paste(e));
         }
@@ -1088,8 +1115,7 @@
           this.state.media[asset.value] = m.html;
         }
         this.restoreRange(body);
-        const html = '<div class="ec-media" contenteditable="false" data-ec-media="' + esc(asset.value) + '">'
-          + this.state.media[asset.value] + '</div><p><br></p>';
+        const html = this.mediaBox(asset.value, 'div', this.state.media[asset.value]) + '<p><br></p>';
         if (!document.execCommand('insertHTML', false, html)) body.insertAdjacentHTML('beforeend', html);
         this.block(id).html = this.fromEditable(body);
         this.dirty();
@@ -1218,7 +1244,12 @@
           + '<p class="note">Si faltan elementos, se añaden columnas vacías. En un móvil se apilan.</p></div>';
       }
       if (b.type === 'COLUMN') html += '<p class="note">Sus bloques van uno debajo de otro.</p>';
-      if (f.has('html')) html += '<p class="note">✍️ El texto se escribe sobre la página, con la barra de formato del bloque.</p>';
+      if (f.has('html')) {
+        html += '<p class="note">✍️ El texto se escribe sobre la página, con la barra de formato del bloque.</p>'
+          + '<details class="code"' + (this.codeOpen ? ' open' : '') + '><summary>Ver el HTML</summary>'
+          + '<textarea class="f-html" rows="10" spellcheck="false" aria-label="HTML del bloque">' + esc(b.html || '') + '</textarea>'
+          + '<p class="note">Los medios son marcas como <code>[[media:id]]</code>. Al guardar se quita lo que no es seguro, como los scripts.</p></details>';
+      }
       if (f.has('itemId')) {
         html += '<div class="field"><label for="f-item">Item destacado</label><select id="f-item" class="f-item">'
           + opt(cat.items, b.itemId, '— elige un item publicado —') + '</select></div>';
@@ -1276,6 +1307,14 @@
         b.type = e.target.value;
         if (LIMITED.has(b.type) && b.limit == null) b.limit = 5;
         this.changed(true);
+      });
+      on('.code', 'toggle', (e) => { this.codeOpen = e.target.open; });
+      on('.f-html', 'input', (e) => {
+        b.html = e.target.value;
+        const body = this.root.querySelector('.blk[data-id="' + b.id + '"] .body');
+        if (body) body.innerHTML = this.toEditable(b.html);
+        this.dirty();
+        this.translated(b.id);
       });
       on('.f-span', 'change', (e) => { b.span = e.target.value === '' ? null : Number(e.target.value); this.changed(true); });
       panel.querySelectorAll('.split').forEach((btn) => btn.addEventListener('click', () => {
