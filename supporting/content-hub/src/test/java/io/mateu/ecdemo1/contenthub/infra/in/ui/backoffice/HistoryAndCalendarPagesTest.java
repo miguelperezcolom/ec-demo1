@@ -145,20 +145,21 @@ class HistoryAndCalendarPagesTest {
             v.content().forEach(x -> collect(x, out, type));
         } else if (c instanceof HorizontalLayout h) {
             h.content().forEach(x -> collect(x, out, type));
+        } else if (c instanceof io.mateu.uidl.data.FormLayout f) {
+            f.content().forEach(x -> collect(x, out, type));
         }
     }
 
     @Test
     void the_history_offers_editable_selects_and_compares_and_restores_an_item_with_two_versions() {
         var id = itemWithTwoVersions();
-        var page = new HistoryPage(history, items, readers).load(id, request);
+        var page = new HistoryPage(history, items, readers, null).load(id, request);
 
         var content = page.detailContent(request);
         var fields = fields(content);
-        assertThat(fields).extracting(FormField::id).containsExactly("desde", "hasta", "aRestaurar");
+        assertThat(fields).extracting(FormField::id).containsExactly("desde", "hasta");
         assertThat(fields).noneMatch(FormField::readOnly);
         assertThat(fields.get(0).options()).extracting(Option::value).containsExactly("draft", "h5", "v2", "h3", "v1", "h1");
-        assertThat(fields.get(2).options()).extracting(Option::value).doesNotContain("draft");
         // opened on: the last version against the draft
         assertThat(page.desde).isEqualTo("v2");
         assertThat(html(content)).contains("Diferencias: Versión 2").contains("verano").contains("invierno")
@@ -172,15 +173,16 @@ class HistoryAndCalendarPagesTest {
                 .doesNotContain("invierno");
 
         // and restores version 1
-        page.aRestaurar = "v1";
-        var result = (List<?>) page.restaurarEstaVersion(request);
-        assertThat(result.getFirst()).isSameAs(page);
+        var form = new RestoreVersionForm(history, readers);
+        form.itemId = id;
+        assertThat(form.options("version", request)).extracting(Option::value).contains("v1").doesNotContain("draft");
+        assertThat(form.restaurar(request)).isInstanceOf(io.mateu.uidl.data.Message.class); // nothing chosen yet
+        form.version = "v1";
+        form.restaurar(request);
         var item = stored.get(id);
         assertThat(item.draft().translations().get("es").title()).isEqualTo("Turnos");
         assertThat(item.versions()).hasSize(2);
         assertThat(item.publishedVersion().orElseThrow().content().translations().get("es").title()).isEqualTo("Turnos de verano");
-        assertThat(page.desde).isEqualTo("v1");
-        assertThat(page.hasta).isEqualTo("draft");
         assertThat(html(page.detailContent(request))).contains("Restaurado");
     }
 

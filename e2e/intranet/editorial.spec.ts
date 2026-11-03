@@ -64,6 +64,31 @@ test.describe('Editorial', () => {
         expect(await ana.text()).not.toContain('Editor visual')
     })
 
+    test('the history compares with real selects, and restoring asks which version in a dialog', async ({ as, hosts }) => {
+        const demo = await as('demo')
+        await demo.go(`${hosts.data}/editorial/historial/${NOTICE}`, /Se puede comparar como/)
+        for (const label of ['Desde', 'Hasta']) {
+            const field = demo.page.getByLabel(label, { exact: true }).first()
+            await field.click()
+            await expect(demo.page.getByRole('option').first(), `${label} is a list to choose from`).toBeVisible()
+            await demo.page.keyboard.press('Escape')
+        }
+        expect(await demo.text(), 'the choice to restore is no longer on the page').not.toContain('Versión a restaurar')
+
+        // it asks, and cancelling leaves it all as it was
+        const open = demo.page.getByRole('button', { name: 'Restaurar una versión' })
+        if (!await open.first().isVisible().catch(() => false)) {
+            await demo.page.getByRole('button', { name: /Más acciones|⋯|More/ }).first().click()
+            await demo.page.getByRole('menuitem', { name: 'Restaurar una versión' }).first().click()
+        } else {
+            await open.first().click()
+        }
+        const dialog = demo.page.getByRole('dialog')
+        await expect(dialog.getByText('Restaurar en el borrador')).toBeVisible({ timeout: 30_000 })
+        await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click()
+        await expect(dialog).toHaveCount(0)
+    })
+
     test('Contenidos lists the items', async ({ as, hosts }) => {
         const demo = await as('demo')
         await demo.go(`${hosts.data}/editorial/contenidos`, /Contenidos/)
