@@ -119,7 +119,9 @@ lista; nunca escribe dónde está.
   intranet alrededor. Se rellena *UI externa* y, para una UI de Mateu, la *Ruta* de la pantalla
   (`/loyalty/members`); para un web component, sus *Atributos* (`nombre=valor`, uno por línea). Lleva
   título, resumen, sección y audiencia como cualquier contenido, y pasa por el mismo workflow.
-- **Componente remoto** (tipo de bloque): lo mismo, como un bloque más de una página.
+- **Componente remoto** (tipo de bloque): lo mismo, como un bloque más de una página. En el editor visual,
+  cada UI registrada y activa sale con su nombre en el «+», en *Componentes*: al elegirla, el bloque ya apunta a
+  ella. Registrar una nueva no requiere desplegar nada. Si hay muchas entradas, el menú tiene scroll y un filtro.
 
 Quién lo ve: quien cumple la audiencia del contenido (y la del bloque) **y** la de la UI externa; además, al
 abrirlo, debe tener los permisos que la UI exige. Si no, el bloque no se pinta y la pantalla dice «No puedes

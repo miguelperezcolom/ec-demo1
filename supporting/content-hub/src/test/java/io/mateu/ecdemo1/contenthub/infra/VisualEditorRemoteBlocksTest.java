@@ -100,6 +100,7 @@ class VisualEditorRemoteBlocksTest {
         when(catalog.values(any())).thenReturn(List.of());
         when(catalog.uiSources()).thenReturn(List.of(new Option("riu-class", "Riu Class (UI de Mateu)"),
                 new Option("push", "Avisos (Web component)")));
+        when(catalog.blockComponents()).thenReturn(List.of(new Option("riu-class", "Riu Class")));
         var controller = new VisualEditorController(new Readers(mock(EmployeeDirectory.class), mock(ContentIndex.class)),
                 items, commands, mock(AudienceCommands.class), named, renderer, mock(ContentRenderer.class),
                 mock(MediaRepository.class), mock(MediaUrls.class), catalog, mock(io.mateu.ecdemo1.contenthub.application.out.Translator.class));
@@ -130,6 +131,8 @@ class VisualEditorRemoteBlocksTest {
                         .header(Readers.SCOPES_HEADER, "content:edit"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.catalog.uiSources[0].value").value("riu-class"))
+                .andExpect(jsonPath("$.catalog.components[0].value").value("riu-class"))
+                .andExpect(jsonPath("$.catalog.components[0].label").value("Riu Class"))
                 .andExpect(jsonPath("$.catalog.types[?(@.value=='REMOTE')].fields[0]").value("remoteSourceId"))
                 .andExpect(jsonPath("$.blocks[0].type").value("REMOTE"))
                 .andExpect(jsonPath("$.blocks[0].remoteSourceId").value("riu-class"))

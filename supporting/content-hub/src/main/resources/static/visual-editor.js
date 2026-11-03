@@ -20,6 +20,8 @@
 
   const TOKEN = '__mateu_auth_token';
   const RICH = new Set(['HTML', 'BANNER']);
+  // From how many entries the «+» menu has a filter.
+  const FILTER_FROM = 15;
   const LIMITED = new Set(['AUTOMATIC_LISTING', 'LATEST', 'NOTICES']);
   const MARK = /\[\[media:([A-Za-z0-9_-]+)]]/g;
   const PASTE_TAGS = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'A', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE']);
@@ -43,7 +45,8 @@
       --ve-accent: var(--lumo-primary-color, #2f6fbf);
       --ve-line: rgba(128,128,128,.35);
       --ve-soft: rgba(128,128,128,.08);
-      --ve-bg: var(--lumo-base-color, Canvas); }
+      --ve-bg: var(--lumo-base-color, Canvas);
+      --ve-fg: var(--lumo-body-text-color, CanvasText); }
     * { box-sizing:border-box; }
     button, select, input { font:inherit; color:inherit; }
     button { cursor:pointer; background:var(--ve-soft); border:1px solid var(--ve-line); border-radius:6px; padding:.3rem .6rem; }
@@ -92,7 +95,13 @@
     .ins:hover button, .ins button:focus { opacity:1; }
     .ins.alone { height:auto; } .ins.alone button { opacity:1; width:auto; height:auto; padding:.4rem .9rem; border-radius:8px; top:0; }
     .menu { position:absolute; top:1.5rem; z-index:10; background:var(--ve-bg); border:1px solid var(--ve-line); border-radius:8px;
-      box-shadow:0 8px 24px rgba(0,0,0,.2); padding:.35rem; display:grid; grid-template-columns:1fr 1fr; gap:.25rem; min-width:20rem; }
+      box-shadow:0 8px 24px rgba(0,0,0,.2); padding:.35rem; min-width:20rem; max-height:min(24rem, 60vh); overflow:auto; }
+    .menu [hidden] { display:none; }
+    .menu-list { display:grid; grid-template-columns:1fr 1fr; gap:.25rem; }
+    .menu-head { font-size:.75rem; opacity:.7; padding:.5rem .4rem .2rem; }
+    .menu-filter { position:sticky; top:-.35rem; margin-bottom:.35rem; background:var(--ve-bg); }
+    .menu-none { padding:.4rem .6rem; font-size:.85rem; opacity:.75; }
+    .menu.up { top:auto; bottom:1.5rem; }
     /* the menu sits inside .ins: its items must not take the round «+» button's look */
     .ins .menu button { text-align:left; width:auto; height:auto; border-radius:6px; padding:.4rem .6rem; opacity:1; top:0;
       line-height:1.2; white-space:nowrap; }
@@ -100,7 +109,7 @@
     [contenteditable=true]:focus { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ve-accent) 35%, transparent); border-radius:4px; }
     h3[data-ph]:empty::before, div[data-ph]:empty::before { content:attr(data-ph); opacity:.5; }
     .rt { display:flex; flex-wrap:wrap; gap:.2rem; margin:0 0 .35rem; position:sticky; top:3.2rem; z-index:4; }
-    .rt button { padding:.1rem .45rem; font-size:.85rem; background:var(--ve-bg); color:var(--lumo-body-text-color, inherit); }
+    .rt button { padding:.1rem .45rem; font-size:.85rem; background:var(--ve-bg); color:var(--ve-fg); }
     .ec-media { position:relative; border:1px dashed rgba(128,128,128,.6); border-radius:8px; padding:.25rem; margin:.5rem 0; user-select:none; }
     .ec-media::after { content:'medio · ' attr(data-ec-media); position:absolute; top:.2rem; right:.3rem; font-size:.7rem;
       background:rgba(0,0,0,.55); color:#fff; padding:0 .3rem; border-radius:4px; }
@@ -152,16 +161,31 @@
     /** What is edited: 'pages' (a page of a site) or 'issues' (a newsletter issue) — the same blocks either way. */
     get resource() { return this.getAttribute('resource') === 'issues' ? 'issues' : 'pages'; }
 
+    static get observedAttributes() { return ['api', 'page-id', 'resource']; }
+
+    // Where the code was already loaded, the element is alive before the renderer has set its attributes.
+    attributeChangedCallback(name, before, now) {
+      if (before !== now && this.isConnected) this.startWhenReady();
+    }
+
+    /** After whatever is setting the attributes has finished; again if they then name another page. */
+    startWhenReady() {
+      queueMicrotask(() => {
+        const key = this.api + '/' + this.resource + '/' + this.pageId;
+        if (!this.pageId || key === this.startedFor) return;
+        this.startedFor = key;
+        Object.assign(this.state, { selected: null, dirty: false, messages: [], menuAt: null, language: null });
+        this.root.innerHTML = '<style>' + CSS + '</style><div class="msg info">Cargando el editor visual…</div>';
+        this.load();
+      });
+    }
+
     connectedCallback() {
       window.addEventListener('beforeunload', this.onBeforeUnload);
       document.addEventListener('click', this.onLeaveClick, true);
       document.addEventListener('selectionchange', this.onSelection);
       this.themeTimer = setInterval(() => this.followTheme(), 2000);
-      if (!this.started) {
-        this.started = true;
-        this.root.innerHTML = '<style>' + CSS + '</style><div class="msg info">Cargando el editor visual…</div>';
-        this.load();
-      }
+      this.startWhenReady();
       this.followTheme();
     }
 
@@ -203,13 +227,16 @@
     }
 
     async load() {
+      const asked = this.startedFor;
       try {
         const data = await this.call('GET', '/' + this.resource + '/' + encodeURIComponent(this.pageId)
           + (this.state.language ? '?language=' + encodeURIComponent(this.state.language) : ''));
+        if (asked !== this.startedFor) return; // it has been told to show another page meanwhile
         this.take(data);
         this.state.dirty = false;
         this.render();
       } catch (e) {
+        if (asked !== this.startedFor) return;
         this.root.innerHTML = '<style>' + CSS + '</style><div class="msg error">' + esc(e.message) + '</div>';
       }
     }
@@ -496,9 +523,51 @@
         + (this.state.menuAt === at ? this.typeMenu() : '') + '</div>';
     }
 
+    /** The menu opens downwards; upwards if it would be cut by whatever scrolls the page and fits there. */
+    placeMenu() {
+      const menu = this.root.querySelector('.menu');
+      if (!menu) return;
+      let top = 0;
+      let bottom = window.innerHeight;
+      for (let n = menu.parentNode; n; n = n instanceof ShadowRoot ? n.host : n.parentNode) {
+        if (!(n instanceof Element) || getComputedStyle(n).overflowY === 'visible') continue;
+        const box = n.getBoundingClientRect();
+        top = Math.max(top, box.top);
+        bottom = Math.min(bottom, box.bottom);
+      }
+      const box = menu.getBoundingClientRect();
+      if (box.bottom <= bottom) return;
+      if (menu.parentElement.getBoundingClientRect().top - top >= box.height) menu.classList.add('up');
+      else menu.scrollIntoView({ block: 'nearest' });
+    }
+
+    /**
+     * The block types, then each registered UI by its name: «Componente remoto» isn't an entry, its
+     * components are. It scrolls past a height, and past FILTER_FROM entries it has a filter too.
+     */
     typeMenu() {
-      return '<div class="menu" role="menu">' + this.state.catalog.types.map((t) =>
-        '<button role="menuitem" data-type="' + esc(t.value) + '">' + esc(t.label) + '</button>').join('') + '</div>';
+      const cat = this.state.catalog;
+      const types = cat.types.filter((t) => t.value !== 'REMOTE');
+      const components = cat.components || [];
+      const entry = (attrs, label) => '<button role="menuitem" ' + attrs + '>' + esc(label) + '</button>';
+      return '<div class="menu" role="menu">'
+        + (types.length + components.length >= FILTER_FROM
+          ? '<input type="search" class="menu-filter" aria-label="Filtrar los bloques" placeholder="Filtrar…">' : '')
+        + '<div class="menu-list">' + types.map((t) => entry('data-type="' + esc(t.value) + '"', t.label)).join('') + '</div>'
+        + (components.length ? '<div class="menu-group"><div class="menu-head">Componentes</div><div class="menu-list">'
+          + components.map((c) => entry('data-type="REMOTE" data-source="' + esc(c.value) + '"', c.label)).join('')
+          + '</div></div>' : '')
+        + '<div class="menu-none" hidden>Nada coincide</div></div>';
+    }
+
+    /** Keeps the entries that match, whatever the case or the accents. */
+    filterMenu(text) {
+      const plain = (t) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+      const wanted = plain(text.trim());
+      const menu = this.root.querySelector('.menu');
+      menu.querySelectorAll('button').forEach((b) => { b.hidden = !plain(b.textContent).includes(wanted); });
+      menu.querySelectorAll('.menu-group').forEach((g) => { g.hidden = !g.querySelector('button:not([hidden])'); });
+      menu.querySelector('.menu-none').hidden = !!menu.querySelector('button:not([hidden])');
     }
 
     typeLabel(type) {
@@ -620,11 +689,27 @@
         s.menuAt = s.menuAt === at ? null : at;
         this.syncEditing();
         this.renderCanvas();
+        this.placeMenu();
+        const filter = this.root.querySelector('.menu-filter');
+        if (filter) filter.focus();
         e.stopPropagation();
       }));
       canvas.querySelectorAll('.menu button').forEach((btn) => btn.addEventListener('click', () => {
-        this.add(Number(btn.closest('.ins').dataset.at), btn.dataset.type);
+        this.add(Number(btn.closest('.ins').dataset.at), btn.dataset.type, btn.dataset.source);
       }));
+      canvas.querySelectorAll('.menu-filter').forEach((input) => {
+        input.addEventListener('input', () => this.filterMenu(input.value));
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const first = this.root.querySelector('.menu button:not([hidden])');
+            if (first) first.click();
+          } else if (e.key === 'Escape') {
+            s.menuAt = null;
+            this.renderCanvas();
+          }
+        });
+      });
       canvas.querySelectorAll('.blk').forEach((el) => {
         const id = el.dataset.id;
         el.addEventListener('mousedown', () => { if (s.selected !== id) this.select(id, el); });
@@ -765,10 +850,10 @@
       this.refresh();
     }
 
-    add(at, type) {
+    add(at, type, remoteSourceId) {
       const s = this.state;
       this.syncEditing();
-      const b = this.normal({ id: newId(), type, title: '', html: RICH.has(type) ? '' : null, limit: LIMITED.has(type) ? 5 : null });
+      const b = this.normal({ id: newId(), type, remoteSourceId, title: '', html: RICH.has(type) ? '' : null, limit: LIMITED.has(type) ? 5 : null });
       s.blocks.splice(at, 0, b);
       s.menuAt = null;
       s.selected = b.id;

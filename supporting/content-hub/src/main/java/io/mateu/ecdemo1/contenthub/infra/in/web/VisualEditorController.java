@@ -300,6 +300,9 @@ public class VisualEditorController {
         // the registry of external UIs: what a «Componente remoto» may show (the editor never types where a UI lives)
         var sources = catalog.uiSources();
         out.put("uiSources", options(sources == null ? List.of() : sources));
+        // the same registry, as entries of the «+»: an active UI is a block to add, by its name
+        var components = catalog.blockComponents();
+        out.put("components", options(components == null ? List.of() : components));
         return out;
     }
 
