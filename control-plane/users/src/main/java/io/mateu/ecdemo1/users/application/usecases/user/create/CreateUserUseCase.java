@@ -20,6 +20,7 @@ public class CreateUserUseCase {
     final UserRepository repository;
     final UserChangePublisher publisher;
     final EmployeeAttributesResolver attributesResolver;
+    final io.mateu.ecdemo1.users.application.usecases.user.people.ReportingLine reportingLine;
 
     /**
      * Creates a user, and only creates: the id is the caller's (the username), and the entity is not
@@ -33,6 +34,7 @@ public class CreateUserUseCase {
         if (repository.findById(id).isPresent()) {
             throw new IllegalArgumentException("A user with id " + command.id() + " already exists");
         }
+        reportingLine.check(command.id(), command.profile());
         var user = User.of(
                 id,
                 new Name(command.name()),

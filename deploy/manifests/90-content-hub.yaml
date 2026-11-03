@@ -64,7 +64,7 @@ spec:
             capabilities: { drop: ["ALL"] }
       containers:
         - name: content-hub
-          image: miguelperezcolom/ec-demo1-content-hub:0.95.0
+          image: miguelperezcolom/ec-demo1-content-hub:0.97.0
           env:
             - name: SERVER_PORT
               value: "8135"
@@ -89,6 +89,9 @@ spec:
               value: http://embeddings
             - name: PORTAL_URL
               value: https://ec1.mateu.io/intranet
+            # Where a person's data is edited, for people:edit holders. Empty: no such link in the intranet.
+            - name: CONTENT_HUB_DIRECTORY_EDIT_URL
+              value: https://ec1.mateu.io/personas/empleados/{id}
             - name: KEYCLOAK_ISSUER_URI
               value: https://auth.ec1.mateu.io/realms/ec-demo1
             - name: KEYCLOAK_JWKS_URI

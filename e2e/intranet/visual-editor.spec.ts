@@ -48,6 +48,38 @@ test.describe('Visual editor', () => {
         expect(await widths(), 'after the reload too').toBeGreaterThan(1.5)
     })
 
+    test('a text block shows its HTML, both ways, and a medium in it can be removed', async ({ as, hosts, shell }) => {
+        const demo = await as('demo')
+        const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E html ${RUN} ${shell}` })
+        await openEditor(demo, hosts.data, id)
+        const ve = demo.page.locator('ec-visual-editor')
+        await demo.click(ve.getByRole('button', { name: 'Añadir un bloque aquí' }).first(), 1_000)
+        await demo.click(ve.getByRole('menuitem', { name: 'Banner', exact: true }), 2_000)
+
+        const panel = ve.getByRole('complementary', { name: 'Bloque seleccionado' })
+        await panel.getByText('Ver el HTML').click()
+        const code = panel.getByLabel('HTML del bloque')
+        const body = ve.getByLabel('Contenido del bloque')
+
+        // the code into the page
+        await code.fill('<p>Desde el <b>código</b></p>')
+        await expect(body.locator('b')).toHaveText('código')
+        // the page into the code
+        await body.click()
+        await demo.page.keyboard.press('End')
+        await demo.page.keyboard.type(' y más')
+        await expect(code).toHaveValue(/y más/)
+
+        // a medium, by its mark; the page's sample if there is none in the library: its box is what's tested
+        await code.fill('<p>Antes</p><p>[[media:cualquiera]]</p>')
+        const medium = ve.locator('.ec-media')
+        await expect(medium).toHaveCount(1)
+        await medium.hover()
+        await medium.getByRole('button', { name: 'Quitar este medio' }).click()
+        await expect(medium).toHaveCount(0)
+        await expect(code).toHaveValue('<p>Antes</p>')
+    })
+
     test('the «+» offers each registered UI by its name, with a filter when there are many', async ({ as, hosts, shell }) => {
         const demo = await as('demo')
         const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E componentes ${RUN} ${shell}` })

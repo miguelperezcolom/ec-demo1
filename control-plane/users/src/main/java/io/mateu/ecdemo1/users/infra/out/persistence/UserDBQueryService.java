@@ -49,7 +49,7 @@ public class UserDBQueryService implements UserQueryService {
     @Override
     public ListingData<UserRow> findAll(String searchText,
                                         Object filters, Pageable pageable) {
-        var page = repository.findAllByNameContainingIgnoreCase(searchText, DbPaging.pageable(pageable));
+        var page = repository.findAllByNameContainingIgnoreCaseOrIdContainingIgnoreCaseOrEmailContainingIgnoreCase(searchText, searchText, searchText, DbPaging.pageable(pageable));
         return DbPaging.listing(searchText, page, this::toDomain);
     }
 

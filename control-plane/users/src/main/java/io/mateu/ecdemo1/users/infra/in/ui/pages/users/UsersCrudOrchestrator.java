@@ -39,6 +39,6 @@ public class UsersCrudOrchestrator extends CatalogueCrud<
 
     @Override
     public void deleteAllById(List<String> selectedIds, HttpRequest httpRequest) {
-        deleteUserUseCase.handle(new DeleteUserCommand(selectedIds));
+        io.mateu.ecdemo1.users.infra.in.ui.Refusals.shown(() -> deleteUserUseCase.handle(new DeleteUserCommand(selectedIds)));
     }
 }

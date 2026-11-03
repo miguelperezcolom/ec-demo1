@@ -44,10 +44,12 @@ public class PersonPage implements ComponentTreeSupplier, Identifiable {
 
     final PortalSupport portal;
     final People people;
+    final io.mateu.ecdemo1.contenthub.application.out.DirectoryEditing editing;
 
-    public PersonPage(PortalSupport portal, People people) {
+    public PersonPage(PortalSupport portal, People people, io.mateu.ecdemo1.contenthub.application.out.DirectoryEditing editing) {
         this.portal = portal;
         this.people = people;
+        this.editing = editing;
     }
 
     public PersonPage load(String id, HttpRequest httpRequest) {
@@ -64,7 +66,7 @@ public class PersonPage implements ComponentTreeSupplier, Identifiable {
         if (id == null) {
             id = httpRequest.lastPathItem();
         }
-        portal.reader(httpRequest);
+        var reader = portal.reader(httpRequest);
         var person = people.find(id).orElse(null);
         if (person == null) {
             return Form.builder().title("No encontrado")
@@ -88,6 +90,7 @@ public class PersonPage implements ComponentTreeSupplier, Identifiable {
         if (phone != null) {
             body.add(new Anchor(phone, "tel:" + phone.replace(" ", "")));
         }
+        editing.linkFor(reader.scopes(), person.userId()).ifPresent(url -> body.add(new Anchor("Editar esta persona", url)));
         return Form.builder()
                 .title(People.name(person))
                 .subtitle(people.jobTitle(person))

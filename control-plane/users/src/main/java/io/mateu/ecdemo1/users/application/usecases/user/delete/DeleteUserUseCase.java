@@ -13,10 +13,12 @@ public class DeleteUserUseCase {
 
     final UserRepository repository;
     final UserChangePublisher publisher;
+    final io.mateu.ecdemo1.users.application.usecases.user.people.ReportingLine reportingLine;
 
     @Transactional
     public void handle(DeleteUserCommand command) {
         var ids = command.ids().stream().map(UserId::new).toList();
+        reportingLine.checkNobodyLeftBehind(java.util.Set.copyOf(command.ids()));
         // Raise the deletion event and drain it into this same transaction, before the row goes, so
         // "user gone from here" and "tell Keycloak and the directory to remove it" commit together. A user we cannot
         // find is one already gone — nothing to propagate, so it is skipped.

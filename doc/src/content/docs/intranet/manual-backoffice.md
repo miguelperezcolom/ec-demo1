@@ -24,6 +24,20 @@ Los permisos se asignan con roles en *Usuarios* (consola de control):
 En la demo: `editora` es editora, `publicador` es publicador y `demo` es administrador (ver
 [Operación](/intranet/operacion/#datos-de-demo)).
 
+## Personas
+
+*Personas → Empleados*, un menú de primer nivel en la consola de datos, es donde RRHH mantiene a los empleados.
+Lo ve quien tiene el permiso `people:edit` (rol **Administrador de personas**). También se llega desde la ficha
+de una persona en el portal: **Editar esta persona**.
+
+- **Alta**: usuario, nombre, email, puesto y responsable. Recibe el correo para fijar su contraseña.
+- **Cambios**: lo que se guarda llega solo al directorio, al organigrama y a lo que ve esa persona en la intranet.
+- **Responsable**: nadie puede ser su propio responsable ni depender de quien depende de él.
+- **Baja**: no se admite si la persona tiene gente a cargo. Con **Reasignar personas a cargo** pasan todas a otro responsable.
+
+Aquí no se dan permisos: los **roles y grupos** se gestionan en *Usuarios*, en la consola de control. Por eso, de
+quien tiene algún rol o grupo, el email y la baja también se gestionan allí: cambiar su email permitiría entrar en su cuenta.
+
 ## Contenidos
 
 *Editorial → Contenidos* lista todos los items, en cualquier estado, con su tipo, autor y última
@@ -145,6 +159,9 @@ Lo que se ve es el **borrador** de la página, con sus bloques dibujados como en
 - **Seleccionar un bloque**: al pasar el ratón se marca; un clic lo selecciona. Encima aparecen su tipo
   (y su restricción de audiencia, si tiene) y los botones ⠿ (arrastrar), ↑ ↓ (mover) y ✕ (eliminar,
   pide confirmación).
+- **Quitar un medio** de un texto: pasa el ratón por encima y pulsa su ✕.
+- **Ver el HTML** (panel de un bloque HTML o Banner): lo que hay detrás del texto, editable en los dos sentidos. Los
+  medios son marcas `[[media:id]]`. Al guardar se quita lo que no es seguro, como los scripts.
 - **Filas y columnas**: en el «+», *Diseño*. Al seleccionar una fila, el panel ofrece su **Reparto** (si faltan
   elementos, añade columnas vacías); al seleccionar lo que hay dentro, su **Ancho**. Dentro de una fila, ← →
   cambian el orden; ⠿ mueve un bloque también a otra fila o columna, y una fila o columna se mueve con lo que
