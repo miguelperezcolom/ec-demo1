@@ -106,6 +106,19 @@ class PreviewLinksTest {
     }
 
     @Test
+    void the_editors_preview_reuses_their_link_for_that_profile_and_lasts_a_day() {
+        var first = previews.forEditor(EDITOR, "i1", null, null);
+
+        assertThat(previews.forEditor(EDITOR, "i1", null, null).id()).isEqualTo(first.id());
+        assertThat(previews.forEditor(EDITOR, "i1", "hash", "Recepción").id()).isNotEqualTo(first.id());
+        assertThat(first.expiresAt()).isEqualTo(clock.instant().plus(java.time.Duration.ofDays(1)));
+        assertThatThrownBy(() -> previews.forEditor(READER, "i1", null, null)).isInstanceOf(SecurityException.class);
+
+        previews.revoke(EDITOR, first.id());
+        assertThat(previews.forEditor(EDITOR, "i1", null, null).id()).isNotEqualTo(first.id());
+    }
+
+    @Test
     void anyone_logged_in_opens_it_and_the_view_is_recorded() {
         var link = previews.create(EDITOR, "i1", 7, null, null);
         var opened = previews.open(READER, token(link), true);

@@ -22,15 +22,15 @@ public class ContentHubMenu {
     VisualEditorListing visual;
 
     @Menu
-    @Label("Calendario editorial")
+    @Label("Calendario")
     EditorialCalendarPage calendario;
 
     @Menu
-    @Label("Historial de versiones")
+    @Label("Historial")
     HistoryListing historial;
 
     @Menu
-    @Label("Nueva página desde plantilla")
+    @Label("Nueva desde plantilla")
     NewPageFromTemplatePage nuevaPagina;
 
     @Menu
@@ -39,7 +39,7 @@ public class ContentHubMenu {
     TemplatesCrud plantillas;
 
     @Menu
-    @Label("Enlaces de vista previa")
+    @Label("Vistas previas")
     PreviewLinksListing vistaPrevia;
 
     @Menu
@@ -47,7 +47,7 @@ public class ContentHubMenu {
     MediaCrud medios;
 
     @Menu
-    @Label("Contenido de slots")
+    @Label("Slots")
     @Publishers
     SlotContentCrud slots;
 
@@ -56,7 +56,7 @@ public class ContentHubMenu {
     NewsletterCrud newsletters;
 
     @Menu
-    @Label("Números de newsletter")
+    @Label("Números")
     NewsletterIssuesCrud numeros;
 
     @Menu
@@ -68,7 +68,7 @@ public class ContentHubMenu {
     SurveysCrud encuestas;
 
     @Menu
-    @Label("Respuestas de encuestas")
+    @Label("Respuestas")
     SurveyAnswersListing respuestas;
 
     @Menu
@@ -84,7 +84,7 @@ public class ContentHubMenu {
     ConfirmationsListing confirmaciones;
 
     @Menu
-    @Label("Pendientes de confirmar")
+    @Label("Pendientes")
     PendingConfirmationsListing pendientes;
 
     @Menu
@@ -92,6 +92,6 @@ public class ContentHubMenu {
     AnalyticsPage analitica;
 
     @Menu
-    @Label("Salud del contenido")
+    @Label("Salud")
     HealthListing salud;
 }

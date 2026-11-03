@@ -159,6 +159,9 @@ Lo que se ve es el **borrador** de la página, con sus bloques dibujados como en
 - **Seleccionar un bloque**: al pasar el ratón se marca; un clic lo selecciona. Encima aparecen su tipo
   (y su restricción de audiencia, si tiene) y los botones ⠿ (arrastrar), ↑ ↓ (mover) y ✕ (eliminar,
   pide confirmación).
+- **Vista previa**: guarda lo que falte en el borrador y lo abre en otra pestaña, pintado por el portal, con el
+  aspecto real de la consola en la que estás (Vaadin o Redwood) y como el perfil de «Ver como», si hay uno elegido. El
+  editor se parece al portal y usa sus colores, pero solo esto es exacto. Se ve en tu idioma, no en el que estés editando.
 - **Quitar un medio** de un texto: pasa el ratón por encima y pulsa su ✕.
 - **Ver el HTML** (panel de un bloque HTML o Banner): lo que hay detrás del texto, editable en los dos sentidos. Los
   medios son marcas `[[media:id]]`. Al guardar se quita lo que no es seguro, como los scripts.
@@ -209,7 +212,7 @@ Una **plantilla** es de dónde sale una página nueva: un nombre, para qué sirv
 una plantilla es un borrador normal: se copia, no se enlaza (cambiar la plantilla luego no cambia ninguna
 página hecha con ella).
 
-- **Nueva página desde plantilla** (*Editorial → Nueva página desde plantilla*, `/editorial/nuevaPagina`,
+- **Nueva página desde plantilla** (*Editorial → Nueva desde plantilla*, `/editorial/nuevaPagina`,
   cualquier editor): elige el **sitio** (la intranet o una newsletter), la **plantilla** (las globales y las
   de ese sitio, descritas abajo con sus bloques y su audiencia; *Ver la plantilla elegida* la marca), el
   **título** y, si quieres, la **sección** del sitio. **Crear y abrir el formulario** abre el formulario del
@@ -285,7 +288,7 @@ notificara al publicarse. *Lectores notificados*, en *Cifras*, dice a cuántos s
 
 ### Historial de versiones
 
-**Historial**, en la barra del formulario de un contenido (o *Editorial → Historial de versiones* y elegir el
+**Historial**, en la barra del formulario de un contenido (o *Editorial → Historial* y elegir el
 contenido), abre `/editorial/historial/{id}`:
 
 - **El historial**: cada paso, el más reciente arriba —número, cuándo, quién y qué: *Creado*, *Editado*,
@@ -299,7 +302,7 @@ contenido), abre `/editorial/historial/{id}`:
   cuerpo se compara por su texto, no por sus etiquetas, y si solo cambia el formato lo dice), *Bloques* (añadidos,
   quitados, movidos de posición o cambiados, y en qué), *Audiencia* y *Publicación* (fechas de publicación,
   caducidad y confirmación, seguimiento, notificación).
-- **Restaurar esta versión** (`content:edit`): copia la versión elegida en *Restaurar* en el **borrador**. No
+- **Restaurar una versión** (`content:edit`): abre un diálogo para elegirla y la copia en el **borrador**. No
   publica nada: lo que ven los lectores sigue igual, y el borrador restaurado sigue el flujo de siempre (revisión,
   publicación). Queda en el historial como *Restaurado*. Si la versión tenía una fecha de *Publicar a partir de*
   ya pasada se quita (se publicará al publicarla); si su caducidad o su fecha límite de confirmación ya pasaron,
@@ -310,7 +313,7 @@ Ver el historial y comparar es para cualquier permiso editorial. Vale para los c
 
 ### Calendario editorial
 
-*Editorial → Calendario editorial* (`/editorial/calendario`) muestra, por mes, semana o lista, qué pasa cada día:
+*Editorial → Calendario* (`/editorial/calendario`) muestra, por mes, semana o lista, qué pasa cada día:
 
 | Entrada | Color | Cuándo |
 | :------ | :---- | :----- |
@@ -492,7 +495,7 @@ Los huecos de contenido editorial en pantallas de otras aplicaciones. Están par
   clave `aplicacion.pantalla.nombre`, una descripción, un **fallback** (lo que pinta la aplicación cuando
   no hay variante visible) y un estado: *Vacío*, *N variante(s)* o *Huérfano* (ya no aparece en los
   descriptores de su aplicación; no se borra, por si vuelve).
-- **Lo que lo llena** —sus variantes— es trabajo editorial: *Editorial → Contenido de slots*
+- **Lo que lo llena** —sus variantes— es trabajo editorial: *Editorial → Slots*
   (publicador), que lista los slots vivos. Cada **variante** tiene prioridad (la mayor gana; dos
   variantes no pueden tener la misma), título, HTML (admite `[[media:id]]`), enlace y audiencia (con
   nombre, regiones, hoteles, departamentos). El lector ve la variante visible de mayor prioridad. Guardar
@@ -544,7 +547,7 @@ página*—; publicada, sale en su menú) y **Ver en el portal**.
 
 ### Números
 
-*Editorial → Números de newsletter* lista todos los números (newsletter, nº, fecha, asunto, estado,
+*Editorial → Números* lista todos los números (newsletter, nº, fecha, asunto, estado,
 aperturas, clics); **Nuevo** pide la newsletter y abre su número siguiente. Un número tiene:
 
 - **Asunto**, **fecha** y **Enviar el** (vacío: al programar).
@@ -613,7 +616,7 @@ encuesta cerrada ya no se modifica. Llegar a la fecha de cierre deja de admitir 
 (con su media), con el recuento y el porcentaje sobre quienes respondieron esa pregunta, y los textos libres,
 por orden alfabético.
 
-*Editorial → Respuestas de encuestas* da cada respuesta en una fila, para buscar y **exportar a CSV**, que Excel abre. Las
+*Editorial → Respuestas* da cada respuesta en una fila, para buscar y **exportar a CSV**, que Excel abre. Las
 de una encuesta anónima no dicen quién ni cuándo, y las filas van ordenadas por respuesta para que no se puedan
 reconstruir las respuestas de una misma persona.
 

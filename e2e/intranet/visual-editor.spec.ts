@@ -1,4 +1,4 @@
-import { test, expect, RUN, Session } from './support'
+import { test, expect, RUN, Session, pageText } from './support'
 import { createItem } from './content'
 
 /**
@@ -117,6 +117,37 @@ test.describe('Visual editor', () => {
         })
         expect(fits.nextToItsRow, 'a column dragged out to the page').toBe(false)
         await expect(panel).toBeVisible()
+    })
+
+    test('«Vista previa» saves what is unsaved and opens the page as the portal draws it', async ({ as, hosts, shell }) => {
+        const demo = await as('demo')
+        const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E previa ${RUN} ${shell}` })
+        await openEditor(demo, hosts.data, id)
+        const ve = demo.page.locator('ec-visual-editor')
+        await demo.click(ve.getByRole('button', { name: 'Añadir un bloque aquí' }).first(), 1_000)
+        await demo.click(ve.getByRole('menuitem', { name: 'HTML', exact: true }), 1_500)
+        const text = `Sin guardar ${RUN}`
+        await ve.getByLabel('Contenido del bloque').click()
+        await demo.page.keyboard.type(text, { delay: 10 })
+        await expect(ve.getByText('● Cambios sin guardar')).toBeVisible()
+
+        const [tab] = await Promise.all([
+            demo.page.context().waitForEvent('page'),
+            ve.getByRole('button', { name: 'Vista previa', exact: true }).click(),
+        ])
+        await expect(ve.getByText('● Cambios sin guardar')).toBeHidden({ timeout: 30_000 })
+        await expect.poll(() => tab.url(), { timeout: 30_000 }).toContain('/intranet/vista-previa/')
+        // the same host: the same renderer
+        expect(new URL(tab.url()).host).toBe(new URL(hosts.data).host)
+        await expect.poll(() => pageText(tab), { timeout: 120_000, intervals: [2_000] }).toContain(text)
+        expect(await pageText(tab)).toContain('Borrador — vista previa')
+
+        // again: the same link, no pile of them
+        const [again] = await Promise.all([
+            demo.page.context().waitForEvent('page'),
+            ve.getByRole('button', { name: 'Vista previa', exact: true }).click(),
+        ])
+        await expect.poll(() => again.url(), { timeout: 30_000 }).toBe(tab.url())
     })
 
     test('the «+» offers each registered UI by its name, with a filter when there are many', async ({ as, hosts, shell }) => {

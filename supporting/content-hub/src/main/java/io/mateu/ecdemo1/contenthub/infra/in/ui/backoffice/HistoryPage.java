@@ -14,7 +14,6 @@ import io.mateu.uidl.annotations.Toolbar;
 import io.mateu.uidl.data.FieldDataType;
 import io.mateu.uidl.data.FieldStereotype;
 import io.mateu.uidl.data.FormField;
-import io.mateu.uidl.data.HorizontalLayout;
 import io.mateu.uidl.data.Message;
 import io.mateu.uidl.data.Option;
 import io.mateu.uidl.data.UICommand;
@@ -32,7 +31,7 @@ import java.util.List;
 /**
  * An item's history (/editorial/historial/{id}): every step, who and when; two of its states compared
  * (a version, a saved draft or the current draft), field by field and language by language; and
- * «Restaurar esta versión», which copies one into the draft — never publishes. Viewing is for any
+ * «Restaurar una versión», a dialog (RestoreVersionForm) that copies one into the draft — never publishes. Viewing is for any
  * editorial permission; restoring, for content:edit.
  *
  * <p>The listing opens this as its record's page, which Mateu draws read-only from the fields: the
@@ -52,14 +51,15 @@ public class HistoryPage implements Identifiable, DetailContentSupplier {
     String desde;
     @Hidden
     String hasta = ItemHistory.DRAFT;
-    @Hidden
-    String aRestaurar;
 
     final ItemHistory history;
     final ItemRepository items;
     final Readers readers;
+    final org.springframework.beans.factory.ObjectProvider<RestoreVersionForm> restoreForm;
 
-    public HistoryPage(ItemHistory history, ItemRepository items, Readers readers) {
+    public HistoryPage(ItemHistory history, ItemRepository items, Readers readers,
+                       org.springframework.beans.factory.ObjectProvider<RestoreVersionForm> restoreForm) {
+        this.restoreForm = restoreForm;
         this.history = history;
         this.items = items;
         this.readers = readers;
@@ -84,12 +84,11 @@ public class HistoryPage implements Identifiable, DetailContentSupplier {
         var reader = readers.of(httpRequest);
         var revisions = history.revisions(reader, id);
         var options = revisions.stream().map(r -> new Option(r.key(), r.label())).toList();
-        var earlier = options.stream().filter(o -> !ItemHistory.DRAFT.equals(o.value())).toList();
         var content = new ArrayList<Component>();
-        content.add(HorizontalLayout.builder().spacing(true).style("flex-wrap: wrap; align-items: flex-end;").content(List.of(
+        // In a form layout: it's where Redwood draws a fluent field as what it is, a select
+        content.add(io.mateu.uidl.data.FormLayout.builder().maxColumns(2).content(List.of(
                 select("desde", "Desde", options, desde),
-                select("hasta", "Hasta", options, hasta),
-                select("aRestaurar", "Versión a restaurar en el borrador", earlier, aRestaurar))).build());
+                select("hasta", "Hasta", options, hasta))).build());
         content.add(Html.block(markup(reader, revisions)));
         return VerticalLayout.builder().fullWidth(true).spacing(true).content(content).build();
     }
@@ -130,24 +129,13 @@ public class HistoryPage implements Identifiable, DetailContentSupplier {
         return this;
     }
 
+    /** Which version, in a dialog: it only matters when restoring. */
     @Toolbar
     @Writers
-    @Action(confirmationRequired = true, confirmationTitle = "¿Restaurar esta versión?",
-            confirmationMessage = "Se copia en el borrador: no se publica. Luego sigue el flujo de siempre (revisión, publicación).")
-    @Label("Restaurar esta versión")
-    public Object restaurarEstaVersion(HttpRequest httpRequest) {
-        if (aRestaurar == null || aRestaurar.isBlank()) {
-            return List.of(this, Message.warning("Elige la versión a restaurar"));
-        }
-        var restored = history.restore(readers.of(httpRequest), id, aRestaurar);
-        desde = aRestaurar;
-        hasta = ItemHistory.DRAFT;
-        aRestaurar = null;
-        var out = new ArrayList<Object>();
-        out.add(this);
-        out.add(Message.success(restored.message()));
-        restored.warnings().forEach(w -> out.add(Message.warning(w)));
-        return out;
+    @Action
+    @Label("Restaurar una versión")
+    public Object restaurarUnaVersion(HttpRequest httpRequest) {
+        return restoreForm.getObject().dialogFor(id);
     }
 
     @Toolbar

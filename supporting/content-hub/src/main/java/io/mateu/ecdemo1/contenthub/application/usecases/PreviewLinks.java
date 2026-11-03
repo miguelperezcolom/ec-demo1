@@ -48,6 +48,21 @@ public class PreviewLinks {
         return link;
     }
 
+    /**
+     * The link behind the visual editor's «Vista previa», for its editor: the one they already have for this item
+     * and profile if it's still good, so previewing again doesn't pile up links; or a new one, for a day.
+     */
+    @Transactional
+    public PreviewLink forEditor(Reader reader, String itemId, String viewAs, String viewAsLabel) {
+        requireEditor(reader);
+        return links.ofItem(itemId).stream()
+                .filter(l -> reader.userId().equals(l.createdBy()))
+                .filter(l -> java.util.Objects.equals(viewAs, l.viewAs()))
+                .filter(l -> status(l) == io.mateu.ecdemo1.contenthub.domain.preview.PreviewLinkStatus.ACTIVE)
+                .findFirst()
+                .orElseGet(() -> create(reader, itemId, 1, viewAs, viewAsLabel));
+    }
+
     @Transactional
     public void revoke(Reader reader, String linkId) {
         requireEditor(reader);
