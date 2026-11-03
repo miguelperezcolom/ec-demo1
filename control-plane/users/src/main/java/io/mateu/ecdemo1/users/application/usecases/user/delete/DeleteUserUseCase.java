@@ -13,6 +13,7 @@ public class DeleteUserUseCase {
 
     final UserRepository repository;
     final UserChangePublisher publisher;
+    final io.mateu.ecdemo1.users.application.out.PersonPhotoRepository photos;
     final io.mateu.ecdemo1.users.application.usecases.user.people.ReportingLine reportingLine;
 
     @Transactional
@@ -26,6 +27,7 @@ public class DeleteUserUseCase {
             repository.findById(id).ifPresent(user -> {
                 user.markDeleted();
                 publisher.publish(user);
+                photos.deleteOfUser(id.id());
             });
         }
         repository.deleteAllById(ids);

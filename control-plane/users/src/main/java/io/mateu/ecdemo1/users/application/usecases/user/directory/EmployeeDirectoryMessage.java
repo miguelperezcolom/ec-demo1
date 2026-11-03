@@ -35,7 +35,7 @@ import io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile;
  * and renaming a field in the domain must not silently rename it on the wire.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({"eventId", "type", "userId", "name", "email", "enabled", "managerId", "phone", "attributes",
+@JsonPropertyOrder({"eventId", "type", "userId", "name", "email", "enabled", "managerId", "phone", "photoUrl", "attributes",
         "labels", "occurredAt"})
 public record EmployeeDirectoryMessage(String eventId,
                                        String type,
@@ -45,6 +45,7 @@ public record EmployeeDirectoryMessage(String eventId,
                                        Boolean enabled,
                                        String managerId,
                                        String phone,
+                                       String photoUrl,
                                        Attributes attributes,
                                        Map<String, String> labels,
                                        String occurredAt) {
@@ -70,17 +71,17 @@ public record EmployeeDirectoryMessage(String eventId,
                                                     EmployeeProfile profile, String occurredAt) {
         var p = profile == null ? EmployeeProfile.NONE : profile;
         return new EmployeeDirectoryMessage(eventId, UPSERTED, userId, name, email, enabled, p.managerId(),
-                p.phone(), Attributes.of(attributes), null, occurredAt);
+                p.phone(), p.photoUrl(), Attributes.of(attributes), null, occurredAt);
     }
 
     public static EmployeeDirectoryMessage removed(String eventId, String userId, String occurredAt) {
-        return new EmployeeDirectoryMessage(eventId, REMOVED, userId, null, null, null, null, null, null, null,
+        return new EmployeeDirectoryMessage(eventId, REMOVED, userId, null, null, null, null, null, null, null, null,
                 occurredAt);
     }
 
     /** The same message, with the attribute codes' labels (left out when there are none). */
     public EmployeeDirectoryMessage withLabels(Map<String, String> labels) {
-        return new EmployeeDirectoryMessage(eventId, type, userId, name, email, enabled, managerId, phone, attributes,
+        return new EmployeeDirectoryMessage(eventId, type, userId, name, email, enabled, managerId, phone, photoUrl, attributes,
                 labels == null || labels.isEmpty() ? null : labels, occurredAt);
     }
 }

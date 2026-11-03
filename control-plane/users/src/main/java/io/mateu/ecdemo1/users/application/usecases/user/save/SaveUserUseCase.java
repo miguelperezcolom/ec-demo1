@@ -30,7 +30,9 @@ public class SaveUserUseCase {
                 command.groups().stream().map(UserGroupId::new).toList(),
                 command.roles().stream().map(RoleId::new).toList(),
                 attributesResolver.resolve(command.attributes()),
-                command.profile()
+                // a photo changes only through PersonPhotos: no form holds it
+                (command.profile() == null ? io.mateu.ecdemo1.users.domain.aggregates.user.vo.EmployeeProfile.NONE : command.profile())
+                        .withPhotoUrl(user.getProfile() == null ? null : user.getProfile().photoUrl())
                 );
         repository.save(user);
         // Same transaction as the save: the change to propagate commits with the user. See

@@ -39,6 +39,11 @@ public class PreferencesPage implements OptionsSupplier, Hydratable {
     @io.mateu.uidl.annotations.Colspan(2)
     java.util.concurrent.Callable<io.mateu.uidl.fluent.Component> newsletters = this::newsletters;
 
+    @Section("Mi foto")
+    @Label("")
+    @io.mateu.uidl.annotations.Colspan(2)
+    java.util.concurrent.Callable<io.mateu.uidl.fluent.Component> miFoto = this::miFoto;
+
     @Section("Notificaciones")
     @Label("Avisarme en la aplicación")
     @Help("La campana y las notificaciones del navegador: lo nuevo que puedes ver y lo que debes confirmar.")
@@ -56,6 +61,7 @@ public class PreferencesPage implements OptionsSupplier, Hydratable {
     final io.mateu.ecdemo1.contenthub.application.usecases.NewsletterService newsletterService;
     final NotificationPreferences notifications;
     /** The reader, for the newsletters' list (drawn after hydration); not part of the form's state. */
+    @Hidden
     transient io.mateu.ecdemo1.contenthub.application.security.Reader reader;
 
     public PreferencesPage(PortalSupport portal,
@@ -64,6 +70,11 @@ public class PreferencesPage implements OptionsSupplier, Hydratable {
         this.portal = portal;
         this.newsletterService = newsletterService;
         this.notifications = notifications;
+    }
+
+    /** Its own screen: the users service's, the employee's data being theirs. */
+    io.mateu.uidl.fluent.Component miFoto() {
+        return new io.mateu.uidl.data.Anchor("Cambiar mi foto", "/miFoto");
     }
 
     /** Each newsletter for the reader: whether they receive it, and the way to its page (subscribe, unsubscribe, sections). */

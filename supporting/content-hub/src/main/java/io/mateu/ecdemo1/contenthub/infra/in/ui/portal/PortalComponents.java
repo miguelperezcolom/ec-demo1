@@ -133,7 +133,7 @@ public final class PortalComponents {
     }
 
     public static Avatar avatar(Employee e) {
-        return Avatar.builder().name(People.name(e)).abbreviation(People.initials(People.name(e))).build();
+        return Avatar.builder().name(People.name(e)).abbreviation(People.initials(People.name(e))).image(e.photoUrl()).build();
     }
 
     /** People one under the other, or a line saying there is nobody. */

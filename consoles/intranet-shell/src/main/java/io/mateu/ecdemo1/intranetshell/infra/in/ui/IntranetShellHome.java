@@ -63,6 +63,11 @@ public class IntranetShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Hidden
     RemoteMenu inbox = new RemoteMenu("/_inbox");
 
+    /** One's own photo: reached from their card and from «Mis preferencias», so not on the bar. */
+    @Menu
+    @Hidden
+    RemoteMenu ownPhoto = new RemoteMenu("/_mi-foto").withLabel("Mi foto"); // not named as its route: the web renderer would strip it
+
     /** The bell and who is signed in; the demo's banner is about the consoles, and stays out. */
     @Override
     public List<Component> widgets(HttpRequest httpRequest) {

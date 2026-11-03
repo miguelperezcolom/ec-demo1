@@ -182,7 +182,9 @@ public class SecurityConfig {
                         // The editorial backoffice; content-hub refuses whoever holds no content:* permission.
                         .pathMatchers("/_editorial/**").authenticated()
                         // The employees, for human resources; the users service refuses whoever lacks people:edit.
-                        .pathMatchers("/_people/**").authenticated()
+                        // Except a photo: an <img> carries no token, and its address is unguessable (PersonPhotos).
+                        .pathMatchers(HttpMethod.GET, "/_people/photos/**").permitAll()
+                        .pathMatchers("/_people/**", "/_mi-foto/**").authenticated()
                         // The integration PoC's product-side screen: the partners master. Same
                         // reason as the two above.
                         .pathMatchers("/_erp/**").authenticated()

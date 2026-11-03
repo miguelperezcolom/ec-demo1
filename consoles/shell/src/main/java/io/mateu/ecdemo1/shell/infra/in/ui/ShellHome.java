@@ -175,6 +175,11 @@ public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu personas = new RemoteMenu("/_people").withLabel("Personas");
 
+    /** One's own photo: reached from their card and from «Mis preferencias», so not on the bar. */
+    @Menu
+    @Hidden
+    RemoteMenu ownPhoto = new RemoteMenu("/_mi-foto").withLabel("Mi foto"); // not named as its route: the web renderer would strip it
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

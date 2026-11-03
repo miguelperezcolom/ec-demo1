@@ -34,6 +34,10 @@ public class People {
 
     final EmployeeDirectory directory;
 
+    /** Where the portal is, for {@link #photoAddress}. */
+    @org.springframework.beans.factory.annotation.Value("${content-hub.portal-url:http://ec1.localhost:8800/intranet}")
+    String portalUrl = "";
+
     public List<Employee> all() {
         return directory.all().stream().filter(Employee::enabled).sorted(BY_NAME).toList();
     }
@@ -141,8 +145,24 @@ public class People {
                 + "</span></a>";
     }
 
-    /** Initials on a colour picked from the user id: the same person, the same colour, no photos. */
+    /**
+     * Their photo's full address, or null: the web renderer's org chart takes anything else for initials, and
+     * would write the path in the circle.
+     */
+    public String photoAddress(Employee e) {
+        if (e.photoUrl() == null) {
+            return null;
+        }
+        var portal = java.net.URI.create(portalUrl);
+        return portal.getScheme() == null ? e.photoUrl() : portal.getScheme() + "://" + portal.getAuthority() + e.photoUrl();
+    }
+
+    /** Their photo, or their initials on a colour picked from the user id: the same person, the same colour. */
     public static String avatar(Employee e, int size) {
+        if (e.photoUrl() != null) {
+            return "<img src=\"" + esc(e.photoUrl()) + "\" alt=\"\" style=\"flex:none;width:" + size + "px;height:" + size
+                    + "px;border-radius:50%;object-fit:cover\">";
+        }
         var colours = List.of("#b42318", "#175cd3", "#067647", "#9e4c0a", "#6941c6", "#c11574", "#0e7090");
         var colour = colours.get(Math.floorMod(e.userId().hashCode(), colours.size()));
         return "<span style=\"display:inline-flex;align-items:center;justify-content:center;flex:none;width:" + size

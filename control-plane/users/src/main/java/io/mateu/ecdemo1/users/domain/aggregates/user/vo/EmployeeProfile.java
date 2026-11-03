@@ -8,14 +8,24 @@ package io.mateu.ecdemo1.users.domain.aggregates.user.vo;
  *
  * <p>Both optional: the head of the company reports to nobody, and not everybody has a work phone.
  */
-public record EmployeeProfile(String managerId, String phone) {
+public record EmployeeProfile(String managerId, String phone, String photoUrl) {
 
-    public static final EmployeeProfile NONE = new EmployeeProfile(null, null);
+    public static final EmployeeProfile NONE = new EmployeeProfile(null, null, null);
 
     /** Blank strings become null: an unselected field in a form is "no value", not a value "". */
     public EmployeeProfile {
         managerId = blankToNull(managerId);
         phone = blankToNull(phone);
+        photoUrl = blankToNull(photoUrl);
+    }
+
+    /** Without a say on the photo: whoever saves this keeps the one there is. */
+    public EmployeeProfile(String managerId, String phone) {
+        this(managerId, phone, null);
+    }
+
+    public EmployeeProfile withPhotoUrl(String photoUrl) {
+        return new EmployeeProfile(managerId, phone, photoUrl);
     }
 
     private static String blankToNull(String value) {

@@ -33,7 +33,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: intranet-shell
-          image: miguelperezcolom/ec-demo1-intranet-shell:0.111.0
+          image: miguelperezcolom/ec-demo1-intranet-shell:0.113.0
           env:
             - name: SERVER_PORT
               value: "8141"

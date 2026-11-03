@@ -202,8 +202,14 @@ Cada pieza se puede sustituir sin tocar lo demás:
 | :--------- | :----------- | :------------------ |
 | Quién es el dueño de los empleados (un sistema de RRHH, el Directorio Activo) | Quien publica en el topic `employee-directory`, con el mismo mensaje (`EmployeeDirectoryMessage`), y responde a `employee-directory-requests` | `content-hub`: audiencias, organigrama, newsletter |
 | Dónde se editan | `CONTENT_HUB_DIRECTORY_EDIT_URL` (con `{id}`; vacío quita el enlace) o el bean `DirectoryEditing` | El portal |
+| Dónde están las fotos | El `photoUrl` del mismo mensaje: la intranet solo guarda esa dirección (`PersonPhotos` y `PersonPhotoRepository` en `users`) | Portal y organigrama |
 | El proveedor de identidad | `IdentityProviderPort` en `users` | Los casos de uso y las pantallas |
 | Qué permiso se exige para el enlace | `content-hub.directory.edit-scope` | El portal |
+
+Las fotos se sirven en `/_people/photos/{token}` sin sesión, porque un `<img>` no lleva token, como los medios del
+portal: la dirección no se puede adivinar y cambia con cada foto. Lo subido se redibuja como un JPEG cuadrado de
+320 px, así que nunca se sirve el fichero original (ni un SVG con scripts). Publicar fotos de empleados puede requerir
+base legal o consentimiento: lo debe confirmar RIU.
 
 Si el dueño pasa a ser otro sistema, *Personas* se retira de `ShellHome` y del gateway: nada más depende de ella.
 

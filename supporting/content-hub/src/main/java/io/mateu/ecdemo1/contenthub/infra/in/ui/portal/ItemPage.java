@@ -61,11 +61,13 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
     final DriveDocuments drive;
     final io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis;
     final io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote;
+    final People people;
 
     public ItemPage(PortalSupport portal, PageRenderer renderer, ReaderActions actions, Collaboration collaboration,
                     UsageTracker usage, ItemNotifications notifications, DriveDocuments drive,
                     io.mateu.ecdemo1.contenthub.application.usecases.RemoteUis remoteUis,
-                    io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote) {
+                    io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer remote, People people) {
+        this.people = people;
         this.remoteUis = remoteUis;
         this.remote = remote;
         this.portal = portal;
@@ -197,7 +199,9 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
         } else {
             parts.add(CommentThread.builder().id("comentarios").comments(list.stream().map(c -> {
                 var author = c.authorName() == null || c.authorName().isBlank() ? c.authorId() : c.authorName();
-                return new Comment(c.id(), author, People.initials(author), c.text(), Ui.when(c.at()), List.of());
+                // their photo if they have one: the renderers take an avatar for an address or for initials
+                var avatar = people.find(c.authorId()).map(io.mateu.ecdemo1.contenthub.domain.employee.Employee::photoUrl).orElse(People.initials(author));
+                return new Comment(c.id(), author, avatar == null ? People.initials(author) : avatar, c.text(), Ui.when(c.at()), List.of());
             }).toList()).build());
         }
         if (!social.open()) {

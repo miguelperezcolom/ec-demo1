@@ -44,6 +44,9 @@ import java.util.List;
 public class PersonForm implements CatalogueEditor<UserDto> {
 
     @Section("Persona")
+    @io.mateu.uidl.annotations.UploadableImage
+    @Label("Foto")
+    String foto;
     @EditableOnlyWhenCreating
     @NotEmpty
     @Label("Usuario")
@@ -96,16 +99,23 @@ public class PersonForm implements CatalogueEditor<UserDto> {
     String newManagerOfReports;
 
     final PersonAdministration people;
+    final io.mateu.ecdemo1.users.application.usecases.user.people.PersonPhotos photos;
 
     @Override
     public String create(HttpRequest httpRequest) {
-        Refusals.shown(() -> people.create(person()));
+        Refusals.shown(() -> {
+            people.create(person());
+            photos.replace(id, foto);
+        });
         return id;
     }
 
     @Override
     public void save(HttpRequest httpRequest) {
-        Refusals.shown(() -> people.save(person()));
+        Refusals.shown(() -> {
+            people.save(person());
+            photos.replace(id, foto);
+        });
     }
 
     /** A button of the edit form, by the field it uses: a toolbar's would be on the record's view, where the field is read-only. */
@@ -116,6 +126,17 @@ public class PersonForm implements CatalogueEditor<UserDto> {
         var moved = Refusals.answered(() -> people.reassignReports(id, newManagerOfReports));
         newManagerOfReports = null;
         return List.of(this, Message.success(moved == 0 ? "No tiene a nadie a cargo" : moved + " persona(s) reasignada(s)"));
+    }
+
+    /** On the record's view. Saving never takes a photo away: an empty field isn't asking for it. */
+    @io.mateu.uidl.annotations.Toolbar
+    @Action(confirmationRequired = true, confirmationTitle = "¿Quitar la foto?",
+            confirmationMessage = "Deja de verse en la intranet: se verán sus iniciales.")
+    @Label("Quitar la foto")
+    public Object quitarFoto(HttpRequest httpRequest) {
+        Refusals.shown(() -> photos.remove(id));
+        foto = null;
+        return List.of(this, Message.success("Foto quitada"));
     }
 
     private Person person() {
@@ -144,6 +165,7 @@ public class PersonForm implements CatalogueEditor<UserDto> {
         var profile = user.profile() == null ? EmployeeProfile.NONE : user.profile();
         managerId = profile.managerId();
         phone = profile.phone();
+        foto = profile.photoUrl();
         return this;
     }
 

@@ -35,6 +35,10 @@ de una persona en el portal: **Editar esta persona**.
 - **Responsable**: nadie puede ser su propio responsable ni depender de quien depende de él.
 - **Baja**: no se admite si la persona tiene gente a cargo. Con **Reasignar personas a cargo** pasan todas a otro responsable.
 
+- **Foto**: se sube en el formulario de la persona (JPEG o PNG, hasta 5 MB) y se guarda recortada y reducida; se quita con
+  **Quitar la foto**, en su ficha de *Empleados*. Cada empleado puede cambiar o quitar la suya en **Mi foto**, desde
+  *Mis preferencias* o desde su ficha del portal.
+
 Aquí no se dan permisos: los **roles y grupos** se gestionan en *Usuarios*, en la consola de control. Por eso, de
 quien tiene algún rol o grupo, el email y la baja también se gestionan allí: cambiar su email permitiría entrar en su cuenta.
 
