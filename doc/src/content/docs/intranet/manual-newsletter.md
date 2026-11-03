@@ -72,7 +72,7 @@ con las herramientas `mis_newsletters`, `numeros_newsletter` y `leer_numero`. Ve
 
 ## Para el editor
 
-Las newsletters se llevan en *Editorial → Newsletters* y *Editorial → Números de newsletter* (consola del plano
+Las newsletters se llevan en *Editorial → Newsletters* y *Editorial → Números* (consola del plano
 de datos, permisos `content:*`). El menú de cada sitio, en la consola de control.
 
 ### Las newsletters
@@ -120,7 +120,7 @@ de la intranet: ver [Menús](/intranet/manual-backoffice/#menús).
 
 ### Un número
 
-*Editorial → Números de newsletter* lista todos los números (newsletter, nº, fecha, asunto, estado, aperturas,
+*Editorial → Números* lista todos los números (newsletter, nº, fecha, asunto, estado, aperturas,
 clics); **Nuevo** pide la newsletter y abre su número siguiente.
 
 ![Los números: borradores, programados y enviados, con sus aperturas y clics.](../../../assets/intranet/n07-numeros.jpg)

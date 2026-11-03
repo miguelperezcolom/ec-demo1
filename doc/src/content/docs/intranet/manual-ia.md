@@ -15,7 +15,7 @@ Ninguna de estas funciones publica nada sola: lo que propone la IA lo revisa una
 | Portal → *Buscar* | Responde a una pregunta con los contenidos que puedes leer, citándolos | Cualquier empleado | `intranet-agent` |
 | Chat de la consola | Responde, busca contenidos y personas, lista lo pendiente de confirmar | Cualquier empleado | `console-agent` (con el MCP `intranet`) |
 | Editorial → un contenido, una página o un número de newsletter | **Traducir con IA** los idiomas que faltan | Editores | `intranet-translator` |
-| Editorial → *Salud del contenido* | **Sugerir texto alternativo con IA** para una imagen | Editores | `intranet-alt-text` |
+| Editorial → *Salud* | **Sugerir texto alternativo con IA** para una imagen | Editores | `intranet-alt-text` |
 
 ## Para el empleado
 

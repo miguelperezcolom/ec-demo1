@@ -837,7 +837,7 @@ Las clases `ec-remote-ui`, `ec-remote-block`/`ec-remote-page` y `ec-remote-notit
 ## Salud del contenido
 
 Cinco comprobaciones sobre **todos los sitios** (la intranet y cada newsletter), cada noche y a demanda, con sus
-avisos guardados (pantalla: *Editorial → Salud del contenido*).
+avisos guardados (pantalla: *Editorial → Salud*).
 
 - **Una foto y funciones puras.** `ContentHealth.snapshot()` lee una vez items, medios, textos alternativos,
   slots, sitios con sus inicios y secciones, menús, números y maquetas de newsletter, el registro de UIs,
