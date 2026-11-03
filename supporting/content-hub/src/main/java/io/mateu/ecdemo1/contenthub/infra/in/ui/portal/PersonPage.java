@@ -90,12 +90,15 @@ public class PersonPage implements ComponentTreeSupplier, Identifiable {
         if (phone != null) {
             body.add(new Anchor(phone, "tel:" + phone.replace(" ", "")));
         }
+        if (reader.userId().equals(person.userId())) {
+            body.add(new Anchor("Cambiar mi foto", "/miFoto"));
+        }
         editing.linkFor(reader.scopes(), person.userId()).ifPresent(url -> body.add(new Anchor("Editar esta persona", url)));
         return Form.builder()
                 .title(People.name(person))
                 .subtitle(people.jobTitle(person))
                 .template(ItemOverviewPage.builder()
-                        .avatar(new TemplateImage(null, People.initials(People.name(person))))
+                        .avatar(new TemplateImage(person.photoUrl(), People.initials(People.name(person))))
                         .body(body)
                         .footerItem(new Anchor("Ver el organigrama", Ui.PORTAL + "/organigrama"))
                         .build())

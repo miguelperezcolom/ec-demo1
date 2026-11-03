@@ -107,7 +107,7 @@ public class OrgChartPage implements ComponentTreeSupplier {
 
     /** A person as an org chart node: their name and job; clicking it opens their card. */
     static OrgNode node(Employee e, People people, List<OrgNode> children) {
-        return OrgNode.builder().id(PERSON + e.userId()).title(People.name(e)).subtitle(people.jobTitle(e))
+        return OrgNode.builder().id(PERSON + e.userId()).title(People.name(e)).subtitle(people.jobTitle(e)).avatar(people.photoAddress(e))
                 .actionId(OPEN).children(children).build();
     }
 

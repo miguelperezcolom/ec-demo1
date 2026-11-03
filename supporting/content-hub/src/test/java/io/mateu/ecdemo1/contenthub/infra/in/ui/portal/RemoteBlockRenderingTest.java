@@ -137,7 +137,7 @@ class RemoteBlockRenderingTest {
                 mock(io.mateu.ecdemo1.contenthub.application.usecases.Collaboration.class),
                 mock(io.mateu.ecdemo1.contenthub.application.usecases.UsageTracker.class),
                 mock(io.mateu.ecdemo1.contenthub.application.usecases.ItemNotifications.class),
-                mock(io.mateu.ecdemo1.contenthub.application.drive.DriveDocuments.class), remoteUis, remote);
+                mock(io.mateu.ecdemo1.contenthub.application.drive.DriveDocuments.class), remoteUis, remote, org.mockito.Mockito.mock(People.class));
         page.id = "p1";
         var item = new io.mateu.ecdemo1.contenthub.application.out.VisibleItem("p1", 1, "REMOTE_PAGE", null, "es",
                 "Riu Class", "Socios", "", "ui:riu-class/loyalty/members", "eva", null, null, false, false, null, 0);

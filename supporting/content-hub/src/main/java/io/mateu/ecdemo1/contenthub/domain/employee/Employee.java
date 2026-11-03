@@ -10,7 +10,13 @@ import java.util.Map;
  * the labels of their attribute codes ({@code hotel → "Riu Demo Tenerife"}) as the users service names them.
  */
 public record Employee(String userId, String name, String email, boolean enabled, EmployeeAttributes attributes,
-                       String managerId, String phone, Map<String, String> labels) {
+                       String managerId, String phone, Map<String, String> labels, String photoUrl) {
+
+    /** Without a photo. */
+    public Employee(String userId, String name, String email, boolean enabled, EmployeeAttributes attributes,
+                    String managerId, String phone, Map<String, String> labels) {
+        this(userId, name, email, enabled, attributes, managerId, phone, labels, null);
+    }
 
     public Employee {
         labels = labels == null ? Map.of() : Map.copyOf(labels);

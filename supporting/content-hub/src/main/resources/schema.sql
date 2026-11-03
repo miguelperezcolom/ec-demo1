@@ -31,6 +31,7 @@ create table if not exists ch_employee (
 alter table ch_employee add column if not exists manager_id text;
 alter table ch_employee add column if not exists phone text;
 alter table ch_employee add column if not exists labels jsonb;
+alter table ch_employee add column if not exists photo_url text;
 -- Employees' requests (vacation, training, equipment), decided by the solicitud-empleado process
 create table if not exists ch_request (id text primary key, employee_id text not null, status text not null,
     created_at timestamptz not null, doc jsonb not null);
