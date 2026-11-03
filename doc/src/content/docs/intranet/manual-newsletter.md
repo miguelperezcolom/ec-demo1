@@ -153,11 +153,14 @@ número; la prueba y el envío siguen en su formulario («Volver al número»).
 | Estado | Acciones |
 | :----- | :------- |
 | Borrador | Añadir lo nuevo, Editar sobre el número, **Enviar prueba**, **Programar**, Cancelar |
-| Programado | **Volver a borrador**, Cancelar, Enviar prueba |
+| Programado | **Volver a borrador**, Cancelar, Enviar prueba; **Reintentar el envío** si se ha detenido |
 | Enviado / Cancelado | Ninguna: ya no cambia |
 
 - **Enviar prueba** te lo manda a ti (tu perfil, todas las secciones; en la demo, al buzón de redirección) sin
   registrar nada.
+- Si un grupo no sale, se reintenta tras 1 minuto, 5, 15, 1 hora y 6 horas. Después el envío se detiene: el
+  número lo dice en su estado, cada grupo muestra su error y **Reintentar el envío** envía los que faltan
+  (`content:publish`). Los grupos que ya salieron no se repiten.
 - **Programar**, **Volver a borrador** y **Cancelar** piden `content:publish`. Programado, sale en menos de un
   minuto desde su hora (o ya, si no tiene).
 - Si un grupo falla se reintenta solo ese.

@@ -282,14 +282,26 @@ public class NewsletterService {
     /** Sends every issue that is due; a failed group is retried on the next pass, the others are not resent. */
     public int sendDue() {
         var sent = 0;
-        for (var issue : issues.due(clock.instant())) {
+        var now = clock.instant();
+        for (var issue : issues.due(now).stream().filter(i -> i.due(now)).toList()) {
             try {
                 sent += send(issue.id());
             } catch (RuntimeException e) {
                 log.warn("Newsletter issue {} not sent: {}", issue.id(), e.getMessage());
+                issues.find(issue.id()).ifPresent(i -> {
+                    passFailed(i);
+                    issues.save(i);
+                });
             }
         }
         return sent;
+    }
+
+    private void passFailed(NewsletterIssue issue) {
+        issue.sendFailed(clock.instant());
+        if (issue.sendingStopped()) {
+            log.error("Newsletter issue {}: sending stopped after repeated failures, until someone retries it", issue.id());
+        }
     }
 
     @Transactional
@@ -329,7 +341,9 @@ public class NewsletterService {
                 failed = true;
             }
         }
-        if (!failed) {
+        if (failed) {
+            passFailed(issue);
+        } else {
             issue.markSent(clock.instant());
         }
         issues.save(issue);
@@ -390,7 +404,9 @@ public class NewsletterService {
                         error == null ? itemIdsFor(issue, group) : List.of(), error == null ? clock.instant() : null, error));
             }
         }
-        if (!failed) {
+        if (failed) {
+            passFailed(issue);
+        } else {
             issue.markSent(clock.instant());
         }
         issues.save(issue);

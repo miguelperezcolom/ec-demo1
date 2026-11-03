@@ -349,6 +349,15 @@ public class NewsletterEditorial {
         issues.save(issue);
     }
 
+    /** After it stopped trying: the groups still unsent go on the next pass. */
+    @Transactional
+    public void retrySending(Reader reader, String id) {
+        reader.require(EditorialPermission.PUBLISH);
+        var issue = issue(id);
+        issue.retrySending();
+        issues.save(issue);
+    }
+
     @Transactional
     public void unschedule(Reader reader, String id) {
         reader.require(EditorialPermission.PUBLISH);
