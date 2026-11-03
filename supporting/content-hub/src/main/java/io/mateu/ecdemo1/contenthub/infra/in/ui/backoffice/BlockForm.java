@@ -103,9 +103,17 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
      * @param defaultLanguage the language of the block's own text (its page's, its newsletter's): its fields are
      *                        that language's; each translation fills its own
      */
+    /** Where it is in a row or column, kept as it was: this form doesn't edit layouts, the visual editor does. */
+    @io.mateu.uidl.annotations.HiddenInList
+    public String parentId;
+    @io.mateu.uidl.annotations.HiddenInList
+    public Integer span;
+
     public static BlockForm of(Block b, String defaultLanguage) {
         var f = new BlockForm();
         f.id = b.id();
+        f.parentId = b.parentId();
+        f.span = b.span();
         f.type = b.type();
         f.itemId = b.itemId();
         f.sectionId = b.sectionId();
@@ -168,7 +176,7 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
         }
         return new Block(id == null || id.isBlank() ? "b" + UUID.randomUUID().toString().substring(0, 6) : id,
                 t, audience, title(defaultLanguage), html(defaultLanguage), blank(itemId), blank(sectionId), limit,
-                parsedLinks, blank(mediaId), remote, translations);
+                parsedLinks, blank(mediaId), remote, translations, blank(parentId), span);
     }
 
     public String title(String language) {
@@ -252,7 +260,7 @@ public class BlockForm implements OptionsSupplier, VisibilitySupplier {
 
     @Override
     public boolean isHidden(String fieldName, HttpRequest httpRequest) {
-        if ("id".equals(fieldName)) {
+        if ("id".equals(fieldName) || "parentId".equals(fieldName) || "span".equals(fieldName)) {
             return true;
         }
         // the HTML in each language is the type's «html»

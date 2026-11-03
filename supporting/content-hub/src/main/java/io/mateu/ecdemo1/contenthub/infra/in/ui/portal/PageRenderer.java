@@ -7,6 +7,7 @@ import io.mateu.ecdemo1.contenthub.application.security.Reader;
 import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.application.visibility.Visibility;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
+import io.mateu.ecdemo1.contenthub.domain.item.BlockTree;
 import io.mateu.ecdemo1.contenthub.domain.item.BlockType;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.infra.in.render.ContentRenderer;
@@ -22,7 +23,10 @@ import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
 
+import io.mateu.uidl.data.HorizontalLayout;
+import io.mateu.uidl.data.VerticalLayout;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,8 +70,10 @@ public class PageRenderer {
         String overline = null;
         String subtitle = null;
         var panels = new ArrayList<Component>();
-        for (var b : visibleBlocks(reader, page.itemId())) {
-            if (b.type() == BlockType.GREETING) {
+        var blocks = visibleBlocks(reader, page.itemId());
+        var inRows = rowSpans(blocks);
+        for (var b : blocks) {
+            if (b.type() == BlockType.GREETING || b.type().isContainer()) {
                 continue;
             }
             if (b.type() == BlockType.BANNER && overline == null && subtitle == null) {
@@ -77,8 +83,8 @@ public class PageRenderer {
             }
             var content = content(reader, b);
             if (content != null) {
-                panels.add(panel(b.id(), title(b), content, b.type() == BlockType.HTML || b.type() == BlockType.MEDIA
-                        || b.type() == BlockType.REMOTE ? 3 : 1));
+                panels.add(panel(b.id(), title(b), content, inRows.containsKey(b.id()) ? inRows.get(b.id())
+                        : b.type() == BlockType.HTML || b.type() == BlockType.MEDIA || b.type() == BlockType.REMOTE ? 3 : 1));
             }
         }
         return new Home(overline, subtitle, panels);
@@ -86,16 +92,88 @@ public class PageRenderer {
 
     /** A page's blocks as the sections of the page read as an item: a card each. */
     public List<Component> sections(Reader reader, String pageId) {
+        return drawn(reader, BlockTree.of(visibleBlocks(reader, pageId)));
+    }
+
+    private List<Component> drawn(Reader reader, List<BlockTree.Node> nodes) {
         var out = new ArrayList<Component>();
-        for (var b : visibleBlocks(reader, pageId)) {
-            var content = b.type() == BlockType.GREETING
-                    ? Text.builder().text("Hola, " + reader.name()).container(TextContainer.h2).build()
-                    : content(reader, b);
-            if (content != null) {
-                out.add(section(title(b), content));
+        for (var n : nodes) {
+            var c = drawn(reader, n);
+            if (c != null) {
+                out.add(c);
             }
         }
         return out;
+    }
+
+    /** A block as its card, a column as what it holds one under another, a row as what it holds side by side. */
+    private Component drawn(Reader reader, BlockTree.Node n) {
+        var b = n.block();
+        if (b.type() == BlockType.COLUMN) {
+            var held = drawn(reader, n.children());
+            return held.isEmpty() ? null : VerticalLayout.builder().content(held).spacing(true).build();
+        }
+        if (b.type() == BlockType.ROW) {
+            var cells = new ArrayList<Component>();
+            for (var child : n.children()) {
+                var c = drawn(reader, child);
+                if (c != null) {
+                    cells.add(VerticalLayout.builder().content(List.of(c))
+                            .style(cellStyle(BlockTree.spanOf(child.block(), n.children().size()))).build());
+                }
+            }
+            return cells.isEmpty() ? null : HorizontalLayout.builder().content(cells).style(ROW_STYLE).build();
+        }
+        var content = b.type() == BlockType.GREETING
+                ? Text.builder().text("Hola, " + reader.name()).container(TextContainer.h2).build()
+                : content(reader, b);
+        return content == null ? null : section(title(b), content);
+    }
+
+    /** It wraps: a cell the row has no room for goes below, so a phone gets them stacked. */
+    static final String ROW_STYLE = "display:flex;flex-wrap:wrap;gap:1rem;align-items:stretch;width:100%";
+
+    /**
+     * Its share of the row; what a cell the reader doesn't see leaves free goes to the others; never too narrow to
+     * read. Exactly this form of flex: it's how Redwood recognises a column and draws it on its grid.
+     */
+    static String cellStyle(int span) {
+        return "flex:1 1 calc(" + Math.round(span * 10000f / BlockTree.COLUMNS) / 100f + "% - 1rem);min-width:min(100%, 16rem)";
+    }
+
+    /** On a home's three-column board: what each block in a row takes of it, by its width. */
+    private static Map<String, Integer> rowSpans(List<Block> blocks) {
+        var rows = blocks.stream().filter(b -> b.type() == BlockType.ROW).map(Block::id).collect(Collectors.toSet());
+        var siblings = blocks.stream().filter(b -> rows.contains(b.parentId()))
+                .collect(Collectors.groupingBy(Block::parentId, Collectors.counting()));
+        var out = new HashMap<String, Integer>();
+        blocks.stream().filter(b -> rows.contains(b.parentId())).forEach(b -> out.put(b.id(), Math.max(1, Math.round(
+                BlockTree.spanOf(b, siblings.get(b.parentId()).intValue()) * 3f / BlockTree.COLUMNS))));
+        return out;
+    }
+
+    /** Blocks already filtered for a reader, as markup, keeping their rows and columns. */
+    public String blocksHtml(Reader reader, List<Block> blocks, String hash) {
+        var out = new StringBuilder();
+        BlockTree.of(blocks).forEach(n -> blockHtml(reader, n, hash, out));
+        return out.toString();
+    }
+
+    private void blockHtml(Reader reader, BlockTree.Node n, String hash, StringBuilder out) {
+        var b = n.block();
+        if (b.type() == BlockType.ROW) {
+            out.append("<div style=\"").append(ROW_STYLE).append("\">");
+            for (var child : n.children()) {
+                out.append("<div style=\"").append(cellStyle(BlockTree.spanOf(child.block(), n.children().size()))).append("\">");
+                blockHtml(reader, child, hash, out);
+                out.append("</div>");
+            }
+            out.append("</div>");
+        } else if (b.type() == BlockType.COLUMN) {
+            n.children().forEach(child -> blockHtml(reader, child, hash, out));
+        } else {
+            out.append(blockHtml(reader, b, hash));
+        }
     }
 
     /** An item's body, its media expanded, for the reader. */
@@ -142,7 +220,7 @@ public class PageRenderer {
         if (page == null) {
             return List.of();
         }
-        return page.content().blocks().stream().filter(b -> visible.contains(b.id()))
+        return BlockTree.shown(page.content().blocks(), b -> visible.contains(b.id())).stream()
                 .map(b -> b.in(language, item.defaultLanguage())).toList();
     }
 
@@ -182,6 +260,7 @@ public class PageRenderer {
             case REMOTE -> remoteUis.usable(reader, b.remote()).map(s -> remote.component(s, b.remote(),
                     io.mateu.ecdemo1.contenthub.infra.in.render.RemoteUiRenderer.Mode.BLOCK, !blank(b.title()))).orElse(null);
             case NEWSLETTER_SECTION -> null; // a newsletter issue's (NewsletterRenderer)
+            case ROW, COLUMN -> null; // drawn by what they hold (drawn)
         };
     }
 
@@ -230,6 +309,7 @@ public class PageRenderer {
             }
             case REMOTE -> remote.editorHtml(b.remote());
             case NEWSLETTER_SECTION -> null; // a newsletter issue's (NewsletterRenderer)
+            case ROW, COLUMN -> null; // drawn by what they hold (blocksHtml)
         };
         if (inner == null) {
             return "";

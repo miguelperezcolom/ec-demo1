@@ -134,10 +134,9 @@ public final class NewsletterRenderer {
     public static String blocks(View v) {
         var out = new StringBuilder();
         var defaultLanguage = v.site().defaultLanguage();
-        for (var b : v.issue().blocks()) {
-            if (v.blockShown().test(b)) {
-                out.append(block(v, b.in(v.language(), defaultLanguage)));
-            }
+        // one under another, whatever rows they are in: columns don't survive every mail client
+        for (var b : io.mateu.ecdemo1.contenthub.domain.item.BlockTree.shown(v.issue().blocks(), v.blockShown())) {
+            out.append(block(v, b.in(v.language(), defaultLanguage)));
         }
         return out.toString();
     }
@@ -166,6 +165,7 @@ public final class NewsletterRenderer {
                 yield list == null || list.isEmpty() ? null : items(v, list);
             }
             case GREETING -> "<p style=\"font-size:16px\">" + esc(v.greeting()) + "</p>";
+            case ROW, COLUMN -> null; // what they hold follows them
             case PENDING -> null; // a reader's own pending confirmations: the intranet's home, not a newsletter
             case NEWSLETTER_SECTION -> {
                 var key = Newsletter.sectionOf(b);

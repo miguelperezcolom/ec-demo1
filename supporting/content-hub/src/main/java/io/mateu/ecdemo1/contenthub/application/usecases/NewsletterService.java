@@ -170,7 +170,8 @@ public class NewsletterService {
     boolean anythingFor(NewsletterIssue issue, Group group) {
         var site = site(issue);
         var items = itemsFor(issue, group.profile(), group.preference());
-        return issue.blocks().stream().filter(b -> sees(site, b, group.profile())).anyMatch(b -> switch (b.type()) {
+        return io.mateu.ecdemo1.contenthub.domain.item.BlockTree.shown(issue.blocks(), b -> sees(site, b, group.profile()))
+                .stream().anyMatch(b -> switch (b.type()) {
             case NEWSLETTER_SECTION -> !items.getOrDefault(io.mateu.ecdemo1.contenthub.domain.newsletter.Newsletter.sectionOf(b),
                     List.of()).isEmpty();
             case HTML, BANNER -> b.html() != null && !b.html().isBlank();
@@ -501,8 +502,8 @@ public class NewsletterService {
         var sectionItems = itemsFor(issue, profile, preference.subscribed() ? preference : null);
         var names = sectionNames(site.id(), language);
         var out = new ArrayList<ReadBlock>();
-        for (var stored : issue.blocks()) {
-            if (!sees(site, stored, profile)) {
+        for (var stored : io.mateu.ecdemo1.contenthub.domain.item.BlockTree.shown(issue.blocks(), b -> sees(site, b, profile))) {
+            if (stored.type().isContainer()) {
                 continue;
             }
             var b = stored.in(language, site.defaultLanguage());

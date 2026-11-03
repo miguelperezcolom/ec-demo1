@@ -32,10 +32,19 @@ import java.util.function.UnaryOperator;
  * @param remote       REMOTE: the registered UI source shown, and its route or attributes
  * @param translations the text in the other languages ({@link BlockText}); what a language lacks, its
  *                     reader gets in the default language
+ * @param parentId     the ROW or COLUMN holding this block; null at the top level ({@link BlockTree})
+ * @param span         in a ROW, how many of its {@link BlockTree#COLUMNS} columns it takes; null: an equal share
  */
 public record Block(String id, BlockType type, Audience audience, String title, String html, String itemId,
                     String sectionId, Integer limit, List<Link> links, String mediaId, RemoteUi remote,
-                    Map<String, BlockText> translations) {
+                    Map<String, BlockText> translations, String parentId, Integer span) {
+
+    /** A block at the page's top level. */
+    public Block(String id, BlockType type, Audience audience, String title, String html, String itemId,
+                 String sectionId, Integer limit, List<Link> links, String mediaId, RemoteUi remote,
+                 Map<String, BlockText> translations) {
+        this(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations, null, null);
+    }
 
     /** A block with its text in the default language only. */
     public Block(String id, BlockType type, Audience audience, String title, String html, String itemId,
@@ -110,6 +119,10 @@ public record Block(String id, BlockType type, Audience audience, String title, 
             throw new IllegalArgumentException("A block needs its type");
         }
         audience = audience == null ? Audience.EVERYONE : audience;
+        parentId = parentId == null || parentId.isBlank() ? null : parentId;
+        if (span != null && (span < 1 || span > BlockTree.COLUMNS)) {
+            throw new IllegalArgumentException("El ancho de un bloque va de 1 a " + BlockTree.COLUMNS + " columnas");
+        }
         links = links == null ? List.of() : List.copyOf(links);
         if (type == BlockType.REMOTE && remote == null) {
             throw new IllegalArgumentException("Un componente remoto necesita su UI externa");
@@ -139,7 +152,7 @@ public record Block(String id, BlockType type, Audience audience, String title, 
 
     /** The same block with another text (the sanitiser's), everything else kept. */
     public Block withHtml(String html) {
-        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations);
+        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations, parentId, span);
     }
 
     /** Every HTML text of the block — the default language's and each translation's — through {@code f} (the sanitiser). */
@@ -148,17 +161,23 @@ public record Block(String id, BlockType type, Audience audience, String title, 
         translations.forEach((l, t) -> texts.put(l, new BlockText(t.title(), t.html() == null ? null : f.apply(t.html()),
                 t.labels())));
         return new Block(id, type, audience, title, html == null ? null : f.apply(html), itemId, sectionId, limit, links,
-                mediaId, remote, texts);
+                mediaId, remote, texts, parentId, span);
     }
 
     /** The same block under another id (an issue's copy of its newsletter's layout), its text in every language kept. */
     public Block withId(String id) {
-        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations);
+        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations, parentId, span);
+    }
+
+    /** The same block in another place: inside {@code parentId} (null: the top level), {@code span} columns wide. */
+    public Block placedIn(String parentId, Integer span) {
+        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations,
+                parentId, span);
     }
 
     /** The same block with other translations. */
     public Block withTranslations(Map<String, BlockText> translations) {
-        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations);
+        return new Block(id, type, audience, title, html, itemId, sectionId, limit, links, mediaId, remote, translations, parentId, span);
     }
 
     // ── languages ───────────────────────────────────────────────────────────────────────────────────
@@ -175,7 +194,7 @@ public record Block(String id, BlockType type, Audience audience, String title, 
         }
         var shown = links.stream().map(l -> new Link(t.labels().getOrDefault(l.url(), l.label()), l.url())).toList();
         return new Block(id, type, audience, t.title() != null ? t.title() : title, t.html() != null ? t.html() : html,
-                itemId, sectionId, limit, shown, mediaId, remote, translations);
+                itemId, sectionId, limit, shown, mediaId, remote, translations, parentId, span);
     }
 
     /**
@@ -219,7 +238,7 @@ public record Block(String id, BlockType type, Audience audience, String title, 
         if (language == null || language.equals(defaultLanguage)) {
             var labelled = links.stream().map(l -> new Link(t.labels().getOrDefault(l.url(), l.label()), l.url())).toList();
             return new Block(id, type, audience, t.title(), t.html(), itemId, sectionId, limit, labelled, mediaId, remote,
-                    translations);
+                    translations, parentId, span);
         }
         var texts = new LinkedHashMap<>(translations);
         texts.put(language, t);
@@ -241,7 +260,7 @@ public record Block(String id, BlockType type, Audience audience, String title, 
         texts.remove(to);
         texts.put(from, old);
         return new Block(id, type, audience, shown.title(), shown.html(), itemId, sectionId, limit, shown.links(), mediaId,
-                remote, texts);
+                remote, texts, parentId, span);
     }
 
     /**
@@ -275,7 +294,7 @@ public record Block(String id, BlockType type, Audience audience, String title, 
         var links = edited.links().stream().map(l -> new Link(defaultLabels.getOrDefault(l.url(), l.label()), l.url()))
                 .toList();
         var base = new Block(edited.id(), edited.type(), edited.audience(), stored.title(), stored.html(), edited.itemId(),
-                edited.sectionId(), edited.limit(), links, edited.mediaId(), edited.remote(), stored.translations());
+                edited.sectionId(), edited.limit(), links, edited.mediaId(), edited.remote(), stored.translations(), edited.parentId(), edited.span());
         var before = stored.translations().getOrDefault(language, BlockText.NONE);
         var shown = stored.in(language, defaultLanguage); // what the editor was shown
         var title = before.title() == null && Objects.equals(own.title(), trimmed(shown.title())) ? null : own.title();
