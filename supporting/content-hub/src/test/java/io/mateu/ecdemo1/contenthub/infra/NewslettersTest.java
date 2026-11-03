@@ -31,6 +31,7 @@ import io.mateu.ecdemo1.contenthub.domain.newsletter.Newsletter;
 import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue;
 import io.mateu.ecdemo1.contenthub.domain.shared.DomainEvent;
 import io.mateu.ecdemo1.contenthub.domain.site.Site;
+import io.mateu.ecdemo1.contenthub.infra.in.mcp.NewsletterMcpTools;
 import io.mateu.ecdemo1.contenthub.infra.out.persistence.NewsletterMigration;
 import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgContentIndex;
 import io.mateu.ecdemo1.contenthub.infra.out.persistence.PgEmployeeDirectory;
@@ -359,6 +360,68 @@ class NewslettersTest {
                 .contains("Solo recepción").contains("/intranet/noticias/" + reception);
         assertThat(service.render(issue, ConsumersTest.KLAUS, null, NewsletterRenderer.Mode.WEB, "Hola, Klaus", links))
                 .doesNotContain("Solo recepción");
+    }
+
+    /** The MCP tools (desktop AI clients, the chat agent): what the portal shows the caller, sent issues only. */
+    @Test
+    void the_mcp_tools_give_the_caller_their_newsletters_and_the_sent_issues_as_they_get_them() {
+        var id = bulletin(false, Audience.EVERYONE);
+        var reception = editorial.create(PUBLISHER, new Site.Definition("Recepción al día", "", RECEPCION, List.of(), null,
+                        null, null, null, true), List.of(new NewsletterEditorial.SectionSpec("noticias", "Noticias", List.of("noticias"))),
+                new Newsletter.Settings(List.of(), Map.of(), Cadence.NONE, false));
+        var onlyReception = publish(null, "noticias", RECEPCION, "Solo recepción");
+        var forAll = publish(null, "noticias", Audience.EVERYONE, "Para todos");
+        var ana = new Reader("ana", "Ana", ConsumersTest.ANA, Set.of(), null);
+        var klaus = new Reader("klaus", "Klaus", ConsumersTest.KLAUS, Set.of(), null);
+        var anasTools = new NewsletterMcpTools(service, () -> ana);
+        var klausTools = new NewsletterMcpTools(service, () -> klaus);
+
+        // the newsletters whose audience admits them, with their subscription
+        service.subscribe(ana, reception, false, Set.of());
+        assertThat(anasTools.mis_newsletters()).extracting(NewsletterMcpTools.NewsletterSummary::id)
+                .containsExactlyInAnyOrder(id, reception);
+        assertThat(anasTools.mis_newsletters()).filteredOn(n -> n.id().equals(reception)).singleElement()
+                .satisfies(n -> assertThat(n.subscribed()).isFalse());
+        assertThat(klausTools.mis_newsletters()).extracting(NewsletterMcpTools.NewsletterSummary::id).containsExactly(id);
+
+        // a draft is nobody's here, not even an editor's
+        var issueId = editorial.newIssue(EDITOR, id);
+        var editor = new Reader("ana", "Ana", ConsumersTest.ANA, EnumSet.allOf(EditorialPermission.class), null);
+        assertThat(new NewsletterMcpTools(service, () -> editor).numeros_newsletter(id)).isEmpty();
+        assertThat(anasTools.leer_numero(id, issueId).blocks()).isEmpty();
+        assertThat(anasTools.leer_numero(id, issueId).subject()).startsWith("No existe");
+        assertThat(anasTools.mis_newsletters()).filteredOn(n -> n.id().equals(id)).singleElement()
+                .satisfies(n -> assertThat(n.latestIssue()).isNull());
+
+        editorial.schedule(PUBLISHER, issueId, clock.instant());
+        service.sendDue();
+
+        assertThat(anasTools.numeros_newsletter(id)).singleElement().satisfies(i -> {
+            assertThat(i.id()).isEqualTo(issueId);
+            assertThat(i.number()).isEqualTo(1);
+            assertThat(i.link()).endsWith("/intranet/n/" + id + "/numeros/" + issueId);
+        });
+        assertThat(anasTools.mis_newsletters()).filteredOn(n -> n.id().equals(id)).singleElement()
+                .satisfies(n -> assertThat(n.latestIssue().id()).isEqualTo(issueId));
+
+        // the issue as each gets it: their items, absolute links
+        var forAna = anasTools.leer_numero(id, issueId);
+        assertThat(forAna.number()).isEqualTo(1);
+        assertThat(forAna.link()).startsWith("http").endsWith("/intranet/n/" + id + "/numeros/" + issueId);
+        var anasItems = forAna.blocks().stream().flatMap(b -> b.items().stream()).toList();
+        assertThat(anasItems).extracting(NewsletterMcpTools.IssueItem::id).contains(onlyReception, forAll);
+        assertThat(anasItems).extracting(NewsletterMcpTools.IssueItem::link).allMatch(l -> l.startsWith("http"));
+        assertThat(forAna.blocks()).filteredOn(b -> !b.items().isEmpty()).extracting(NewsletterMcpTools.IssueBlock::title)
+                .contains("Noticias");
+        var klausItems = klausTools.leer_numero(id, issueId).blocks().stream().flatMap(b -> b.items().stream()).toList();
+        assertThat(klausItems).extracting(NewsletterMcpTools.IssueItem::id).contains(forAll).doesNotContain(onlyReception);
+        // empty: the latest sent
+        assertThat(anasTools.leer_numero(id, " ").id()).isEqualTo(issueId);
+
+        // a newsletter that is not for them: nothing of it, whatever the id
+        assertThat(klausTools.numeros_newsletter(reception)).isEmpty();
+        assertThat(klausTools.leer_numero(reception, null).blocks()).isEmpty();
+        assertThat(klausTools.leer_numero(id + "-otra", issueId).blocks()).isEmpty();
     }
 
     @Test

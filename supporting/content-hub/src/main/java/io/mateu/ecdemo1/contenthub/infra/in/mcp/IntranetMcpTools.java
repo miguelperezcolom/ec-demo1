@@ -9,14 +9,11 @@ import io.mateu.ecdemo1.contenthub.application.usecases.ReaderActions;
 import io.mateu.ecdemo1.contenthub.application.visibility.ContentQuestions;
 import io.mateu.ecdemo1.contenthub.application.visibility.Visibility;
 import io.mateu.ecdemo1.contenthub.application.security.Reader;
-import io.mateu.ecdemo1.contenthub.infra.in.security.Readers;
 import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 
@@ -29,7 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class IntranetMcpTools {
 
-    final Readers readers;
+    final McpCaller caller;
     final Visibility visibility;
     final ReaderActions actions;
     final ContentQuestions questions;
@@ -67,6 +64,10 @@ public class IntranetMcpTools {
                 - Directorio de personas (organigrama): buscar_personas encuentra empleados por nombre, puesto,
                   departamento, hotel o región ("jefe recepción tenerife"); ficha_persona da su ficha con su
                   cadena de responsables y su equipo. Solo datos de trabajo; enlaza siempre la ficha.
+                - Newsletters: mis_newsletters lista las que son para la persona (si la recibe, último número);
+                  numeros_newsletter da los números ya enviados de una; leer_numero da un número tal como esa
+                  persona lo recibe (sus bloques, solo lo que puede ver) con su enlace web. Suscribirse o darse de
+                  baja se hace en el portal, no desde el chat.
                 """;
     }
 
@@ -126,7 +127,6 @@ public class IntranetMcpTools {
     }
 
     Reader reader() {
-        var request = RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes a ? a.getRequest() : null;
-        return readers.real(h -> request == null ? null : request.getHeader(h));
+        return caller.reader();
     }
 }

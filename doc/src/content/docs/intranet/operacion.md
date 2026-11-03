@@ -1,6 +1,6 @@
 ---
 title: Operación de la intranet
-description: Desplegar content-hub — manifiesto, base de datos, variables de entorno, redespliegue local, datos de demo, registro del MCP y problemas conocidos y límites.
+description: Desplegar content-hub — manifiesto, base de datos, variables de entorno, redespliegue local, datos de demo, registro del MCP, el MCP desde clientes de escritorio (Claude, Antigravity) y problemas conocidos y límites.
 ---
 
 ## Despliegue
@@ -14,8 +14,10 @@ espera a que exista); la imagen es
   de datos **`content_hub`** si no existe, con las credenciales del Secret `ec-cp-postgres`. Las tablas
   (y la extensión `vector`) las crea el servicio al arrancar (`schema.sql`, solo aditivo).
 - **initContainer `wait-for-kafka`**: espera a `redpanda:19092`.
-- Sin ruta para el MCP: solo `/_intranet/**` (hosts de datos: portal y editorial) y `/_content-hub/**`
-  (hosts de control: configuración) en el gateway.
+- Rutas del gateway: `/_intranet/**` (hosts de datos: portal y editorial), `/_content-hub/**` (hosts de
+  control: configuración) y el MCP para clientes de escritorio (`/_intranet/mcp/sse`, `/_intranet/mcp/message` y
+  `/_intranet/mcp`, en los hosts de datos y en los de la intranet; ver
+  [El MCP desde clientes de escritorio](#el-mcp-desde-clientes-de-escritorio)).
 - Sondas en `/actuator/health/readiness` y `/liveness`; métricas en `/actuator/prometheus`.
 - Lo usan además: el gateway (rutas, `CONTENT_HUB_URL`, y `AUTH_GRPC_ADDRESS` para los permisos), los dos
   shells (`RemoteMenu` *Intranet* y `@Script` de `embed.js`), el servicio de usuarios (topics del
@@ -190,12 +192,118 @@ del usuario en Keycloak antes de entrar.
 ## Registro del MCP
 
 El servidor MCP de content-hub (SSE en `http://content-hub:8135/sse`) está en el catálogo de IA como
-**`intranet`** (`gitops/example/ia/mcp/intranet.yaml`), y `console-agent` lo incluye en su lista `mcp`
-(`gitops/example/ia/agents/console-agent.yaml`). Para dárselo a otro agente (por ejemplo
+**`intranet`**, y `console-agent` lo incluye en su lista `mcp`. El catálogo del clúster local lo sincroniza
+GitOps desde el repositorio **`ec-ia-config`** (`ia/mcp/intranet.yaml`, `ia/agents/console-agent.yaml`); en
+este repositorio queda el ejemplo, `gitops/example/ia/mcp/intranet.yaml`. Para dárselo a otro agente (por ejemplo
 `reception-agent`) se añade `intranet` a su lista `mcp` en el catálogo, o desde el plano de control de IA. Ver [GitOps del catálogo](/ia/gitops/).
 
 `ia-agent` reenvía el token de quien chatea; content-hub lo verifica contra Keycloak. Sin token, la
 llamada se rechaza.
+
+## El MCP desde clientes de escritorio
+
+El mismo servidor, **`intranet`** (intranet y newsletters), se puede conectar desde Claude Code, Claude
+Desktop o Google Antigravity en el portátil de cada uno. Las herramientas responden con lo que esa persona ve
+en el portal y nada más: cada llamada lleva **su** token de Keycloak. No hay acceso anónimo (el gateway exige
+token en todo `/_intranet/**` y content-hub lo vuelve a verificar).
+
+| | Local (kind) | ec1 (cuando se despliegue) |
+| :-- | :-- | :-- |
+| HTTP *streamable* (preferido) | `http://intranet.localhost:8800/_intranet/mcp` | `https://intranet.ec1.mateu.io/_intranet/mcp` |
+| SSE | `http://intranet.localhost:8800/_intranet/mcp/sse` | `https://intranet.ec1.mateu.io/_intranet/mcp/sse` |
+
+Las mismas rutas valen en los hosts de datos (`ec1.localhost:8800`, `rw.localhost:8800`, `ec1.mateu.io`…).
+Herramientas: `preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`,
+`buscar_personas`, `ficha_persona`, `mis_newsletters`, `numeros_newsletter` y `leer_numero` (ver
+[Arquitectura](/intranet/arquitectura/#rag-y-chat)).
+
+### El token
+
+Los tokens del realm `ec-demo1` duran **5 minutos** (el valor por defecto de Keycloak; el realm no lo cambia),
+y los clientes de escritorio mandan una cabecera fija durante toda la sesión. Por eso hay un cliente de
+Keycloak propio, **`intranet-mcp`** (público, con *device flow*), cuyos tokens duran **8 horas**; solo los
+suyos, las consolas siguen con 5 minutos. Está en `deploy/keycloak/ec-demo1-realm.json`, pero el realm solo se
+importa la primera vez: en un Keycloak que ya existe hay que crearlo a mano (`kcadm.sh create clients -r
+ec-demo1` con el mismo JSON; en el clúster local ya está creado).
+
+`deploy/demo/intranet-mcp-token.py` (Python 3, sin dependencias) lo gestiona:
+
+```sh
+python3 deploy/demo/intranet-mcp-token.py login        # una vez: abre la URL que imprime e inicia sesión
+python3 deploy/demo/intranet-mcp-token.py              # un token nuevo (8 h), sin volver a pedir contraseña
+python3 deploy/demo/intranet-mcp-token.py header-json  # {"Authorization": "Bearer …"}, para headersHelper
+```
+
+Guarda el *refresh token* en `~/.config/ec-demo1/intranet-mcp-<host>.json` (solo legible por ti) y lo renueva
+en cada uso; dura lo que la sesión del realm (24 horas): pasado ese tiempo, `login` otra vez. Para ec1,
+`INTRANET_AUTH_URL=https://auth.ec1.mateu.io`.
+
+:::caution[*.localhost en el Mac]
+El navegador y Claude Code resuelven `*.localhost` solos, pero Node (`npx mcp-remote`, el inspector de MCP) no:
+`getaddrinfo ENOTFOUND intranet.localhost`. Para el clúster local, añade a `/etc/hosts`
+`127.0.0.1 intranet.localhost ec1.localhost auth.localhost`. El script del token no lo necesita.
+:::
+
+### Claude Code
+
+Con `headersHelper`, que pide un token nuevo cada vez que Claude Code se conecta (recomendado):
+
+```sh
+claude mcp add-json intranet '{"type":"http","url":"http://intranet.localhost:8800/_intranet/mcp","headersHelper":"python3 /ruta/a/ec-demo1/deploy/demo/intranet-mcp-token.py header-json"}'
+```
+
+O con la cabecera fija (vale 8 horas; después, `claude mcp remove intranet` y añadirlo otra vez):
+
+```sh
+claude mcp add --transport http intranet http://intranet.localhost:8800/_intranet/mcp \
+  --header "Authorization: Bearer $(python3 deploy/demo/intranet-mcp-token.py)"
+# o por SSE
+claude mcp add --transport sse intranet http://intranet.localhost:8800/_intranet/mcp/sse \
+  --header "Authorization: Bearer $(python3 deploy/demo/intranet-mcp-token.py)"
+```
+
+`claude mcp list` debe decir `✓ Connected`.
+
+### Claude Desktop
+
+Por `mcp-remote`, que hace de puente stdio ↔ HTTP. En `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "intranet": {
+      "command": "bash",
+      "args": ["-lc", "exec npx -y mcp-remote http://intranet.localhost:8800/_intranet/mcp --allow-http --header \"Authorization:Bearer $(python3 /ruta/a/ec-demo1/deploy/demo/intranet-mcp-token.py)\""]
+    }
+  }
+}
+```
+
+Pide el token cada vez que Claude Desktop arranca el servidor (dura 8 horas: si caduca, reinicia Claude
+Desktop). `--allow-http` solo hace falta en local (http); con `https://intranet.ec1.mateu.io/_intranet/mcp`
+sobra. `bash -lc` para que encuentre `npx` y `python3` con el `PATH` de tu sesión.
+
+Un **conector personalizado** (Ajustes → Conectores, solo la URL) **no funciona hoy**: Claude Desktop haría
+OAuth contra el servidor (metadatos de recurso protegido y registro dinámico de clientes), y ni content-hub ni
+el gateway lo publican. `mcp-remote` también sondea ese OAuth al arrancar, pero si la cabecera vale se conecta
+sin él.
+
+### Google Antigravity
+
+En su `mcp_config.json` (*Manage MCP Servers* → *View raw config*), con el token pegado (8 horas):
+
+```json
+{
+  "mcpServers": {
+    "intranet": {
+      "serverUrl": "http://intranet.localhost:8800/_intranet/mcp",
+      "headers": { "Authorization": "Bearer <salida de intranet-mcp-token.py>" }
+    }
+  }
+}
+```
+
+O, para no pegar tokens, el mismo `command`/`args` con `mcp-remote` que en Claude Desktop.
 
 ## Problemas conocidos y límites
 
@@ -209,8 +317,11 @@ llamada se rechaza.
   admite `www.youtube-nocookie.com`, `player.vimeo.com`, `drive.google.com` y los medios propios.
 - **`embed.js` vigila los shadow roots** con un `MutationObserver` y un sondeo cada 1,5 s: un reproductor
   puede tardar un instante en aparecer.
-- **El MCP solo existe dentro del clúster** y pide el token del usuario: no es para clientes externos ni
-  para llamadas de servicio a servicio sin usuario.
+- **El MCP pide siempre el token de una persona**: dentro del clúster (`ia-agent`) o desde un cliente de
+  escritorio por el gateway. No es para llamadas de servicio a servicio sin usuario. Sin OAuth propio
+  (metadatos de recurso protegido, registro de clientes): los clientes que solo saben conectarse por OAuth,
+  como los conectores personalizados de Claude, no pueden usarlo todavía. Y los clientes de escritorio no
+  renuevan el token a mitad de sesión: con el cliente `intranet-mcp` dura 8 horas.
 - **Vista previa de Drive**: la dibuja Google en un iframe, con la sesión de Google del navegador del lector.
   Sin acceso al fichero, el iframe muestra el aviso de Google; los enlaces siguen ahí. No se usa la cuenta de
   servicio para esto.

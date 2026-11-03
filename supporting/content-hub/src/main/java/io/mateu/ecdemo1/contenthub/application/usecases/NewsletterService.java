@@ -17,6 +17,7 @@ import io.mateu.ecdemo1.contenthub.domain.audience.Audience;
 import io.mateu.ecdemo1.contenthub.domain.employee.Employee;
 import io.mateu.ecdemo1.contenthub.domain.employee.EmployeeAttributes;
 import io.mateu.ecdemo1.contenthub.domain.item.Block;
+import io.mateu.ecdemo1.contenthub.domain.item.BlockType;
 import io.mateu.ecdemo1.contenthub.domain.item.ItemType;
 import io.mateu.ecdemo1.contenthub.domain.navigation.Section;
 import io.mateu.ecdemo1.contenthub.domain.newsletter.NewsletterIssue;
@@ -462,6 +463,57 @@ public class NewsletterService {
     public Optional<NewsletterIssue> readableIssue(Reader reader, String siteId, String issueId) {
         return readable(reader, siteId).flatMap(s -> issues.find(issueId))
                 .filter(i -> i.newsletterId().equals(siteId) && i.status() == NewsletterIssue.Status.SENT);
+    }
+
+    /**
+     * One block of an issue as one reader gets it, as data rather than markup (the MCP tools): its text, the
+     * items it lists (only those the reader sees), its links. {@code html} is the block's rich text, as written.
+     */
+    public record ReadBlock(BlockType type, String title, String html, List<VisibleItem> items, List<Block.Link> links) {
+    }
+
+    /**
+     * A sent issue as the reader gets it — what its web version draws for them: the blocks they see, in their
+     * language, with the items they see and, when subscribed, only the sections they want. A block with
+     * nothing for them is left out, as in the email.
+     */
+    public List<ReadBlock> read(Reader reader, NewsletterIssue issue) {
+        var site = site(issue);
+        var language = site.languageFor(reader.attributes().language());
+        var profile = reader.attributes().withLanguage(language);
+        var preference = preference(reader, site.id());
+        var sectionItems = itemsFor(issue, profile, preference.subscribed() ? preference : null);
+        var names = sectionNames(site.id(), language);
+        var out = new ArrayList<ReadBlock>();
+        for (var stored : issue.blocks()) {
+            if (!sees(site, stored, profile)) {
+                continue;
+            }
+            var b = stored.in(language, site.defaultLanguage());
+            var title = b.title() == null ? "" : b.title();
+            var block = switch (b.type()) {
+                case HTML, BANNER -> b.html() == null || b.html().isBlank() ? null
+                        : new ReadBlock(b.type(), title, b.html(), List.of(), List.of());
+                case MEDIA -> b.mediaId() == null ? null : new ReadBlock(b.type(), title, "", List.of(), List.of());
+                case QUICK_LINKS -> b.links().isEmpty() ? null : new ReadBlock(b.type(), title, "", List.of(), b.links());
+                case FEATURED, AUTOMATIC_LISTING, LATEST, NOTICES -> {
+                    var list = listing(b, profile);
+                    yield list.isEmpty() ? null : new ReadBlock(b.type(), title, "", list, List.of());
+                }
+                case NEWSLETTER_SECTION -> {
+                    var key = io.mateu.ecdemo1.contenthub.domain.newsletter.Newsletter.sectionOf(b);
+                    var list = sectionItems.getOrDefault(key, List.of());
+                    yield list.isEmpty() ? null : new ReadBlock(b.type(), title.isBlank() ? names.getOrDefault(key, key) : title,
+                            "", list, List.of());
+                }
+                case REMOTE -> b.remote() == null ? null : new ReadBlock(b.type(), title, "", List.of(), List.of());
+                default -> null; // the greeting, pending confirmations: nothing of the issue's own
+            };
+            if (block != null) {
+                out.add(block);
+            }
+        }
+        return out;
     }
 
     public NewsletterPreferences.Preference preference(Reader reader, String siteId) {

@@ -174,6 +174,8 @@ public class SecurityConfig {
                         // or clicked in a mail app: signed by content-hub, a click only ever goes on
                         // to a portal item (which asks for a session as usual).
                         .pathMatchers(HttpMethod.GET, "/_intranet/media/**", "/_intranet/embed.js", "/_intranet/n/**").permitAll()
+                        // This covers the intranet's MCP server too (/_intranet/mcp/**, for desktop AI
+                        // clients): never anonymous, the person's own token on every call.
                         .pathMatchers("/_intranet/**").authenticated()
                         // The same portal without the backoffice, for the intranet's own host.
                         .pathMatchers("/_portal/**").authenticated()
