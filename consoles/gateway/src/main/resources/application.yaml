@@ -227,12 +227,39 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
             - Path=/_content/**
 
+        # The intranet's MCP server, for people's own AI clients (Claude Code, Claude Desktop,
+        # Antigravity…) on their machine — the same tools ia-agent uses inside the cluster, each call
+        # with the person's own token (required here like all of /_intranet/**, and verified again by
+        # content-hub). On the data plane's hosts and the intranet's:
+        #   /_intranet/mcp/sse      → /sse   (SSE; its endpoint event names /_intranet/mcp/message,
+        #   /_intranet/mcp/message  → as is   a path routed unchanged here and served by content-hub)
+        #   /_intranet/mcp          → /mcp   (streamable HTTP)
+        # First, so they win over the intranet route below and the intranet host's shell catch-all.
+        - id: intranet-mcp-sse
+          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
+            - Path=/_intranet/mcp/sse
+          filters:
+            - SetPath=/sse
+        - id: intranet-mcp-streamable
+          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
+            - Path=/_intranet/mcp
+          filters:
+            - SetPath=/mcp
+        - id: intranet-mcp-message
+          uri: ${CONTENT_HUB_URL:http://content-hub:8135}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
+            - Path=/_intranet/mcp/message
+
         # The intranet: content-hub's portal and, as its "Editorial" entry, the editorial backoffice —
         # on the data plane like /_content: employees read it, and editors write it, where they work.
         # Who sees the backoffice is content-hub's call (content:* permissions from X-User-Scopes).
-        # The intranet's configuration is on the control host (/_content-hub, below). Only the Mateu
-        # UI: its MCP server is for agents inside the cluster, like registration-rules' and the front
-        # office's, and is not routed.
+        # The intranet's configuration is on the control host (/_content-hub, below). Its MCP server
+        # has the routes above.
         - id: intranet
           uri: ${CONTENT_HUB_URL:http://content-hub:8135}
           predicates:

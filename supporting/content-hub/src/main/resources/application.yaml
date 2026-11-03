@@ -42,6 +42,11 @@ spring:
         name: content-hub
         version: 1.0.0
         protocol: SSE
+        # ia-agent opens /sse inside the cluster; a desktop client /_intranet/mcp/sse through the gateway.
+        # The stream's endpoint event names this path, resolved against whichever host the client used:
+        # the gateway routes /_intranet/** unchanged, so it is right from both sides (McpConfig). The same
+        # tools over streamable HTTP at /mcp (public: /_intranet/mcp).
+        sse-message-endpoint: /_intranet/mcp/message
 
   # The MCP calls' tokens: Keycloak's keys over the cluster network, the issuer as the token says it.
   security:

@@ -27,7 +27,7 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, UIs externas, directorio y visibilidad |
 | **UIs externas** | `UiSource` (registro, `ch_ui_source`), `RemoteUis`, `RemoteUiRenderer`; `<ec-ui-source>` en `embed.js` | Pantallas de otras aplicaciones como páginas (`REMOTE_PAGE`) y bloques (`REMOTE`) de la intranet (ver [UIs externas](#uis-externas)) |
 | **Plantillas y vista previa** | `PageTemplate` (`ch_page_template`), `Templates`, `TemplatesCrud`/`TemplateForm`, `NewPageFromTemplatePage`, `TemplateSeeder`; `PreviewLink` (`ch_preview_link`), `PreviewLinks`, `PreviewLinksSigner`, `PreviewLinksPage`/`PreviewLinksListing` y, en el portal, `PreviewPage` (`/intranet/vista-previa/{id}.{firma}`) | Páginas nuevas a partir de plantillas (globales o de un sitio), y enlaces firmados y caducables con los que un revisor con sesión ve un borrador (ver [Plantillas y vista previa](#plantillas-y-vista-previa)) |
-| **Servidor MCP** | `/sse` (`infra/in/mcp`), solo dentro del clúster | Las herramientas del chat, con el token de quien chatea: contenido (`preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`) y directorio (`buscar_personas`, `ficha_persona`) |
+| **Servidor MCP** | `infra/in/mcp`: SSE en `/sse` (mensajes en `/_intranet/mcp/message`) y HTTP *streamable* en `/mcp`; dentro del clúster para `ia-agent` y, por el gateway (`/_intranet/mcp/sse`, `/_intranet/mcp`), para los clientes de IA de escritorio | Las herramientas del chat, con el token de quien llama: contenido (`preguntar_intranet`, `buscar_contenido`, `leer_item`, `confirmaciones_pendientes`), directorio (`buscar_personas`, `ficha_persona`) y newsletters (`mis_newsletters`, `numeros_newsletter`, `leer_numero`) |
 | **Remoto de slots** | `GET /_intranet/api/slots/{key}` (`SlotController`) | La variante visible de un slot, como JSON (provisional). La consumen el inicio del data plane (`data-plane.inicio.novedades`), el del control plane (`control-plane.inicio.avisos`) y la bienvenida del front office (`front-office.bienvenida.destacado`), en servidor con el token del usuario (`ui-commons` `ContentSlots`) |
 | **Medios** | `GET /_intranet/media/{id}` (`MediaController`) | Los ficheros de la biblioteca, con URL firmada |
 | **Seguimiento de la newsletter** | `GET /_intranet/n/o/…` (píxel) y `/_intranet/n/c/…` (clic, redirige al item) (`NewsletterTrackingController`) | Aperturas y clics por edición y grupo, con firma HMAC (`NewsletterLinksSigner`); el gateway los deja pasar sin token |
@@ -53,6 +53,7 @@ flowchart LR
   CH -- employee-directory-requests --> U
   GW["gateway<br/>X-User-Scopes / X-User-Roles"] -- "/_intranet (portal y editorial)<br/>/_content-hub (configuración)" --> CH["content-hub"]
   AG["ia-agent<br/>(console-agent)"] -- "MCP /sse + token" --> CH
+  DK["Claude, Antigravity…<br/>(escritorio)"] -- "MCP /_intranet/mcp + token" --> GW
   CH -- content-events --> K[("Kafka")]
   CH -- SMTP --> PF["postfix"]
   CH -- "/v1/embeddings" --> EMB["embeddings (TEI)"]
@@ -391,9 +392,11 @@ páginas y contadores solo cuentan lo visible.
   revocación y publicación (guarda cuántas versiones tenía el item; publicar añade una). Enseña el borrador con
   medios firmados `EDITOR` y sin acciones; lee como el usuario real o como el perfil del enlace, nunca con los
   permisos editoriales de nadie.
-- **MCP.** El servidor MCP no pasa por el gateway (es interno del clúster): aquí sí se verifica el token
-  que reenvía `ia-agent` contra Keycloak (`KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI`) y una llamada sin él
-  se rechaza. Cada herramienta lee como el usuario real (nunca como su "ver como").
+- **MCP.** `ia-agent` lo llama dentro del clúster (`http://content-hub:8135/sse`) y los clientes de IA de
+  escritorio por el gateway (`/_intranet/mcp/**`, que exige token como todo `/_intranet/**`). En los dos casos
+  content-hub verifica el token contra Keycloak (`KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI`) y una llamada sin
+  él se rechaza; nunca hay acceso anónimo. Cada herramienta lee como el usuario real (nunca como su "ver
+  como"), con sus permisos (`X-User-Scopes` cuando llega por el gateway).
 
 ## RAG y chat
 
@@ -404,7 +407,7 @@ páginas y contadores solo cuentan lo visible.
   encontrarlo el chat.
 - La pregunta se embebe y se buscan los pasajes más cercanos (`<=>`) **unidos a `ch_item_doc` con el mismo
   filtro de visibilidad**: el agente nunca recibe un pasaje que la persona no pueda leer.
-- Herramientas MCP (`IntranetMcpTools`):
+- Herramientas MCP (`IntranetMcpTools` y `NewsletterMcpTools`, un solo servidor):
 
 | Herramienta | Qué devuelve |
 | :---------- | :----------- |
@@ -412,9 +415,33 @@ páginas y contadores solo cuentan lo visible.
 | `buscar_contenido(texto)` | Hasta 10 items por texto (prefijo); vacío, los últimos |
 | `leer_item(id)` | El texto completo de un item, si lo puede ver, y si debe confirmarlo |
 | `confirmaciones_pendientes()` | Lo que debe confirmar y aún no ha confirmado. Confirmar se hace en el portal, no desde el chat |
+| `buscar_personas(texto)` | Hasta 20 personas del directorio por nombre, puesto, departamento, hotel o región |
+| `ficha_persona(id)` | La ficha de una persona: puesto, dónde trabaja, contacto, su cadena de responsables y su equipo |
+| `mis_newsletters()` | Las newsletters cuya audiencia incluye a quien llama: si la recibe, qué secciones, su último número enviado y el enlace |
+| `numeros_newsletter(newsletter)` | Los números **enviados** de una newsletter que puede leer, del último al primero (hasta 50) |
+| `leer_numero(newsletter, numero)` | Un número enviado tal como lo recibe esa persona (`NewsletterService.read`): asunto, fecha, sus bloques como texto con los items que puede ver y sus enlaces, y el enlace web del número; sin `numero`, el último |
 
-El servidor se registra en el plano de control de IA como el MCP **`intranet`**
-(`gitops/example/ia/mcp/intranet.yaml`, SSE a `http://content-hub:8135`) y lo usa `console-agent`.
+Las newsletters son de solo lectura y solo dan números **enviados**: un borrador o un número programado es
+trabajo del backoffice editorial y no sale por el MCP, tenga quien llama los permisos que tenga. Suscribirse o
+darse de baja se hace en el portal. Sus enlaces son absolutos (`PORTAL_URL`), como en el correo, porque quien
+llama puede ser un cliente de escritorio fuera del portal; los de las herramientas de contenido siguen siendo
+rutas del portal (`/intranet/noticias/{id}`).
+
+Dos transportes, las mismas herramientas (`McpConfig`):
+
+- **SSE** (el que configura Spring AI): el flujo en `/sse` y los mensajes en `/_intranet/mcp/message`. El
+  primer evento del flujo (`endpoint`) le dice al cliente a qué ruta mandar los mensajes, y el cliente la
+  resuelve contra el host al que se conectó: dentro del clúster `http://content-hub:8135/_intranet/mcp/message`,
+  desde fuera `https://<host>/_intranet/mcp/message`, que el gateway pasa tal cual. Por eso esa ruta y no
+  `/mcp/message`: vale desde los dos lados sin reescribir el evento.
+- **HTTP *streamable*** (montado aparte, porque la autoconfiguración solo monta un transporte): `/mcp`, que el
+  gateway publica como `/_intranet/mcp`. Sin evento que nombre una URL, basta con reescribir la ruta. Es el que
+  prefieren los clientes de escritorio actuales; `ia-agent` sigue en SSE.
+
+El servidor se registra en el plano de control de IA como el MCP **`intranet`** (SSE a
+`http://content-hub:8135`; en local el catálogo sale del repositorio `ec-ia-config`, `ia/mcp/intranet.yaml`, y el
+ejemplo de este repositorio está en `gitops/example/ia/mcp/intranet.yaml`) y lo usa `console-agent`. Para
+conectar Claude o Antigravity desde el Mac, ver [Operación](/intranet/operacion/#el-mcp-desde-clientes-de-escritorio).
 
 ## Búsqueda híbrida y respuesta de la IA
 

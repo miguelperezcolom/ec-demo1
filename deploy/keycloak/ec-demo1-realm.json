@@ -90,6 +90,19 @@
         "post.logout.redirect.uris": "+",
         "pkce.code.challenge.method": "S256"
       }
+    },
+    {
+      "clientId": "intranet-mcp",
+      "name": "Intranet MCP for desktop AI clients",
+      "description": "Claude Code, Claude Desktop, Antigravity: the person's own token for the intranet's MCP server (/_intranet/mcp). Login once with the device flow (deploy/demo/intranet-mcp-token.py), then refreshed silently. Its access tokens last 8 hours instead of the realm's 5 minutes, because those clients send a fixed header for a whole session; only this client's tokens, the consoles keep 5 minutes.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
+        "access.token.lifespan": "28800"
+      }
     }
   ],
   "users": [
