@@ -96,8 +96,8 @@ El mismo en items, audiencias con nombre y newsletter:
 | **Pendientes de confirmar** | Lo que el lector debe confirmar y no ha confirmado (nada, si no hay) |
 | **Últimos avisos** | Los últimos avisos que el lector puede ver; *Cuántos* |
 | **Últimas noticias** | Las últimas noticias y páginas que el lector puede ver, de una sección o de todas; *Cuántos* |
-| **Fila** | Pone lo que contiene en paralelo. Cada elemento ocupa de 1 a 12 columnas, con su *Ancho* en el panel; o elige un *Reparto* (8 + 4, 4 + 4 + 4…). En un móvil se apilan |
-| **Columna** | Pone lo que contiene uno debajo de otro: sirve para tener varios bloques en una columna de una fila |
+| **Fila** | En la página o dentro de una columna. Pone lo que contiene en paralelo. Cada elemento ocupa de 1 a 12 columnas, con su *Ancho* en el panel; o elige un *Reparto* (8 + 4, 4 + 4 + 4…). En un móvil se apilan |
+| **Columna** | Solo dentro de una fila. Pone lo que contiene uno debajo de otro: sirve para tener varios bloques en una columna de la fila |
 | **Componente remoto** | Una pantalla o un elemento de otra aplicación, de las registradas: *UI externa*, *Ruta* o *Atributos* (ver [Pantallas externas y componentes remotos](#pantallas-externas-y-componentes-remotos)) |
 
 *Saludo*, *Pendientes de confirmar*, *Últimos avisos* y *Últimas noticias* sirven para montar **inicios** (ver [Inicios por audiencia](#inicios-por-audiencia)),

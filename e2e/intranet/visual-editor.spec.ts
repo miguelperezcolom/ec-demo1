@@ -80,6 +80,45 @@ test.describe('Visual editor', () => {
         await expect(code).toHaveValue('<p>Antes</p>')
     })
 
+    test('a column goes only in a row, and a row not directly in a row', async ({ as, hosts, shell }) => {
+        const demo = await as('demo')
+        const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E diseño ${RUN} ${shell}` })
+        await openEditor(demo, hosts.data, id)
+        const ve = demo.page.locator('ec-visual-editor')
+        const add = () => ve.getByRole('button', { name: 'Añadir un bloque aquí' })
+        const offers = async (name: string) => await ve.locator('.menu').getByRole('menuitem', { name, exact: true }).count() === 1
+        const panel = ve.getByRole('complementary', { name: 'Bloque seleccionado' })
+
+        // the page: rows, no columns
+        await demo.click(add().first(), 1_000)
+        expect(await offers('Fila')).toBe(true)
+        expect(await offers('Columna'), 'a column on the page').toBe(false)
+        await demo.click(ve.getByRole('menuitem', { name: 'Fila', exact: true }), 1_500)
+
+        // an empty row: columns, no rows
+        const row = ve.locator('.blk.ctr').first()
+        await demo.click(row.getByRole('button', { name: 'Añadir un bloque aquí' }).last(), 1_000)
+        expect(await offers('Columna')).toBe(true)
+        expect(await offers('Fila'), 'a row directly in a row').toBe(false)
+        await demo.click(ve.getByRole('menuitem', { name: 'Columna', exact: true }), 1_500)
+
+        // a column: rows, no columns
+        const column = row.locator('.blk.ctr').first()
+        await demo.click(column.getByRole('button', { name: 'Añadir un bloque aquí' }).first(), 1_000)
+        expect(await offers('Fila')).toBe(true)
+        expect(await offers('Columna'), 'a column in a column').toBe(false)
+
+        // and dragging keeps to the same rules: a column stays out of the page and out of another column
+        const fits = await ve.evaluate((el: any) => {
+            const ids = (t: string) => el.state.blocks.filter((b: any) => b.type === t).map((b: any) => b.id)
+            const [r] = ids('ROW')
+            const [c] = ids('COLUMN')
+            return { nextToItsRow: el.fits(c, r) }
+        })
+        expect(fits.nextToItsRow, 'a column dragged out to the page').toBe(false)
+        await expect(panel).toBeVisible()
+    })
+
     test('the «+» offers each registered UI by its name, with a filter when there are many', async ({ as, hosts, shell }) => {
         const demo = await as('demo')
         const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E componentes ${RUN} ${shell}` })

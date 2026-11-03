@@ -621,7 +621,7 @@
       // a container here must still have room for what it will hold
       const parent = parentId ? this.block(parentId) : null;
       const layouts = (parent ? this.depth(parent) + 2 : 1) > MAX_DEPTH ? []
-        : cat.types.filter((t) => CONTAINERS.has(t.value));
+        : cat.types.filter((t) => CONTAINERS.has(t.value) && this.mayHold(parent, t.value));
       const components = cat.components || [];
       const entry = (attrs, label) => '<button role="menuitem" ' + attrs + '>' + esc(label) + '</button>';
       return '<div class="menu" role="menu">'
@@ -1004,7 +1004,18 @@
       this.root.querySelector('.blk[data-id="' + id + '"] > .tools ' + (delta < 0 ? '.up' : '.down'))?.focus();
     }
 
-    /** Whether what is at {@code id} may go next to or into {@code targetId}: not inside itself, nor too deep. */
+    /**
+     * Whether a container of {@code type} goes in {@code parent} (null: the page). A column is only of a row: anywhere
+     * else things already stack. A row isn't directly in a row: that's what widths and columns are for. Only the
+     * editor says so: a page that already has them still reads and saves.
+     */
+    mayHold(parent, type) {
+      if (type === 'COLUMN') return !!parent && parent.type === 'ROW';
+      if (type === 'ROW') return !parent || parent.type !== 'ROW';
+      return true;
+    }
+
+    /** Whether what is at {@code id} may go next to or into {@code targetId}: not inside itself, nor too deep, nor where it doesn't belong. */
     fits(id, targetId) {
       const blocks = this.state.blocks;
       const i = blocks.findIndex((b) => b.id === id);
@@ -1012,6 +1023,8 @@
       if (moved.some((b) => b.id === targetId)) return false;
       const target = this.block(targetId);
       const inside = CONTAINERS.has(target.type) && !this.kids(targetId).length;
+      const parent = inside ? target : (target.parentId ? this.block(target.parentId) : null);
+      if (!this.mayHold(parent, moved[0].type)) return false;
       const base = this.depth(target) + (inside ? 1 : 0);
       const own = this.depth(moved[0]);
       return moved.every((b) => base + this.depth(b) - own <= MAX_DEPTH);
