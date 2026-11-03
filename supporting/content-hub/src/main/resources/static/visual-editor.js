@@ -47,20 +47,29 @@
 
   const CSS = `
     :host { display:block; width:100%; color:inherit; font:inherit;
+      /* the shell's own tokens: Vaadin's (lumo), Redwood's (oj), and something sensible on neither */
       --ve-accent: var(--lumo-primary-color, #2f6fbf);
-      --ve-line: rgba(128,128,128,.35);
-      --ve-soft: rgba(128,128,128,.08);
-      --ve-bg: var(--lumo-base-color, Canvas);
-      --ve-fg: var(--lumo-body-text-color, CanvasText); }
+      --ve-primary: var(--lumo-primary-color, var(--oj-core-text-color-primary, #2f6fbf));
+      --ve-on-primary: var(--lumo-primary-contrast-color, var(--oj-core-bg-color-content, #fff));
+      --ve-line: var(--lumo-contrast-20pct, var(--oj-core-divider-color, rgba(128,128,128,.35)));
+      --ve-soft: var(--lumo-contrast-5pct, rgba(128,128,128,.08));
+      --ve-bg: var(--lumo-base-color, var(--oj-core-bg-color-content, Canvas));
+      --ve-fg: var(--lumo-body-text-color, var(--oj-core-text-color-primary, CanvasText));
+      --ve-card-radius: var(--lumo-border-radius-l, var(--oj-panel-border-radius, 12px));
+      --ve-radius: var(--lumo-border-radius-m, var(--oj-core-border-radius-md, 6px));
+      --ve-heading: var(--lumo-font-size-l, var(--oj-typography-heading-xs-font-size, 1.17em)); }
+    /* the blocks the server draws, as this shell's cards */
+    .content section { border-radius:var(--ve-card-radius) !important; border-color:var(--ve-line) !important; background:var(--ve-bg); }
+    .content h3, .ttl { font-size:var(--ve-heading); }
     * { box-sizing:border-box; }
     button, select, input { font:inherit; color:inherit; }
-    button { cursor:pointer; background:var(--ve-soft); border:1px solid var(--ve-line); border-radius:6px; padding:.3rem .6rem; }
+    button { cursor:pointer; background:var(--ve-soft); border:1px solid var(--ve-line); border-radius:var(--ve-radius); padding:.3rem .6rem; }
     button:hover:not(:disabled) { border-color:var(--ve-accent); }
     button:disabled { opacity:.5; cursor:default; }
-    button.primary { background:var(--ve-accent); border-color:var(--ve-accent); color:#fff; }
+    button.primary { background:var(--ve-primary); border-color:var(--ve-primary); color:var(--ve-on-primary); }
     button.danger { color:#c62828; }
     select, textarea, input[type=text], input[type=url], input[type=number], input[type=search] {
-      background:transparent; border:1px solid var(--ve-line); border-radius:6px; padding:.3rem .45rem; width:100%; }
+      background:transparent; border:1px solid var(--ve-line); border-radius:var(--ve-radius); padding:.3rem .45rem; width:100%; }
     select option { background:var(--ve-bg); color:inherit; }
     .bar { display:flex; flex-wrap:wrap; gap:.5rem .75rem; align-items:center; padding:.5rem 0 .75rem;
       border-bottom:1px solid var(--ve-line); position:sticky; top:0; z-index:5; background:var(--ve-bg); }
@@ -105,7 +114,7 @@
     .ins button { border-radius:999px; width:1.6rem; height:1.6rem; padding:0; line-height:1; opacity:.35; position:relative; top:-.25rem; }
     .ins:hover button, .ins button:focus { opacity:1; }
     .ins.alone { height:auto; } .ins.alone button { opacity:1; width:auto; height:auto; padding:.4rem .9rem; border-radius:8px; top:0; }
-    .menu { position:absolute; top:1.5rem; z-index:10; background:var(--ve-bg); border:1px solid var(--ve-line); border-radius:8px;
+    .menu { position:absolute; top:1.5rem; z-index:10; background:var(--ve-bg); border:1px solid var(--ve-line); border-radius:var(--ve-card-radius);
       box-shadow:0 8px 24px rgba(0,0,0,.2); padding:.35rem; min-width:20rem; max-height:min(24rem, 60vh); overflow:auto; }
     .menu [hidden] { display:none; }
     .menu-list { display:grid; grid-template-columns:1fr 1fr; gap:.25rem; }
@@ -132,7 +141,7 @@
     .code textarea { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.8rem; line-height:1.4; }
     /* while editing, a player is a picture: a click on it selects its block (an iframe would swallow it) */
     .canvas.editing .blk iframe, .canvas.editing .blk video, .canvas.editing .blk audio { pointer-events:none; }
-    .panel { position:sticky; top:3.5rem; border:1px solid var(--ve-line); border-radius:10px; padding:.75rem .9rem; background:var(--ve-bg);
+    .panel { position:sticky; top:3.5rem; border:1px solid var(--ve-line); border-radius:var(--ve-card-radius); padding:.75rem .9rem; background:var(--ve-bg);
       max-height:calc(100vh - 8rem); overflow:auto; }
     .panel h3 { margin:.1rem 0 .5rem; font-size:1rem; }
     .panel h4 { margin:.9rem 0 .35rem; font-size:.85rem; text-transform:uppercase; letter-spacing:.03em; opacity:.75; }
@@ -146,7 +155,7 @@
     .aud b { font-weight:600; }
     .row { display:flex; gap:.35rem; flex-wrap:wrap; margin-top:.75rem; }
     .modal { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; display:flex; align-items:center; justify-content:center; }
-    .dialog { background:var(--ve-bg); border-radius:12px; padding:1rem; width:min(760px, 94vw); max-height:84vh; overflow:auto; border:1px solid var(--ve-line); }
+    .dialog { background:var(--ve-bg); border-radius:var(--ve-card-radius); padding:1rem; width:min(760px, 94vw); max-height:84vh; overflow:auto; border:1px solid var(--ve-line); }
     .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:.5rem; margin-top:.5rem; }
     .grid button { display:flex; flex-direction:column; gap:.3rem; align-items:stretch; text-align:left; padding:.4rem; }
     .grid img, .grid .ph { width:100%; height:90px; object-fit:cover; border-radius:6px; background:var(--ve-soft);
@@ -338,6 +347,26 @@
       }
     }
 
+    /**
+     * The page as the portal itself draws it, with this shell's renderer: what's unsaved goes first, into the
+     * draft, which no reader sees. The tab opens on the click, or the browser would take it for a pop-up.
+     */
+    async realPreview() {
+      const s = this.state;
+      if (s.busy) return;
+      const tab = window.open('about:blank', '_blank');
+      try {
+        if (s.dirty) await this.save();
+        if (s.dirty) throw new Error('el borrador no se ha guardado');
+        const data = await this.call('POST', '/pages/' + encodeURIComponent(this.pageId) + '/preview-link', { viewAs: s.viewAs || null });
+        if (tab) tab.location = data.url;
+        else this.message('warn', 'El navegador ha bloqueado la pestaña: permite las ventanas emergentes de esta página.');
+      } catch (e) {
+        if (tab) tab.close();
+        this.message('error', 'No se ha podido abrir la vista previa: ' + e.message);
+      }
+    }
+
     async save() {
       const s = this.state;
       if (s.busy) return;
@@ -470,12 +499,15 @@
         + '<label>Ver como <select class="viewas"><option value="">yo, editando</option>'
         + s.profiles.map((o) => '<option value="' + esc(o.value) + '"' + (o.value === s.viewAs ? ' selected' : '') + '>'
           + esc(o.label) + '</option>').join('') + '</select></label>'
+        + (this.resource === 'pages' ? '<button class="real-preview"' + (s.busy ? ' disabled' : '')
+          + ' title="Guarda el borrador y lo abre en otra pestaña, pintado por el portal, como lo verán sus lectores">Vista previa</button>' : '')
         + '<button class="primary save"' + (!s.dirty || s.busy || !p.canEdit ? ' disabled' : '') + '>'
         + (s.busy ? 'Guardando…' : 'Guardar') + '</button>';
       bar.querySelector('.viewas').addEventListener('change', (e) => this.viewAs(e.target.value));
       bar.querySelector('.lang').addEventListener('change', (e) => this.switchLanguage(e.target.value));
       bar.querySelector('.translate')?.addEventListener('click', () => this.translate());
       bar.querySelector('.save').addEventListener('click', () => this.save());
+      bar.querySelector('.real-preview')?.addEventListener('click', () => this.realPreview());
       if (!p.canEdit) this.message('info', 'Solo puedes verlo: guardar pide el permiso content:edit.');
     }
 
