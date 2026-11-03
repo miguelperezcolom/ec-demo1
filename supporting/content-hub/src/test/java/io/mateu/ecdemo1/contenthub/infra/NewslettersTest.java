@@ -102,6 +102,8 @@ class NewslettersTest {
     DirectoryUpdates directory;
     final List<String> mails = new ArrayList<>();
     boolean redirected;
+    boolean mailRefused;
+    int attempts;
 
     @BeforeAll
     static void start() {
@@ -129,6 +131,7 @@ class NewslettersTest {
         }
         mails.clear();
         redirected = false;
+        mailRefused = false;
         clock = new ConsumersTest.MutableClock(MONDAY_10);
         var itemRepo = new PgItemRepository(jdbc);
         var employees = new PgEmployeeDirectory(jdbc);
@@ -151,6 +154,10 @@ class NewslettersTest {
         service = new NewsletterService(issues, sites, nav, employees, visibility, named, new Mailer() {
             @Override
             public void send(List<String> to, String subject, String html) {
+                if (mailRefused) {
+                    attempts++;
+                    throw new IllegalStateException("556 Domain does not accept mail");
+                }
                 mails.add(subject + " → " + to + "\n" + html);
             }
 
@@ -422,6 +429,45 @@ class NewslettersTest {
         assertThat(klausTools.numeros_newsletter(reception)).isEmpty();
         assertThat(klausTools.leer_numero(reception, null).blocks()).isEmpty();
         assertThat(klausTools.leer_numero(id + "-otra", issueId).blocks()).isEmpty();
+    }
+
+    @Test
+    void a_refused_send_waits_longer_each_time_stops_and_goes_again_when_told() {
+        var id = bulletin(false, Audience.EVERYONE);
+        publish(null, "noticias", RECEPCION, "Solo recepción");
+        var issueId = editorial.newIssue(EDITOR, id);
+        editorial.schedule(PUBLISHER, issueId, clock.instant());
+        mailRefused = true;
+
+        service.sendDue();
+        assertThat(attempts).as("every group of the first pass").isPositive();
+        var perPass = attempts;
+        service.sendDue();
+        assertThat(attempts).as("the same minute: it waits").isEqualTo(perPass);
+
+        for (var wait : List.of(Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(15), Duration.ofHours(1),
+                Duration.ofHours(6))) {
+            clock.advance(wait.minusSeconds(1));
+            var before = attempts;
+            service.sendDue();
+            assertThat(attempts).as("before its time").isEqualTo(before);
+            clock.advance(Duration.ofSeconds(1));
+            service.sendDue();
+            assertThat(attempts).as("after " + wait).isEqualTo(before + perPass);
+        }
+
+        var stopped = issues.find(issueId).orElseThrow();
+        assertThat(stopped.sendingStopped()).isTrue();
+        var after = attempts;
+        clock.advance(Duration.ofDays(7));
+        service.sendDue();
+        assertThat(attempts).as("it has stopped").isEqualTo(after);
+
+        assertThatThrownBy(() -> editorial.retrySending(EDITOR, issueId)).isInstanceOf(SecurityException.class);
+        mailRefused = false;
+        editorial.retrySending(PUBLISHER, issueId);
+        assertThat(service.sendDue()).isPositive();
+        assertThat(issues.find(issueId).orElseThrow().status()).isEqualTo(NewsletterIssue.Status.SENT);
     }
 
     @Test

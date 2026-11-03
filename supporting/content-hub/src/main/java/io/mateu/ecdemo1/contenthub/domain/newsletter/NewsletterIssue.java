@@ -4,6 +4,7 @@ import io.mateu.ecdemo1.contenthub.domain.item.Block;
 import io.mateu.ecdemo1.contenthub.domain.item.BlockType;
 import io.mateu.ecdemo1.contenthub.domain.shared.AggregateRoot;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -43,6 +44,10 @@ public class NewsletterIssue extends AggregateRoot {
                             String error) {
     }
 
+    /** How long after each failed pass the next one goes. Past the last, it stops until someone says otherwise. */
+    static final List<Duration> RETRIES = List.of(Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(15),
+            Duration.ofHours(1), Duration.ofHours(6));
+
     private String id;
     private String newsletterId;
     private int number;
@@ -55,6 +60,9 @@ public class NewsletterIssue extends AggregateRoot {
     private Instant scheduledAt;
     private Instant sentAt;
     private Map<String, GroupSend> sends;
+    /** Passes over this issue that left a group unsent, since it was scheduled or last told to retry. */
+    private int failedPasses;
+    private Instant retryAt;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -141,6 +149,8 @@ public class NewsletterIssue extends AggregateRoot {
         }
         scheduledAt = at;
         status = Status.SCHEDULED;
+        failedPasses = 0;
+        retryAt = null;
     }
 
     public void unschedule() {
@@ -162,7 +172,28 @@ public class NewsletterIssue extends AggregateRoot {
     }
 
     public boolean due(Instant now) {
-        return status == Status.SCHEDULED && scheduledAt != null && !scheduledAt.isAfter(now);
+        return status == Status.SCHEDULED && scheduledAt != null && !scheduledAt.isAfter(now)
+                && !sendingStopped() && (retryAt == null || !retryAt.isAfter(now));
+    }
+
+    /** A pass left a group unsent: the next one waits, longer each time, and after the last it stops. */
+    public void sendFailed(Instant now) {
+        failedPasses++;
+        retryAt = sendingStopped() ? null : now.plus(RETRIES.get(failedPasses - 1));
+    }
+
+    /** It gave up on what failed; the groups already sent stay sent. */
+    public boolean sendingStopped() {
+        return status == Status.SCHEDULED && failedPasses > RETRIES.size();
+    }
+
+    /** Someone has fixed what failed: the groups still unsent go on the next pass. */
+    public void retrySending() {
+        if (!sendingStopped()) {
+            throw new IllegalStateException("Este número no ha dejado de intentar su envío");
+        }
+        failedPasses = 0;
+        retryAt = null;
     }
 
     public static String groupKey(String hash, String language) {

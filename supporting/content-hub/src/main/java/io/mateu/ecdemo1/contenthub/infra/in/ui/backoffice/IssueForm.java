@@ -73,6 +73,8 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier, Visibili
     /** The status itself, for which actions apply (state above is its text). */
     @Hidden
     String status;
+    @Hidden
+    boolean sendingStopped;
     @HiddenInCreate
     @Label("Asunto")
     String subject;
@@ -135,8 +137,10 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier, Visibili
         date = i.date();
         scheduledAt = Ui.local(i.scheduledAt());
         status = i.status().name();
+        sendingStopped = i.sendingStopped();
         state = i.status().label() + switch (i.status()) {
-            case SCHEDULED -> " para el " + Ui.when(i.scheduledAt());
+            case SCHEDULED -> i.sendingStopped() ? " · envío detenido tras varios fallos: revisa los errores y reinténtalo"
+                    : " para el " + Ui.when(i.scheduledAt());
             case SENT -> " el " + Ui.when(i.sentAt());
             default -> "";
         };
@@ -294,6 +298,7 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier, Visibili
         return switch (memberName) {
             case "anadirLoNuevo", "programar" -> !draft;
             case "volverABorrador" -> !"SCHEDULED".equals(status);
+            case "reintentarEnvio" -> !sendingStopped;
             case "cancelar" -> !draft && !"SCHEDULED".equals(status);
             default -> false;
         };
@@ -324,6 +329,15 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier, Visibili
     public Object programar(HttpRequest httpRequest) {
         editorial.schedule(readers.of(httpRequest), id, Ui.instant(scheduledAt));
         return List.of(load(id), Message.success("Programado. Sale en menos de un minuto desde su hora."));
+    }
+
+    @Toolbar
+    @Publishers
+    @Action
+    @io.mateu.uidl.annotations.Label("Reintentar el envío")
+    public Object reintentarEnvio(HttpRequest httpRequest) {
+        editorial.retrySending(readers.of(httpRequest), id);
+        return List.of(load(id), Message.success("Los grupos que faltan salen en menos de un minuto"));
     }
 
     @Toolbar
