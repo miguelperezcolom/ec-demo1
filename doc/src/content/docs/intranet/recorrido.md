@@ -189,9 +189,9 @@ El cuerpo se escribe con un editor de texto rico (negrita, listas, enlaces…), 
 
   
 
-![Newsletter: ediciones con sus items; un envío por grupo de perfil e idioma. En la demo todo va a un buzón de redirección.](../../../assets/intranet/e04-newsletter.png)
+![Newsletters: cada una es un sitio con su audiencia, su periodicidad y sus números.](../../../assets/intranet/n04-editorial-newsletters.jpg)
 
-*Newsletter: ediciones con sus items; un envío por grupo de perfil e idioma. En la demo todo va a un buzón de redirección.*
+*Newsletters: cada una es un sitio, con su audiencia, sus secciones, su menú y sus números. Un número llega por correo (un envío por grupo de perfil e idioma; en la demo, todo a un buzón de redirección) y se lee también en el portal, en `/intranet/n/boletin-intranet`. Todo en el [Manual de la newsletter](/intranet/manual-newsletter/).*
 
 ### Ver como
 
@@ -283,14 +283,19 @@ Mientras Mateu no resuelva microfrontends en servidor, el slot se sirve por REST
 
 ## 8. El asistente (MCP)
 
-content-hub publica un servidor MCP, registrado como `intranet` en el plano de control de IA para **console-agent** y **reception-agent**. Sus herramientas trabajan con el token del usuario, así que el asistente solo ve lo que el usuario ve:
+content-hub publica un servidor MCP, registrado como `intranet` en el plano de control de IA y usado por **console-agent** (el chat de la consola). Sus herramientas trabajan con el token del usuario, así que el asistente solo ve lo que el usuario ve:
 
 - `preguntar_intranet` — búsqueda semántica (RAG, pgvector) para responder citando items;
 - `buscar_contenido` — búsqueda de texto;
 - `leer_item` — el texto completo de un item visible;
-- y los pendientes de confirmar del usuario.
+- `confirmaciones_pendientes` — lo pendiente de confirmar del usuario;
+- `buscar_personas` y `ficha_persona` — el directorio: puesto, dónde trabaja, jefes y quién le reporta.
 
-Para probarlo: abre el chat del plano de datos y pregunta, por ejemplo, «¿qué dice la política de protección de datos?» o «¿tengo algo pendiente de confirmar?».
+Para probarlo: abre el chat del plano de datos y pregunta, por ejemplo, «¿qué dice la política de protección de datos?», «¿tengo algo pendiente de confirmar?» o «¿quién es el jefe de Ana Pérez?».
+
+![El chat de la consola con las herramientas de la intranet.](../../../assets/intranet/ia02-chat-intranet.jpg)
+
+Qué más hace la IA (la respuesta del buscador, traducir, el texto alternativo) y cómo conectar la intranet a otros asistentes: [La IA en la intranet](/intranet/manual-ia/).
 
 ## 9. Guion de prueba paso a paso
 

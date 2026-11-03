@@ -363,7 +363,7 @@ usuario ese tiempo). Lo que no cambia son las **rutas**: `/intranet/noticias`, `
 siguen funcionando aunque la entrada se mueva, se renombre o se quite del menú.
 
 El listado tiene una fila por entrada, en el orden del menú; lo que cuelga de un submenú va sangrado («— »)
-y el submenú lleva «▸». Columna **Sitio**: hoy solo `intranet`; cada newsletter tendrá el suyo. Al arrancar
+y el submenú lleva «▸». Columna **Sitio**: `intranet` o el de cada newsletter (cada una tiene su menú). Al arrancar
 por primera vez, el menú de la intranet se rellena con **exactamente las entradas de siempre** (Inicio,
 Noticias, Avisos… Mis preferencias), así que nada cambia hasta que alguien lo toque.
 
