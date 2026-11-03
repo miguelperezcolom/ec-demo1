@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * The portal alone, for the intranet's own host (consoles/intranet-shell → /_portal): what employees
- * read, without the "Editorial" entry the data plane's /_intranet adds for editors. Same menu, so the
+ * read, like the data plane's /_intranet. Same menu, so the
  * same routes (/intranet/noticias/{id}…) — the links the portal draws (Ui.itemLink) work in both.
  */
 @UI("/_portal")

@@ -179,6 +179,8 @@ public class SecurityConfig {
                         .pathMatchers("/_intranet/**").authenticated()
                         // The same portal without the backoffice, for the intranet's own host.
                         .pathMatchers("/_portal/**").authenticated()
+                        // The editorial backoffice; content-hub refuses whoever holds no content:* permission.
+                        .pathMatchers("/_editorial/**").authenticated()
                         // The integration PoC's product-side screen: the partners master. Same
                         // reason as the two above.
                         .pathMatchers("/_erp/**").authenticated()

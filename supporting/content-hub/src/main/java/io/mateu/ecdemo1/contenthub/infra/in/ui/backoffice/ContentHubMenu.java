@@ -5,7 +5,7 @@ import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Menu;
 
 /**
- * The editorial backoffice, mounted by the portal as its "Editorial" entry (see IntranetHome) for whoever
+ * The editorial backoffice, the "Editorial" section of the data plane's shells (see EditorialHome), for whoever
  * holds a content:* permission: the day-to-day work of writing, publishing and following up. How the
  * intranet is configured — sections, audiences, slots, the directory, the projection — is on the control
  * console (ContentHubHome). Each screen also carries its own restriction, so a typed URL is refused like a

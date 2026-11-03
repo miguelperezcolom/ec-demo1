@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { Locator } from '@playwright/test'
 import { test, expect, Session } from './support'
 
@@ -39,6 +40,29 @@ test.describe('Editorial', () => {
         await s.confirmIfAsked()
         await expect.poll(() => s.page.url(), { message: 'Cancel did not leave the edit form' }).not.toMatch(/\/edit$/)
     }
+
+    test('Editorial is a menu of its own, only for editors', async ({ as, hosts }) => {
+        const openMenu = (page: Page) => page.getByRole('button', { name: /^(Secciones|Menú)$/ }).first().click()
+        const ENTRY = /(^| \| )Editorial( \| |$)/
+
+        const demo = await as('demo')
+        await demo.go(`${hosts.data}/editorial/contenidos`, /Editor visual/)
+        await demo.go(`${hosts.data}/intranet/inicio`, /Noticias/)
+        expect(await demo.text(), 'the intranet no longer holds the editorial menu').not.toContain('Editor visual')
+        await openMenu(demo.page)
+        await demo.waitText(ENTRY, 'an editor has no «Editorial» in the first-level menu')
+
+        const ana = await as('ana.perez')
+        await ana.go(`${hosts.data}/intranet/inicio`, /Noticias/)
+        await openMenu(ana.page)
+        await ana.waitText(/(^| \| )Intranet( \| |$)/, 'the first-level menu did not open')
+        expect(await ana.text(), 'a reader has «Editorial» in the menu').not.toMatch(ENTRY)
+
+        // A typed URL shows her none of it, whichever way each shell says so
+        await ana.page.goto(`${hosts.data}/editorial/contenidos`, { waitUntil: 'domcontentloaded' })
+        await ana.page.waitForTimeout(15_000)
+        expect(await ana.text()).not.toContain('Editor visual')
+    })
 
     test('Contenidos lists the items', async ({ as, hosts }) => {
         const demo = await as('demo')
