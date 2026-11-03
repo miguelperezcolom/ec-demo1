@@ -49,8 +49,14 @@ public class UserDBQueryService implements UserQueryService {
     @Override
     public ListingData<UserRow> findAll(String searchText,
                                         Object filters, Pageable pageable) {
-        var page = repository.findAllByNameContainingIgnoreCaseOrIdContainingIgnoreCaseOrEmailContainingIgnoreCase(searchText, searchText, searchText, DbPaging.pageable(pageable));
+        var page = repository.findAllByNameContainingIgnoreCaseOrIdContainingIgnoreCaseOrEmailContainingIgnoreCase(searchText, searchText, searchText, byNameUnlessSorted(DbPaging.pageable(pageable)));
         return DbPaging.listing(searchText, page, this::toDomain);
     }
 
+
+    /** Without an order of its own a page shuffles: whoever was just edited moved to another. */
+    private static org.springframework.data.domain.Pageable byNameUnlessSorted(org.springframework.data.domain.Pageable pageable) {
+        return pageable.getSort().isSorted() ? pageable : org.springframework.data.domain.PageRequest.of(pageable.getPageNumber(),
+                pageable.getPageSize(), org.springframework.data.domain.Sort.by("name"));
+    }
 }
