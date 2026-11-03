@@ -10,6 +10,37 @@ import { createItem } from './content'
  */
 test.describe('Visual editor', () => {
 
+    test('the «+» offers each registered UI by its name, with a filter when there are many', async ({ as, hosts, shell }) => {
+        const demo = await as('demo')
+        const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E componentes ${RUN} ${shell}` })
+        await openEditor(demo, hosts.data, id)
+        const ve = demo.page.locator('ec-visual-editor')
+        const add = ve.getByRole('button', { name: 'Añadir un bloque aquí' }).first()
+
+        await demo.click(add, 1_000)
+        await expect(ve.getByRole('menuitem', { name: 'Componente remoto', exact: true })).toHaveCount(0)
+        await expect(ve.locator('.menu-filter')).toHaveCount(0)
+        await demo.click(ve.getByRole('menuitem', { name: 'Riu Class', exact: true }), 2_500)
+        const panel = ve.getByRole('complementary', { name: 'Bloque seleccionado' })
+        await expect(panel.getByLabel('UI externa')).toHaveValue('riu-class')
+
+        // Many entries: not in the seed, so the catalogue the editor holds grows here
+        await ve.evaluate((el: any) => {
+            for (let i = 0; i < 20; i++) el.state.catalog.components.push({ value: `c${i}`, label: `Módulo ${i}` })
+        })
+        await demo.click(ve.getByRole('button', { name: 'Añadir un bloque aquí' }).first(), 1_000)
+        const filter = ve.getByRole('searchbox', { name: 'Filtrar los bloques' })
+        await expect(filter).toBeFocused()
+        await filter.fill('modulo 17')
+        await expect(ve.locator('.menu button:not([hidden])')).toHaveText(['Módulo 17'])
+        await filter.fill('zzz')
+        await expect(ve.getByText('Nada coincide')).toBeVisible()
+        await filter.fill('riu cl')
+        await filter.press('Enter')
+        await expect(ve.locator('.menu')).toHaveCount(0)
+        await expect(panel.getByLabel('UI externa')).toHaveValue('riu-class')
+    })
+
     test('one page after another from the list opens each, and the last «+» shows all its menu', async ({ as, hosts }) => {
         const demo = await as('demo')
         await demo.go(`${hosts.data}/editorial/visual`, /Herramientas/)

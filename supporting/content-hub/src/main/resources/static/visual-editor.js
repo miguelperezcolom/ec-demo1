@@ -20,6 +20,8 @@
 
   const TOKEN = '__mateu_auth_token';
   const RICH = new Set(['HTML', 'BANNER']);
+  // From how many entries the «+» menu has a filter.
+  const FILTER_FROM = 15;
   const LIMITED = new Set(['AUTOMATIC_LISTING', 'LATEST', 'NOTICES']);
   const MARK = /\[\[media:([A-Za-z0-9_-]+)]]/g;
   const PASTE_TAGS = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'A', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE']);
@@ -93,7 +95,12 @@
     .ins:hover button, .ins button:focus { opacity:1; }
     .ins.alone { height:auto; } .ins.alone button { opacity:1; width:auto; height:auto; padding:.4rem .9rem; border-radius:8px; top:0; }
     .menu { position:absolute; top:1.5rem; z-index:10; background:var(--ve-bg); border:1px solid var(--ve-line); border-radius:8px;
-      box-shadow:0 8px 24px rgba(0,0,0,.2); padding:.35rem; display:grid; grid-template-columns:1fr 1fr; gap:.25rem; min-width:20rem; }
+      box-shadow:0 8px 24px rgba(0,0,0,.2); padding:.35rem; min-width:20rem; max-height:min(24rem, 60vh); overflow:auto; }
+    .menu [hidden] { display:none; }
+    .menu-list { display:grid; grid-template-columns:1fr 1fr; gap:.25rem; }
+    .menu-head { font-size:.75rem; opacity:.7; padding:.5rem .4rem .2rem; }
+    .menu-filter { position:sticky; top:-.35rem; margin-bottom:.35rem; background:var(--ve-bg); }
+    .menu-none { padding:.4rem .6rem; font-size:.85rem; opacity:.75; }
     .menu.up { top:auto; bottom:1.5rem; }
     /* the menu sits inside .ins: its items must not take the round «+» button's look */
     .ins .menu button { text-align:left; width:auto; height:auto; border-radius:6px; padding:.4rem .6rem; opacity:1; top:0;
@@ -534,9 +541,33 @@
       else menu.scrollIntoView({ block: 'nearest' });
     }
 
+    /**
+     * The block types, then each registered UI by its name: «Componente remoto» isn't an entry, its
+     * components are. It scrolls past a height, and past FILTER_FROM entries it has a filter too.
+     */
     typeMenu() {
-      return '<div class="menu" role="menu">' + this.state.catalog.types.map((t) =>
-        '<button role="menuitem" data-type="' + esc(t.value) + '">' + esc(t.label) + '</button>').join('') + '</div>';
+      const cat = this.state.catalog;
+      const types = cat.types.filter((t) => t.value !== 'REMOTE');
+      const components = cat.components || [];
+      const entry = (attrs, label) => '<button role="menuitem" ' + attrs + '>' + esc(label) + '</button>';
+      return '<div class="menu" role="menu">'
+        + (types.length + components.length >= FILTER_FROM
+          ? '<input type="search" class="menu-filter" aria-label="Filtrar los bloques" placeholder="Filtrar…">' : '')
+        + '<div class="menu-list">' + types.map((t) => entry('data-type="' + esc(t.value) + '"', t.label)).join('') + '</div>'
+        + (components.length ? '<div class="menu-group"><div class="menu-head">Componentes</div><div class="menu-list">'
+          + components.map((c) => entry('data-type="REMOTE" data-source="' + esc(c.value) + '"', c.label)).join('')
+          + '</div></div>' : '')
+        + '<div class="menu-none" hidden>Nada coincide</div></div>';
+    }
+
+    /** Keeps the entries that match, whatever the case or the accents. */
+    filterMenu(text) {
+      const plain = (t) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+      const wanted = plain(text.trim());
+      const menu = this.root.querySelector('.menu');
+      menu.querySelectorAll('button').forEach((b) => { b.hidden = !plain(b.textContent).includes(wanted); });
+      menu.querySelectorAll('.menu-group').forEach((g) => { g.hidden = !g.querySelector('button:not([hidden])'); });
+      menu.querySelector('.menu-none').hidden = !!menu.querySelector('button:not([hidden])');
     }
 
     typeLabel(type) {
@@ -659,11 +690,26 @@
         this.syncEditing();
         this.renderCanvas();
         this.placeMenu();
+        const filter = this.root.querySelector('.menu-filter');
+        if (filter) filter.focus();
         e.stopPropagation();
       }));
       canvas.querySelectorAll('.menu button').forEach((btn) => btn.addEventListener('click', () => {
-        this.add(Number(btn.closest('.ins').dataset.at), btn.dataset.type);
+        this.add(Number(btn.closest('.ins').dataset.at), btn.dataset.type, btn.dataset.source);
       }));
+      canvas.querySelectorAll('.menu-filter').forEach((input) => {
+        input.addEventListener('input', () => this.filterMenu(input.value));
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const first = this.root.querySelector('.menu button:not([hidden])');
+            if (first) first.click();
+          } else if (e.key === 'Escape') {
+            s.menuAt = null;
+            this.renderCanvas();
+          }
+        });
+      });
       canvas.querySelectorAll('.blk').forEach((el) => {
         const id = el.dataset.id;
         el.addEventListener('mousedown', () => { if (s.selected !== id) this.select(id, el); });
@@ -804,10 +850,10 @@
       this.refresh();
     }
 
-    add(at, type) {
+    add(at, type, remoteSourceId) {
       const s = this.state;
       this.syncEditing();
-      const b = this.normal({ id: newId(), type, title: '', html: RICH.has(type) ? '' : null, limit: LIMITED.has(type) ? 5 : null });
+      const b = this.normal({ id: newId(), type, remoteSourceId, title: '', html: RICH.has(type) ? '' : null, limit: LIMITED.has(type) ? 5 : null });
       s.blocks.splice(at, 0, b);
       s.menuAt = null;
       s.selected = b.id;

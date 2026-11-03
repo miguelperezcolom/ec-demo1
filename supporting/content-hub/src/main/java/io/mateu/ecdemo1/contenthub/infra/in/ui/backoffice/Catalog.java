@@ -102,6 +102,12 @@ public class Catalog {
     }
 
     /** The registry of external UIs: what a remote page or a «Componente remoto» block may show. */
+    /** What the visual editor offers directly as blocks: the registry's active entries, by name. */
+    public List<Option> blockComponents() {
+        return uiSources.all().stream().filter(io.mateu.ecdemo1.contenthub.domain.uisource.UiSource::active)
+                .map(s -> new Option(s.id(), s.name())).toList();
+    }
+
     public List<Option> uiSources() {
         return uiSources.all().stream().map(s -> new Option(s.id(), s.name() + " (" + s.kind().label()
                 + (s.active() ? "" : ", inactiva") + ")")).toList();
