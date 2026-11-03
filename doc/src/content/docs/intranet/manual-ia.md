@@ -1,6 +1,6 @@
 ---
 title: La IA en la intranet
-description: Qué hace la IA en la intranet y en las newsletters —buscar y responder, el chat, traducir, el texto alternativo de las imágenes—, con qué datos trabaja (los RAG), cómo llega a otros asistentes (el MCP) y qué hay que configurar.
+description: Qué hace la IA en la intranet y en las newsletters —buscar y responder, el chat, traducir, el texto alternativo de las imágenes—, con qué datos trabaja (los RAG), cómo llega a otros asistentes (el MCP, también desde Claude o Antigravity) y qué hay que configurar.
 ---
 
 La IA de la intranet tiene **una regla que no cambia en ninguna parte: solo sabe lo que tú puedes leer**.
@@ -136,13 +136,52 @@ del catálogo que lo tenga en su lista puede usar sus herramientas:
 | `confirmaciones_pendientes()` | Lo que debes confirmar y no has confirmado |
 | `buscar_personas(texto)` | Personas del directorio por nombre, puesto, departamento, hotel o región |
 | `ficha_persona(id)` | La ficha de una persona: puesto, dónde trabaja, contacto, sus jefes y quién le reporta |
+| `mis_newsletters()` | Las newsletters que son para ti: si la recibes, qué secciones, su último número y su enlace |
+| `numeros_newsletter(newsletter)` | Los números ya enviados de una newsletter, del último al primero |
+| `leer_numero(newsletter, numero?)` | Un número tal como te llega (asunto, fecha, sus bloques y los items que puedes ver, su enlace); sin número, el último |
 
 - **Todas trabajan con el token de quien chatea**: el plano de control de IA lo reenvía, y content-hub lo
   verifica. Sin token, no responden. Un asistente no puede saltarse la visibilidad, porque no la aplica él.
-- **Solo leen.** Confirmar, comentar, aprobar o publicar se hace en el portal.
+- **Solo leen.** Confirmar, comentar, aprobar, publicar o suscribirse a una newsletter se hace en el portal.
+  De las newsletters solo salen **números ya enviados**: nunca un borrador ni uno programado.
 - Hoy lo usa **`console-agent`** (el chat de la consola). Para dárselo a otro agente (p. ej.
   `reception-agent`): añadir `intranet` a su lista de MCP en el catálogo, o desde el plano de control de IA
   (*Agentes*). Ver [Operación → Registro del MCP](/intranet/operacion/#registro-del-mcp).
+
+### Desde Claude o Antigravity
+
+El mismo servidor se puede usar **desde tu ordenador**, en Claude Code, Claude Desktop o Google Antigravity:
+le preguntas a tu asistente por la intranet o por las newsletters y responde con lo que tú puedes ver.
+
+| | |
+| :- | :- |
+| Dirección (recomendada, *streamable HTTP*) | `https://intranet.ec1.mateu.io/_intranet/mcp` (en local, `http://intranet.localhost:8800/_intranet/mcp`) |
+| Dirección SSE | La misma, terminada en `/_intranet/mcp/sse` |
+| Identidad | Tu token de Keycloak en la cabecera `Authorization: Bearer …`. Sin él, la respuesta es 401 |
+
+1. **Inicia sesión una vez** con `python3 deploy/demo/intranet-mcp-token.py login`: abre el navegador para
+   que entres con tu usuario (el cliente `intranet-mcp` de Keycloak). Después, el script da un token nuevo cada
+   vez que se le pide (duran 8 horas) sin volver a pedir la contraseña.
+2. **Configura tu asistente**:
+   - **Claude Code**: `claude mcp add-json intranet '{"type":"http","url":"…/_intranet/mcp","headersHelper":"python3 …/deploy/demo/intranet-mcp-token.py header-json"}'`
+     — pide un token nuevo cada vez que conecta.
+   - **Claude Desktop**: en `claude_desktop_config.json`, un servidor que arranca `npx mcp-remote <dirección>
+     --header "Authorization:Bearer $(python3 …/intranet-mcp-token.py)"`. Un *conector personalizado* (solo la
+     URL) **no** sirve: pediría OAuth, que este servidor no ofrece.
+   - **Google Antigravity**: en `mcp_config.json`, `serverUrl` con la dirección y `headers` con la cabecera,
+     o el mismo `mcp-remote` que Claude Desktop.
+3. Pregunta: «¿qué trae el último boletín de la intranet?», «¿tengo algo pendiente de confirmar?», «¿quién es
+   el jefe de recepción de Tenerife?».
+
+Los ficheros exactos, el script y los problemas típicos (en local, que `*.localhost` no resuelva para las
+herramientas de Node: hay que añadirlos a `/etc/hosts`), en
+[Operación → El MCP desde clientes de escritorio](/intranet/operacion/#el-mcp-desde-clientes-de-escritorio).
+
+:::note
+Los enlaces de las herramientas de newsletter son completos (abren el portal). Los de las demás herramientas
+son rutas del portal (`/intranet/noticias/…`): en un asistente de escritorio hay que anteponerles la dirección
+de la intranet.
+:::
 
 ## Para el administrador
 

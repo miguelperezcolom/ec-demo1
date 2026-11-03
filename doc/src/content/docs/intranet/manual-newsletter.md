@@ -65,7 +65,9 @@ destinatarios. Nadie recibe nada de verdad.
 ### Buscarla y preguntar por ella
 
 Los artículos y páginas publicados de una newsletter son contenidos de la intranet: salen en *Buscar*, el chat
-los encuentra y la respuesta de la IA los cita, siempre que seas de su audiencia. Ver
+los encuentra y la respuesta de la IA los cita, siempre que seas de su audiencia. Y tu asistente (el chat de la
+consola, o Claude o Antigravity en tu ordenador) puede decirte qué newsletters recibes y leerte el último número
+con las herramientas `mis_newsletters`, `numeros_newsletter` y `leer_numero`. Ver
 [La IA en la intranet](/intranet/manual-ia/).
 
 ## Para el editor
