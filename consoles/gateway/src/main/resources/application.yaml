@@ -255,7 +255,7 @@ spring:
             - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
             - Path=/_intranet/mcp/message
 
-        # The intranet: content-hub's portal and, as its "Editorial" entry, the editorial backoffice —
+        # The intranet (content-hub's portal) and, as a section of its own, the editorial backoffice —
         # on the data plane like /_content: employees read it, and editors write it, where they work.
         # Who sees the backoffice is content-hub's call (content:* permissions from X-User-Scopes).
         # The intranet's configuration is on the control host (/_content-hub, below). Its MCP server
@@ -264,7 +264,7 @@ spring:
           uri: ${CONTENT_HUB_URL:http://content-hub:8135}
           predicates:
             - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
-            - Path=/_intranet/**
+            - Path=/_intranet/**,/_editorial/**
 
         # Users moved to the control console: on the CONTROL host now, not the demo host, because
         # administering access is a control-plane concern. Behind the ai-admin role, like the IA

@@ -22,8 +22,8 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | Componente | Dónde | Qué hace |
 | :--------- | :---- | :------- |
 | **Portal** | `@UI("/_intranet")` (`infra/in/ui/portal`), en el shell del plano de datos (`RemoteMenu` *Intranet*) | Lo que lee el empleado: inicio, noticias, avisos, documentos, secciones, búsqueda, personas y organigrama (`People`, `PeopleListing`, `PersonPage`, `OrgChartPage`), favoritos, pendientes; comentarios y «Me gusta» en `ItemPage`, encuestas (`SurveysListing`, `SurveyPage`) |
-| **Backoffice editorial** | Menú *Editorial* de la misma `@UI("/_intranet")` (`infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, encuestas y sus respuestas, moderación de comentarios, ver como y confirmaciones |
-| **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal, sin *Editorial*; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
+| **Backoffice editorial** | Menú de primer nivel *Editorial*, `@UI("/_editorial")` (`EditorialHome`, `infra/in/ui/backoffice`), solo para permisos `content:*` | Contenidos, medios, contenido de slots, newsletter, encuestas y sus respuestas, moderación de comentarios, ver como y confirmaciones |
+| **Portal aparte** | `@UI("/_portal")` (`PortalHome`): el mismo menú que el portal; lo monta `consoles/intranet-shell` en `intranet.ec1.mateu.io` (Vaadin) y `rw-intranet.ec1.mateu.io` (Redwood) | La intranet para quien solo la lee, sin las consolas alrededor |
 | **Configuración** | `@UI("/_content-hub")` (`ContentHubHome`), en la consola de control (`RemoteMenu` *Intranet*), `ai-admin` + `content:admin` | Secciones, audiencias con nombre, slots, UIs externas, directorio y visibilidad |
 | **UIs externas** | `UiSource` (registro, `ch_ui_source`), `RemoteUis`, `RemoteUiRenderer`; `<ec-ui-source>` en `embed.js` | Pantallas de otras aplicaciones como páginas (`REMOTE_PAGE`) y bloques (`REMOTE`) de la intranet (ver [UIs externas](#uis-externas)) |
 | **Plantillas y vista previa** | `PageTemplate` (`ch_page_template`), `Templates`, `TemplatesCrud`/`TemplateForm`, `NewPageFromTemplatePage`, `TemplateSeeder`; `PreviewLink` (`ch_preview_link`), `PreviewLinks`, `PreviewLinksSigner`, `PreviewLinksPage`/`PreviewLinksListing` y, en el portal, `PreviewPage` (`/intranet/vista-previa/{id}.{firma}`) | Páginas nuevas a partir de plantillas (globales o de un sitio), y enlaces firmados y caducables con los que un revisor con sesión ve un borrador (ver [Plantillas y vista previa](#plantillas-y-vista-previa)) |
@@ -38,7 +38,7 @@ Un solo servicio Spring Boot hexagonal (`domain/`, `application/`, `infra/in`, `
 | **Google Drive** | `DriveDocuments`; portal `DriveFilesListing`, `ItemPage` | Referencias a ficheros, nunca copias, y sus metadatos (ver [Google Drive](#google-drive)) |
 | **Trabajos** | `ContentJobs`, `NotificationJobs` | Cruces de fechas, newsletter, embeddings del RAG, metadatos de Drive y limpieza de perfiles huérfanos; reparto de notificaciones, recordatorios y agregados diarios de uso |
 
-Portal y trabajo editorial son la misma UI, en `ec1.mateu.io`, donde trabajan los empleados y los
+Portal y trabajo editorial son dos menús de la misma consola, `ec1.mateu.io`, donde trabajan los empleados y los
 editores; **la configuración** —cómo funciona la intranet, no lo que publica— va en la consola de control,
 `console.ec1.mateu.io`, como el catálogo de atributos de *Usuarios*. **Los permisos separan leer de
 escribir**: las pantallas llevan `@EyesOnly` (anotaciones `@Editors`, `@Publishers` y `@ContentAdmins`), y
@@ -51,7 +51,7 @@ traduce a permisos de Mateu los `content:*` de `X-User-Scopes`.
 flowchart LR
   U["users<br/>(atributos y catálogo)"] -- employee-directory --> CH
   CH -- employee-directory-requests --> U
-  GW["gateway<br/>X-User-Scopes / X-User-Roles"] -- "/_intranet (portal y editorial)<br/>/_content-hub (configuración)" --> CH["content-hub"]
+  GW["gateway<br/>X-User-Scopes / X-User-Roles"] -- "/_intranet (portal)<br/>/_editorial (editorial)<br/>/_content-hub (configuración)" --> CH["content-hub"]
   AG["ia-agent<br/>(console-agent)"] -- "MCP /sse + token" --> CH
   DK["Claude, Antigravity…<br/>(escritorio)"] -- "MCP /_intranet/mcp + token" --> GW
   CH -- content-events --> K[("Kafka")]

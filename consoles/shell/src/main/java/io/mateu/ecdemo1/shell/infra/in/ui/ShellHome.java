@@ -161,6 +161,13 @@ public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu intranet = new RemoteMenu("/_intranet").withLabel("Intranet");
 
+    /**
+     * The intranet's editorial work: contents, media, newsletters. For content:* holders: content-hub
+     * decides who gets anything in it.
+     */
+    @Menu
+    RemoteMenu editorial = new RemoteMenu("/_editorial").withLabel("Editorial");
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

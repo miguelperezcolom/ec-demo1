@@ -6,7 +6,7 @@ description: La intranet para editores, publicadores y administradores — conte
 El backoffice tiene dos caras, en dos consolas:
 
 - **Editorial**, el trabajo diario —contenidos, medios, contenido de slots, newsletter, ver como y
-  confirmaciones—, es un menú de la propia intranet en la consola de datos (`https://ec1.mateu.io`, en
+  confirmaciones—, es un menú de primer nivel, junto a *Intranet*, en la consola de datos (`https://ec1.mateu.io`, en
   local `http://ec1.localhost:8800` → *Editorial*). Solo lo ve quien tiene algún **permiso editorial**;
   quien no, ni ve la entrada ni puede abrir sus pantallas tecleando la URL.
 - **Configuración** —secciones, menús, audiencias con nombre, slots, UIs externas, directorio y visibilidad: cómo funciona la
