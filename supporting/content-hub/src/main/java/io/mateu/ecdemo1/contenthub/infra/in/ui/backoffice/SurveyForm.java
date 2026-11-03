@@ -153,7 +153,7 @@ public class SurveyForm extends AudienceForm implements SimpleCrud.CrudForm, Vis
             confirmationMessage = "La verá su audiencia desde su fecha de apertura. Después ya no se pueden cambiar sus preguntas ni si es anónima.")
     public Object publicar(HttpRequest httpRequest) {
         surveys.publish(readers.of(httpRequest), id);
-        return Message.success("Publicada. Su audiencia la verá en «Encuestas» en cuanto abra.");
+        return withNewState(Message.success("Publicada. Su audiencia la verá en «Encuestas» en cuanto abra."));
     }
 
     @Toolbar
@@ -162,7 +162,13 @@ public class SurveyForm extends AudienceForm implements SimpleCrud.CrudForm, Vis
             confirmationMessage = "Nadie más podrá responder. Los resultados se conservan.")
     public Object cerrar(HttpRequest httpRequest) {
         surveys.close(readers.of(httpRequest), id);
-        return Message.success("Encuesta cerrada");
+        return withNewState(Message.success("Encuesta cerrada"));
+    }
+
+    /** After a button: the message, and the state it left. Only the badge: what has been typed and not saved stays. */
+    private Object withNewState(Message message) {
+        estado = status(repository.find(id).orElseThrow());
+        return List.of(this, message);
     }
 
     @Override

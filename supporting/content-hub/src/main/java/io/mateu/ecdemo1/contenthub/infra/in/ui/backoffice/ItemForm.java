@@ -275,13 +275,29 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
         lectoresUnicos = String.valueOf(figures.uniqueReaders());
         confirmaciones = String.valueOf(figures.confirmations());
         notificados = String.valueOf(figures.notified());
-        applied = item.latestVersion().map(v -> index.applied(item.id())
-                .map(a -> a.version() >= v.number() ? "Sí — versión " + v.number() + " aplicada el " + Ui.when(a.at())
-                        : "Aplicando la versión " + v.number() + "…")
-                .orElse("Aplicando la versión " + v.number() + "…")).orElse("Aún no publicado");
+        applied = applied(item);
         var w = commands.warnings(c);
         warnings = w.isEmpty() ? "Sin avisos" : "⚠️ " + String.join("\n⚠️ ", w);
         return this;
+    }
+
+    private String applied(Item item) {
+        return item.latestVersion().map(v -> index.applied(item.id())
+                .map(a -> a.version() >= v.number() ? "Sí — versión " + v.number() + " aplicada el " + Ui.when(a.at())
+                        : "Aplicando la versión " + v.number() + "…")
+                .orElse("Aplicando la versión " + v.number() + "…")).orElse("Aún no publicado");
+    }
+
+    /**
+     * After a workflow button: the message, and this form with the state the button left. Only the lines
+     * that state decides, not {@link #load}: the buttons act on the saved draft, and whatever has been
+     * typed and not saved stays on screen.
+     */
+    private Object withNewState(Message message) {
+        var item = items.find(id).orElseThrow();
+        estado = status(item);
+        applied = applied(item);
+        return List.of(this, message);
     }
 
     static Status status(Item item) {
@@ -511,7 +527,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Label("Enviar a revisión")
     public Object enviarARevision(HttpRequest httpRequest) {
         commands.submitForReview(readers.of(httpRequest), id);
-        return Message.success("Enviado a revisión");
+        return withNewState(Message.success("Enviado a revisión"));
     }
 
     @Toolbar
@@ -520,7 +536,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             confirmationMessage = "Se congela el borrador en una versión nueva y la ven sus lectores desde su fecha de publicación.")
     public Object publicar(HttpRequest httpRequest) {
         commands.publish(readers.of(httpRequest), id, requireReconfirmation);
-        return Message.success("Publicado. Los lectores lo verán en unos segundos (columna «Aplicado»).");
+        return withNewState(Message.success("Publicado. Los lectores lo verán en unos segundos (columna «Aplicado»)."));
     }
 
     @Toolbar
@@ -528,7 +544,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
     @Action
     public Object rechazar(HttpRequest httpRequest) {
         commands.reject(readers.of(httpRequest), id);
-        return Message.warning("Devuelto al editor");
+        return withNewState(Message.warning("Devuelto al editor"));
     }
 
     @Toolbar
@@ -537,7 +553,7 @@ public class ItemForm extends AudienceForm implements Identifiable, VisibilitySu
             confirmationMessage = "Deja de verse en todos los consumidores: portal, menús, búsqueda, slots, newsletter y chat.")
     public Object retirar(HttpRequest httpRequest) {
         commands.retire(readers.of(httpRequest), id);
-        return Message.success("Retirado");
+        return withNewState(Message.success("Retirado"));
     }
 
     @Override
