@@ -50,6 +50,7 @@ espera a que exista); la imagen es
 | `PROJECTION_ASYNC` | — | `true` | Recalcular la visibilidad fuera del hilo de la petición (`false` en las pruebas) |
 | `CONTENT_SEED` | — | `true` | La semilla de contenido de demo |
 | `SEARCH_MAX_DISTANCE` | — | `0.3` | Distancia coseno máxima para que un pasaje cuente como coincidencia por significado |
+| `CONTENT_HUB_DIRECTORY_EDIT_URL` | vacío | `https://ec1.mateu.io/personas/empleados/{id}` | El enlace «Editar esta persona» de la ficha, para `people:edit`. Vacío: sin enlace |
 | `INTRANET_AGENT_URL`, `INTRANET_AGENT_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-agent`, — | igual, `PT30S` | El agente de la «Respuesta de la IA» |
 | `INTRANET_TRANSLATOR_URL`, `INTRANET_TRANSLATOR_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-translator`, — | igual, `PT60S` | El agente de «Traducir con IA» |
 | `INTRANET_ALT_TEXT_URL`, `INTRANET_ALT_TEXT_TIMEOUT` | `http://ia-agent:8095/a2a/intranet-alt-text`, — | igual, `PT60S` | El agente de «Sugerir texto alternativo con IA» (su modelo tiene que ver imágenes) |
@@ -188,6 +189,23 @@ entrar como uno: en Keycloak (`auth.localhost:8800`, realm `ec-demo1`) → *User
 apellido** (*Last name*): sin él, el login se queda en «Update account information». Rellénalo en la ficha
 del usuario en Keycloak antes de entrar.
 :::
+
+## Quién manda sobre los empleados
+
+Los empleados son nuestros: el dueño es el servicio `users`, y sus dos pantallas son la única forma de cambiarlos.
+*Personas* (`/_people`, permiso `people:edit`, consola de datos) mantiene los datos de empleado, y *Usuarios*
+(`/_users`, `ai-admin`, consola de control) además los permisos. Ambas pasan por los mismos casos de uso.
+
+Cada pieza se puede sustituir sin tocar lo demás:
+
+| Si cambia… | Se sustituye | No hace falta tocar |
+| :--------- | :----------- | :------------------ |
+| Quién es el dueño de los empleados (un sistema de RRHH, el Directorio Activo) | Quien publica en el topic `employee-directory`, con el mismo mensaje (`EmployeeDirectoryMessage`), y responde a `employee-directory-requests` | `content-hub`: audiencias, organigrama, newsletter |
+| Dónde se editan | `CONTENT_HUB_DIRECTORY_EDIT_URL` (con `{id}`; vacío quita el enlace) o el bean `DirectoryEditing` | El portal |
+| El proveedor de identidad | `IdentityProviderPort` en `users` | Los casos de uso y las pantallas |
+| Qué permiso se exige para el enlace | `content-hub.directory.edit-scope` | El portal |
+
+Si el dueño pasa a ser otro sistema, *Personas* se retira de `ShellHome` y del gateway: nada más depende de ella.
 
 ## Registro del MCP
 

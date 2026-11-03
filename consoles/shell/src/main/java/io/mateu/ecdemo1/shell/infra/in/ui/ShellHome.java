@@ -168,6 +168,13 @@ public class ShellHome implements WidgetSupplier, HomeRouteSupplier {
     @Menu
     RemoteMenu editorial = new RemoteMenu("/_editorial").withLabel("Editorial");
 
+    /**
+     * The employees, for human resources: who they are and who they report to. For people:edit holders: the
+     * users service decides who gets anything in it. What people may do stays on the control console.
+     */
+    @Menu
+    RemoteMenu personas = new RemoteMenu("/_people").withLabel("Personas");
+
     // Contenidos is no longer on this bar. The pod is untouched and still serves its own @UI, so
     // /content/contents and the rest still resolve for a deep link or an embedder — what went is
     // the menu entry, not the screens.

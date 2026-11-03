@@ -6,4 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserEntityRepository extends JpaRepository<UserEntity, String> {
     Page<UserEntity> findAllByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    /** By what someone looking for a person may type: their name, their username or their email. */
+    Page<UserEntity> findAllByNameContainingIgnoreCaseOrIdContainingIgnoreCaseOrEmailContainingIgnoreCase(String name, String id,
+                                                                                                         String email, Pageable pageable);
 }

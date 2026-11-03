@@ -269,6 +269,13 @@ spring:
         # Users moved to the control console: on the CONTROL host now, not the demo host, because
         # administering access is a control-plane concern. Behind the ai-admin role, like the IA
         # catalogues — see SecurityConfig.
+        # The employees, for human resources, on the data plane; who may is the users service's call (people:edit).
+        - id: people
+          uri: ${USERS_URL:http://users:8102}
+          predicates:
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
+            - Path=/_people/**
+
         - id: users
           uri: ${USERS_URL:http://users:8102}
           predicates:

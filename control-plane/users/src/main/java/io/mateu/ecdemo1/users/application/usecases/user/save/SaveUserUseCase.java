@@ -19,9 +19,11 @@ public class SaveUserUseCase {
     final UserRepository repository;
     final UserChangePublisher publisher;
     final EmployeeAttributesResolver attributesResolver;
+    final io.mateu.ecdemo1.users.application.usecases.user.people.ReportingLine reportingLine;
 
     @Transactional
     public void handle(SaveUserCommand command) {
+        reportingLine.check(command.id(), command.profile());
         var user = repository.findById(new UserId(command.id())).orElseThrow();
         user.update(new Name(command.name()),
                 new Email(command.email()),

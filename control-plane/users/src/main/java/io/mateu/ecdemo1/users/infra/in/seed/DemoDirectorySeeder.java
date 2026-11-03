@@ -153,10 +153,12 @@ public class DemoDirectorySeeder {
     static final List<PermissionSeed> PERMISSIONS = List.of(
             new PermissionSeed("Editar contenido", "Crear y editar contenido de la intranet", "content:edit"),
             new PermissionSeed("Publicar contenido", "Publicar y retirar contenido de la intranet", "content:publish"),
+            new PermissionSeed("Mantener empleados", "Altas, cambios y bajas de empleados, y a quién reportan", "people:edit"),
             new PermissionSeed("Administrar contenido", "Audiencias, navegación, slots y newsletter", "content:admin")
     );
 
     static final String CONTENT_ADMIN = "content-admin";
+    static final String PEOPLE_ADMIN = "people-admin";
 
     static final List<RoleSeed> ROLES = List.of(
             new RoleSeed("content-editor", "Editor de contenido", "Redacta contenido de la intranet",
@@ -164,7 +166,9 @@ public class DemoDirectorySeeder {
             new RoleSeed("content-publisher", "Publicador de contenido", "Redacta y publica contenido de la intranet",
                     List.of("content:edit", "content:publish")),
             new RoleSeed(CONTENT_ADMIN, "Administrador de contenido", "Todo el contenido de la intranet",
-                    List.of("content:edit", "content:publish", "content:admin"))
+                    List.of("content:edit", "content:publish", "content:admin")),
+            new RoleSeed(PEOPLE_ADMIN, "Administrador de personas", "Mantiene los empleados; no lo que pueden hacer",
+                    List.of("people:edit"))
     );
 
     static final List<Employee> EMPLOYEES = List.of(
@@ -206,7 +210,7 @@ public class DemoDirectorySeeder {
             Employee.at("CUN01", "ricardo.flores", "Ricardo Flores", "DIRECCION", "DIRECTOR_HOTEL", "es"),
             // Servicios centrales (Palma), no hotel — the general manager heads the org chart
             Employee.at(null, GENERAL_MANAGER, "Rosa Camps", "DIRECCION", "DIRECTOR_GENERAL", "es"),
-            Employee.at(null, "isabel.torres", "Isabel Torres", "RRHH", "TECNICO_RRHH", "es"),
+            new Employee("isabel.torres", "Isabel Torres", null, "RRHH", "TECNICO_RRHH", "es", List.of(PEOPLE_ADMIN)),
             Employee.at(null, "miguel.navarro", "Miguel Navarro", "IT", null, "es"),
             // The editorial team the content demo signs in as
             new Employee("editora", "Eva Morales", null, "RRHH", "TECNICO_RRHH", "es", List.of("content-editor")),
@@ -321,7 +325,8 @@ public class DemoDirectorySeeder {
             created += attempt("user " + employee.id(), () -> {
                 var existing = users.getById(employee.id());
                 if (existing.isPresent()) {
-                    return giveProfileIfMissing(existing.get(), profileOf(employee));
+                    var profile = giveProfileIfMissing(existing.get(), profileOf(employee));
+                    return giveRolesIfMissing(users.getById(employee.id()).orElseThrow(), employee.roles()) || profile;
                 }
                 createUser.handle(new CreateUserCommand(employee.id(), employee.name(),
                         employee.id() + "@example.com", List.of(), employee.roles(), employee.attributes(),
@@ -346,24 +351,41 @@ public class DemoDirectorySeeder {
         var existing = users.getById(DEMO_USER);
         if (existing.isEmpty()) {
             createUser.handle(new CreateUserCommand(DEMO_USER, "Demo User", "demo@mateu.io", List.of(),
-                    List.of(CONTENT_ADMIN), DEMO_ATTRIBUTES, DEMO_PROFILE, true));
+                    List.of(CONTENT_ADMIN, PEOPLE_ADMIN), DEMO_ATTRIBUTES, DEMO_PROFILE, true));
             return true;
         }
         var demo = existing.get();
         var noAttributes = demo.attributes() == null || EmployeeAttributes.NONE.equals(demo.attributes());
         var roleIds = new ArrayList<>(demo.roleIds() == null ? List.<String>of() : demo.roleIds());
-        var noAdmin = !roleIds.contains(CONTENT_ADMIN);
+        var noAdmin = !roleIds.contains(CONTENT_ADMIN) || !roleIds.contains(PEOPLE_ADMIN);
         var noProfile = demo.profile() == null || EmployeeProfile.NONE.equals(demo.profile());
         if (!noAttributes && !noAdmin && !noProfile) {
             return false;
         }
         if (noAdmin) {
-            roleIds.add(CONTENT_ADMIN);
+            for (var role : List.of(CONTENT_ADMIN, PEOPLE_ADMIN)) {
+                if (!roleIds.contains(role)) {
+                    roleIds.add(role);
+                }
+            }
         }
         var email = demo.email() == null || demo.email().isBlank() ? "demo@mateu.io" : demo.email();
         var name = demo.name() == null || demo.name().isBlank() ? "Demo User" : demo.name();
         saveUser.handle(new SaveUserCommand(demo.id(), name, email, demo.groupIds(), roleIds,
                 noAttributes ? DEMO_ATTRIBUTES : demo.attributes(), noProfile ? DEMO_PROFILE : demo.profile()));
+        return true;
+    }
+
+    /** A seeded role a user lacks (one added after they were seeded); only a role the seed gives, and none taken away. */
+    boolean giveRolesIfMissing(UserDto user, List<String> seeded) {
+        var roleIds = new ArrayList<>(user.roleIds() == null ? List.<String>of() : user.roleIds());
+        var missing = seeded.stream().filter(r -> PEOPLE_ADMIN.equals(r) && !roleIds.contains(r)).toList();
+        if (missing.isEmpty()) {
+            return false;
+        }
+        roleIds.addAll(missing);
+        saveUser.handle(new SaveUserCommand(user.id(), user.name(), user.email(), user.groupIds(), roleIds,
+                user.attributes(), user.profile()));
         return true;
     }
 

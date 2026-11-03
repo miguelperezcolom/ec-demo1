@@ -116,8 +116,8 @@ estructura**, cada empresa con sus regiones, hotel por hotel (o los servicios ce
 departamento sus personas, el responsable primero.
 
 El directorio no depende de las audiencias: todos ven a todos. Solo salen datos de trabajo, y los usuarios
-desactivados no aparecen. Quién reporta a quién y el teléfono los mantiene RRHH en el servicio de usuarios
-(*Usuarios → Directorio*, campos **Responsable** y **Teléfono**).
+desactivados no aparecen. Quién reporta a quién y el teléfono los mantiene RRHH en **Personas → Empleados**; quien
+tiene ese permiso ve **Editar esta persona** en la ficha.
 
 ## Favoritos
 

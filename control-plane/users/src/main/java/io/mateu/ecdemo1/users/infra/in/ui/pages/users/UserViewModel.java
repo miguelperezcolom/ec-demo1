@@ -102,13 +102,14 @@ public class UserViewModel implements CatalogueEditor<UserDto> {
     final SaveUserUseCase saveUserUseCase;
 
     public String create(HttpRequest httpRequest) {
-        createUserUseCase.handle(new CreateUserCommand(id, name, email, groups, roles, attributes(), profile(),
-                false));
+        io.mateu.ecdemo1.users.infra.in.ui.Refusals.shown(() -> createUserUseCase.handle(new CreateUserCommand(id, name, email, groups, roles,
+                attributes(), profile(), false)));
         return id;
     }
 
     public void save(HttpRequest httpRequest) {
-        saveUserUseCase.handle(new SaveUserCommand(id, name, email, groups, roles, attributes(), profile()));
+        io.mateu.ecdemo1.users.infra.in.ui.Refusals.shown(() -> saveUserUseCase.handle(new SaveUserCommand(id, name, email, groups, roles,
+                attributes(), profile())));
     }
 
     private EmployeeAttributes attributes() {
