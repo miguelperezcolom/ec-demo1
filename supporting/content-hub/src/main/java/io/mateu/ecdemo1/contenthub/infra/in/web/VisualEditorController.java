@@ -95,7 +95,16 @@ public class VisualEditorController {
     public record BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
                            Integer limit, List<LinkDto> links, String mediaId, List<String> departments,
                            List<String> hotels, List<String> jobTitles, String remoteSourceId, String remoteRoute,
-                           Map<String, String> remoteAttributes, Boolean untranslated) {
+                           Map<String, String> remoteAttributes, Boolean untranslated, String parentId, Integer span) {
+
+        /** A block at the top level. */
+        public BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
+                        Integer limit, List<LinkDto> links, String mediaId, List<String> departments,
+                        List<String> hotels, List<String> jobTitles, String remoteSourceId, String remoteRoute,
+                        Map<String, String> remoteAttributes, Boolean untranslated) {
+            this(id, type, title, html, itemId, sectionId, limit, links, mediaId, departments, hotels, jobTitles,
+                    remoteSourceId, remoteRoute, remoteAttributes, untranslated, null, null);
+        }
 
         /** A block in the language it is edited in. */
         public BlockDto(String id, String type, String title, String html, String itemId, String sectionId,
@@ -339,7 +348,8 @@ public class VisualEditorController {
                 b.links().stream().map(l -> new LinkDto(l.label(), l.url())).toList(), b.mediaId(),
                 nonNull(f.blockDepartments), nonNull(f.blockHotels), nonNull(f.blockJobTitles),
                 b.remote() == null ? null : b.remote().sourceId(), b.remote() == null ? null : b.remote().route(),
-                b.remote() == null ? Map.of() : b.remote().attributes(), stored.untranslatedIn(language, defaultLanguage));
+                b.remote() == null ? Map.of() : b.remote().attributes(), stored.untranslatedIn(language, defaultLanguage),
+                b.parentId(), b.span());
     }
 
     static List<BlockDto> dtos(List<Block> blocks, String language, String defaultLanguage) {
@@ -439,6 +449,8 @@ public class VisualEditorController {
             f.blockDepartments = checked(Attribute.DEPARTMENT, d.departments(), known);
             f.blockHotels = checked(Attribute.HOTEL, d.hotels(), known);
             f.blockJobTitles = checked(Attribute.JOB_TITLE, d.jobTitles(), known);
+            f.parentId = d.parentId();
+            f.span = d.span();
             out.add(f.toBlock(BlockForm.LANGUAGES.getFirst()));
         }
         return out;

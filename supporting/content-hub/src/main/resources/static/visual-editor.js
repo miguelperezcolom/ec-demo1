@@ -20,8 +20,13 @@
 
   const TOKEN = '__mateu_auth_token';
   const RICH = new Set(['HTML', 'BANNER']);
+  // What holds other blocks. A block is inside MAX_DEPTH of them at most (BlockTree, on the server).
+  const CONTAINERS = new Set(['ROW', 'COLUMN']);
+  const MAX_DEPTH = 3;
+  // A row's ways of sharing its 12 columns.
+  const SPLITS = [[12], [6, 6], [8, 4], [4, 8], [9, 3], [3, 9], [4, 4, 4], [6, 3, 3], [3, 3, 6], [3, 3, 3, 3]];
   // From how many entries the «+» menu has a filter.
-  const FILTER_FROM = 15;
+  const FILTER_FROM = 18;
   const LIMITED = new Set(['AUTOMATIC_LISTING', 'LATEST', 'NOTICES']);
   const MARK = /\[\[media:([A-Za-z0-9_-]+)]]/g;
   const PASTE_TAGS = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'A', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE']);
@@ -86,7 +91,13 @@
       background:var(--ve-accent); color:#fff; display:none; z-index:2; white-space:nowrap; max-width:70%; overflow:hidden; text-overflow:ellipsis; }
     .tools { position:absolute; right:0; top:-.95rem; display:none; gap:.2rem; z-index:3; }
     .tools button { padding:0 .4rem; font-size:.8rem; background:var(--ve-bg); }
-    .canvas.editing .blk:hover .tag, .blk.sel .tag, .canvas.editing .blk:hover .tools, .blk.sel .tools { display:flex; }
+    .canvas.editing .blk:hover > .tag, .blk.sel > .tag, .canvas.editing .blk:hover > .tools, .blk.sel > .tools { display:flex; }
+    .blk.ctr { border:1px dashed var(--ve-line); padding:.6rem; }
+    .blk.drop-inside { box-shadow:inset 0 0 0 2px var(--ve-accent); }
+    .row { display:flex; flex-wrap:wrap; gap:.75rem; align-items:stretch; }
+    .cell { min-width:0; }
+    .cell.add-cell { flex:0 0 100%; display:flex; justify-content:center; }
+    .splits { display:flex; flex-wrap:wrap; gap:.25rem; }
     .handle { cursor:grab; }
     .empty { padding:.75rem; border:1px dashed var(--ve-line); border-radius:8px; opacity:.75; font-size:.9rem; }
     .gone { padding:.4rem .75rem; border:1px dashed var(--ve-line); border-radius:8px; font-size:.85rem; opacity:.8; }
@@ -263,7 +274,8 @@
         remoteSourceId: b.remoteSourceId || '', remoteRoute: b.remoteRoute || '',
         remoteAttributes: Object.entries(b.remoteAttributes || {}).map(([k, v]) => k + '=' + v).join('\n'),
         // its text is the default language's: this language has none of its own (yet)
-        untranslated: !!b.untranslated };
+        untranslated: !!b.untranslated,
+        parentId: b.parentId || null, span: b.span == null ? null : b.span };
     }
 
     get translating() { const p = this.state.page || {}; return !!p.language && p.language !== p.defaultLanguage; }
@@ -290,6 +302,7 @@
         remoteSourceId: b.type === 'REMOTE' ? (b.remoteSourceId || null) : null,
         remoteRoute: b.type === 'REMOTE' ? (b.remoteRoute || null) : null,
         remoteAttributes: b.type === 'REMOTE' ? this.attrsOf(b.remoteAttributes) : {},
+        parentId: b.parentId || null, span: b.span == null || b.span === '' ? null : Number(b.span),
       }));
     }
 
@@ -491,11 +504,7 @@
           + ' <button class="back">Volver a editar</button></div>';
         if (v && !v.pageVisible) html += '<div class="msg warn">Este perfil no ve la página: su audiencia no lo incluye.</div>';
       }
-      s.blocks.forEach((b, i) => {
-        if (this.editing) html += this.insertRow(i);
-        html += this.blockHtml(b, i);
-      });
-      if (this.editing) html += this.insertRow(s.blocks.length, s.blocks.length === 0);
+      html += this.listHtml(null);
       canvas.innerHTML = html;
       this.wireCanvas(canvas);
     }
@@ -517,10 +526,66 @@
         + ': nada que mostrar ahora' + (this.hint(b) ? ' — ' + this.hint(b) : '') + '.</div>';
     }
 
-    insertRow(at, alone) {
-      return '<div class="ins' + (alone ? ' alone' : '') + '" data-at="' + at + '"><button class="add" aria-label="Añadir un bloque aquí" title="Añadir un bloque aquí">'
+    // ── rows and columns: the blocks stay one flat list, each container right before what it holds ──
+
+    kids(parentId) { return this.state.blocks.filter((b) => (b.parentId || null) === (parentId || null)); }
+
+    /** How many containers it is inside of. */
+    depth(b) {
+      let n = 0;
+      for (let p = b; p && p.parentId && n <= MAX_DEPTH + 1; p = this.block(p.parentId)) n++;
+      return n;
+    }
+
+    /** Where what starts at flat index {@code i} ends: past what it holds. */
+    subtreeEnd(i) {
+      const blocks = this.state.blocks;
+      const inside = new Set([blocks[i].id]);
+      let j = i + 1;
+      while (j < blocks.length && inside.has(blocks[j].parentId)) inside.add(blocks[j++].id);
+      return j;
+    }
+
+    /** One block after another, with a «+» between them: the page's, or a column's. */
+    listHtml(parentId) {
+      const s = this.state;
+      const kids = this.kids(parentId);
+      let html = '';
+      kids.forEach((b) => {
+        if (this.editing) html += this.insertRow(s.blocks.indexOf(b), false, parentId);
+        html += this.blockHtml(b);
+      });
+      if (this.editing) html += this.insertRow(this.endOf(parentId), !parentId && !kids.length, parentId);
+      return html;
+    }
+
+    /** The flat index just past what a container (or the page) holds. */
+    endOf(parentId) {
+      const s = this.state;
+      return parentId ? this.subtreeEnd(s.blocks.findIndex((b) => b.id === parentId)) : s.blocks.length;
+    }
+
+    /** What a row or column holds, drawn as the reader gets it. */
+    layoutHtml(b) {
+      const kids = this.kids(b.id);
+      const none = !kids.length && !this.editing ? '' : !kids.length
+        ? '<div class="empty">' + esc(this.typeLabel(b.type)) + ' vacía: añade bloques con «+»'
+          + (b.type === 'ROW' ? ' o elige un reparto en el panel' : '') + '.</div>' : '';
+      if (b.type === 'COLUMN') return none + '<div class="col">' + this.listHtml(b.id) + '</div>';
+      const cell = (k) => {
+        const span = k.span || Math.max(1, Math.floor(12 / kids.length));
+        return '<div class="cell" style="flex:' + span + ' ' + span + ' calc(' + span + ' / 12 * 100% - .75rem);min-width:min(100%, 8rem)">'
+          + this.blockHtml(k) + '</div>';
+      };
+      return none + '<div class="row">' + kids.map(cell).join('')
+        + (this.editing ? '<div class="cell add-cell">' + this.insertRow(this.endOf(b.id), false, b.id) + '</div>' : '') + '</div>';
+    }
+
+    insertRow(at, alone, parentId) {
+      const key = at + ':' + (parentId || '');
+      return '<div class="ins' + (alone ? ' alone' : '') + '" data-at="' + at + '" data-parent="' + esc(parentId || '') + '"><button class="add" aria-label="Añadir un bloque aquí" title="Añadir un bloque aquí">'
         + (alone ? '+ Añadir el primer bloque' : '+') + '</button>'
-        + (this.state.menuAt === at ? this.typeMenu() : '') + '</div>';
+        + (this.state.menuAt === key ? this.typeMenu(parentId) : '') + '</div>';
     }
 
     /** The menu opens downwards; upwards if it would be cut by whatever scrolls the page and fits there. */
@@ -545,15 +610,21 @@
      * The block types, then each registered UI by its name: «Componente remoto» isn't an entry, its
      * components are. It scrolls past a height, and past FILTER_FROM entries it has a filter too.
      */
-    typeMenu() {
+    typeMenu(parentId) {
       const cat = this.state.catalog;
-      const types = cat.types.filter((t) => t.value !== 'REMOTE');
+      const types = cat.types.filter((t) => t.value !== 'REMOTE' && !CONTAINERS.has(t.value));
+      // a container here must still have room for what it will hold
+      const parent = parentId ? this.block(parentId) : null;
+      const layouts = (parent ? this.depth(parent) + 2 : 1) > MAX_DEPTH ? []
+        : cat.types.filter((t) => CONTAINERS.has(t.value));
       const components = cat.components || [];
       const entry = (attrs, label) => '<button role="menuitem" ' + attrs + '>' + esc(label) + '</button>';
       return '<div class="menu" role="menu">'
-        + (types.length + components.length >= FILTER_FROM
+        + (types.length + layouts.length + components.length >= FILTER_FROM
           ? '<input type="search" class="menu-filter" aria-label="Filtrar los bloques" placeholder="Filtrar…">' : '')
         + '<div class="menu-list">' + types.map((t) => entry('data-type="' + esc(t.value) + '"', t.label)).join('') + '</div>'
+        + (layouts.length ? '<div class="menu-group"><div class="menu-head">Diseño</div><div class="menu-list">'
+          + layouts.map((t) => entry('data-type="' + esc(t.value) + '"', t.label)).join('') + '</div></div>' : '')
         + (components.length ? '<div class="menu-group"><div class="menu-head">Componentes</div><div class="menu-list">'
           + components.map((c) => entry('data-type="REMOTE" data-source="' + esc(c.value) + '"', c.label)).join('')
           + '</div></div>' : '')
@@ -583,8 +654,12 @@
       return parts.join(' · ');
     }
 
-    blockHtml(b, i) {
+    blockHtml(b) {
       const s = this.state;
+      const siblings = this.kids(b.parentId);
+      const i = siblings.indexOf(b);
+      const inRow = b.parentId && this.block(b.parentId)?.type === 'ROW';
+      const container = CONTAINERS.has(b.type);
       const r = s.rendered[b.id];
       const sel = this.editing && s.selected === b.id;
       const narrowed = this.narrowing(b);
@@ -594,11 +669,14 @@
           return '<div class="blk hidden" data-id="' + esc(b.id) + '"><div class="gone">🚫 No lo ve este perfil: «'
             + esc(b.title || this.typeLabel(b.type)) + '»' + (narrowed ? ' (solo ' + esc(narrowed) + ')' : '') + '</div></div>';
         }
+        if (container) return '<div class="blk" data-id="' + esc(b.id) + '">' + this.layoutHtml(b) + '</div>';
         inner = r ? r.html : '';
         if (!inner) inner = '<div class="empty">«' + esc(this.typeLabel(b.type)) + '»: nada que mostrar a este perfil ahora.</div>';
         return '<div class="blk" data-id="' + esc(b.id) + '">' + inner + '</div>';
       }
-      if (RICH.has(b.type)) {
+      if (container) {
+        inner = this.layoutHtml(b);
+      } else if (RICH.has(b.type)) {
         inner = '<section style="' + SECTION_STYLE[b.type] + '">'
           + (sel ? this.richToolbar() : '')
           + '<h3 class="ttl" style="margin:.25rem 0 .5rem" contenteditable="true" spellcheck="true" data-ph="Título (opcional)" aria-label="Título del bloque">'
@@ -609,7 +687,7 @@
         inner = '<div class="content">' + this.serverInner(b) + '</div>';
       }
       const untranslated = this.translating && b.untranslated;
-      return '<div class="blk' + (sel ? ' sel' : '') + (untranslated ? ' untranslated' : '') + '" data-id="' + esc(b.id)
+      return '<div class="blk' + (container ? ' ctr' : '') + (sel ? ' sel' : '') + (untranslated ? ' untranslated' : '') + '" data-id="' + esc(b.id)
         + '" data-i="' + i + '" tabindex="0" aria-label="Bloque '
         + (i + 1) + ': ' + esc(this.typeLabel(b.type)) + (untranslated ? ', sin traducir' : '') + '">'
         + (untranslated ? '<span class="untr" title="Sin texto propio en este idioma: se ve en el idioma por defecto ('
@@ -617,8 +695,10 @@
           + esc(s.page.defaultLanguage) + '</span>' : '')
         + '<span class="tag">' + esc(this.typeLabel(b.type)) + (narrowed ? ' · solo ' + esc(narrowed) : '') + '</span>'
         + '<span class="tools"><button class="handle" draggable="true" title="Arrastra para mover" aria-label="Mover">⠿</button>'
-        + '<button class="up" title="Subir" aria-label="Subir"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
-        + '<button class="down" title="Bajar" aria-label="Bajar"' + (i === s.blocks.length - 1 ? ' disabled' : '') + '>↓</button>'
+        + '<button class="up" title="' + (inRow ? 'A la izquierda' : 'Subir') + '" aria-label="' + (inRow ? 'A la izquierda' : 'Subir') + '"'
+          + (i === 0 ? ' disabled' : '') + '>' + (inRow ? '←' : '↑') + '</button>'
+        + '<button class="down" title="' + (inRow ? 'A la derecha' : 'Bajar') + '" aria-label="' + (inRow ? 'A la derecha' : 'Bajar') + '"'
+          + (i === siblings.length - 1 ? ' disabled' : '') + '>' + (inRow ? '→' : '↓') + '</button>'
         + '<button class="del danger" title="Eliminar" aria-label="Eliminar">✕</button></span>'
         + inner + '</div>';
     }
@@ -685,8 +765,9 @@
       });
       if (!this.editing) return;
       canvas.querySelectorAll('.ins .add').forEach((btn) => btn.addEventListener('click', (e) => {
-        const at = Number(btn.parentElement.dataset.at);
-        s.menuAt = s.menuAt === at ? null : at;
+        const row = btn.parentElement;
+        const key = row.dataset.at + ':' + row.dataset.parent;
+        s.menuAt = s.menuAt === key ? null : key;
         this.syncEditing();
         this.renderCanvas();
         this.placeMenu();
@@ -695,7 +776,8 @@
         e.stopPropagation();
       }));
       canvas.querySelectorAll('.menu button').forEach((btn) => btn.addEventListener('click', () => {
-        this.add(Number(btn.closest('.ins').dataset.at), btn.dataset.type, btn.dataset.source);
+        const row = btn.closest('.ins');
+        this.add(Number(row.dataset.at), btn.dataset.type, btn.dataset.source, row.dataset.parent || null);
       }));
       canvas.querySelectorAll('.menu-filter').forEach((input) => {
         input.addEventListener('input', () => this.filterMenu(input.value));
@@ -712,38 +794,58 @@
       });
       canvas.querySelectorAll('.blk').forEach((el) => {
         const id = el.dataset.id;
-        el.addEventListener('mousedown', () => { if (s.selected !== id) this.select(id, el); });
-        el.addEventListener('focusin', () => { if (s.selected !== id) this.select(id, el); });
+        // the innermost block is the one clicked, not the rows around it
+        // and the «+» selects nothing: losing the previous block's toolbar moved it from under the pointer
+        const onInsert = (e) => e.composedPath().some((n) => n.classList && n.classList.contains('ins'));
+        el.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          if (s.selected !== id && !onInsert(e)) this.select(id, el);
+        });
+        el.addEventListener('focusin', (e) => {
+          e.stopPropagation();
+          if (s.selected !== id && !onInsert(e)) this.select(id, el);
+        });
         el.addEventListener('keydown', (e) => {
           if (e.target === el && (e.key === 'Delete')) this.remove(id);
         });
-        el.querySelector('.up')?.addEventListener('click', () => this.move(id, -1));
-        el.querySelector('.down')?.addEventListener('click', () => this.move(id, 1));
-        el.querySelector('.del')?.addEventListener('click', () => this.remove(id));
-        const handle = el.querySelector('.handle');
+        el.querySelector(':scope > .tools .up')?.addEventListener('click', () => this.move(id, -1));
+        el.querySelector(':scope > .tools .down')?.addEventListener('click', () => this.move(id, 1));
+        el.querySelector(':scope > .tools .del')?.addEventListener('click', () => this.remove(id));
+        const handle = el.querySelector(':scope > .tools .handle');
         handle?.addEventListener('dragstart', (e) => {
           this.dragging = id;
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('text/plain', id);
           e.dataTransfer.setDragImage(el, 20, 20);
+          e.stopPropagation();
         });
         handle?.addEventListener('dragend', () => { this.dragging = null; this.clearDrop(); });
         el.addEventListener('dragover', (e) => {
-          if (!this.dragging || this.dragging === id) return;
+          if (!this.dragging || this.dragging === id || !this.fits(this.dragging, id)) return;
           e.preventDefault();
-          const box = el.getBoundingClientRect();
-          const after = e.clientY > box.top + box.height / 2;
+          e.stopPropagation();
           this.clearDrop();
+          const target = this.block(id);
+          if (CONTAINERS.has(target.type) && !this.kids(id).length) {
+            el.classList.add('drop-inside');
+            return;
+          }
+          const box = el.getBoundingClientRect();
+          const inRow = target.parentId && this.block(target.parentId)?.type === 'ROW';
+          const after = inRow ? e.clientX > box.left + box.width / 2 : e.clientY > box.top + box.height / 2;
           el.classList.add(after ? 'drop-after' : 'drop-before');
         });
         el.addEventListener('drop', (e) => {
           if (!this.dragging) return;
           e.preventDefault();
+          e.stopPropagation();
           const after = el.classList.contains('drop-after');
+          const inside = el.classList.contains('drop-inside');
           this.clearDrop();
-          this.moveTo(this.dragging, id, after);
+          this.moveTo(this.dragging, id, after, inside);
           this.dragging = null;
         });
+        if (el.classList.contains('ctr')) return; // what it holds has its own text, and is wired itself
         const ttl = el.querySelector('.ttl');
         const body = el.querySelector('.body');
         if (ttl) {
@@ -777,7 +879,7 @@
     }
 
     clearDrop() {
-      this.root.querySelectorAll('.drop-before, .drop-after').forEach((n) => n.classList.remove('drop-before', 'drop-after'));
+      this.root.querySelectorAll('.drop-before, .drop-after, .drop-inside').forEach((n) => n.classList.remove('drop-before', 'drop-inside', 'drop-after'));
     }
 
     block(id) { return this.state.blocks.find((b) => b.id === id); }
@@ -786,6 +888,7 @@
     syncEditing() {
       this.root.querySelectorAll('.blk').forEach((el) => {
         const b = this.block(el.dataset.id);
+        if (el.classList.contains('ctr')) return;
         if (b && b.untranslated) return; // the default language's text, as shown: not this language's
         const body = el.querySelector('.body');
         const ttl = el.querySelector('.ttl');
@@ -850,10 +953,10 @@
       this.refresh();
     }
 
-    add(at, type, remoteSourceId) {
+    add(at, type, remoteSourceId, parentId) {
       const s = this.state;
       this.syncEditing();
-      const b = this.normal({ id: newId(), type, remoteSourceId, title: '', html: RICH.has(type) ? '' : null, limit: LIMITED.has(type) ? 5 : null });
+      const b = this.normal({ id: newId(), type, remoteSourceId, parentId, title: '', html: RICH.has(type) ? '' : null, limit: LIMITED.has(type) ? 5 : null });
       s.blocks.splice(at, 0, b);
       s.menuAt = null;
       s.selected = b.id;
@@ -866,27 +969,52 @@
     }
 
     move(id, delta) {
-      const s = this.state;
-      const i = s.blocks.findIndex((b) => b.id === id);
-      const j = i + delta;
-      if (i < 0 || j < 0 || j >= s.blocks.length) return;
-      this.syncEditing();
-      const [b] = s.blocks.splice(i, 1);
-      s.blocks.splice(j, 0, b);
-      this.changed(true);
-      this.root.querySelector('.blk[data-id="' + id + '"] ' + (delta < 0 ? '.up' : '.down'))?.focus();
+      const b = this.block(id);
+      const siblings = this.kids(b.parentId);
+      const other = siblings[siblings.indexOf(b) + delta];
+      if (!other) return;
+      this.moveTo(id, other.id, delta > 0);
+      this.root.querySelector('.blk[data-id="' + id + '"] > .tools ' + (delta < 0 ? '.up' : '.down'))?.focus();
     }
 
-    moveTo(id, targetId, after) {
+    /** Whether what is at {@code id} may go next to or into {@code targetId}: not inside itself, nor too deep. */
+    fits(id, targetId) {
+      const blocks = this.state.blocks;
+      const i = blocks.findIndex((b) => b.id === id);
+      const moved = blocks.slice(i, this.subtreeEnd(i));
+      if (moved.some((b) => b.id === targetId)) return false;
+      const target = this.block(targetId);
+      const inside = CONTAINERS.has(target.type) && !this.kids(targetId).length;
+      const base = this.depth(target) + (inside ? 1 : 0);
+      const own = this.depth(moved[0]);
+      return moved.every((b) => base + this.depth(b) - own <= MAX_DEPTH);
+    }
+
+    /** It and what it holds, next to {@code targetId} ({@code after} it) or, when empty, {@code inside} it. */
+    moveTo(id, targetId, after, inside) {
       const s = this.state;
+      if (!this.fits(id, targetId)) return;
       this.syncEditing();
       const i = s.blocks.findIndex((b) => b.id === id);
       if (i < 0) return;
-      const [b] = s.blocks.splice(i, 1);
-      let j = s.blocks.findIndex((x) => x.id === targetId);
-      if (j < 0) j = s.blocks.length;
-      s.blocks.splice(after ? j + 1 : j, 0, b);
+      const chunk = s.blocks.splice(i, this.subtreeEnd(i) - i);
+      const j = s.blocks.findIndex((x) => x.id === targetId);
+      const target = s.blocks[j];
+      chunk[0].parentId = inside ? targetId : target.parentId;
+      s.blocks.splice(inside ? j + 1 : after ? this.subtreeEnd(j) : j, 0, ...chunk);
       s.selected = id;
+      this.changed(true);
+    }
+
+    /** A row shared out: the widths on what it holds, and empty columns for what it lacks. */
+    split(rowId, parts) {
+      const s = this.state;
+      this.syncEditing();
+      const kids = this.kids(rowId);
+      parts.forEach((span, n) => {
+        if (kids[n]) kids[n].span = span;
+        else s.blocks.splice(this.endOf(rowId), 0, this.normal({ id: newId(), type: 'COLUMN', title: '', html: null, parentId: rowId, span }));
+      });
       this.changed(true);
     }
 
@@ -894,10 +1022,13 @@
       const s = this.state;
       const b = this.block(id);
       if (!b) return;
-      if (!confirm('¿Eliminar el bloque «' + (b.title || this.typeLabel(b.type)) + '»? Se quita de la página al guardar.')) return;
+      const i = s.blocks.indexOf(b);
+      const gone = s.blocks.slice(i, this.subtreeEnd(i));
+      if (!confirm('¿Eliminar el bloque «' + (b.title || this.typeLabel(b.type)) + '»'
+        + (gone.length > 1 ? ' y los ' + (gone.length - 1) + ' que contiene' : '') + '? Se quita de la página al guardar.')) return;
       this.syncEditing();
-      s.blocks = s.blocks.filter((x) => x.id !== id);
-      if (s.selected === id) s.selected = null;
+      s.blocks = s.blocks.filter((x) => !gone.includes(x));
+      if (gone.some((x) => x.id === s.selected)) s.selected = null;
       this.changed(true);
     }
 
@@ -1065,9 +1196,28 @@
         + list.map((o) => '<option value="' + esc(o.value) + '"' + (o.value === value ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('');
       const r = s.rendered[b.id];
       const p = s.page;
-      let html = '<h3>' + esc(this.typeLabel(b.type)) + (b.title ? ' · ' + esc(b.title) : '') + '</h3>'
-        + '<div class="field"><label for="f-type">Tipo</label><select id="f-type" class="f-type">' + opt(cat.types, b.type) + '</select></div>'
-        + '<div class="field"><label for="f-title">Título</label><input id="f-title" type="text" class="f-title" value="' + esc(b.title) + '"></div>';
+      const inRowPanel = b.parentId && this.block(b.parentId)?.type === 'ROW';
+      const isContainer = CONTAINERS.has(b.type);
+      const leafTypes = cat.types.filter((t) => !CONTAINERS.has(t.value));
+      let html = '<h3>' + esc(this.typeLabel(b.type)) + (b.title ? ' · ' + esc(b.title) : '') + '</h3>';
+      if (!isContainer) {
+        html += '<div class="field"><label for="f-type">Tipo</label><select id="f-type" class="f-type">' + opt(leafTypes, b.type) + '</select></div>'
+          + '<div class="field"><label for="f-title">Título</label><input id="f-title" type="text" class="f-title" value="' + esc(b.title) + '"></div>';
+      }
+      if (inRowPanel) {
+        html += '<div class="field"><label for="f-span">Ancho (de 12 columnas)</label><select id="f-span" class="f-span">'
+          + '<option value="">Reparto igual</option>'
+          + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => '<option value="' + n + '"' + (Number(b.span) === n ? ' selected' : '') + '>' + n + '</option>').join('')
+          + '</select></div>';
+      }
+      if (b.type === 'ROW') {
+        const holds = this.kids(b.id).length;
+        html += '<div class="field"><label>Reparto</label><div class="splits">'
+          + SPLITS.filter((parts) => parts.length >= holds).map((parts) => '<button class="split" data-parts="' + parts.join(',') + '">'
+            + parts.join(' + ') + '</button>').join('') + '</div>'
+          + '<p class="note">Si faltan elementos, se añaden columnas vacías. En un móvil se apilan.</p></div>';
+      }
+      if (b.type === 'COLUMN') html += '<p class="note">Sus bloques van uno debajo de otro.</p>';
       if (f.has('html')) html += '<p class="note">✍️ El texto se escribe sobre la página, con la barra de formato del bloque.</p>';
       if (f.has('itemId')) {
         html += '<div class="field"><label for="f-item">Item destacado</label><select id="f-item" class="f-item">'
@@ -1127,6 +1277,10 @@
         if (LIMITED.has(b.type) && b.limit == null) b.limit = 5;
         this.changed(true);
       });
+      on('.f-span', 'change', (e) => { b.span = e.target.value === '' ? null : Number(e.target.value); this.changed(true); });
+      panel.querySelectorAll('.split').forEach((btn) => btn.addEventListener('click', () => {
+        this.split(b.id, btn.dataset.parts.split(',').map(Number));
+      }));
       on('.f-title', 'input', (e) => {
         b.title = e.target.value;
         const ttl = this.root.querySelector('.blk[data-id="' + b.id + '"] .ttl');

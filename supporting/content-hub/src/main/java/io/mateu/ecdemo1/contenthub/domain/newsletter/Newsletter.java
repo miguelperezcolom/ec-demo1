@@ -136,7 +136,7 @@ public class Newsletter extends AggregateRoot {
         var issueId = slot != null ? id + "-" + Cadence.key(slot) : id + "-n" + issued;
         var date = (slot != null ? slot : now).atZone(Cadence.ZONE).toLocalDate();
         var n = issued;
-        var blocks = settings.layout().stream().map(b -> b.withId(b.id() + "-" + n)).toList();
+        var blocks = io.mateu.ecdemo1.contenthub.domain.item.BlockTree.withIds(settings.layout(), id -> id + "-" + n);
         return NewsletterIssue.draft(issueId, id, issued, date, slot, name + " · nº " + issued, blocks,
                 items == null ? Map.of() : items, now);
     }

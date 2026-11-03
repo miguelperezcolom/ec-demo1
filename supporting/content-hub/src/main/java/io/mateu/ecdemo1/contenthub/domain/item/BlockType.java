@@ -27,12 +27,20 @@ public enum BlockType {
      * A newsletter issue's: the items the issue carries in one of its newsletter's sections
      * ({@code sectionId} = {@code nl:<section>}). Draws nothing on a page of the intranet.
      */
-    NEWSLETTER_SECTION("Sección de la newsletter");
+    NEWSLETTER_SECTION("Sección de la newsletter"),
+    /** Holds blocks side by side, each its width ({@link Block#span}). Draws nothing itself ({@link BlockTree}). */
+    ROW("Fila"),
+    /** Holds blocks one under another: several in one column of a row. Draws nothing itself. */
+    COLUMN("Columna");
 
     private final String label;
 
     BlockType(String label) {
         this.label = label;
+    }
+
+    public boolean isContainer() {
+        return this == ROW || this == COLUMN;
     }
 
     public String label() {

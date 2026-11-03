@@ -82,9 +82,11 @@ El mismo en items, audiencias con nombre y newsletter:
 | **Pendientes de confirmar** | Lo que el lector debe confirmar y no ha confirmado (nada, si no hay) |
 | **Últimos avisos** | Los últimos avisos que el lector puede ver; *Cuántos* |
 | **Últimas noticias** | Las últimas noticias y páginas que el lector puede ver, de una sección o de todas; *Cuántos* |
+| **Fila** | Pone lo que contiene en paralelo. Cada elemento ocupa de 1 a 12 columnas, con su *Ancho* en el panel; o elige un *Reparto* (8 + 4, 4 + 4 + 4…). En un móvil se apilan |
+| **Columna** | Pone lo que contiene uno debajo de otro: sirve para tener varios bloques en una columna de una fila |
 | **Componente remoto** | Una pantalla o un elemento de otra aplicación, de las registradas: *UI externa*, *Ruta* o *Atributos* (ver [Pantallas externas y componentes remotos](#pantallas-externas-y-componentes-remotos)) |
 
-Los cuatro últimos sirven para montar **inicios** (ver [Inicios por audiencia](#inicios-por-audiencia)),
+*Saludo*, *Pendientes de confirmar*, *Últimos avisos* y *Últimas noticias* sirven para montar **inicios** (ver [Inicios por audiencia](#inicios-por-audiencia)),
 pero valen en cualquier página.
 
 Al elegir el **tipo** solo se ven los campos que ese tipo usa (un bloque HTML, su título y su contenido;
@@ -143,6 +145,11 @@ Lo que se ve es el **borrador** de la página, con sus bloques dibujados como en
 - **Seleccionar un bloque**: al pasar el ratón se marca; un clic lo selecciona. Encima aparecen su tipo
   (y su restricción de audiencia, si tiene) y los botones ⠿ (arrastrar), ↑ ↓ (mover) y ✕ (eliminar,
   pide confirmación).
+- **Filas y columnas**: en el «+», *Diseño*. Al seleccionar una fila, el panel ofrece su **Reparto** (si faltan
+  elementos, añade columnas vacías); al seleccionar lo que hay dentro, su **Ancho**. Dentro de una fila, ← →
+  cambian el orden; ⠿ mueve un bloque también a otra fila o columna, y una fila o columna se mueve con lo que
+  contiene. Caben hasta tres niveles. En el correo de una newsletter todo va uno debajo de otro; en un móvil, lo
+  que no cabe baja a la línea siguiente. Si un lector no ve un elemento de la fila, los demás ocupan su hueco.
 - **Texto en el sitio**: en los bloques **HTML** y **Banner** el título y el texto se escriben
   directamente. La barra del bloque seleccionado tiene negrita, cursiva, enlace, listas, título (H2),
   subtítulo (H3), párrafo, quitar formato e **🖼 Medio**, que abre la biblioteca de medios con

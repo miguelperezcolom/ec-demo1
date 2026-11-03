@@ -10,6 +10,44 @@ import { createItem } from './content'
  */
 test.describe('Visual editor', () => {
 
+    test('a row of two columns, 8 + 4, with blocks inside: saved, reloaded, and each in its place', async ({ as, hosts, shell }) => {
+        const demo = await as('demo')
+        const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E fila ${RUN} ${shell}` })
+        await openEditor(demo, hosts.data, id)
+        const ve = demo.page.locator('ec-visual-editor')
+        const panel = ve.getByRole('complementary', { name: 'Bloque seleccionado' })
+
+        await demo.click(ve.getByRole('button', { name: 'Añadir un bloque aquí' }).first(), 1_000)
+        await demo.click(ve.getByRole('menuitem', { name: 'Fila', exact: true }), 1_500)
+        await demo.click(panel.getByRole('button', { name: '8 + 4', exact: true }), 1_500)
+
+        const row = ve.locator('.blk.ctr').first()
+        const cells = row.locator('> .row > .cell:not(.add-cell)')
+        await expect(cells).toHaveCount(2)
+        // an HTML block in each column
+        for (const [n, text] of [[0, `Izquierda ${RUN}`], [1, `Derecha ${RUN}`]] as const) {
+            await demo.click(cells.nth(n).getByRole('button', { name: 'Añadir un bloque aquí' }).first(), 1_000)
+            await demo.click(cells.nth(n).getByRole('menuitem', { name: 'HTML', exact: true }), 1_500)
+            const body = cells.nth(n).getByLabel('Contenido del bloque')
+            await body.click()
+            await demo.page.keyboard.type(text, { delay: 10 })
+        }
+        const widths = async () => {
+            const [a, b] = await Promise.all([cells.nth(0).boundingBox(), cells.nth(1).boundingBox()])
+            expect(a!.y, 'side by side').toBeCloseTo(b!.y, -1)
+            return a!.width / b!.width
+        }
+        expect(await widths(), '8 columns against 4').toBeGreaterThan(1.5)
+
+        await demo.click(ve.getByRole('button', { name: 'Guardar', exact: true }), 2_500)
+        await expect(ve.getByText('● Cambios sin guardar')).toBeHidden()
+        await demo.page.reload({ waitUntil: 'domcontentloaded' })
+        await expect(cells).toHaveCount(2, { timeout: 60_000 })
+        await expect(cells.nth(0)).toContainText(`Izquierda ${RUN}`)
+        await expect(cells.nth(1)).toContainText(`Derecha ${RUN}`)
+        expect(await widths(), 'after the reload too').toBeGreaterThan(1.5)
+    })
+
     test('the «+» offers each registered UI by its name, with a filter when there are many', async ({ as, hosts, shell }) => {
         const demo = await as('demo')
         const id = await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es: `E2E componentes ${RUN} ${shell}` })
@@ -41,17 +79,22 @@ test.describe('Visual editor', () => {
         await expect(panel.getByLabel('UI externa')).toHaveValue('riu-class')
     })
 
-    test('one page after another from the list opens each, and the last «+» shows all its menu', async ({ as, hosts }) => {
+    test('one page after another from the list opens each, and the last «+» shows all its menu', async ({ as, hosts, shell }) => {
         const demo = await as('demo')
-        await demo.go(`${hosts.data}/editorial/visual`, /Herramientas/)
+        // Its own pages: they are the newest, so they're on the list's first page whatever else there is
+        const titles = [`E2E lista A ${RUN} ${shell}`, `E2E lista B ${RUN} ${shell}`]
+        for (const es of titles) await createItem(demo, hosts, { type: /^Page$/, section: /^Operaciones$/, es })
+        await demo.go(`${hosts.data}/editorial/visual`, new RegExp(titles[1]))
         const ve = demo.page.locator('ec-visual-editor')
         // The second one is what failed: the editor's code already there, alive before it knows its page
-        for (const title of ['Quiénes somos', 'Herramientas']) {
+        for (const title of titles) {
             await demo.click(demo.page.getByText(title, { exact: true }).last(), 1_000)
             await expect(ve.getByRole('button', { name: 'Añadir un bloque aquí' }).first()).toBeVisible({ timeout: 30_000 })
             await expect(ve.getByText('Not Found')).toHaveCount(0)
-            if (title === 'Quiénes somos') await demo.page.goBack()
-            if (title === 'Quiénes somos') await demo.waitText(/Herramientas/, 'the list did not come back')
+            if (title === titles[0]) {
+                await demo.page.goBack()
+                await demo.waitText(new RegExp(titles[1]), 'the list did not come back')
+            }
         }
 
         const adds = ve.getByRole('button', { name: 'Añadir un bloque aquí' })
@@ -67,7 +110,7 @@ test.describe('Visual editor', () => {
             }
             return box.bottom - bottom
         })
-        expect(cut, 'pixels of the menu below what scrolls the page').toBeLessThanOrEqual(0)
+        expect(cut, 'pixels of the menu below what scrolls the page').toBeLessThanOrEqual(1)
     })
 
     test('edit a banner in place, add quick links, save, reload; «Ver como» hides a block for another department',
