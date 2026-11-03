@@ -104,6 +104,8 @@ export default defineConfig({
 						{ label: 'Arquitectura', slug: 'intranet/arquitectura' },
 						{ label: 'Manual del portal', slug: 'intranet/manual-portal' },
 						{ label: 'Manual del backoffice', slug: 'intranet/manual-backoffice' },
+						{ label: 'Manual de la newsletter', slug: 'intranet/manual-newsletter' },
+						{ label: 'La IA en la intranet', slug: 'intranet/manual-ia' },
 						{ label: 'Recorrido de la demo', slug: 'intranet/recorrido' },
 						{ label: 'Operación', slug: 'intranet/operacion' },
 					],

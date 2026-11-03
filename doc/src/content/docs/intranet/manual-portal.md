@@ -1,6 +1,6 @@
 ---
 title: Manual del portal
-description: La intranet para el empleado — inicio, noticias, avisos y documentos, comentarios y «Me gusta», encuestas, secciones, búsqueda, personas y organigrama, solicitudes, favoritos, confirmar lectura, preferencias de la newsletter y de los avisos, y preguntar al chat.
+description: La intranet para el empleado — inicio, noticias, avisos y documentos, comentarios y «Me gusta», encuestas, secciones, búsqueda, personas y organigrama, solicitudes, favoritos, confirmar lectura, preferencias de la newsletter y de los avisos, pantallas de otras aplicaciones y preguntar al chat.
 ---
 
 La intranet está en la consola del plano de datos, en el menú **Intranet** (`https://ec1.mateu.io`, en
@@ -161,6 +161,9 @@ En la página de una newsletter:
 
 Nunca te llegará nada que no puedas ver en la intranet, elijas lo que elijas.
 
+Todo sobre las newsletters —el sitio, el archivo, el correo y cómo se hacen—, en el
+[Manual de la newsletter](/intranet/manual-newsletter/).
+
 ## Mis preferencias
 
 *Mis preferencias* lista **las newsletters que recibes** (cada una lleva a su página, donde te das de
@@ -218,6 +221,17 @@ exige, tu confirmación sigue valiendo.
 Algunos contenidos registran además **que los has abierto** (seguimiento de lectura); los editores ven
 solo el resumen por hotel y departamento.
 
+## Pantallas de otras aplicaciones
+
+Algunas páginas de la intranet, o algunas entradas del menú, son **pantallas de otras aplicaciones** de la
+empresa (por ejemplo, los socios de Riu Class o las acumulaciones de puntos), y un contenido puede llevar una de
+ellas como un bloque más («Herramientas»). Se usan ahí mismo, sin salir de la intranet y **con tus permisos en
+esa aplicación**: ves y puedes hacer lo mismo que si la abrieras aparte.
+
+- Si no tienes permiso en esa aplicación, en su lugar sale **«No puedes usar esta aplicación»**.
+- La pestaña del navegador lleva el título de la página de la intranet; la miga de pan es la de la intranet.
+- En el correo de una newsletter no se pueden usar: salen como un enlace a la página en la web.
+
 ## Preguntar al chat
 
 El chat de la consola (el agente `console-agent`) puede consultar la intranet **con tu identidad**: solo
@@ -232,6 +246,9 @@ sabe lo que tú puedes leer.
 
 Confirmar una lectura **no** se hace desde el chat: abre el enlace y confírmala en el portal. Un contenido
 recién publicado tarda unos segundos en estar disponible para el chat.
+
+Qué hace la IA, con qué datos y cómo usar la intranet desde otros asistentes (Claude, Antigravity…): ver
+[La IA en la intranet](/intranet/manual-ia/).
 
 ## Si te mandan un enlace de vista previa
 
