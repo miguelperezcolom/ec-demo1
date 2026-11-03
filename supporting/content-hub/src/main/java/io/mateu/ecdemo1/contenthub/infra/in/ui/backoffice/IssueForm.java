@@ -16,6 +16,7 @@ import io.mateu.ecdemo1.contenthub.infra.in.ui.common.Ui;
 import io.mateu.ecdemo1.uicommons.html.Html;
 import io.mateu.uidl.annotations.Action;
 import io.mateu.uidl.annotations.Colspan;
+import io.mateu.uidl.annotations.Hidden;
 import io.mateu.uidl.annotations.HiddenInCreate;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.ReadOnly;
@@ -29,6 +30,7 @@ import io.mateu.uidl.data.UICommand;
 import io.mateu.uidl.fluent.Component;
 import io.mateu.uidl.interfaces.HttpRequest;
 import io.mateu.uidl.interfaces.OptionsSupplier;
+import io.mateu.uidl.interfaces.VisibilitySupplier;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
@@ -50,7 +52,7 @@ import java.util.stream.Collectors;
 @Service
 @Scope("prototype")
 @Editors
-public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
+public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier, VisibilitySupplier {
 
     @Section("Número")
     @ReadOnly
@@ -68,6 +70,9 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
     @HiddenInCreate
     @Label("Estado")
     String state;
+    /** The status itself, for which actions apply (state above is its text). */
+    @Hidden
+    String status;
     @HiddenInCreate
     @Label("Asunto")
     String subject;
@@ -129,6 +134,7 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
         subject = i.subject();
         date = i.date();
         scheduledAt = Ui.local(i.scheduledAt());
+        status = i.status().name();
         state = i.status().label() + switch (i.status()) {
             case SCHEDULED -> " para el " + Ui.when(i.scheduledAt());
             case SENT -> " el " + Ui.when(i.sentAt());
@@ -276,6 +282,21 @@ public class IssueForm implements SimpleCrud.CrudForm, OptionsSupplier {
     public void save(HttpRequest httpRequest) {
         editorial.editIssue(readers.of(httpRequest), id, subject, date,
                 blocks == null ? List.of() : blocks.stream().map(b -> b.toBlock(language(newsletterId))).toList(), sectionItems());
+    }
+
+    /** Each action only where it applies: a draft is scheduled, a scheduled issue goes back to draft… */
+    @Override
+    public boolean isHidden(String memberName, HttpRequest httpRequest) {
+        if (status == null) {
+            return false;
+        }
+        var draft = "DRAFT".equals(status);
+        return switch (memberName) {
+            case "anadirLoNuevo", "programar" -> !draft;
+            case "volverABorrador" -> !"SCHEDULED".equals(status);
+            case "cancelar" -> !draft && !"SCHEDULED".equals(status);
+            default -> false;
+        };
     }
 
     /** What was published since the issue was opened, added to its sections. */
