@@ -2,6 +2,8 @@ package io.mateu.ecdemo1.contenthub.infra.in.ui.backoffice;
 
 import io.mateu.ecdemo1.contenthub.application.usecases.NewsletterEditorial;
 import io.mateu.ecdemo1.contenthub.infra.in.security.Editors;
+import io.mateu.uidl.annotations.HiddenInList;
+import io.mateu.uidl.annotations.HiddenInEditor;
 import io.mateu.uidl.annotations.Label;
 import io.mateu.uidl.annotations.Stereotype;
 import io.mateu.uidl.data.FieldStereotype;
@@ -25,13 +27,19 @@ public class NewsletterSectionForm implements OptionsSupplier {
     public String name;
     @Label("Toma lo publicado en estas secciones de la intranet")
     @Stereotype(FieldStereotype.multiSelect)
+    @HiddenInList
     public List<String> sources = new ArrayList<>();
+    /** The same, for the table: a list in a table cell is drawn with its values run together. */
+    @Label("Toma lo publicado de")
+    @HiddenInEditor
+    public String sourcesText;
 
     public static NewsletterSectionForm of(String id, String name, List<String> sources) {
         var f = new NewsletterSectionForm();
         f.id = id;
         f.name = name;
         f.sources = new ArrayList<>(sources == null ? List.of() : sources);
+        f.sourcesText = String.join(", ", f.sources);
         return f;
     }
 

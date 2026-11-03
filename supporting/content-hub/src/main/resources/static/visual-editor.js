@@ -309,7 +309,9 @@
         s.busy = false;
         s.messages = [];
         this.render();
-        this.message('ok', 'Guardado en el borrador. Para que lo vean los lectores: «Volver al formulario» → enviar a revisión o publicar.');
+        this.message('ok', this.resource === 'issues'
+          ? 'Guardado en el número. Para enviarlo: «Volver al número» → Enviar prueba o Programar.'
+          : 'Guardado en el borrador. Para que lo vean los lectores: «Volver al formulario» → enviar a revisión o publicar.');
       } catch (e) {
         s.busy = false;
         this.renderBar();
@@ -964,8 +966,11 @@
           ? 'Haz clic en un bloque para editarlo: el texto de los bloques HTML y Banner se escribe sobre la página; aquí, su tipo, '
             + 'sus campos y a quién se muestra. «+» entre bloques añade uno; ⠿ arrastra, ↑ ↓ mueven.'
           : 'Estás viendo la página como un perfil: vuelve a «yo, editando» para cambiarla.') + '</p>'
-          + '<p class="note">Guardar cambia el <b>borrador</b>. La revisión y la publicación siguen en el formulario '
-          + '(botón «Volver al formulario», arriba).</p>';
+          + (this.resource === 'issues'
+            ? '<p class="note">Guardar cambia el <b>número</b>. La prueba y el envío siguen en su formulario '
+              + '(botón «Volver al número», arriba).</p>'
+            : '<p class="note">Guardar cambia el <b>borrador</b>. La revisión y la publicación siguen en el formulario '
+              + '(botón «Volver al formulario», arriba).</p>');
         return;
       }
       const cat = s.catalog;
