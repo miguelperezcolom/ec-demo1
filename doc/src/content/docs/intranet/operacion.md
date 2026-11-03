@@ -78,8 +78,8 @@ el atributo alt de una intranet de hoteles: una sola frase en español, de 125 c
 comillas ni comentarios. Si no recibes ninguna imagen, responde exactamente SIN_IMAGEN.» Sin herramientas ni
 RAG. Sin él, el botón da un aviso y nada cambia.
 
-Los tres agentes viven solo en la base de datos del plano de control (tabla `agent`), no en el repositorio:
-en un entorno nuevo hay que crearlos (en la consola del plano de control, «Agentes», o con un `insert`).
+Los tres agentes están en el catálogo GitOps, en `ia/agents/` de `miguelperezcolom/ec-ia-config`, no en este
+repositorio. Se cambian con un PR allí; con GitOps activo, el plano de control los carga desde ese catálogo.
 
 ### Salud del contenido
 
