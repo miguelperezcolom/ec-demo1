@@ -219,6 +219,8 @@ public class SecurityConfig {
                         // catch-all would permit it anyway, but silence is the wrong way to make a
                         // public endpoint public.
                         .matchers(onControlHost("/cp-webhooks/**")).permitAll()
+                        // ecomm's layout editor bundle: a static file, imported without a token.
+                        .matchers(onControlHost("/layout-builder/**")).permitAll()
                         // The control console — an admin console whose halves are the IA
                         // catalogues, user and access management, and the two engines'
                         // administration UIs. /_workflow-admin and /_forms-admin are served by the
@@ -232,6 +234,8 @@ public class SecurityConfig {
                                 // The intranet's configuration: sections, audiences, slots, the
                                 // employee directory (content:admin on top, in content-hub).
                                 "/_content-hub/**",
+                                // The public website: what gets published, and who approves it.
+                                "/_ecomm/**",
                                 "/api/workflow-agents",
                                 "/_workflow-admin/**", "/_forms-admin/**",
                                 // The integration's control plane (PoC ACL): activating a hotel or
