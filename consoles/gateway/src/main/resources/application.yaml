@@ -290,6 +290,14 @@ spring:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_ecomm/**
 
+        # The layout editor's bundle, imported by the page through a <script type="module">, which carries no
+        # token. A static file with no data in it, public on purpose: see SecurityConfig.
+        - id: ecomm-layout-builder
+          uri: ${ECOMM_URL:http://ecomm.riu.svc.cluster.local}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/layout-builder/**
+
         # content-hub's configuration — sections, audiences, slots, the directory, the projection:
         # how the intranet works, so on the CONTROL host next to users, behind ai-admin — see
         # SecurityConfig. Same pod as the data plane's /_intranet, where the editorial work is.
