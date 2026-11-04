@@ -12,14 +12,14 @@ consultado el clúster ni ha ejecutado llamadas a Opera, Salesforce o los LLM.
 
 | Componente | Versión | Fuente |
 | :--------- | :------ | :----- |
-| Mateu | `3.0-beta.49` | `mateu.version` en los POM con interfaz |
+| Mateu | `3.0-beta.50` | `mateu.version` en los POM con interfaz |
 | Librerías de EventConductor | `2.37.0` | `eventconductor.version` en los módulos que las usan |
 | Orquestador | `2.37.0` | `orchestrator.imageTag` en `deploy/values/eventconductor.yaml` |
 | Formularios | `2.37.0` | `forms.imageTag` en el mismo fichero |
 | Reglas | `2.37.0` | `rules.imageTag` en el mismo fichero |
-| Aplicaciones con Mateu | `0.114.0` | Imágenes en `deploy/manifests/` |
-| Gateway, `ia-agent`, `api-mcp` | `0.114.0` | `35-gateway.yaml`, `63-ia-agent.yaml`, `74-api-mcp.yaml` |
-| Sitio de documentación | `0.4.25` | `81-docs.yaml` |
+| Aplicaciones con Mateu | `0.115.0` | Imágenes en `deploy/manifests/` |
+| Gateway, `ia-agent`, `api-mcp` | `0.115.0` | `35-gateway.yaml`, `63-ia-agent.yaml`, `74-api-mcp.yaml` |
+| Sitio de documentación | `0.4.26` | `81-docs.yaml` |
 
 La versión de la librería usada al compilar y la de una imagen desplegable son decisiones separadas.
 El `appVersion: 2.1.1` del chart vendorizado identifica su origen; **los `imageTag` de los values son
