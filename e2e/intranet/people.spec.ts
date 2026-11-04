@@ -39,24 +39,39 @@ test.describe('Personas', () => {
         await klaus.waitText(/Foto guardada/, 'the photo was not saved')
 
         // the directory gets it through Kafka
+        const photoOnScreen = () => klaus.page.evaluate(() => {
+            let found = false
+            const walk = (n: any) => {
+                if (n.shadowRoot) walk(n.shadowRoot)
+                for (const k of n.children ?? []) {
+                    if ((k.tagName === 'IMG' && k.src.includes('/_people/photos/')) || getComputedStyle(k).backgroundImage.includes('/_people/photos/')) found = true
+                    walk(k)
+                }
+            }
+            walk(document.body)
+            return found
+        })
         const shows = async () => {
             await klaus.page.goto(`${hosts.data}/intranet/personas/klaus.schmidt`, { waitUntil: 'domcontentloaded' })
             await klaus.waitText(/Cambiar mi foto/, 'no way to one\'s own photo from one\'s own card')
             await klaus.page.waitForTimeout(2_000)
-            return klaus.page.evaluate(() => {
-                let found = false
-                const walk = (n: any) => {
-                    if (n.shadowRoot) walk(n.shadowRoot)
-                    for (const k of n.children ?? []) {
-                        if ((k.tagName === 'IMG' && k.src.includes('/_people/photos/')) || (k.getAttribute('style') ?? '').includes('/_people/photos/')) found = true
-                        walk(k)
-                    }
-                }
-                walk(document.body)
-                return found
-            })
+            return photoOnScreen()
         }
         await expect.poll(shows, { timeout: 90_000, intervals: [5_000] }).toBe(true)
+
+        // next to their comment: the seeded one on the welcome article, with no address written as text
+        await klaus.go(`${hosts.data}/intranet/noticias/bienvenida`, /Sehr gut/)
+        await klaus.page.waitForTimeout(2_000)
+        expect(await photoOnScreen(), 'no photo next to their comment').toBe(true)
+        expect(await klaus.text(), 'the address written in the avatar').not.toContain('_people')
+
+        // and in the directory, on the row found by searching for them
+        await klaus.go(`${hosts.data}/intranet/personas`, /Personas/)
+        // the listing's own box, not the shell's hidden «Buscar o ir a…»
+        const search = klaus.page.getByPlaceholder(/^Buscar…?$/).first()
+        await search.fill('schmidt')
+        await search.press('Enter')
+        await expect.poll(photoOnScreen, { timeout: 15_000, message: 'no photo in the directory' }).toBe(true)
 
         // and it can be taken away again: nothing of this stays
         await klaus.go(`${hosts.data}/miFoto`, /Guardar mi foto/)

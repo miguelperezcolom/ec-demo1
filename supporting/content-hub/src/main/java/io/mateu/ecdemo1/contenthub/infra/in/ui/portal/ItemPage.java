@@ -199,9 +199,9 @@ public class ItemPage implements ComponentTreeSupplier, Identifiable {
         } else {
             parts.add(CommentThread.builder().id("comentarios").comments(list.stream().map(c -> {
                 var author = c.authorName() == null || c.authorName().isBlank() ? c.authorId() : c.authorName();
-                // their photo if they have one: the renderers take an avatar for an address or for initials
-                var avatar = people.find(c.authorId()).map(io.mateu.ecdemo1.contenthub.domain.employee.Employee::photoUrl).orElse(People.initials(author));
-                return new Comment(c.id(), author, avatar == null ? People.initials(author) : avatar, c.text(), Ui.when(c.at()), List.of());
+                // the full address: for the web renderer, anything else is initials, and it would write the path in the circle
+                var avatar = people.find(c.authorId()).map(people::photoAddress).orElse(People.initials(author));
+                return new Comment(c.id(), author, avatar, c.text(), Ui.when(c.at()), List.of());
             }).toList()).build());
         }
         if (!social.open()) {

@@ -42,7 +42,7 @@ public class PeopleListing implements Listing<PersonRow>, Navigable<PersonPage, 
         var number = pageable == null ? 0 : Math.max(0, pageable.page());
         var found = people.search(text);
         var rows = found.stream().skip((long) number * size).limit(size)
-                .map(e -> new PersonRow(e.userId(), People.name(e), people.jobTitle(e), people.department(e),
+                .map(e -> new PersonRow(e.userId(), People.picture(e), People.name(e), people.jobTitle(e), people.department(e),
                         people.hotel(e).isEmpty() ? "Servicios centrales" : people.hotel(e),
                         e.phone() == null ? "" : e.phone(), e.email() == null ? "" : e.email()))
                 .toList();

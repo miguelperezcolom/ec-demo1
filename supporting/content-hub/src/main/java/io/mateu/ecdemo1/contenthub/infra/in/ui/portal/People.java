@@ -157,17 +157,35 @@ public class People {
         return portal.getScheme() == null ? e.photoUrl() : portal.getScheme() + "://" + portal.getAuthority() + e.photoUrl();
     }
 
+    /**
+     * What goes where only an image's address fits, like a listing's first column: their photo, or their initials
+     * drawn as an image, so that every name in the column starts at the same place.
+     */
+    public static String picture(Employee e) {
+        if (e.photoUrl() != null) {
+            return e.photoUrl();
+        }
+        var svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><rect width=\"64\" height=\"64\" fill=\""
+                + colourOf(e) + "\"/><text x=\"32\" y=\"32\" dy=\".35em\" text-anchor=\"middle\" font-family=\"sans-serif\" "
+                + "font-size=\"26\" font-weight=\"600\" fill=\"#fff\">" + esc(initials(name(e))) + "</text></svg>";
+        return "data:image/svg+xml;base64," + java.util.Base64.getEncoder()
+                .encodeToString(svg.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     /** Their photo, or their initials on a colour picked from the user id: the same person, the same colour. */
     public static String avatar(Employee e, int size) {
         if (e.photoUrl() != null) {
             return "<img src=\"" + esc(e.photoUrl()) + "\" alt=\"\" style=\"flex:none;width:" + size + "px;height:" + size
                     + "px;border-radius:50%;object-fit:cover\">";
         }
-        var colours = List.of("#b42318", "#175cd3", "#067647", "#9e4c0a", "#6941c6", "#c11574", "#0e7090");
-        var colour = colours.get(Math.floorMod(e.userId().hashCode(), colours.size()));
         return "<span style=\"display:inline-flex;align-items:center;justify-content:center;flex:none;width:" + size
-                + "px;height:" + size + "px;border-radius:50%;background:" + colour + ";color:#fff;font-weight:600;"
+                + "px;height:" + size + "px;border-radius:50%;background:" + colourOf(e) + ";color:#fff;font-weight:600;"
                 + "font-size:" + Math.round(size * 0.4) + "px\">" + esc(initials(name(e))) + "</span>";
+    }
+
+    private static String colourOf(Employee e) {
+        var colours = List.of("#b42318", "#175cd3", "#067647", "#9e4c0a", "#6941c6", "#c11574", "#0e7090");
+        return colours.get(Math.floorMod(e.userId().hashCode(), colours.size()));
     }
 
     static String name(Employee e) {
