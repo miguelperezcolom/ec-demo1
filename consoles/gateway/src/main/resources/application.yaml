@@ -282,6 +282,14 @@ spring:
             - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
             - Path=/_users/**
 
+        # The public website's control plane (frontend-public-reference's ecomm), in its own namespace.
+        # Control host only, behind ai-admin — see SecurityConfig. It checks the token and the role too.
+        - id: ecomm
+          uri: ${ECOMM_URL:http://ecomm.riu.svc.cluster.local}
+          predicates:
+            - Host=${CONTROL_HOST:console.ec1.mateu.io},${RW_CONTROL_HOST:rw-console.ec1.mateu.io}
+            - Path=/_ecomm/**
+
         # content-hub's configuration — sections, audiences, slots, the directory, the projection:
         # how the intranet works, so on the CONTROL host next to users, behind ai-admin — see
         # SecurityConfig. Same pod as the data plane's /_intranet, where the editorial work is.

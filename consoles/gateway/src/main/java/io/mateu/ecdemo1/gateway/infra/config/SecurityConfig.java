@@ -232,6 +232,8 @@ public class SecurityConfig {
                                 // The intranet's configuration: sections, audiences, slots, the
                                 // employee directory (content:admin on top, in content-hub).
                                 "/_content-hub/**",
+                                // The public website: what gets published, and who approves it.
+                                "/_ecomm/**",
                                 "/api/workflow-agents",
                                 "/_workflow-admin/**", "/_forms-admin/**",
                                 // The integration's control plane (PoC ACL): activating a hotel or

@@ -185,6 +185,14 @@ public class ControlShellHome implements WidgetSupplier, HomeRouteSupplier {
 
     // The demo itself (integrations-service): reset it to zero — the engine's reset-demo, confirmed in
     // the inbox — and simulate an Opera outage. Behind ai-admin, like the rest of this console.
+    /**
+     * The public website's control plane: websites, dynamic pages, releases and their approval. Served by
+     * frontend-public-reference's ecomm, another repository and another namespace, so a cluster without it only
+     * sees this section disabled.
+     */
+    @Menu
+    RemoteMenu ecomm = new RemoteMenu("/_ecomm").withLabel("Ecomm");
+
     @Menu
     RemoteMenu demo = new RemoteMenu("/_demo").withLabel("Demo");
 
