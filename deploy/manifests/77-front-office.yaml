@@ -120,6 +120,11 @@ spec:
             # consumes: the stays and catalogue of the PMS (front-office-commands), the MDM's customers.
             - name: KAFKA_BROKERS
               value: redpanda:19092
+            # What the UI's manifest tells the Mateu mobile app to sign in with (/mateu/v3/manifest).
+            - name: MATEU_MOBILE_OIDC_ISSUER
+              value: https://auth.ec1.mateu.io/realms/ec-demo1
+            - name: MATEU_MOBILE_OIDC_CLIENT_ID
+              value: mateu-mobile
             - name: KEYCLOAK_ISSUER_URI
               value: https://auth.ec1.mateu.io/realms/ec-demo1
             - name: KEYCLOAK_JWKS_URI
