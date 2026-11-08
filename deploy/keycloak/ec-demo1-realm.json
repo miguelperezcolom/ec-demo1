@@ -92,6 +92,20 @@
       }
     },
     {
+      "clientId": "mateu-mobile",
+      "name": "Mateu mobile app",
+      "description": "The Mateu app for iOS and Android, signing in to the front office (front.ec1.mateu.io) with Authorization Code + PKCE through the system browser. The app learns this client from the UI's manifest (/mateu/v3/manifest); it always comes back to mateu://auth.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["mateu://auth"],
+      "attributes": {
+        "post.logout.redirect.uris": "+",
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
       "clientId": "intranet-mcp",
       "name": "Intranet MCP for desktop AI clients",
       "description": "Claude Code, Claude Desktop, Antigravity: the person's own token for the intranet's MCP server (/_intranet/mcp). Login once with the device flow (deploy/demo/intranet-mcp-token.py), then refreshed silently. Its access tokens last 8 hours instead of the realm's 5 minutes, because those clients send a fixed header for a whole session; only this client's tokens, the consoles keep 5 minutes.",

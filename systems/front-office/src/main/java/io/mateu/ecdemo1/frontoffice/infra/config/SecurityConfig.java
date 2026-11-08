@@ -3,6 +3,7 @@ package io.mateu.ecdemo1.frontoffice.infra.config;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -11,6 +12,9 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * A resource server, as the consoles' shells: the UI's calls ({@code /mateu/**}) need a Keycloak
  * token; the bootstrap page stays public, since it is what sends a visitor to Keycloak.
+ *
+ * <p>So does {@code /mateu/v3/manifest}: the Mateu mobile app reads it before anyone has signed in, to
+ * learn this UI's name and which identity provider to use. It says nothing a login page would not.
  *
  * <p>{@code /api/**} — where the integration writes reservations — is open here and not routed from
  * the internet: the gateway does not take it to this service, and only the connector, inside the
@@ -31,6 +35,7 @@ public class SecurityConfig {
         // The SSE stream is written from async dispatches of the request that opened it — already
         // authorized; Spring Security would otherwise judge each dispatch again, with no token.
         .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+            .requestMatchers(HttpMethod.GET, "/mateu/v3/manifest").permitAll()
             .requestMatchers("/mateu/**", "/sse", "/mcp/**").authenticated()
             .anyRequest().permitAll())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
