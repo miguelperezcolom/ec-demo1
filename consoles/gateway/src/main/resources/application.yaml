@@ -196,12 +196,14 @@ spring:
             - Path=/_history/**
 
         # Riu Class: the loyalty programme's members, tiers, points and accruals (a demo service) — the
-        # business's, so on the data plane's hosts only. Only its screens: its REST API (/members, which the
-        # front office reads) and its MCP server stay inside the cluster.
+        # business's, so on the data plane's hosts, and on the intranet's: the intranet embeds its screens
+        # (content-hub's «Riu Class» UI source: the page «Herramientas», the remote page «Riu Class · socios»).
+        # Only its screens: its REST API (/members, which the front office reads) and its MCP server stay
+        # inside the cluster.
         - id: loyalty
           uri: ${LOYALTY_URL:http://loyalty:8134}
           predicates:
-            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io}
+            - Host=${CONSOLE_HOST:ec1.mateu.io,ws.ec1.mateu.io,workspace.ec1.mateu.io},${RW_CONSOLE_HOST:rw.ec1.mateu.io,rw-ws.ec1.mateu.io,rw-workspace.ec1.mateu.io},${INTRANET_HOST:intranet.ec1.mateu.io},${RW_INTRANET_HOST:rw-intranet.ec1.mateu.io}
             - Path=/_loyalty/**
 
         # Registro de huéspedes: the registration rules — governance, so on the control hosts only, and
