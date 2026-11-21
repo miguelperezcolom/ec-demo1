@@ -43,6 +43,7 @@ el valor por defecto de `application.yaml`, `http://<servicio>:<puerto>`.
 | `FRONT_OFFICE_AGENT` | `reception-agent` por defecto | El del front office (`X-Agent-Channel: front-office`) |
 | `KEYCLOAK_JWKS_URI`, `KEYCLOAK_ISSUER_URI` | `http://keycloak:8080/realms/ec-demo1/…/certs`, `https://auth.ec1.mateu.io/realms/ec-demo1` | Las claves, por la red del clúster, y el emisor tal como viene en el token |
 | `CONTENT_HUB_URL` | `http://content-hub:8135` | Las dos rutas de la intranet: `/_intranet` (hosts de datos: portal y editorial) y `/_content-hub` (hosts de control: configuración) |
+| `ECOMM_URL` | `http://ecomm.riu.svc.cluster.local` | La consola de la web pública (`/_ecomm`, hosts de control), de `frontend-public-reference`. Sin ese servicio, la sección aparece deshabilitada |
 | `AUTH_GRPC_ADDRESS` | `static://users:9191` | El `AuthService` del servicio de usuarios, al que pregunta los roles y scopes de cada usuario para las cabeceras `X-User-Roles` y `X-User-Scopes` (también vale `users:9191` o `dns:///users:9191`) |
 | `AUTH_GRPC_DEADLINE` | `1s` por defecto | Cuánto espera esa llamada; si vence, la petición sigue sin las dos cabeceras |
 | `AUTH_CACHE_TTL` | `5m` por defecto | Cuánto se cachea la respuesta por token: lo que tarda en notarse un cambio de roles |
